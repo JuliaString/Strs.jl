@@ -12,22 +12,22 @@ isascii(s::ASCIIStr) = true
 
 bytestring(s::ASCIIStr) = s
 
-function search(s::ASCIIStr, c::Char, i::Integer)
+function search(s::ASCIIStr, c::UInt32, i::Integer)
     len, dat = _lendata(s)
     i == len + 1 && return 0
     1 <= i <= len || throw(BoundsError(s, i))
-    c%UInt32 < 0x80 ? search(dat, c%UInt8, i) : 0
+    c < 0x80 ? search(dat, c%UInt8, i) : 0
 end
 
-rsearch(s::ASCIIStr, c::Char, i::Integer) =
-    c%UInt32 < 0x80 ? rsearch(_data(s), c%UInt8, i) : 0
+rsearch(s::ASCIIStr, c::UInt32, i::Integer) =
+    c < 0x80 ? rsearch(_data(s), c%UInt8, i) : 0
 
 function _string(c)
     n = 0
     for s in c
         n += _len(s)
     end
-    v = _sv(n)
+    v = _allocate(n)
     o = 1
     for s in c
         len, dat = _lendata(s)
@@ -98,21 +98,43 @@ write(io::IO, s::ASCIIStr) = write(io, _data(s))
 
 ## transcoding to ASCII ##
 
-ascii(x) = convert(ASCIIStr, x)
-convert(::Type{ASCIIStr}, s::ASCIIStr) = s
-convert(::Type{ASCIIStr}, s::UTF8Strings) = ascii(_data(s))
-convert(::Type{ASCIIStr}, a::Vector{UInt8}) = begin
-    isvalid(ASCIIStr, a) || throw(ArgumentError("invalid ASCII sequence"))
-    ASCIIStr(a)
+ascii(str) = convert(ASCIIStr, str)
+function convert(::Type{ASCIIStr}, str::AbstractString)
+    # Need to fix this to show where the non-ASCII character was found!
+    isascii(str) || throw(ArgumentError("invalid ASCII sequence"))
+    len = length(str)
+    buf = _allocate(len)
+    out = 0
+    @inbounds for ch in str
+        buf[out += 1] = ch%UInt8
+    end
+    ASCIIStr(buf)
+end
+convert(::Type{ASCIIStr}, str::ASCIIStr) = str
+function convert(::Type{ASCIIStr}, str::T) where {T<:Union{LatinStr,UTF8Str}}
+    isascii(str) || throw(ArgumentError("invalid ASCII sequence"))
+    ASCIIStr(_data(str))
+end
+function convert(::Type{ASCIIStr}, str::String)
+    len, flags = unsafe_checkstring(str, 1, endof(str))
+    flags == 0 && ASCIIStr(_data(str))
+    (flags & ~UTF_LONG) == 0 || throw(UnicodeError(UTF_ERR_INVALID_ASCII))
+    # Handle any long encodings, such as \xc0\x80 for \0
+    buf = _allocate(len)
+    out = 0
+    @inbounds for ch in str
+        buf[out += 1] = ch%UInt8
+    end
+    ASCIIStr(buf)
 end
 
-ascii(p::Ptr{UInt8}) =
-    ascii(p, p == C_NULL ? Csize_t(0) : ccall(:strlen, Csize_t, (Ptr{UInt8},), p))
-ascii(p::Ptr{UInt8}, len::Integer) = begin
-    p == C_NULL && throw(ArgumentError("cannot convert NULL to string"))
-    ary = ccall(:jl_pchar_to_array, Vector{UInt8}, (Ptr{UInt8}, Csize_t), p, len)
-    isvalid(ASCIIStr, ary) || throw(ArgumentError("invalid ASCII sequence"))
-    ASCIIStr(ary)
+ascii(pnt::Ptr{UInt8}) =
+    ascii(pnt, pnt == C_NULL ? Csize_t(0) : ccall(:strlen, Csize_t, (Ptr{UInt8},), pnt))
+ascii(pnt::Ptr{UInt8}, len::Integer) = begin
+    pnt == C_NULL && throw(ArgumentError("cannot convert NULL to string"))
+    vec = ccall(:jl_pchar_to_array, Vector{UInt8}, (Ptr{UInt8}, Csize_t), pnt, len)
+    isvalid(ASCIIStr, vec) || throw(ArgumentError("invalid ASCII sequence"))
+    ASCIIStr(vec)
 end
 
 # This should really use a keyword argument, and allow for the following possibilities:
@@ -133,14 +155,14 @@ function _convert_ascii(a, invlen, invdat)
     # so that changes later to the vector will affect the string!
     # that is only safe if the vector came from something else immutable
     cnt == 0 && return ASCIIStr(a)
-    v = _sv(len + cnt*invlen)
+    v = _allocate(len + cnt*invlen)
     out = 1
     @inbounds for i = 1:len
         if (ch = a[i]) <= 0x7f
             v[out] = ch
             out += 1
         else
-            copy!(v, out, invdat, 1, invlen)
+            unsafe_copy!(v, out, invdat, 1, invlen)
             out += invlen
         end
     end
@@ -155,5 +177,3 @@ convert(::Type{ASCIIStr}, a::Vector{UInt8}, invalids_as::ASCIIStr) =
 
 convert(::Type{ASCIIStr}, a::Vector{UInt8}, invalids_as::AbstractString) =
     convert(ASCIIStr, a, ascii(invalids_as))
-
-convert(::Type{ASCIIStr}, s::AbstractString) = ascii(bytestring(s))

@@ -36,7 +36,7 @@ length(it::CodeUnits) = _len(it.xs)
 start(it::CodeUnits) = start(it.xs)
 done(it::CodeUnits, state) = done(it.xs, state)
 
-Base.@propagate_inbounds next(it::CodeUnits, state) = (get_codeunit(_pnt(it.xs), state), state+1)
+@propagate_inbounds next(it::CodeUnits, state) = (get_codeunit(_pnt(it.xs), state), state+1)
 
 
 # CodePoints -- return the code points of a string
@@ -75,6 +75,5 @@ eltype(::Type{CodePoints{S}}) where {S} = eltype(S)
 length(it::CodePoints) = length(it.xs)
 start(it::CodePoints) = start(it.xs)
 done(it::CodePoints, state) = done(it.xs, state)
-Base.@propagate_inbounds next(it::CodePoints, state) = next(it.xs, state)
-Base.@propagate_inbounds next(it::CodePoints{S}, state) where {S<:DirectIndexStr} =
-    (get_codepoint(_pnt(it.xs), state), state+1)
+@propagate_inbounds next(it::CodePoints{T}, state) where {T<:Str} =
+    _next(CodePointStyle(T), codepoint_type(T), it.xs, state)

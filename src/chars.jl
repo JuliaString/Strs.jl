@@ -1,33 +1,70 @@
 #=
-CodePoint types
+CodePoint support
 
 Copyright 2017 Gandalf Software, Inc., Scott P. Jones
 Licensed under MIT License, see LICENSE.md
-In small part based on code for Char in Julia
+In part based on code for Char in Julia
 =#
-export CodePoint
+ncodeunits(str::T) where {T<:Str} = _len(str)
 
-abstract type CodePoint <: AbstractChar end
+"""Type of codeunits"""
+codeunit_type(::Type{String})    = UInt8
+codeunit_type(::Type{<:ByteStr}) = UInt8
+codeunit_type(::Type{<:WordStr}) = UInt16
+codeunit_type(::Type{<:QuadStr}) = UInt32
 
-primitive type _ASCII <: CodePoint  8 end
-primitive type _Latin <: CodePoint  8 end
-primitive type _UCS2  <: CodePoint 16 end
-primitive type _UTF32 <: CodePoint 32 end
+"""Size of codeunits"""
+codeunit_size(::Type{T}) where {T<:Union{String,Str}} = sizeof(codeunit_type(T))
 
-basetype(::Type{_ASCII}) = UInt8
-basetype(::Type{_Latin}) = UInt8
-basetype(::Type{_UCS2})  = UInt16
-basetype(::Type{_UTF32}) = UInt32
+basetype(::Type{ASCIIChr})  = UInt8
+basetype(::Type{LatinChr})  = UInt8
+basetype(::Type{LatinUChr}) = UInt8
+basetype(::Type{UCS2Chr})   = UInt16
+basetype(::Type{UTF32Chr})  = UInt32
+
+basetype(::Type{RawByte}) = UInt8
+basetype(::Type{RawWord}) = UInt16
+basetype(::Type{RawChar}) = UInt32
+
+basetype(::Type{T}) where {T<:CodeUnitTypes} = T
 
 tobase(v::T) where {T<:CodePoint} = reinterpret(basetype(T), v)
-
-const ByteChars = Union{_ASCII, _Latin}
-const WideChars = Union{_UCS2, _UTF32}
+tobase(v::T) where {T<:CodeUnitTypes} = v
 
 typemin(::Type{T}) where {T<:CodePoint} = reinterpret(T, typemin(basetype(T)))
-typemin(::Type{T}) where {T<:Union{_Latin,_UCS2}} = reinterpret(T, typemax(basetype(T)))
-typemax(::Type{_ASCII}) = reinterpret(_ASCII, 0x7f)
-typemax(::Type{_UTF32}) = reinterpret(_UTF32, 0x10ffff)
+typemax(::Type{T}) where {T<:CodePoint} = reinterpret(T, typemax(basetype(T)))
+
+typemax(::Type{T}) where {T<:Union{LatinChars,UCS2Chr}} = reinterpret(T, typemax(basetype(T)))
+typemax(::Type{ASCIIChr}) = reinterpret(ASCIIChr, 0x7f)
+typemax(::Type{UTF32Chr}) = reinterpret(UTF32Chr, 0x10ffff)
+
+codepoint_type(::Type{RawByteStr})       = RawByte
+codepoint_type(::Type{RawWordStr})       = RawWord
+codepoint_type(::Type{RawCharStr})       = RawChar
+codepoint_type(::Type{BinaryStr})        = UInt8
+
+codepoint_type(::Type{ASCIIStr})         = ASCIIChr
+codepoint_type(::Type{LatinStr})         = LatinChr
+codepoint_type(::Type{LatinUStr})        = LatinUChr
+codepoint_type(::Type{UCS2Str})          = UCS2Chr
+codepoint_type(::Type{<:UnicodeStrings}) = UTF32Chr
+
+codepoint_size(::Type{T}) where {T<:Union{String,Str}} = sizeof(codepoint_type(T))
+
+get_codeunit(dat, pos) = codeunit(dat, pos)
+get_codeunit(pnt::Ptr{<:CodeUnitTypes}, pos) = unsafe_load(pnt, pos)
+get_codeunit(dat::AbstractVector{<:CodeUnitTypes}, pos) = dat[pos]
+get_codeunit(str::Str, pos) = get_codeunit(_pnt(str), pos)
+
+codeunit(str::Str, pos::Integer) = get_codeunit(str, pos)
+
+set_codeunit!(pnt::Ptr{<:CodeUnitTypes}, pos, ch) = unsafe_store!(pnt, ch, pos)
+set_codeunit!(dat::AbstractVector{<:CodeUnitTypes}, pos, ch) = (dat[pos] = ch)
+
+isvalid(::Type{ASCIIStr}, str::Vector{ASCIIChr}) = true
+isvalid(::Type{LatinStrings}, str::Vector{T}) where {T<:Union{ASCIIChr,LatinChars}} = true
+isvalid(::Type{UCS2Str}, str::Vector{T}) where {T<:Union{ASCIIChr,LatinChars,UCS2Chr}} = true
+isvalid(::Type{S}, str::Vector{T}) where {S<:UnicodeStrings} where {T<:UnicodeChars} = true
 
 isvalid(::Type{T}, v::Signed) where {T<:ByteChars} = typemin(T) <= v <= typemax(T)
 isvalid(::Type{T}, v::Unsigned) where {T<:ByteChars} = v <= typemax(T)
@@ -37,11 +74,25 @@ isvalid(::Type{T}, v::Unsigned) where {T<:WideChars} =
 
 convert(::Type{T}, v::S) where {T<:Integer, S<:CodePoint} = convert(T, tobase(v))
 convert(::Type{T}, v::Signed) where {T<:CodePoint} =
-    isvalid(T, v) ? convert(T, Unsigned(v)) : error("Invalid CodePoint:$T $v")
+    (v >= 0 && isvalid(T, v%Unsigned)) ? convert(T, tobase(v)) : error("Invalid CodePoint:$T $v")
 convert(::Type{T}, v::Unsigned) where {T<:CodePoint} =
     isvalid(T, v) ? reinterpret(T, basetype(T)(v)) : error("Invalid CodePoint:$T $v")
 
-rem(x::S, ::Type{T}) where {S<:CodePoint, T<:Number} = rem(basetype(S)(x), T)
+rem(x::S, ::Type{T}) where {S<:CodePoint, T<:Number}    = rem(reinterpret(basetype(S), x), T)
+rem(x::S, ::Type{T}) where {S<:Number, T<:CodePoint}    = reinterpret(T, x%basetype(T))
+rem(x::S, ::Type{T}) where {S<:CodePoint, T<:CodePoint} = reinterpret(T, x%basetype(T))
+
+UInt64(cu::T) where {T<:CodePoint} = tobase(cu)%UInt64
+Int64(cu::T) where {T<:CodePoint} =  tobase(cu)%Int64
+
+RawByte(v)   = convert(RawByte, v)
+RawWord(v)   = convert(RawWord, v)
+RawChar(v)   = convert(RawChar, v)
+ASCIIChr(v)  = convert(ASCIIChr, v)
+LatinChr(v)  = convert(LatinChr, v)
+LatinUChr(v) = convert(LatinUChr, v)
+UCS2Chr(v)   = convert(UCS2Chr, v)
+UTF32Chr(v)  = convert(UTF32Chr, v)
 
 size(cp::CodePoint) = ()
 size(cp::CodePoint, dim) = convert(Int, dim) < 1 ? throw(BoundsError()) : 1
@@ -62,18 +113,22 @@ done(cp::CodePoint, state) = state
 isempty(cp::CodePoint) = false
 in(x::CodePoint, y::CodePoint) = x == y
 
-==(x::CodePoint, y::CodePoint) = tobase(x) == tobase(y)
-==(x::CodePoint, y::Char) = Char(tobase(x)) == y
+==(x::CodePointTypes, y::CodePoint) = tobase(x) == tobase(y)
+==(x::CodePoint, y::CodeUnitTypes) = tobase(x) == tobase(y)
+==(x::CodePoint, y::Char) = tobase(x) == y%UInt32
 ==(x::Char, y::CodePoint) = y == x
 
-isless(x::CodePoint, y::CodePoint) = tobase(x) < tobase(y)
-isless(x::CodePoint, y::Char) = Char(tobase(x)) < y
-isless(x::Char, y::CodePoint) = x < Char(tobase(y))
+isless(x::CodePointTypes, y::CodePoint) = tobase(x) < tobase(y)
+isless(x::CodePoint, y::CodeUnitTypes)  = tobase(x) < tobase(y)
+isless(x::CodePointTypes, y::Char) = tobase(x) < y%UInt32
+isless(x::Char, y::CodePointTypes) = x%UInt32 < tobase(y)
 
 hash(x::CodePoint, h::UInt) =
-    hash_uint64(((UInt32(x) + 0x0d4d64234) << 32) ⊻ UInt64(h))
+    hash_uint64(xor((UInt32(x) + 0x0d4d64234) << 32), UInt64(h))
 
--(x::CodePoint, y::CodePoint) = Int(x) - Int(y)
--(x::CodePoint, y::Integer) = CodePoint(Int32(x) - Int32(y))
-+(x::CodePoint, y::Integer) = CodePoint(Int32(x) + Int32(y))
+-(x::CodePointTypes, y::CodePoint) = Int(x) - Int(y)
+-(x::CodePoint, y::Integer) = CodePoint((Int32(x) - Int32(y))%UInt32)
++(x::CodePoint, y::Integer) = CodePoint((Int32(x) + Int32(y))%UInt32)
 +(x::Integer, y::CodePoint) = y + x
+
+Base.show(io, cp::CodePoint) = show(io, Char(tobase(cp)))
