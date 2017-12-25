@@ -23,7 +23,8 @@ struct UnknownValidity <: ValidatedStyle end
 ValidatedStyle(A::AbstractString) = ValidatedStyle(typeof(A))
 ValidatedStyle(::Type{T}) where {T<:AbstractString} = ValidatedStyle(T)
 
-for T in (BinaryStr, ASCIIStr, LatinStr, LatinUStr, UTF8Str, UCS2Str, UTF16Str, UTF32Str)
+for T in (BinaryStr, ASCIIStr, LatinStr, UTF8Str, UCS2Str, UTF16Str, UTF32Str,
+          _LatinStr, _UCS2Str, _UTF32Str)
     @eval(ValidatedStyle(::Type{$T}) = AlwaysValid())
 end
                                  
@@ -32,7 +33,7 @@ ValidatedStyle(::Type{T}) where {T<:AbstractChar} = UnknownValidity()
 ValidatedStyle(A::Char) = UnknownValidity() # Only until Char becomes <: AbstractChar
 ValidatedStyle(::Type{Char}) = UnknownValidity() # Only until Char becomes <: AbstractChar
 
-for T in (ASCIIChr, LatinChr, LatinUChr, UCS2Chr, UTF32Chr)
+for T in (ASCIIChr, LatinChr, _LatinChr, UCS2Chr, UTF32Chr)
     @eval(ValidatedStyle(::Type{$T}) = AlwaysValid())
 end
 
@@ -94,17 +95,18 @@ struct CharSetBinary        <: CharSetStyle end
 """Raw bytes, words, or character string, unknown encoding/character set"""
 struct CharSetUnknown       <: CharSetStyle end
                                  
-CharSetStyle(A::AbstractString) = CharSetStyle(typeof(A))
+CharSetStyle(A::AbstractString)  = CharSetStyle(typeof(A))
 CharSetStyle(::Type{<:AbstractString}) = CharSetUnicode()
-CharSetStyle(::Type{String})    = CharSetUnicodePlus() # Encodes invalid characters also
+CharSetStyle(::Type{String})     = CharSetUnicodePlus() # Encodes invalid characters also
 CharSetStyle(::Type{RawByteStr}) = CharSetUnknown()
 CharSetStyle(::Type{RawWordStr}) = CharSetUnknown()
 CharSetStyle(::Type{RawCharStr}) = CharSetUnknown() # Char or UInt32, since Char might be invalid
-CharSetStyle(::Type{BinaryStr}) = CharSetBinary()
-CharSetStyle(::Type{ASCIIStr})  = CharSetASCIICompat()
-CharSetStyle(::Type{LatinStr})  = CharSetISOCompat()
-CharSetStyle(::Type{LatinUStr}) = CharSetISOCompat()
-CharSetStyle(::Type{UCS2Str})   = CharSetBMPCompat()
+CharSetStyle(::Type{BinaryStr})  = CharSetBinary()
+CharSetStyle(::Type{ASCIIStr})   = CharSetASCIICompat()
+CharSetStyle(::Type{LatinStr})   = CharSetISOCompat()
+CharSetStyle(::Type{UCS2Str})    = CharSetBMPCompat()
+CharSetStyle(::Type{_LatinStr})  = CharSetISOCompat()
+CharSetStyle(::Type{_UCS2Str})   = CharSetBMPCompat()
 
 CharSetStyle(A::AbstractChar)   = CharSetStyle(typeof(A))
 CharSetStyle(::Type{<:AbstractChar}) = CharSetUnicode()
@@ -112,6 +114,7 @@ CharSetStyle(::Type{Char})      = CharSetUnicodePlus() # Encodes invalid charact
 CharSetStyle(::Type{UInt8})     = CharSetBinary()
 CharSetStyle(::Type{ASCIIChr})  = CharSetASCIICompat()
 CharSetStyle(::Type{LatinChr})  = CharSetISOCompat()
+CharSetStyle(::Type{_LatinChr}) = CharSetISOCompat()
 CharSetStyle(::Type{UCS2Chr})   = CharSetBMPCompat()
 CharSetStyle(::Type{UInt16})    = CharSetUnknown()
 CharSetStyle(::Type{UInt32})    = CharSetUnknown()

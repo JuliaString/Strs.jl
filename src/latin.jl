@@ -1,5 +1,5 @@
 #=
-LatinStr/LatinUStr type (ISO Latin1 8-bit subset of Unicode)
+LatinStr/_LatinStr type (ISO Latin1 8-bit subset of Unicode)
 
 Copyright 2017 Gandalf Software, Inc., Scott P. Jones, and other contributors to the Julia language
 Licensed under MIT License, see LICENSE.md
@@ -35,7 +35,7 @@ function string(c::UnicodeByteStrings...)
         unsafe_copyto!(buf, off, dat, 1, len)
         off += len
     end
-    LatinUStr(buf)
+    _LatinStr(buf)
 end
 
 function ucfirst(str::LatinStr)
@@ -52,7 +52,7 @@ function ucfirst(str::LatinStr)
 end
 
 # Special handling for characters that can't map into Latin1
-function ucfirst(str::LatinUStr)
+function ucfirst(str::_LatinStr)
     dat = _data(str)
     isempty(dat) && return str
     @inbounds ch = dat[1]
@@ -86,7 +86,7 @@ function _upper(::Type{LatinStr}, d, i, len)
     LatinStr(td)
 end
 
-function _upper(::Type{LatinUStr}, d, i, len)
+function _upper(::Type{_LatinStr}, d, i, len)
     # Need to scan the rest of the string to see if _widenupper needs to be called
     @inbounds begin
         for j = i:len
@@ -97,7 +97,7 @@ function _upper(::Type{LatinUStr}, d, i, len)
             islower(td[j]%LatinChr) && (td[j] -= 32)
         end
     end
-    LatinUStr(td)
+    _LatinStr(td)
 end
 
 function _widenupper(dat, i, len)
@@ -126,12 +126,12 @@ function uppercase(str::LatinStr)
     str
 end
 
-function uppercase(str::LatinUStr)
+function uppercase(str::_LatinStr)
     len, dat = _lendata(str)
     @inbounds for i = 1:len
         ch = dat[i]
         ((ch == 0xb5) | (ch == 0xff)) && return _widenupper(dat, i, len)
-        islower(ch%LatinChr) && return _upper(LatinUStr, dat, i, len)
+        islower(ch%LatinChr) && return _upper(_LatinStr, dat, i, len)
     end
     str
 end
@@ -182,6 +182,11 @@ function write(io::IO, str::LatinStrings)
     len + cnt
 end
 
+_write(io::IO, ch::UInt8) =
+    ch <= 0x7f ? write(io, ch) : write(io, 0xc0 | (ch >>> 6), 0x80 | (ch & 0x3f))
+
+write(io::IO, ch::LatinChars) = _write(io, tobase(ch))
+
 function convert(::Type{T}, ch::UInt32) where {T<:LatinStrings}
     ch <= 0xff || throw(UnicodeError(UTF_ERR_INVALID_LATIN1))
     buf = _allocate(1)
@@ -198,18 +203,46 @@ end
 
 ## transcoding to Latin1 ##
 
-latin1(x) = convert(LatinUStr, x)
+latin1(x) = convert(_LatinStr, x)
 convert(::Type{T}, s::T) where {T<:LatinStrings} = s
 convert(::Type{T}, s::S) where {T<:LatinStrings,S<:UnicodeByteStrings} = T(_data(s))
-convert(::Type{T}, s::String) where {T<:LatinStrings} = convert(T, (Vector{UInt8}(s)))
 convert(::Type{T}, s::UTF8Str) where {T<:LatinStrings} = convert(T, _data(s))
-convert(::Type{T}, a::Vector{UInt8}) where {T<:LatinStrings} = convert(T, a)
+
+function convert(::Type{LatinStr}, str::String)
+    # handle zero length string quickly
+    isempty(str) && return empty_latin
+    # get number of bytes to allocate
+    len, flags, num4byte, num3byte, num2byte, latinbyte =
+        unsafe_checkstring(str, 1, sizeof(str))
+    num4byte + num3byte + num2byte == 0 || throw(UnicodeError(UTF_ERR_INVALID_LATIN1))
+    LatinStr((flags & (UTF_LONG | UTF_SURROGATE)) == 0
+             ? _data(str)
+             : _transcode(UInt8, dat, len + latinbyte))
+end
+
+function convert(::Type{_LatinStr}, str::String)
+    # handle zero length string quickly
+    isempty(str) && return empty_ascii
+    # get number of bytes to allocate
+    len, flags, num4byte, num3byte, num2byte, latinbyte =
+        unsafe_checkstring(str, 1, sizeof(str))
+    num4byte + num3byte + num2byte == 0 || throw(UnicodeError(UTF_ERR_INVALID_LATIN1))
+    T = latinbyte == 0 ? ASCIIStr : _LatinStr
+    T((flags & (UTF_LONG | UTF_SURROGATE)) == 0
+      ? _data(str)
+      : _transcode(UInt8, _data(str), len + latinbyte))
+end
+
+_convert(T, a::Vector{UInt8}) = (len = sizeof(a); T(copyto!(_allocate(len), a, len)))
+
+convert(::Type{LatinStr}, a::Vector{UInt8}) = _convert(LatinStr, a)
+convert(::Type{_LatinStr}, a::Vector{UInt8}) = _convert(isascii(a) ? ASCIIStr : _LatinStr, a)
 
 latin1(p::Ptr{UInt8}) =
     latin1(p, p == C_NULL ? Csize_t(0) : ccall(:strlen, Csize_t, (Ptr{UInt8},), p))
 function latin1(p::Ptr{UInt8}, len::Integer)
     p == C_NULL && throw(ArgumentError("cannot convert NULL to string"))
-    LatinUStr(ccall(:jl_pchar_to_array, Vector{UInt8}, (Ptr{UInt8}, Csize_t), p, len))
+    _LatinStr(ccall(:jl_pchar_to_array, Vector{UInt8}, (Ptr{UInt8}, Csize_t), p, len))
 end
 
 function convert(::Type{T}, str::AbstractString) where {T<:LatinStrings}

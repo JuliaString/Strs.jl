@@ -57,7 +57,7 @@ end
 
 @inline _mask_bytes(n) = (1%UInt<<(n<<3))-0x1
 
-function isascii(str::T) where {T<:Union{UTF8Str, LatinStr, LatinUStr}}
+function isascii(str::T) where {T<:Union{UTF8Str, LatinStr, _LatinStr}}
     len, pnt = _lenpnt(str)
     qpnt = reinterpret(Ptr{UInt64}, pnt)
     while len >= 8

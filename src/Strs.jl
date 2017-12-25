@@ -16,9 +16,13 @@ Have types using both a UniStr type along with UTF-8 and/or UTF-16 versions, and
 knowing the real length of the string from the UniStr version, and always reading the string,
 except for times when a UTF-8 (or UTF-16) version is needed, using the O(1) version.
 
-Add types UCS2U and UTF32U (maybe change the names to _Latin, _UCS2, _UTF32, for the internal
-versions of those encodings, which are guarenteed to have at least one character of that type,
-which allows for O(1) == comparisons between strings of different types.
+Have extra parameter(s?), for types to hold things like: UnitRange{UInt16,UInt32,UInt64},
+for substrings, UInt64 for caching hash value, Str{T}, where T could be Raw*, UTF8, or UTF16,
+to cache either unchanged input data and/or validated UTF8/UTF16, and possibly even one of those with a substring type!
+
+Add types _UCS2 and _UTF32, for the internal versions of those encodings, which are guaranteed to
+have at least one character of that type, which allows for O(1) == comparisons between strings of
+different types. [done!]
 
 Having a mixed string type, for large strings where you may have occasional BMP or non-BMP characters, but the major portion is ASCII/Latin1.
    -> Keep a table of offsets and types, 2 bits per 64 character chunk for encoded type of chunk,
@@ -28,7 +32,7 @@ Having a mixed string type, for large strings where you may have occasional BMP 
 
 Have a function that given a Vector{UInt8}, BinaryStr, UTF8Str, String, etc.
 returns a vector of substring'ed UniStr, which only has to make copies if some of the lines
-are LatinU, UCS2U, UTF32U.
+are _Latin, _UCS2, _UTF32.
 (This could be done as well for input of Vector{UInt16}, RawWordStr)
 
 To save space, and for better performance, lines with different types are pooled together,
@@ -54,7 +58,7 @@ import Base: containsnul, convert, endof, getindex, length, map, pointer, collec
              reverse, rsearch, search, show, sizeof, string, unsafe_convert, unsafe_load, write,
              codeunit, start, next, done, nextind, prevind, reverseind, ind2chr, chr2ind,
              typemin, typemax, isvalid, rem, size, ndims, first, last, eltype, isempty, in,
-             hash, isless, ==, -, +
+             hash, isless, ==, -, +, *, cmp, promote_rule, one, repeat, filter, thisind
 
 if isdefined(Base, :ncodeunits)
     import Base: ncodeunits
@@ -87,6 +91,8 @@ include("utf8.jl")
 include("utf16.jl")
 include("utf32.jl")
 include("encode.jl")
-include("util.jl")
+include("stats.jl")    
+#include("util.jl")
+#include("io.jl")
 
 end # module Strs

@@ -30,6 +30,28 @@ end
     end
 end
 
+@inline _write_utf_2(io, ch) =
+    write(io, 0xc0 | (ch >>> 6)%UInt8, 0x80 | (ch & 0x3f)%UInt8)
+
+@inline _write_utf_3(io, ch) =
+    write(io, 0xe0 | ((ch >>> 12) & 0x3f)%UInt8,
+              0x80 | ((ch >>> 6) & 0x3f)%UInt8,
+              0x80 | (ch & 0x3f)%UInt8)
+
+@inline _write_utf_4(io, ch) =
+    write(io, 0xf0 | (ch >>> 18)%UInt8,
+              0x80 | ((ch >>> 12) & 0x3f)%UInt8,
+              0x80 | ((ch >>> 6) & 0x3f)%UInt8,
+              0x80 | (ch & 0x3f)%UInt8)
+
+@inline _write_ucs2(io, ch) =
+    ch <= 0x7f ? write(io, ch%UInt8) : ch <= 0x7ff ? _write_utf2(io, ch) : _write_utf3(io, ch)
+
+@inline _write_utf32(io, ch) = ch <= 0xffff ? _write_ucs2(io, ch) : _write_utf4(io, ch)
+
+@inline write(io::IO, ch::UCS2Chr) = _write_ucs2(io, tobase(ch))
+@inline write(io::IO, ch::UTF32Chr) = _write_utf32(io, tobase(ch))
+
 const _ascii_mask = 0xff80_ff80_ff80_ff80
 const _trail_mask = 0xdc00_dc00_dc00_dc00
 
@@ -233,6 +255,39 @@ function check_valid(ch, pos)
     ch
 end
 
+## outputting UCS2 strings ##
+
+function write(io::IO, str::T) where {T<:Union{UCS2Strings,UTF32Strings}}
+    len, pnt = _lenpnt(str)
+    cnt = 0
+    @inbounds for i = 1:len
+        cnt += write(io, get_codeunit(pnt, i))
+    end
+    cnt
+end
+
+## output UTF-16 string ##
+
+function write(io::IO, str::UTF16Str)
+    len, pnt = _lenpnt(str)
+    # Skip and write out ASCII sequences together
+    @inbounds for i = 1:len
+        ch = get_codeunit(pnt)
+        # Handle 0x80-0x7ff
+        if ch <= 0x7f
+            write(io, ch%UInt8)
+        elseif ch <= 0x7ff
+            _write_utf_2(io, ch)
+        elseif 0xd800 <= ch <= 0xd7ff
+            _write_utf_4(io, get_supplementary(ch, get_codeunit(pnt += 2)))
+        else
+            _write_utf_3(io, ch)
+        end
+        pnt += 2
+    end
+    len<<1
+end
+
 function convert(::Type{UTF16Str}, ch::UInt32)
     check_valid(ch, 0)
     if ch <= 0x0ffff
@@ -291,7 +346,7 @@ function convert(::Type{T}, str::UnicodeByteStrings) where {T<:WideStr}
     # Might want to have an invalids_as argument
     len, dat = _lendata(str)
     # handle zero length string quickly
-    len == 0 && return empty_ucs2
+    len == 0 && return empty_str(T)
     T(_cvtsize(UInt16, dat, len))
 end
 
@@ -317,6 +372,8 @@ function isvalid(::Type{UTF16Str}, data::AbstractArray{UInt16})
     pos > len || !is_surrogate_codeunit(data[pos])
 end
 
+# This can be sped up, to check 4 words at a time, only checking for unpaired
+# or out of order surrogates when one is found in the UInt64
 function isvalid(::Type{UTF16Str}, data::Ptr{UInt16}, len)
     i = 1
     @inbounds while i < len # check for unpaired surrogates

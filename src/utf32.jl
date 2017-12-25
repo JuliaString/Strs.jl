@@ -20,6 +20,7 @@ function isascii(str::UTF32Str)
     end
     len == 0 || unsafe_load(reinterpret(Ptr{UInt32}, pnt)) < 0x80
 end
+isascii(str::_UTF32Str) = false
 
 const _bmp_mask_32 = 0xffff0000_ffff0000
 
@@ -43,7 +44,7 @@ function _cnt_non_bmp(len, pnt::Ptr{UInt32})
     cnt
 end
 
-function search(str::UTF32Str, ch::UInt32, i::Integer)
+function search(str::UTF32Strings, ch::UInt32, i::Integer)
     len, pnt = _lenpnt(str)
     i == len + 1 && return 0
     1 <= i <= len && throw(BoundsError(s, i))
@@ -55,7 +56,7 @@ function search(str::UTF32Str, ch::UInt32, i::Integer)
     0
 end
 
-function rsearch(s::UTF32Str, ch::UInt32, i::Integer)
+function rsearch(s::UTF32Strings, ch::UInt32, i::Integer)
     len, pnt = _lenpnt(str)
     i == len + 1 && return 0
     1 <= i <= len && throw(BoundsError(s, i))
@@ -67,14 +68,14 @@ function rsearch(s::UTF32Str, ch::UInt32, i::Integer)
     0
 end
 
-function reverse(str::UTF32Str)
+function reverse(str::T) where {T<:UTF32Strings}
     len, pnt = _lenpnt(str)
     len == 0 && return str
     buf, out = _allocate(UInt32, len)
     @inbounds for i = 1:len
         set_codeunit!(out, i, get_codeunit(pnt, len - i + 1))
     end
-    UTF32Str(buf)
+    T(buf)
 end
 
 function convert(::Type{UTF32Str}, ch::UInt32)
@@ -84,6 +85,25 @@ function convert(::Type{UTF32Str}, ch::UInt32)
     UTF32Str(buf)
 end
 
+# Type _UTF32Str must have at least 1 character > 0xffff, so use other types as well
+function convert(::Type{_UTF32Str}, ch::UInt32)
+    check_valid(cu, 0)
+    if cu <= 0xff
+        buf1, pnt1 = _allocate(UInt8, 1)
+        set_codeunit!(pnt1, 1, cu)
+        cu <= 0x7f ? ASCIIStr(buf1) : _LatinStr(buf1)
+    elseif cu <= 0xffff
+        buf2, pnt2 = _allocate(UInt16, 1)
+        set_codeunit!(pnt2, 1, cu)
+        _UCS2Str(buf2)
+    else
+        buf4, pnt4 = _allocate(UInt32, 1)
+        set_codeunit!(pnt4, 1, cu)
+        _UTF32Str(buf4)
+    end
+end
+
+# Is this even necessary anymore?  should have a convert(::Type{T}, s::T) where {T<:Str} = s
 convert(::Type{UTF32Str}, s::UTF32Str) = s
 
 function convert(::Type{UTF32Str}, str::AbstractString)
@@ -93,6 +113,7 @@ function convert(::Type{UTF32Str}, str::AbstractString)
     @inbounds for ch in str ; set_codeunit!(pnt, out += 1, UInt32(ch)) ; end
     UTF32Str(buf)
 end
+convert(::Type{_UTF32Str}, str::AbstractString) = Str(str)
 
 # This needs to handle the fact that the String type can contain invalid data!
 function convert(::Type{UTF32Str}, str::String)
@@ -191,8 +212,8 @@ function convert(::Type{UTF32Str}, str::UTF8Str)
     UTF32Str(buf)
 end
 
-# This can rely on the fact that an ASCIIStr, LatinStr, LatinUStr, or UCS2Str is always valid
-function convert(::Type{UTF32Str}, str::Union{ASCIIStr, LatinStr, LatinUStr, UCS2Str})
+# This can rely on the fact that an ASCIIStr, LatinStr, UCS2Str is always valid
+function convert(::Type{UTF32Str}, str::Union{ASCIIStr, LatinStr, _LatinStr, UCS2Str, _UCS2Str})
     len, pnt = _lenpnt(str)
     len == 0 ? empty_utf32 : UTF32Str(_cvtsize(UInt32, pnt, len))
 end
@@ -249,12 +270,15 @@ end
 convert(::Type{T}, v::AbstractVector{<:UniRawChar}) where {T<:AbstractString} =
     convert(T, utf32(v))
 
-#=
-# Note: removed them because these are unsafe, they allow the supposed immutable string to be
-# aliased and modified
-convert(::Type{Vector{UInt32}}, str::UTF32Str) = _data(str)
-convert(::Type{Array{UInt32}},  str::UTF32Str) = _data(str)
-=#
+function convert(::Type{Vector{UInt32}}, str::UTF32Strings)
+    len, pnt = _lenpnt(str)
+    vec = Vector{UInt32}(uninitialized, len)
+    @inbounds unsafe_copyto!(pointer(vec), pnt, len)
+    vec
+end
+
+# Is this supposed to allow creating strings sliced up in different ways?
+#convert(::Type{Array{UInt32}},  str::UTF32Str) = _data(str)
 
 unsafe_convert(::Type{Ptr{T}}, s::UTF32Str) where {T<:UniRawChar} = convert(Ptr{T}, _pnt(s))
 
@@ -264,7 +288,7 @@ _convert(pnt::Ptr{T}, len, T1) where {T<:Union{UInt32,UInt32_U,UInt32_S,UInt32_U
      ? _convert(reinterpret(Ptr{T1}, pnt + 4), len - 1)
      : (ch == 0x0feff ? _convert(pnt + 4, len - 1) : _convert(pnt, len)))
 
-function convert(::Type{UTF32Str}, bytes::AbstractArray{UInt8})
+function convert(::Type{T}, bytes::AbstractArray{UInt8}) where {T<:UTF32Strings}
     isempty(bytes) && return _empty_utf32
     # Note: there are much better ways of detecting what the likely encoding is here,
     # this only deals with big or little-ending UTF-32
@@ -278,11 +302,12 @@ function convert(::Type{UTF32Str}, bytes::AbstractArray{UInt8})
     else
         buf, out = _convert(reinterpret(Ptr{UInt32_U}, pnt), len, swappedtype(UInt32_U))
     end
+    # Todo, this needs better handling
     isvalid(UTF32Str, out, len) || throw(UnicodeError(UTF_ERR_INVALID, 0, 0))
     UTF32Str(buf)
 end
 
-function isvalid(::Type{UTF32Str}, str::Vector{<:UniRawChar})
+function isvalid(::Type{UTF32Strings}, str::Vector{<:UniRawChar})
     @inbounds for c in str
         ch = UInt32(c)
         (!is_surrogate_codeunit(ch) && ch <= 0x10ffff) || return false
@@ -306,7 +331,7 @@ function utf32(p::Ptr{UInt32})
     UTF32Str(buf)
 end
 
-function map(fun, str::UTF32Str)
+function map(fun, str::UTF32Strings)
     len, dat = _lendata(str)
     buf, pnt = _allocate(UInt32, len)
     @inbounds for i = 1:len

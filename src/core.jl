@@ -61,7 +61,7 @@ end
 @propagate_inbounds endof(str::T) where {T<:Str} =
     (@_inline_meta(); _endof(CodePointStyle(T), str))
 @propagate_inbounds getindex(str::T, i::Int) where {T<:Str} =
-    (@_inline_meta(); _getindex(CodePointStyle(T), codeunit_type(T), str, i))
+    (@_inline_meta(); _getindex(CodePointStyle(T), codepoint_type(T), str, i))
 @propagate_inbounds next(str::T, i::Int) where {T<:Str} =
     (@_inline_meta(); _next(CodePointStyle(T), codepoint_type(T), str, i))
 @propagate_inbounds length(str::T) where {T<:Str} =
@@ -112,10 +112,10 @@ end
     vec = Vector{S}(uninitialized, len)
     cpt = codepoint_type(T)
     if S == cpt
-        @inbounds unsafe_copy!(reinterpret(Ptr{basetype(cpt)}, pointer(vec)), 1, pnt, 1, len)
+        @inbounds unsafe_copyto!(reinterpret(Ptr{basetype(cpt)}, pointer(vec)), pnt, len)
     else
         @inbounds for i = 1:len
-            vec[i] = T(get_codepoint(pnt, i))
+            vec[i] = T(get_codeunit(pnt, i))
         end
     end
     vec

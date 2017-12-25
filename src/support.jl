@@ -427,7 +427,7 @@ byte_string_classify(s::ByteStr) = byte_string_classify(_data(s))
 isvalid(::Type{ASCIIStr},  s::Vector{UInt8}) = byte_string_classify(s) == 1
 isvalid(::Type{UTF8Str},   s::Vector{UInt8}) = byte_string_classify(s) != 0
 isvalid(::Type{LatinStr},  s::Vector{UInt8}) = true
-isvalid(::Type{LatinUStr}, s::Vector{UInt8}) = true
+isvalid(::Type{_LatinStr}, s::Vector{UInt8}) = true
 
 bytestring() = empty_ascii
 
@@ -455,13 +455,14 @@ for sym in (:bin, :oct, :dec, :hex)
     @eval ($sym)(x::CodePoint)         = ($sym)(tobase(x), 1, false)
 end
 
-function show(io::IO, s::T) where {T <: Str{S}} where {S <: CodePoint}
+function show(io::IO, s::T) where {T <: Str{S}} where {S}
     print(io, '"')
     escape_string(io, s, "\"\$") #"# work around syntax highlighting problem
     print(io, '"')
 end
 
-Base.display(io::IO, s::T) where {T <: Str} = show(io, s)
+Base.display(io::IO, ch::CodePoint) = show(io, ch)
+Base.display(io::IO, str::T) where {T <: Str{S}} where {S} = show(io, str)
 
 function _cvtsize(::Type{T}, dat, len) where {T <: CodeUnitTypes}
     buf, pnt = _allocate(T, len)
@@ -476,3 +477,63 @@ function _copy!(out, pnt::Ptr{T}, len) where {T}
         pnt += sizeof(T)
     end
 end
+
+(*)(s1::Union{C1, S1}, ss::Union{C2, S2}...) where {C1<:CodePoint,C2<:CodePoint,S1<:Str,S2<:Str} =
+    string(s1, ss...)
+
+one(::Union{T,Type{T}}) where {T<:Str} = empty_(T)
+
+function _cmp(a::Str, b::AbstractString)
+    a === b && return 0
+    i = start(a)
+    j = start(b)
+    while !done(a, i)
+        done(b, j) && return 1
+        c, i = next(a, i)
+        d, j = next(b, j)
+        c ≠ d && return ifelse(c < d, -1, 1)
+    end
+    return ifelse(done(b, j), 0, -1)
+end
+_cmp(a::AbstractString, b::Str) = -_cmp(b, a)
+
+# Fast version, compare bytes directly
+# (note, have to be handle things a bit different when add substrings to the Str type)
+function _cmp(a::T, b::T) where {T<:Str}
+end
+
+==(a::AbstractString, b::Str) = cmp(a, b) == 0
+==(a::Str, b::AbstractString) = cmp(a, b) == 0
+==(a::Str, b::Str) = cmp(a, b) == 0
+
+# Handle cases where it's known by the types that can't be equal
+# (should do this better, it's a simple pattern)
+==(a::ASCIIStr, b::T) where {T<:Union{_LatinStr,_UCS2Str,_UTF32Str}} = false
+==(a::T, b::ASCIIStr) where {T<:Union{_LatinStr,_UCS2Str,_UTF32Str}} = false
+==(a::_LatinStr, b::T) where {T<:Union{ASCIIStr,_UCS2Str,_UTF32Str}} = false
+==(a::T, b::_LatinStr) where {T<:Union{ASCIIStr,_UCS2Str,_UTF32Str}} = false
+==(a::_UCS2Str, b::T) where {T<:Union{ASCIIStr,_LatinStr,_UTF32Str}} = false
+==(a::T, b::_UCS2Str) where {T<:Union{ASCIIStr,_LatinStr,_UTF32Str}} = false
+==(a::_UTF32Str, b::T) where {T<:Union{ASCIIStr,_LatinStr,UCS2Str}} = false
+==(a::T, b::_UTF32Str) where {T<:Union{ASCIIStr,_LatinStr,UCS2Str}} = false
+
+isless(a::AbstractString, b::Str) = cmp(a, b) < 0
+isless(a::Str, b::AbstractString) = cmp(a, b) < 0
+isless(a::Str, b::Str) = cmp(a, b) < 0
+
+thisind(s::Str, i::Integer) = thisind(s, Int(i))
+
+function filter(f, s::T) where {T<:Str}
+    out = IOBuffer(StringVector(endof(s)), true, true)
+    truncate(out, 0)
+    for c in s
+        f(c) && write(out, c)
+    end
+    T(take!(out))
+end
+
+first(s::Str, n::Integer) = s[1:min(end, nextind(s, 0, n))]
+last(s::Str, n::Integer) = s[max(1, prevind(s, ncodeunits(s)+1, n)):end]
+reverseind(s::Str, i::Integer) = thisind(s, ncodeunits(s)-i+1)
+repeat(s::Str, r::Integer) = repeat(String(s), r)
+(^)(s::Union{Str,CodePoint}, r::Integer) = repeat(s, r)

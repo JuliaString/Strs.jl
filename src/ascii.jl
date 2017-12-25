@@ -92,9 +92,11 @@ end
 
 reverse(s::ASCIIStr) = ASCIIStr(reverse(_data(s)))
 
-## outputing ASCII strings ##
+## outputting ASCII strings ##
 
 write(io::IO, s::ASCIIStr) = write(io, _data(s))
+
+write(io::IO, ch::ASCIIChr) = write(io, tobase(ch))
 
 ## transcoding to ASCII ##
 

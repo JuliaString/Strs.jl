@@ -276,17 +276,17 @@ const _punct_80 = 0x88c0088200000000
 @inline islatin(ch::ASCIIChr)   = true
 @inline islatin(ch::LatinChars) = true
 
-@inline islower(ch::CodePointTypes) = islatin(ch) ? islower(ch%LatinUChr) : (_cat(ch) == Uni.LL)
+@inline islower(ch::CodePointTypes) = islatin(ch) ? islower(ch%_LatinChr) : (_cat(ch) == Uni.LL)
 @inline islower(ch::ASCIIChr)   = _isasciilower(tobase(ch))
 @inline islower(ch::LatinChars) = _isasciilower(tobase(ch)) | _islatinlower(tobase(ch))
 
 @inline isupper(ch::CodePointTypes) =
-    islatin(ch) ? isupper(ch%LatinUChr) : _check_mask(ch, Uni.LU, Uni.LT)
+    islatin(ch) ? isupper(ch%_LatinChr) : _check_mask(ch, Uni.LU, Uni.LT)
 @inline isupper(ch::ASCIIChr)   = _isasciiupper(ch)
 @inline isupper(ch::LatinChars) = _isasciiupper(ch) | _islatinupper(ch)
 
 @inline isalpha(ch::CodePointTypes) =
-    islatin(ch) ? isalpha(ch%LatinUChr) : _check_mask(ch, _isalpha_mask)
+    islatin(ch) ? isalpha(ch%_LatinChr) : _check_mask(ch, _isalpha_mask)
 @inline isalpha(ch::ASCIIChr) = _isasciilower(ch) | _isasciiupper(ch)
 @inline isalpha(ch::LatinChars) = isalpha(ch%ASCIIChr) | _islatinlower(ch) | _islatinupper(ch)
 
@@ -296,7 +296,7 @@ const _punct_80 = 0x88c0088200000000
 @inline isnumeric(ch::LatinChars) = _isnumericlatin(tobase(ch))
 
 @inline isalnum(ch::CodePointTypes) =
-    islatin(ch) ? isalnum(ch%LatinUChr) : _check_mask(ch, _isnumeric_mask | _isalpha_mask)
+    islatin(ch) ? isalnum(ch%_LatinChr) : _check_mask(ch, _isnumeric_mask | _isalpha_mask)
 @inline isalnum(ch::ASCIIChr) = isdigit(ch) | isalpha(ch)
 @inline isalnum(ch::LatinChars) = isalpha(ch) | isnumeric(ch)
 
@@ -336,8 +336,8 @@ uppercase(ch::LatinChr) = ifelse(islower(ch), T(ch - 0x20), ch)
 
 # Special handling for case where this is just an optimization of the first 256 bytes of Unicode,
 # and not the 8-bit ISO 8859-1 character set
-function uppercase(ch::LatinUChr)
-    islower(ch%LatinChr) && return LatinUChr(ch + 0x20)
+function uppercase(ch::_LatinChr)
+    islower(ch%LatinChr) && return _LatinChr(ch + 0x20)
     ch == 0xb5 ? UCS2Chr(0x39c) : (ch == 0xff ? UCS2Chr(0x178) : ch)
 end
 titlecase(ch::LatinChars) = uppercase(ch)

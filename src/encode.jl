@@ -18,9 +18,9 @@ function _str(str::T) where {T<:Union{Vector{UInt8}, BinaryStr, RawByteStr, Stri
         end
         ASCIIStr(buf)
     elseif num4byte != 0
-        UTF32Str(_encode(UInt32, dat, len))
+        _UTF32Str(_encode(UInt32, dat, len))
     elseif num3byte + num2byte != 0
-        UCS2Str(_encode(UInt16, dat, len))
+        _UCS2Str(_encode(UInt16, dat, len))
     else
         buf = _allocate(len)
         out = pos = 0
@@ -30,7 +30,7 @@ function _str(str::T) where {T<:Union{Vector{UInt8}, BinaryStr, RawByteStr, Stri
                              ? ch8
                              : (((ch8 & 3) << 6) | (get_codeunit(dat, pos += 1) & 0x3f)))
         end
-        latin1byte == 0 ? ASCIIStr(buf) : LatinUStr(buf)
+        latin1byte == 0 ? ASCIIStr(buf) : _LatinStr(buf)
     end
 end
 
@@ -44,14 +44,16 @@ function unsafe_str(str::T) where {T <: Union{Vector{UInt8}, BinaryStr, RawByteS
     siz == 0 && return empty_ascii
     len, flags, num4byte, num3byte, num2byte, latin1byte, invalids =
         unsafe_checkstring(dat, 1, siz; accept_long_char=true, accept_invalids=true)
-    if flags & ~UTF_INVALID == 0
+    if invalids != 0
+        RawByteStr(dat)
+    elseif flags == 0
         # Don't allow this to be aliased to a mutable Vector{UInt8}
         T == Vector{UInt8} && (dat = unsafe_copyto!(_allocate(siz), 1, dat, 1, siz))
-        invalids == 0 ? ASCIIStr(dat) : RawByteStr(dat)
+        ASCIIStr(dat)
     elseif num4byte != 0
-        UTF32Str(_encode(UInt32, dat, len))
+        _UTF32Str(_encode(UInt32, dat, len))
     elseif num2byte + num3byte != 0
-        UCS2Str(_encode(UInt16, dat, len))
+        _UCS2Str(_encode(UInt16, dat, len))
     else
         buf = _allocate(len)
         out = pos = 0
@@ -59,7 +61,7 @@ function unsafe_str(str::T) where {T <: Union{Vector{UInt8}, BinaryStr, RawByteS
             ch8 = get_codeunit(dat, pos += 1)
             buf[out += 1] = ch8 <= 0x7f ? ch8 : (((ch8 & 3) << 6) | (dat[pos += 1] & 0x3f))
         end
-        latin1byte == 0 ? ASCIIStr(buf) : LatinUStr(buf)
+        latin1byte == 0 ? ASCIIStr(buf) : _LatinStr(buf)
     end
 end
 
@@ -88,9 +90,9 @@ function unsafe_str(str::T) where {T<:Union{AbstractString,AbstractVector{<:Unio
             T == UInt32 ? RawCharStr(buf) : RawWordStr(buf)
         end
     elseif num4byte != 0
-        UTF32Str(_encode(UInt32, dat, len))
+        _UTF32Str(_encode(UInt32, dat, len))
     elseif num2byte + num3byte != 0
-        UCS2Str(_encode(UInt16, dat, len))
+        _UCS2Str(_encode(UInt16, dat, len))
     else
         buf = _allocate(len)
         out = pos = 0
@@ -98,7 +100,7 @@ function unsafe_str(str::T) where {T<:Union{AbstractString,AbstractVector{<:Unio
             ch8 = dat[pos += 1]
             buf[out += 1] = ch8 <= 0x7f ? ch8 : (((ch8 & 3) << 6) | (dat[pos += 1] & 0x3f))
         end
-        latin1byte == 0 ? ASCIIStr(buf) : LatinUStr(buf)
+        latin1byte == 0 ? ASCIIStr(buf) : _LatinStr(buf)
     end
 end
 

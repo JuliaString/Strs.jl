@@ -18,7 +18,7 @@ codeunit_size(::Type{T}) where {T<:Union{String,Str}} = sizeof(codeunit_type(T))
 
 basetype(::Type{ASCIIChr})  = UInt8
 basetype(::Type{LatinChr})  = UInt8
-basetype(::Type{LatinUChr}) = UInt8
+basetype(::Type{_LatinChr}) = UInt8
 basetype(::Type{UCS2Chr})   = UInt16
 basetype(::Type{UTF32Chr})  = UInt32
 
@@ -45,8 +45,9 @@ codepoint_type(::Type{BinaryStr})        = UInt8
 
 codepoint_type(::Type{ASCIIStr})         = ASCIIChr
 codepoint_type(::Type{LatinStr})         = LatinChr
-codepoint_type(::Type{LatinUStr})        = LatinUChr
+codepoint_type(::Type{_LatinStr})        = _LatinChr
 codepoint_type(::Type{UCS2Str})          = UCS2Chr
+codepoint_type(::Type{_UCS2Str})         = UCS2Chr
 codepoint_type(::Type{<:UnicodeStrings}) = UTF32Chr
 
 codepoint_size(::Type{T}) where {T<:Union{String,Str}} = sizeof(codepoint_type(T))
@@ -58,8 +59,14 @@ get_codeunit(str::Str, pos) = get_codeunit(_pnt(str), pos)
 
 codeunit(str::Str, pos::Integer) = get_codeunit(str, pos)
 
+get_codeunit(dat) = get_codeunit(dat, 1)
+get_codeunit(pnt::Ptr{<:CodeUnitTypes}) = unsafe_load(pnt)
+
 set_codeunit!(pnt::Ptr{<:CodeUnitTypes}, pos, ch) = unsafe_store!(pnt, ch, pos)
 set_codeunit!(dat::AbstractVector{<:CodeUnitTypes}, pos, ch) = (dat[pos] = ch)
+
+set_codeunit!(pnt::Ptr{<:CodeUnitTypes}, ch) = unsafe_store!(pnt, ch)
+set_codeunit!(dat::AbstractVector{<:CodeUnitTypes}, ch) = (dat[1] = ch)
 
 isvalid(::Type{ASCIIStr}, str::Vector{ASCIIChr}) = true
 isvalid(::Type{LatinStrings}, str::Vector{T}) where {T<:Union{ASCIIChr,LatinChars}} = true
@@ -90,7 +97,7 @@ RawWord(v)   = convert(RawWord, v)
 RawChar(v)   = convert(RawChar, v)
 ASCIIChr(v)  = convert(ASCIIChr, v)
 LatinChr(v)  = convert(LatinChr, v)
-LatinUChr(v) = convert(LatinUChr, v)
+_LatinChr(v) = convert(_LatinChr, v)
 UCS2Chr(v)   = convert(UCS2Chr, v)
 UTF32Chr(v)  = convert(UTF32Chr, v)
 
