@@ -3,14 +3,64 @@ Basic types for characters and strings
 
 Copyright 2017 Gandalf Software, Inc., Scott P. Jones
 Licensed under MIT License, see LICENSE.md
+
+Portion of encodings from collaboration on StringEncodings.jl with @nalimilan
 =#
 export Str, UniStr, BinaryStr, ASCIIStr, LatinStr, UTF8Str, UCS2Str, UTF16Str, UTF32Str
 export RawByteStr, RawWordStr, RawCharStr
 export CodePoint, ASCIIChr, LatinChr, UCS2Chr, UTF32Chr, RawByte, RawWord, RawChar
+export CharSet, Encoding, @cs_str, @enc_str, charset, encoding
+export BIG_ENDIAN, LITTLE_ENDIAN
+
+const BIG_ENDIAN    = (ENDIAN_BOM == 0x01020304)
+const LITTLE_ENDIAN = !BIG_ENDIAN
+
+struct CharSet{CS}   end
+struct Encoding{Enc} end
+struct CSE{CS<:CharSet,Enc<:Encoding} end
+
+CharSet(s)  = CharSet{Symbol(s)}()
+Encoding(s) = Encoding{Symbol(s)}()
+CSE(cs, e)  = CSE{CharSet(cs), Encoding(e)}()
+
+macro cs_str(s)
+    :(CharSet{$(Expr(:quote, Symbol(s)))}())
+end
+macro enc_str(s)
+    :(Encoding{$(Expr(:quote, Symbol(s)))}())
+end
+macro cse(cs, e)
+    :(CSE{$(cs_str(cs)), $(enc_str(e))}())
+end
+
+const BinaryCharSet  = CharSet{:Binary}  # really, no character set at all, not text
+const ASCIICharSet   = CharSet{:ASCII}   # (7-bit subset of Unicode)
+const LatinCharSet   = CharSet{:Latin}   # ISO-8859-1 (8-bit subset of Unicode)
+const UCS2CharSet    = CharSet{:UCS2}    # BMP (16-bit subset of Unicode)
+const UnicodeCharSet = CharSet{:Unicode} # corresponding to codepoints (0-0xd7ff, 0xe000-0x10fff)
+const UniPlusCharSet = CharSet{:UniPlus} # valid Unicode, plus unknown characters (for String)
+const Text1CharSet   = CharSet{:Text1}   # Unknown character set, for RawByteChr/RawByteStr
+const Text2CharSet   = CharSet{:Text2}   # Unknown character set, for RawWordChr/RawWordStr
+const Text4CharSet   = CharSet{:Text4}   # Unknown character set, for RawCharChr/RawCharStr
+
+const _CSE{U} = Union{CharSet{U}, Encoding{U}, CSE{U}} where {U}
+
+convert(::Type{T}, ::S) where {T<:AbstractString,S<:_CSE{U}} where {U} = T(U)
+print(io::IO, ::S) where {T<:AbstractString,S<:_CSE{U}} where {U} = print(io, U)
+
+show(io::IO, ::CharSet{S}) where {S}  = print(io, string(S), " character set")
+show(io::IO, ::Encoding{S}) where {S} = print(io, string(S), " encoding")
+show(io::IO, ::CSE{S}) where {S}      = print(io, string(S), " charset encoding")
+
+# Note: this is still in transition to expressing character set, encoding
+# and optional cached info for hashes, UTF-8/UTF-16 encodings, subsets, etc.
+# via more type parameters
 
 struct Str{T} <: AbstractString
     data::Vector{UInt8}
+    (::Type{Str})(S::Symbol, v::Vector{UInt8}) = new{S}(v)
 end
+(::Type{Str{T}})(v::Vector{UInt8}) where {T} = Str(T, v)
 
 const CodeUnitTypes = Union{UInt8, UInt16, UInt32}
 
@@ -34,6 +84,15 @@ const ByteChars    = Union{ASCIIChr, LatinChr, _LatinChr, RawByte}
 const WideChars    = Union{UCS2Chr, UTF32Chr}
 const UnicodeChars = Union{ASCIIChr, LatinChars, UCS2Chr, UTF32Chr}
 
+const BuiltInTypes = (:RawByte, :RawWord, :RawChar,
+                      :Binary, :ASCII, :Latin, :UTF8, :UCS2, :UTF16, :UTF32,
+                      :_Latin, :_UCS2, :_UTF32)
+
+for nam in BuiltInTypes
+    sym = Symbol("$(nam)Str")
+    @eval const $sym = Str{$(Expr(:quote, Symbol(nam)))}
+end
+#=
 const RawByteStr = Str{:RawByte}
 const RawWordStr = Str{:RawWord}
 const RawCharStr = Str{:RawChar}
@@ -48,6 +107,7 @@ const UTF32Str  = Str{:UTF32}
 const _LatinStr = Str{:_Latin}
 const _UCS2Str  = Str{:_UCS2}
 const _UTF32Str = Str{:_UTF32}
+=#
 
 _allocate(len) = Base.StringVector(len)
 
@@ -100,8 +160,55 @@ const UnicodeByteStrings = Union{ASCIIStr, LatinStrings}
 const ByteStrings    = Union{RawByteStr, BinaryStr, UnicodeByteStrings}
 const UnicodeStrings = Union{String, UTF8Str, UTF16Str, UTF32Strings}
 
-const validtypes = (:Binary, :ASCII, :Latin, :UTF8, :UCS2, :UTF16, :UTF32,
-                    :_Latin, :_UCS2, :_UT32, :RawByte, :RawChar, :RawWord)
+const NoEncoding    = Encoding("")
+const UTF8Encoding  = Encoding(:UTF8)
+
+const Native2Byte   = Encoding(:2)
+const Native4Byte   = Encoding(:4)
+const NativeUTF16   = Encoding(:UTF16)
+
+const Swapped2Byte  = Encoding(:S2)
+const Swapped4Byte  = Encoding(:S4)
+const SwappedUTF16  = Encoding(:SUTF16)
+
+@static if BIG_ENDIAN
+    const LE2       = Native2Byte
+    const LE4       = Native4Byte
+    const BE2       = Swapped2Byte
+    const BE4       = Swapped4Byte
+    const UTF16LE   = NativeUTF16
+    const UTF16BE   = SwappedUTF16
+else
+    const LE2       = Swapped2Byte
+    const LE4       = Swapped4Byte
+    const BE2       = Native2Byte
+    const BE4       = Native4Byte
+    const UTF16LE   = SwappedUTF16
+    const UTF16BE   = NativeUTF16
+end
+
+## Get the character set / encoding used by a string type
+
+charset(::Type{BinaryStr})    = BinaryCharSet
+charset(::Type{ASCIIStr})     = ASCIICharSet
+charset(::Type{LatinStrings}) = LatinCharSet
+charset(::Type{UCS2Strings})  = UCS2CharSet
+charset(::Type{T}) where {T<:Union{UTF8Str, UTF16Str, UTF32Strings}} = UnicodeCharSet
+charset(::Type{RawByteStr})   = Text1CharSet
+charset(::Type{RawWordStr})   = Text2CharSet
+charset(::Type{RawCharStr})   = Text4CharSet
+charset(::Type{String})       = UniPlusCharSet
+
+## Get the (default) encoding used by a string type
+
+encoding(::Type{<:AbstractString}) = UTF8Encoding # Julia likes to think of this as the default
+encoding(::Type{<:Str})       = NoEncoding
+encoding(::Type{UCS2Strings}) = Native2Byte
+encoding(::Type{UTF8Str})     = UTF8Encoding
+encoding(::Type{UTF16Str})    = NativeUTF16Encoding
+encoding(::Type{UTF32Str})    = Native4Byte
+encoding(::Type{RawWordStr})  = Native2Byte
+encoding(::Type{RawCharStr})  = Native4Byte
 
 promote_rule(::Type{T}, ::Type{T}) where {T<:CodePoint} = T
 promote_rule(::Type{RawWord}, ::Type{RawByte}) = RawWord
@@ -112,7 +219,6 @@ promote_rule(::Type{T}, ::Type{ASCIIChr}) where {T} = T
 promote_rule(::Type{LatinChr}, ::Type{_LatinChr}) = LatinChr
 promote_rule(::Type{UTF32Chr}, ::Type{UCS2Chr}) = UTF32Chr
 promote_rule(::Type{T}, ::Type{S}) where {T<:WideChars,S<:ByteChars} = T
-
 
 promote_rule(::Type{T}, ::Type{T}) where {T<:Str} = T
 promote_rule(::Type{RawWordStr}, ::Type{RawByteStr}) = RawWordStr
@@ -126,11 +232,6 @@ promote_rule(::Type{T}, ::Type{UCS2Strings}) where {T<:Union{UTF32Strings}} = T
 promote_rule(::Type{LatinStr}, ::Type{_LatinStr}) = LatinStr
 promote_rule(::Type{UCS2Str}, ::Type{_UCS2Str})   = UCS2Str
 promote_rule(::Type{UTF32Str}, ::Type{_UTF32Str}) = UTF32Str
-
-function Str(T::Symbol, data::Vector{UInt8})
-    T in validtypes || error("Not valid type")
-    Str{T}(data)
-end
 
 sizeof(s::Str) = sizeof(s.data)
 
@@ -158,3 +259,21 @@ _len(s::QuadStr) = sizeof(s.data) >>> 2
 _lenpnt(s::Union{String, ByteStr, WordStr, UTF32Str, Vector{UInt8}}) = _len(s), _pnt(s)
 _lendata(s::Union{String, ByteStr, Vector{UInt8}}) = _len(s), _data(s)
 
+function Str(v::Vector{UInt8})
+    siz = sizeof(v)
+    buf = _allocate(siz)
+    @inbounds copyto!(buf, v, siz)
+    RawByteStr(buf)
+end
+function Str(v::Vector{UInt16})
+    len = length(v)
+    buf, pnt = _allocate(UInt16, v)
+    @inbounds unsafe_copyto!(pnt, v, len)
+    RawWordStr(buf)
+end
+function Str(v::Vector{UInt32})
+    len = length(v)
+    buf, pnt = _allocate(UInt32, len)
+    @inbounds unsafe_copyto!(buf, v, len)
+    RawCharStr(buf)
+end

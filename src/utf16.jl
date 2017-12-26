@@ -119,7 +119,7 @@ function _next(::CodeUnitMulti, T, str::UTF16Str, pos::Int)
     T(get_supplementary(ch, ct)), pos + 2
 end
 
-function search(str::UCS2Str, ch::UInt32, pos::Integer)
+function search(str::UCS2Strings, ch::UInt32, pos::Integer)
     len, pnt = _lenpnt(str)
     pos == len + 1 && return 0
     pos <= i <= len && throw(BoundsError(s, pos))
@@ -134,7 +134,7 @@ function search(str::UCS2Str, ch::UInt32, pos::Integer)
     0
 end
 
-function rsearch(s::UCS2Str, ch::UInt32, pos::Integer)
+function rsearch(s::UCS2Strings, ch::UInt32, pos::Integer)
     len, pnt = _lenpnt(str)
     pos == len + 1 && return 0
     1 <= pos <= len && throw(BoundsError(s, pos))
@@ -224,24 +224,24 @@ function reverse(str::UTF16Str)
     UTF16Str(buf)
 end
 
-function reverse(str::UCS2Str)
+function reverse(str::T) where {T<:UCS2Strings}
     len, pnt = _lenpnt(str)
     len == 0 && return str
     buf, out = _allocate(UInt16, len)
     @inbounds for i = 1:len
         set_codeunit!(out, i, get_codeunit(pnt, len - i + 1))
     end
-    UCS2Str(buf)
+    T(buf)
 end
 
-function isvalid(::Type{UCS2Str}, data::AbstractArray{UInt16})
+function isvalid(::Type{<:UCS2Strings}, data::AbstractArray{UInt16})
     @inbounds for ch in data
         is_surrogate_codeunit(ch) && return false
     end
     true
 end
 
-function isvalid(::Type{UCS2Str}, pnt::Ptr{UInt16}, len)
+function isvalid(::Type{<:UCS2Strings}, pnt::Ptr{UInt16}, len)
     pos = 0
     @inbounds while (pos += 1) < len # check for surrogates
         is_surrogate_codeunit(get_codeunit(pnt, pos)) && return false
@@ -257,11 +257,22 @@ end
 
 ## outputting UCS2 strings ##
 
-function write(io::IO, str::T) where {T<:Union{UCS2Strings,UTF32Strings}}
+function write(io::IO, str::UCS2Strings)
     len, pnt = _lenpnt(str)
     cnt = 0
     @inbounds for i = 1:len
-        cnt += write(io, get_codeunit(pnt, i))
+        cnt += _write_ucs2(io, get_codeunit(pnt))
+        pnt += 2
+    end
+    cnt
+end
+
+function write(io::IO, str::UTF32Strings)
+    len, pnt = _lenpnt(str)
+    cnt = 0
+    @inbounds for i = 1:len
+        cnt += write_utf32(io, get_codeunit(pnt))
+        pnt += 4
     end
     cnt
 end
@@ -311,15 +322,15 @@ function convert(::Type{UTF8Str}, ch::UInt32)
     UTF8Str(buf)
 end
 
-function convert(::Type{UCS2Str}, ch::UInt32)
+function convert(::Type{T}, ch::UInt32) where {T<:UCS2Strings}
     check_valid(ch, 0)
     ch <= 0x0ffff || throw(UnicodeError(UTF_ERR_INVALID_UCS2))
     buf, pnt = _allocate(UInt16, 1)
     set_codeunit!(pnt, 1, ch)
-    UCS2Str(buf)
+    T(buf)
 end
 
-function convert(::Type{UCS2Str}, str::AbstractString)
+function convert(::Type{T}, str::AbstractString) where {T<:UCS2Strings}
     # Might want to have an invalids_as argument
     len, flags, num4byte = unsafe_checkstring(str, 1, endof(str))
     num4byte == 0 || throw(UnicodeError(UTF_ERR_INVALID_UCS2))
@@ -327,19 +338,19 @@ function convert(::Type{UCS2Str}, str::AbstractString)
     @inbounds for (i, ch) in enumerate(str)
         set_codeunit!(pnt, i, ch%UInt16)
     end
-    UCS2Str(buf)
+    T(buf)
 end
 
-function convert(::Type{UCS2Str}, str::String)
+function convert(::Type{T}, str::String) where {T<:UCS2Strings}
     # Might want to have an invalids_as argument
     len, dat = _lendata(str)
     # handle zero length string quickly
-    len == 0 && return empty_ucs2
+    len == 0 && return empty_str(T)
     # Check that is correct UTF-8 encoding and get number of words needed
     len, flags, num4byte = unsafe_checkstring(dat, 1, len)
     num4byte == 0 || throw(UnicodeError(UTF_ERR_INVALID_UCS2))
     # Optimize case where no characters > 0x7f
-    UCS2Str(flags == 0 ? _cvtsize(UInt16, dat, len) : _encode(UInt16, dat, len))
+    T(flags == 0 ? _cvtsize(UInt16, dat, len) : _encode(UInt16, dat, len))
 end
 
 function convert(::Type{T}, str::UnicodeByteStrings) where {T<:WideStr}
@@ -350,14 +361,14 @@ function convert(::Type{T}, str::UnicodeByteStrings) where {T<:WideStr}
     T(_cvtsize(UInt16, dat, len))
 end
 
-function convert(::Type{UCS2Str}, str::UTF16Str)
+function convert(::Type{T}, str::UTF16Str) where {T<:UCS2Strings}
     # Might want to have an invalids_as argument
     len, dat = _lendata(str)
     # handle zero length string quickly
-    len == 0 && return empty_ucs2
+    len == 0 && return empty_str(T)
     # Check if conversion is valid
     _any_non_bmp(len, pnt) && throw(UnicodeError(UTF_ERR_INVALID_UCS2))
-    UCS2Str(_cvtsize(UInt16, dat, len))
+    T(_cvtsize(UInt16, dat, len))
 end
 
 function isvalid(::Type{UTF16Str}, data::AbstractArray{UInt16})
@@ -462,7 +473,7 @@ function _encode(::Type{UInt16}, dat::Union{Ptr{UInt8}, Vector{UInt8}}, len)
 end
 
 function convert(::Type{T}, str::S) where {T<:Union{String, UTF8Str},
-                                           S<:Union{UCS2Str, UTF16Str, UTF32Str}}
+                                           S<:Union{UCS2Strings, UTF16Str, UTF32Strings}}
     len, pnt = _lenpnt(str)
     # handle zero length string quickly
     len == 0 && return empty_str(T)
@@ -508,9 +519,9 @@ end
 # Should this be copying? Not safe to expose the internal array if it does not!
 convert(::Type{<:Union{Vector{UInt16},Array{UInt16}}}, str::WordStr) = _data(str)
 
-convert(::Type{UCS2Str},  str::UCS2Str)  = str
+convert(::Type{T},  str::S) where {T<:UCS2Strings, S<:UCS2Strings} = str
 convert(::Type{UTF16Str}, str::UTF16Str) = str
-convert(::Type{UTF16Str}, str::UCS2Str)  = UTF16Str(str.data)
+convert(::Type{UTF16Str}, str::UCS2Strings) = UTF16Str(str.data)
 
 unsafe_convert(::Type{Ptr{UInt16}}, s::UTF16Str) = _pnt(s)
 
@@ -594,7 +605,7 @@ function _maprest(fun, len, dat, buf, pnt, out, pos, uc)
     UTF16Str(totbuf)
 end
 
-function map(fun, str::T) where {T<:Union{UCS2Str,UTF16Str}}
+function map(fun, str::T) where {T<:Union{UCS2Str,_UCS2Str,UTF16Str}}
     len, dat = _lenpnt(str)
     buf, pnt = _allocate(UInt16, len)
     out = pos = 0
@@ -617,7 +628,13 @@ function map(fun, str::T) where {T<:Union{UCS2Str,UTF16Str}}
         set_codeunit!(pnt, out += 1, uc%UInt16)
     end
     out < len && resize!(buf, out<<1)
-    surrflag ? UTF16Str(buf) : UCS2Str(buf)
+    if !surrflag
+        T(buf)
+    elseif T == _UCS2Str
+        # Convert to 32-bit, to keep result in UniStr type union
+    else
+        UTF16Str(buf)
+    end
 end
 
 """

@@ -58,7 +58,8 @@ import Base: containsnul, convert, endof, getindex, length, map, pointer, collec
              reverse, rsearch, search, show, sizeof, string, unsafe_convert, unsafe_load, write,
              codeunit, start, next, done, nextind, prevind, reverseind, ind2chr, chr2ind,
              typemin, typemax, isvalid, rem, size, ndims, first, last, eltype, isempty, in,
-             hash, isless, ==, -, +, *, cmp, promote_rule, one, repeat, filter, thisind
+             hash, isless, ==, -, +, *, cmp, promote_rule, one, repeat, filter, thisind, print
+    
 
 if isdefined(Base, :ncodeunits)
     import Base: ncodeunits

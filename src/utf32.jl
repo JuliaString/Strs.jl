@@ -104,7 +104,7 @@ function convert(::Type{_UTF32Str}, ch::UInt32)
 end
 
 # Is this even necessary anymore?  should have a convert(::Type{T}, s::T) where {T<:Str} = s
-convert(::Type{UTF32Str}, s::UTF32Str) = s
+#convert(::Type{UTF32Str}, s::UTF32Str) = s
 
 function convert(::Type{UTF32Str}, str::AbstractString)
     len, flags = unsafe_checkstring(str, 1, endof(str))
@@ -116,14 +116,14 @@ end
 convert(::Type{_UTF32Str}, str::AbstractString) = Str(str)
 
 # This needs to handle the fact that the String type can contain invalid data!
-function convert(::Type{UTF32Str}, str::String)
+function convert(::Type{T}, str::String) where {T<:UTF32Strings}
     len, dat = _lendata(str)
     # handle zero length string quickly
-    len == 0 && return empty_utf32
+    len == 0 && return empty_str(T)
     # Validate UTF-8 encoding, and get number of words to create
     len, flags = unsafe_checkstring(dat, 1, len)
     # Optimize case where no characters > 0x7f, no invalid
-    UTF32Str(flags == 0 ? _cvtsize(UInt32, dat, len) : _encode(UInt32, dat, len))
+    T(flags == 0 ? _cvtsize(UInt32, dat, len) : _encode(UInt32, dat, len))
 end
 
 @inline function get_cp(dat, pos)
@@ -232,7 +232,7 @@ function convert(::Type{UTF32Str}, str::UTF16Str)
     UTF32Str(buf)
 end
 
-function convert(::Type{UTF16Str}, str::UTF32Str)
+function convert(::Type{UTF16Str}, str::T) where {T<:UTF32Strings}
     len, pnt = _lenpnt(str)
     # handle zero length string quickly
     len == 0 && return empty_ucs2
@@ -245,26 +245,26 @@ function convert(::Type{UTF16Str}, str::UTF32Str)
      : UTF16Str(_encode(UInt16, pnt, len + nonbmp)))
 end
 
-function convert(::Type{UCS2Str}, str::UTF32Str)
+function convert(::Type{S}, str::T) where {S<:UCS2Strings,T<:UTF32Strings}
     # Might want to have an invalids_as argument
     len, pnt = _lenpnt(str)
     # handle zero length string quickly
-    len == 0 && return empty_ucs2
+    len == 0 && return empty_str(S)
     # Check if conversion is valid
     _any_non_bmp(len, pnt) && throw(UnicodeError(UTF_ERR_INVALID_UCS2))
-    UCS2Str(_cvtsize(UInt16, pnt, len))
+    S(_cvtsize(UInt16, pnt, len))
 end
 
 const UniRawChar = Union{UInt32, Int32, Char}
 
-function convert(::Type{UTF32Str}, dat::AbstractVector{<:UniRawChar})
+function convert(::Type{T}, dat::AbstractVector{<:UniRawChar}) where {T<:UTF32Strings}
     len = length(dat)
     buf, pnt = _allocate(UInt32, len)
     @inbounds while out < len
         ch = get_codeunit(dat, pos += 1)%UInt32
         set_codeunit!(pnt, out += 1, check_valid(ch, pos))
     end
-    UTF32Str(buf)
+    T(buf)
 end
 
 convert(::Type{T}, v::AbstractVector{<:UniRawChar}) where {T<:AbstractString} =
@@ -303,8 +303,8 @@ function convert(::Type{T}, bytes::AbstractArray{UInt8}) where {T<:UTF32Strings}
         buf, out = _convert(reinterpret(Ptr{UInt32_U}, pnt), len, swappedtype(UInt32_U))
     end
     # Todo, this needs better handling
-    isvalid(UTF32Str, out, len) || throw(UnicodeError(UTF_ERR_INVALID, 0, 0))
-    UTF32Str(buf)
+    isvalid(T, out, len) || throw(UnicodeError(UTF_ERR_INVALID, 0, 0))
+    T(buf)
 end
 
 function isvalid(::Type{UTF32Strings}, str::Vector{<:UniRawChar})
@@ -331,13 +331,13 @@ function utf32(p::Ptr{UInt32})
     UTF32Str(buf)
 end
 
-function map(fun, str::UTF32Strings)
+function map(fun, str::T) where {T<:UTF32Strings}
     len, dat = _lendata(str)
     buf, pnt = _allocate(UInt32, len)
     @inbounds for i = 1:len
         set_codeunit!(pnt, i, check_valid(UInt32(fun(dat[i]))))
     end
-    UTF32Str(buf)
+    T(buf)
 end
 
 # Definitions for C compatible strings, that don't allow embedded
