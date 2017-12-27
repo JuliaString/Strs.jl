@@ -9,15 +9,17 @@ Portion of encodings from collaboration on StringEncodings.jl with @nalimilan
 export Str, UniStr, BinaryStr, ASCIIStr, LatinStr, UTF8Str, UCS2Str, UTF16Str, UTF32Str
 export RawByteStr, RawWordStr, RawCharStr
 export CodePoint, ASCIIChr, LatinChr, UCS2Chr, UTF32Chr, RawByte, RawWord, RawChar
-export CharSet, Encoding, @cs_str, @enc_str, charset, encoding
+export CharSet, Encoding, @cs_str, @enc_str, @cse, charset, encoding
 export BIG_ENDIAN, LITTLE_ENDIAN
 
 const BIG_ENDIAN    = (ENDIAN_BOM == 0x01020304)
 const LITTLE_ENDIAN = !BIG_ENDIAN
 
+const STR_DATA_VECTOR = true
+
 struct CharSet{CS}   end
 struct Encoding{Enc} end
-struct CSE{CS<:CharSet,Enc<:Encoding} end
+struct CSE{CS, ENC}  end
 
 CharSet(s)  = CharSet{Symbol(s)}()
 Encoding(s) = Encoding{Symbol(s)}()
@@ -30,7 +32,8 @@ macro enc_str(s)
     :(Encoding{$(Expr(:quote, Symbol(s)))}())
 end
 macro cse(cs, e)
-    :(CSE{$(cs_str(cs)), $(enc_str(e))}())
+    :(CSE{CharSet{$(Expr(:quote, Symbol(cs)))}(),
+          Encoding{$(Expr(:quote, Symbol(e)))}()})
 end
 
 const BinaryCharSet  = CharSet{:Binary}  # really, no character set at all, not text
@@ -43,24 +46,103 @@ const Text1CharSet   = CharSet{:Text1}   # Unknown character set, for RawByteChr
 const Text2CharSet   = CharSet{:Text2}   # Unknown character set, for RawWordChr/RawWordStr
 const Text4CharSet   = CharSet{:Text4}   # Unknown character set, for RawCharChr/RawCharStr
 
-const _CSE{U} = Union{CharSet{U}, Encoding{U}, CSE{U}} where {U}
+# These are to indicate string types that must have at least one character of the type,
+# for the internal types to make up the UniStr union type
 
-convert(::Type{T}, ::S) where {T<:AbstractString,S<:_CSE{U}} where {U} = T(U)
-print(io::IO, ::S) where {T<:AbstractString,S<:_CSE{U}} where {U} = print(io, U)
+const LatinSubSet    = CharSet{:LatinSubSet}   # Has at least 1 character > 0x7f, all <= 0xff
+const UCS2SubSet     = CharSet{:UCS2SubSet}    # Has at least 1 character > 0xff, all <= 0xffff
+const UnicodeSubSet  = CharSet{:UnicodeSubSet} # Has at least 1 non-BMP character in string
 
-show(io::IO, ::CharSet{S}) where {S}  = print(io, string(S), " character set")
-show(io::IO, ::Encoding{S}) where {S} = print(io, string(S), " encoding")
-show(io::IO, ::CSE{S}) where {S}      = print(io, string(S), " charset encoding")
+const NoEncoding    = Encoding(:None)
+const UTF8Encoding  = Encoding(:UTF8)
+
+const Native2Byte   = Encoding(:2)
+const Native4Byte   = Encoding(:4)
+const NativeUTF16   = Encoding(:UTF16)
+
+const Swapped2Byte  = Encoding(:S2)
+const Swapped4Byte  = Encoding(:S4)
+const SwappedUTF16  = Encoding(:SUTF16)
+
+@static if BIG_ENDIAN
+    const LE2       = Native2Byte
+    const LE4       = Native4Byte
+    const BE2       = Swapped2Byte
+    const BE4       = Swapped4Byte
+    const UTF16LE   = NativeUTF16
+    const UTF16BE   = SwappedUTF16
+else
+    const LE2       = Swapped2Byte
+    const LE4       = Swapped4Byte
+    const BE2       = Native2Byte
+    const BE4       = Native4Byte
+    const UTF16LE   = SwappedUTF16
+    const UTF16BE   = NativeUTF16
+end
+
+const _CSE{U} = Union{CharSet{U}, Encoding{U}} where {U}
+
+#=
+convert(::Type{T}, ::S) where {T<:AbstractString, S<:_CSE{U}} where {U} = T(U)
+(convert(::Type{T}, ::CSE{CS,E})
+    where {T<:AbstractString, CS<:CharSet{S}, E<:Encoding{U}}
+    where {S,U}) =
+        T(string("CSE{",S, ",", U,"}"))
+=#
+
+print(io::IO, ::S) where {S<:_CSE{U}} where {U} =
+    print(io, U)
+print(io::IO, ::CSE{CS,E}) where {CS<:CharSet{S},E<:Encoding{U}} where {S,U} =
+    print(io, "CSE{", string(S), ",", string(U), "}()")
+
+show(io::IO, ::Type{CharSet{S}}) where {S}   = print(io, "CharSet{", string(S), "}")
+show(io::IO, ::Type{Encoding{S}}) where {S}  = print(io, "Encoding{", string(S), "}")
+show(io::IO, ::Type{CSE{CS,E}}) where {CS<:CharSet{S},E<:Encoding{T}} where {S,T} =
+    print(io, "CSE{", string(S), ", ", string(T), "}")
+
+show(io::IO, ::Type{NoEncoding})   = print(io, "None")
+show(io::IO, ::Type{UTF8Encoding}) = print(io, "UTF-8")
+show(io::IO, ::Type{NativeUTF16})  = print(io, "UTF-16")
+show(io::IO, ::Type{Native2Byte})  = print(io, "16-bit")
+show(io::IO, ::Type{Native4Byte})  = print(io, "32-bit")
+show(io::IO, ::Type{SwappedUTF16}) = print(io, "UTF-16", BIG_ENDIAN ? "LE" : "BE")
+show(io::IO, ::Type{Swapped2Byte}) = print(io, "16-bit ", BIG_ENDIAN ? "LE" : "BE")
+show(io::IO, ::Type{Swapped4Byte}) = print(io, "32-bit ", BIG_ENDIAN ? "LE" : "BE")
 
 # Note: this is still in transition to expressing character set, encoding
 # and optional cached info for hashes, UTF-8/UTF-16 encodings, subsets, etc.
 # via more type parameters
 
-struct Str{T} <: AbstractString
-    data::Vector{UInt8}
-    (::Type{Str})(S::Symbol, v::Vector{UInt8}) = new{S}(v)
+const STR_DATA_TYPE = STR_DATA_VECTOR ? Vector{UInt8} : String
+
+struct Str{T,SubStr,Cache,Hash} <: AbstractString
+    data::STR_DATA_TYPE
+    substr::SubStr
+    cache::Cache
+    hash::Hash
+
+    ((::Type{Str})(::CSE_T, v::STR_DATA_TYPE)
+        where {CSE_T<:CSE} =
+      new{CSE_T,Nothing,Nothing,Nothing}(v,nothing,nothing,nothing))
+    ((::Type{Str})(::Type{CSE_T}, v::STR_DATA_TYPE)
+        where {CSE_T<:CSE} =
+      new{CSE_T,Nothing,Nothing,Nothing}(v,nothing,nothing,nothing))
 end
-(::Type{Str{T}})(v::Vector{UInt8}) where {T} = Str(T, v)
+(::Type{STR})(v::STR_DATA_TYPE) where {STR<:Str{T,S,C,H}} where {T<:CSE,S,C,H} = Str(T, v)
+
+#=
+(convert(::Type{T}, ::Type{STR})
+ where {T<:AbstractString, STR<:Str{CSEnc,S,C,H}}
+ where {CSEnc<:CSE{CS,E}, S, C, H}
+ where {CS<:CharSet{ST}, E<:Encoding{ENC}}
+ where {ST, ENC}) =
+     T(string("Str{CSE{CharSet{",ST,",},Encoding{",ENC,"}},",S,",",C,",",H,"}"))
+=#
+
+#show(io::IO, ::Type{Str{T,Nothing,Nothing,Nothing}}) where {T<:CSE} = string("Str{",T,"}")
+#show(io::IO, ::Type{Str{T,S,C,H}}) where {T<:CSE,S,C,H} = string("Str{",T,",",S,",",C,",",H,"}")
+
+# This needs to be redone, with character sets and the code unit as part of the type
 
 const CodeUnitTypes = Union{UInt8, UInt16, UInt32}
 
@@ -88,28 +170,60 @@ const BuiltInTypes = (:RawByte, :RawWord, :RawChar,
                       :Binary, :ASCII, :Latin, :UTF8, :UCS2, :UTF16, :UTF32,
                       :_Latin, :_UCS2, :_UTF32)
 
+const RawByteCSE = CSE{Text1CharSet,   NoEncoding}
+const RawWordCSE = CSE{Text2CharSet,   Native2Byte}
+const RawCharCSE = CSE{Text4CharSet,   Native4Byte}
+const BinaryCSE  = CSE{BinaryCharSet,  NoEncoding}
+const ASCIICSE   = CSE{ASCIICharSet,   NoEncoding}
+const LatinCSE   = CSE{LatinCharSet,   NoEncoding}
+const UCS2CSE    = CSE{UCS2CharSet,    Native2Byte}
+const UTF8CSE    = CSE{UnicodeCharSet, UTF8Encoding}
+const UTF16CSE   = CSE{UnicodeCharSet, NativeUTF16}
+const UTF32CSE   = CSE{UnicodeCharSet, Native4Byte}
+
+const _LatinCSE  = CSE{LatinSubSet,    NoEncoding}
+const _UCS2CSE   = CSE{UCS2SubSet,     Native2Byte}
+const _UTF32CSE  = CSE{UnicodeSubSet,  Native4Byte}
+
 for nam in BuiltInTypes
     sym = Symbol("$(nam)Str")
-    @eval const $sym = Str{$(Expr(:quote, Symbol(nam)))}
+    cse = Symbol("$(nam)CSE")
+    @eval const $sym = Str{$cse, Nothing, Nothing, Nothing}
 end
-#=
-const RawByteStr = Str{:RawByte}
-const RawWordStr = Str{:RawWord}
-const RawCharStr = Str{:RawChar}
-const BinaryStr = Str{:Binary}
-const ASCIIStr  = Str{:ASCII}
-const LatinStr  = Str{:Latin}
-const UTF8Str   = Str{:UTF8}
-const UCS2Str   = Str{:UCS2}
-const UTF16Str  = Str{:UTF16}
-const UTF32Str  = Str{:UTF32}
 
-const _LatinStr = Str{:_Latin}
-const _UCS2Str  = Str{:_UCS2}
-const _UTF32Str = Str{:_UTF32}
+"""Union type for fast dispatching"""
+const UniStr = Union{ASCIIStr, _LatinStr, _UCS2Str, _UTF32Str}
+
+#show(io::IO, str::Type{<:Str}) = print(io, convert(String, str))
+#=
+for nam in BuiltInTypes
+    sym = Symbol("$(nam)Str")
+    @eval show(io::IO, ::Type{$sym}) = print(io, $sym)
+end
 =#
 
-_allocate(len) = Base.StringVector(len)
+show(io::IO, ::Type{RawByteStr}) = print(io, :RawByteStr)
+show(io::IO, ::Type{RawWordStr}) = print(io, :RawWordStr)
+show(io::IO, ::Type{RawCharStr}) = print(io, :RawCharStr)
+show(io::IO, ::Type{BinaryStr})  = print(io, :BinaryStr)
+show(io::IO, ::Type{ASCIIStr})   = print(io, :ASCIIStr)
+show(io::IO, ::Type{LatinStr})   = print(io, :LatinStr)
+show(io::IO, ::Type{UTF8Str})    = print(io, :UTF8Str)
+show(io::IO, ::Type{UCS2Str})    = print(io, :UCS2Str)
+show(io::IO, ::Type{UTF16Str})   = print(io, :UTF16Str)
+show(io::IO, ::Type{UTF32Str})   = print(io, :UTF32Str)
+
+show(io::IO, ::Type{_LatinStr})  = print(io, :_LatinStr)
+show(io::IO, ::Type{_UCS2Str})   = print(io, :_UCS2Str)
+show(io::IO, ::Type{_UTF32Str})  = print(io, :_UTF32Str)
+
+show(io::IO, ::Type{UniStr})     = print(io, :UniStr)
+
+if STR_DATA_VECTOR
+    _allocate(len) = Vector{UInt8}(uninitialized, len)
+else
+    _allocate(len) = Base._string_n((len-1)%Csize_t)
+end
 
 function _allocate(::Type{T}, len) where {T <: CodeUnitTypes}
     buf = _allocate(len * sizeof(T))
@@ -117,18 +231,22 @@ function _allocate(::Type{T}, len) where {T <: CodeUnitTypes}
 end
 
 const empty_string = ""
-const empty_strvec = _allocate(0)
-const empty_binary = BinaryStr(empty_strvec)
-const empty_ascii  = ASCIIStr(empty_strvec)
-const empty_latin  = LatinStr(empty_strvec)
-const empty_utf8   = UTF8Str(empty_strvec)
-const empty_ucs2   = UCS2Str(empty_strvec)
-const empty_utf16  = UTF16Str(empty_strvec)
-const empty_utf32  = UTF32Str(empty_strvec)
+if STR_DATA_VECTOR
+    const empty_strvec = _allocate(0)
+else
+    const empty_strvec = empty_string
+end
+const empty_binary = Str(BinaryCSE, empty_strvec)
+const empty_ascii  = Str(ASCIICSE,  empty_strvec)
+const empty_latin  = Str(LatinCSE,  empty_strvec)
+const empty_utf8   = Str(UTF8CSE,   empty_strvec)
+const empty_ucs2   = Str(UCS2CSE,   empty_strvec)
+const empty_utf16  = Str(UTF16CSE,  empty_strvec)
+const empty_utf32  = Str(UTF32CSE,  empty_strvec)
 
-const empty__latin = _LatinStr(empty_strvec)
-const empty__ucs2  = _UCS2Str(empty_strvec)
-const empty__utf32 = _UTF32Str(empty_strvec)
+const empty__latin = Str(_LatinCSE, empty_strvec)
+const empty__ucs2  = Str(_UCS2CSE,  empty_strvec)
+const empty__utf32 = Str(_UTF32CSE, empty_strvec)
 
 empty_str(::Type{String})    = empty_string
 empty_str(::Type{BinaryStr}) = empty_binary
@@ -147,9 +265,6 @@ const WordStr = Union{RawWordStr, UCS2Str, _UCS2Str, UTF16Str} # 16-bit code uni
 const QuadStr = Union{RawCharStr, UTF32Str, _UTF32Str} # 32-bit code units
 const WideStr = Union{UCS2Str, UTF16Str, UTF32Str, _UCS2Str, _UTF32Str}
 
-"""Union type for fast dispatching"""
-const UniStr = Union{ASCIIStr, _LatinStr, _UCS2Str, _UTF32Str}
-
 # These should be done via traits
 const RawStrings     = Union{RawByteStr, RawWordStr, RawCharStr}
 const LatinStrings   = Union{LatinStr, _LatinStr}
@@ -160,55 +275,13 @@ const UnicodeByteStrings = Union{ASCIIStr, LatinStrings}
 const ByteStrings    = Union{RawByteStr, BinaryStr, UnicodeByteStrings}
 const UnicodeStrings = Union{String, UTF8Str, UTF16Str, UTF32Strings}
 
-const NoEncoding    = Encoding("")
-const UTF8Encoding  = Encoding(:UTF8)
-
-const Native2Byte   = Encoding(:2)
-const Native4Byte   = Encoding(:4)
-const NativeUTF16   = Encoding(:UTF16)
-
-const Swapped2Byte  = Encoding(:S2)
-const Swapped4Byte  = Encoding(:S4)
-const SwappedUTF16  = Encoding(:SUTF16)
-
-@static if BIG_ENDIAN
-    const LE2       = Native2Byte
-    const LE4       = Native4Byte
-    const BE2       = Swapped2Byte
-    const BE4       = Swapped4Byte
-    const UTF16LE   = NativeUTF16
-    const UTF16BE   = SwappedUTF16
-else
-    const LE2       = Swapped2Byte
-    const LE4       = Swapped4Byte
-    const BE2       = Native2Byte
-    const BE4       = Native4Byte
-    const UTF16LE   = SwappedUTF16
-    const UTF16BE   = NativeUTF16
-end
-
 ## Get the character set / encoding used by a string type
 
-charset(::Type{BinaryStr})    = BinaryCharSet
-charset(::Type{ASCIIStr})     = ASCIICharSet
-charset(::Type{LatinStrings}) = LatinCharSet
-charset(::Type{UCS2Strings})  = UCS2CharSet
-charset(::Type{T}) where {T<:Union{UTF8Str, UTF16Str, UTF32Strings}} = UnicodeCharSet
-charset(::Type{RawByteStr})   = Text1CharSet
-charset(::Type{RawWordStr})   = Text2CharSet
-charset(::Type{RawCharStr})   = Text4CharSet
-charset(::Type{String})       = UniPlusCharSet
-
-## Get the (default) encoding used by a string type
+charset(::Type{<:AbstractString})  = UniPlusCharSet
+charset(::Type{T}) where {T<:Str{C}} where {C<:CSE{CS,E}} where {CS,E} = CS
 
 encoding(::Type{<:AbstractString}) = UTF8Encoding # Julia likes to think of this as the default
-encoding(::Type{<:Str})       = NoEncoding
-encoding(::Type{UCS2Strings}) = Native2Byte
-encoding(::Type{UTF8Str})     = UTF8Encoding
-encoding(::Type{UTF16Str})    = NativeUTF16Encoding
-encoding(::Type{UTF32Str})    = Native4Byte
-encoding(::Type{RawWordStr})  = Native2Byte
-encoding(::Type{RawCharStr})  = Native4Byte
+encoding(::Type{T}) where {T<:Str{C}} where {C<:CSE{CS,E}} where {CS,E} = E
 
 promote_rule(::Type{T}, ::Type{T}) where {T<:CodePoint} = T
 promote_rule(::Type{RawWord}, ::Type{RawByte}) = RawWord
@@ -237,10 +310,18 @@ sizeof(s::Str) = sizeof(s.data)
 
 """Codeunits of string as a Vector"""
 _data(s::Vector{UInt8}) = s
-_data(s::String)  = Vector{UInt8}(s)
-_data(s::ByteStr) = s.data
-_data(s::WordStr) = reinterpret(Vector{UInt16}, s.data)
-_data(s::QuadStr) = reinterpret(Vector{UInt32}, s.data)
+if STR_DATA_VECTOR
+    _data(s::String)  = Vector{UInt8}(s)
+    _data(s::ByteStr) = s.data
+    _data(s::WordStr) = reinterpret(Vector{UInt16}, s.data)
+    _data(s::QuadStr) = reinterpret(Vector{UInt32}, s.data)
+else
+    _data(s::String)  = s
+    #_data(s::ByteStr) = s.data
+    _data(s::ByteStr) = Vector{UInt8}(s.data)
+    _data(s::WordStr) = reinterpret(Vector{UInt16}, Vector{UInt8}(s.data))
+    _data(s::QuadStr) = reinterpret(Vector{UInt32}, Vector{UInt8}(s.data))
+end
 
 """Pointer to codeunits of string"""
 _pnt(s::Vector{UInt8}) = pointer(s)
@@ -277,3 +358,4 @@ function Str(v::Vector{UInt32})
     @inbounds unsafe_copyto!(buf, v, len)
     RawCharStr(buf)
 end
+

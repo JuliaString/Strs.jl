@@ -120,8 +120,45 @@ CharSetStyle(::Type{UInt16})    = CharSetUnknown()
 CharSetStyle(::Type{UInt32})    = CharSetUnknown()
 
 _isvalid(::UnknownValidity, ::Type{T}, str::T) where {T<:Str} = _isvalid(T, _pnt(str), _len(str))
-_isvalid(::AlwaysValid, ::Type{T}, str) where{T} = true
+_isvalid(::AlwaysValid, ::Type{T}, str) where {T} = true
 isvalid(::Type{T}, str::T) where {T<:Str}       = _isvalid(ValidatedStyle(T), T, str)
 isvalid(::Type{T}, chr::T) where {T<:CodePoint} = _isvalid(ValidatedStyle(T), T, chr)
 isvalid(str::T) where {T<:Str} = isvalid(T, str)
 isvalid(ch::T) where {T<:CodePoint} = isvalid(T, ch)
+
+# must check range if CS1 is smaller than CS2
+_isvalid(::T, ::Type{ASCIICharSet}, ::Type{<:CharSet}, str) where {T<:ValidatedStyle} =
+    isascii(str)
+_isvalid(::T, ::Type{LatinCharSet}, ::Type{<:CharSet}, str) where {T<:ValidatedStyle} =
+    islatin(str)
+_isvalid(::T, ::Type{UCS2CharSet}, ::Type{<:CharSet}, str) where {T<:ValidatedStyle} =
+    isucs2(str)
+_isvalid(::T, ::Type{UnicodeCharSet}, ::Type{<:CharSet}, str) where {T<:ValidatedStyle} =
+    isunicode(str)
+
+# no checking needed for cases where T is a superset of S
+(_isvalid(::AlwaysValid, ::Type{T}, ::Type{S}, str)
+ where {T<:Union{LatinCharSet,LatinSubSet},
+        S<:Union{ASCIICharSet,LatinCharSet,LatinSubSet}}) =
+     true
+
+(_isvalid(::AlwaysValid, ::Type{T}, ::Type{S}, str)
+ where {T<:Union{UCS2CharSet,UCS2SubSet},
+        S<:Union{LatinCharSet,UCS2CharSet,LatinSubSet,UCS2SubSet}}) =
+     true
+
+(_isvalid(::AlwaysValid, ::Type{T}, ::S, str)
+ where {T<:Union{UnicodeCharSet,UnicodeSubSet},
+        S<:Union{LatinCharSet,UCS2CharSet,UnicodeCharSet,LatinSubSet,UCS2SubSet,UnicodeSubSet}}) =
+     true
+
+(isvalid(::Type{S}, str::T)
+ where {S<:Str{CSE1},T<:Str{CSE2}}
+ where {CSE1<:CSE{CS1},CSE2<:CSE{CS2}}
+ where {CS1, CS2}) =
+     _isvalid(ValidatedStyle(T), CS1, CS2, str)
+
+isvalid(::Type{S}, chr::T) where {S<:CodePoint, T<:CodePoint} =
+     _isvalid(ValidatedStyle(T), S, T, chr)
+
+                                          

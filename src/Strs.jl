@@ -55,10 +55,11 @@ end
 using Base: @_inline_meta, @propagate_inbounds
 
 import Base: containsnul, convert, endof, getindex, length, map, pointer, collect,
-             reverse, rsearch, search, show, sizeof, string, unsafe_convert, unsafe_load, write,
+             reverse, rsearch, search, sizeof, string, unsafe_convert, unsafe_load, write,
              codeunit, start, next, done, nextind, prevind, reverseind, ind2chr, chr2ind,
              typemin, typemax, isvalid, rem, size, ndims, first, last, eltype, isempty, in,
-             hash, isless, ==, -, +, *, cmp, promote_rule, one, repeat, filter, thisind, print
+             hash, isless, ==, -, +, *, cmp, promote_rule, one, repeat, filter, thisind,
+             print, show
     
 
 if isdefined(Base, :ncodeunits)
@@ -92,8 +93,9 @@ include("utf8.jl")
 include("utf16.jl")
 include("utf32.jl")
 include("encode.jl")
-include("stats.jl")    
+include("stats.jl")
 #include("util.jl")
+#include("substring.jl")
 #include("io.jl")
 
 end # module Strs

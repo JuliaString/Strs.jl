@@ -53,6 +53,7 @@ end
 @inline write(io::IO, ch::UTF32Chr) = _write_utf32(io, tobase(ch))
 
 const _ascii_mask = 0xff80_ff80_ff80_ff80
+const _latin_mask = 0xff00_ff00_ff00_ff00
 const _trail_mask = 0xdc00_dc00_dc00_dc00
 
 @inline _mask_surr(v)  = (v | v<<1 | v<<2 | v<<3 | v<<4 | v<<5) & 0x8000_8000_8000_8000
@@ -70,28 +71,50 @@ function _length(::CodeUnitMulti, str::UTF16Str)
     len == 0 ? cnt : (cnt - count_ones(_get_masked(qpnt) & _mask_bytes(len)))
 end
 
-function isascii(str::WordStr)
+function isascii(str::T) where {T<:Union{RawWordStr, UCS2Str, UTF16Str}}
     len, pnt = _lenpnt(str)
     qpnt = reinterpret(Ptr{UInt64}, pnt)
     while len >= 8
-        unsafe_load(qpnt) & _ascii_mask == 0 || return false
+        println("isascii(::", T, ") ", len, ", ", qpnt, ", ",
+                pointer(str),", ",pointer(str.data),", ",typeof(qpnt))
+        return false
+        (unsafe_load(qpnt) & _ascii_mask) == 0 || return false
         qpnt += 8
         len -= 8
     end
-    len == 0 || ((unsafe_load(qpnt) & _mask_bytes(len)) & _ascii_mask == 0)
+    len == 0 || ((unsafe_load(qpnt) & _mask_bytes(len)) & _ascii_mask) == 0
+end
+
+function islatin(str::WordStr) where {T<:Union{RawWordStr, UCS2Str, UTF16Str}}
+    len, pnt = _lenpnt(str)
+    qpnt = reinterpret(Ptr{UInt64}, pnt)
+    while len >= 8
+        println("islatin(::", T, ") ", len, ", ", qpnt, ", ",
+                pointer(str),", ",pointer(str.data),", ",typeof(qpnt))
+        return false
+        (unsafe_load(qpnt) & _latin_mask) == 0 || return false
+        qpnt += 8
+        len -= 8
+    end
+    len == 0 || ((unsafe_load(qpnt) & _mask_bytes(len)) & _ascii_mask) == 0
 end
 
 # Check for any surrogate characters
-function _any_non_bmp(len, pnt::Ptr{UInt16})
+function _all_bmp(len, pnt::Ptr{UInt16})
     len == 0 && return false
     qpnt = reinterpret(Ptr{UInt64}, pnt)
     while len >= 8
-        unsafe_load(qpnt) & _bmp_mask_16 != 0 && return false
+        _get_masked(qpnt) == 0 || return false
         qpnt += 8
         len -= 8
     end
-    len != 0 && (unsafe_load(qpnt) & _mask_bytes(len) & _bmp_mask_16) != 0
+    len == 0 || _get_masked(qpnt) == 0
 end
+
+isascii(str::_UCS2Str) = false
+islatin(str::_UCS2Str) = false
+isbmp(str::UCS2Strings) = true
+isbmp(str::UTF16Str)    = _all_bmp(_lenpnt(str)...)
 
 # Speed this up accessing 64 bits at a time
 function _cnt_non_bmp(len, pnt::Ptr{UInt16})

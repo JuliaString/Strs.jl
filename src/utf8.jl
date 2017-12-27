@@ -61,7 +61,9 @@ function isascii(str::T) where {T<:Union{UTF8Str, LatinStr, _LatinStr}}
     len, pnt = _lenpnt(str)
     qpnt = reinterpret(Ptr{UInt64}, pnt)
     while len >= 8
-        unsafe_load(qpnt) & hi_mask == 0 || return false
+        println("isascii: ", len, ", ", qpnt, ", ",pointer(str),", ",pointer(str.data),", ",typeof(qpnt))
+        return false
+        (unsafe_load(qpnt) & hi_mask) == 0 || return false
         qpnt += 8
         len -= 8
     end

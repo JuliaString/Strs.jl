@@ -1,5 +1,7 @@
-# This file includes code that was formerly a part of Julia.
-# License is MIT: http://julialang.org/license
+# Based partly on code in LegacyStrings that used to be part of Julia
+# Licensed under MIT License, see LICENSE.md
+
+# (Mostly written by Scott P. Jones in series of PRs contributed to the Julia project in 2015)
 
 ## Error messages for Unicode / UTF support
 
@@ -455,15 +457,6 @@ for sym in (:bin, :oct, :dec, :hex)
     @eval ($sym)(x::CodePoint)         = ($sym)(tobase(x), 1, false)
 end
 
-function show(io::IO, s::T) where {T <: Str{S}} where {S}
-    print(io, '"')
-    escape_string(io, s, "\"\$") #"# work around syntax highlighting problem
-    print(io, '"')
-end
-
-Base.display(io::IO, ch::CodePoint) = show(io, ch)
-Base.display(io::IO, str::T) where {T <: Str{S}} where {S} = show(io, str)
-
 function _cvtsize(::Type{T}, dat, len) where {T <: CodeUnitTypes}
     buf, pnt = _allocate(T, len)
     @inbounds for i = 1:len ; set_codeunit!(pnt, i, get_codeunit(dat, i)) ; end
@@ -499,41 +492,45 @@ _cmp(a::AbstractString, b::Str) = -_cmp(b, a)
 
 # Fast version, compare bytes directly
 # (note, have to be handle things a bit different when add substrings to the Str type)
-function _cmp(a::T, b::T) where {T<:Str}
-end
+#function _cmp(a::T, b::T) where {T<:Str}
+#end
 
 ==(a::AbstractString, b::Str) = cmp(a, b) == 0
 ==(a::Str, b::AbstractString) = cmp(a, b) == 0
-==(a::Str, b::Str) = cmp(a, b) == 0
+==(a::Str, b::Str)            = cmp(a, b) == 0
 
 # Handle cases where it's known by the types that can't be equal
 # (should do this better, it's a simple pattern)
-==(a::ASCIIStr, b::T) where {T<:Union{_LatinStr,_UCS2Str,_UTF32Str}} = false
-==(a::T, b::ASCIIStr) where {T<:Union{_LatinStr,_UCS2Str,_UTF32Str}} = false
-==(a::_LatinStr, b::T) where {T<:Union{ASCIIStr,_UCS2Str,_UTF32Str}} = false
-==(a::T, b::_LatinStr) where {T<:Union{ASCIIStr,_UCS2Str,_UTF32Str}} = false
-==(a::_UCS2Str, b::T) where {T<:Union{ASCIIStr,_LatinStr,_UTF32Str}} = false
-==(a::T, b::_UCS2Str) where {T<:Union{ASCIIStr,_LatinStr,_UTF32Str}} = false
-==(a::_UTF32Str, b::T) where {T<:Union{ASCIIStr,_LatinStr,UCS2Str}} = false
-==(a::T, b::_UTF32Str) where {T<:Union{ASCIIStr,_LatinStr,UCS2Str}} = false
+==(a::ASCIIStr, b::T)  where {T<:Union{_LatinStr,_UCS2Str,_UTF32Str}} = false
+==(a::T, b::ASCIIStr)  where {T<:Union{_LatinStr,_UCS2Str,_UTF32Str}} = false
+==(a::_LatinStr, b::T) where {T<:Union{ASCIIStr,_UCS2Str,_UTF32Str}}  = false
+==(a::T, b::_LatinStr) where {T<:Union{ASCIIStr,_UCS2Str,_UTF32Str}}  = false
+==(a::_UCS2Str, b::T)  where {T<:Union{ASCIIStr,_LatinStr,_UTF32Str}} = false
+==(a::T, b::_UCS2Str)  where {T<:Union{ASCIIStr,_LatinStr,_UTF32Str}} = false
+==(a::_UTF32Str, b::T) where {T<:Union{ASCIIStr,_LatinStr,UCS2Str}}   = false
+==(a::T, b::_UTF32Str) where {T<:Union{ASCIIStr,_LatinStr,UCS2Str}}   = false
 
 isless(a::AbstractString, b::Str) = cmp(a, b) < 0
 isless(a::Str, b::AbstractString) = cmp(a, b) < 0
-isless(a::Str, b::Str) = cmp(a, b) < 0
+isless(a::Str, b::Str)            = cmp(a, b) < 0
 
 thisind(s::Str, i::Integer) = thisind(s, Int(i))
 
 function filter(f, s::T) where {T<:Str}
     out = IOBuffer(StringVector(endof(s)), true, true)
     truncate(out, 0)
-    for c in s
+    for c in codepoints(s)
         f(c) && write(out, c)
     end
     T(take!(out))
 end
 
+# These should be optimized based on the traits, and return internal substrings, once
+# I've implemented those
+
 first(s::Str, n::Integer) = s[1:min(end, nextind(s, 0, n))]
 last(s::Str, n::Integer) = s[max(1, prevind(s, ncodeunits(s)+1, n)):end]
-reverseind(s::Str, i::Integer) = thisind(s, ncodeunits(s)-i+1)
+
+#reverseind(s::Str, i::Integer) = thisind(s, ncodeunits(s)-i+1)
 repeat(s::Str, r::Integer) = repeat(String(s), r)
 (^)(s::Union{Str,CodePoint}, r::Integer) = repeat(s, r)

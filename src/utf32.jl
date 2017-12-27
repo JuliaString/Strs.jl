@@ -9,6 +9,8 @@ Based in part on code for UTF32String that used to be in Julia
 # UTF-32 basic functions
 
 const _ascii_mask_32 = 0xffffff80_ffffff80
+const _latin_mask_32 = 0xffffff00_ffffff00
+const _bmp_mask_32   = 0xffff0000_ffff0000
 
 function isascii(str::UTF32Str)
     len, pnt = _lenpnt(str)
@@ -20,20 +22,35 @@ function isascii(str::UTF32Str)
     end
     len == 0 || unsafe_load(reinterpret(Ptr{UInt32}, pnt)) < 0x80
 end
-isascii(str::_UTF32Str) = false
 
-const _bmp_mask_32 = 0xffff0000_ffff0000
-
-function _any_non_bmp(len, pnt::Ptr{UInt32})
-    len == 0 && return false
+function islatin(str::UTF32Str)
+    len, pnt = _lenpnt(str)
     qpnt = reinterpret(Ptr{UInt64}, pnt)
     while len >= 8
-        unsafe_load(qpnt) & _bmp_mask_32 != 0 && return false
+        unsafe_load(qpnt) & _latin_mask_32 == 0 || return false
         qpnt += 8
         len -= 8
     end
-    len != 0 && (unsafe_load(qpnt) & _mask_bytes(len) & _bmp_mask_32) != 0
+    len == 0 || unsafe_load(reinterpret(Ptr{UInt32}, pnt)) < 0x80
 end
+
+function _all_bmp(len, pnt::Ptr{UInt32})
+    len == 0 && return false
+    qpnt = reinterpret(Ptr{UInt64}, pnt)
+    while len >= 8
+        unsafe_load(qpnt) & _bmp_mask_32 == 0 || return false
+        qpnt += 8
+        len -= 8
+    end
+    len == 0 || (unsafe_load(qpnt) & _mask_bytes(len) & _bmp_mask_32) == 0
+end
+
+isascii(str::_UTF32Str) = false
+islatin(str::_UTF32Str) = false
+isucs2(str::_UTF32Str)  = false
+isucs2(str::UTF32Str)   = _all_bmp(_lenpnt(str)...)
+isunicode(str::UTF32Strings) = true
+
 
 # Speed this up by accessing 64 bits or more at a time
 function _cnt_non_bmp(len, pnt::Ptr{UInt32})
@@ -307,7 +324,7 @@ function convert(::Type{T}, bytes::AbstractArray{UInt8}) where {T<:UTF32Strings}
     T(buf)
 end
 
-function isvalid(::Type{UTF32Strings}, str::Vector{<:UniRawChar})
+function isvalid(::Type{<:UTF32Strings}, str::Vector{<:UniRawChar})
     @inbounds for c in str
         ch = UInt32(c)
         (!is_surrogate_codeunit(ch) && ch <= 0x10ffff) || return false
@@ -343,8 +360,10 @@ end
 # Definitions for C compatible strings, that don't allow embedded
 # '\0', and which are terminated by a '\0'
 containsnul(s::ByteStr) = containsnul(unsafe_convert(Ptr{Cchar}, s), sizeof(s))
+
 function containsnul(s::WideStr)
-    findfirst(_data(s), 0) != length(_data(s))
+    # SPJ!!! Fix this!
+    findfirst(_data(s), 0) != (sizeof(s)>>1)
 end
 
 #=

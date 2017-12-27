@@ -38,16 +38,16 @@ typemax(::Type{T}) where {T<:Union{LatinChars,UCS2Chr}} = reinterpret(T, typemax
 typemax(::Type{ASCIIChr}) = reinterpret(ASCIIChr, 0x7f)
 typemax(::Type{UTF32Chr}) = reinterpret(UTF32Chr, 0x10ffff)
 
-codepoint_type(::Type{RawByteStr})       = RawByte
-codepoint_type(::Type{RawWordStr})       = RawWord
-codepoint_type(::Type{RawCharStr})       = RawChar
-codepoint_type(::Type{BinaryStr})        = UInt8
+codepoint_type(::Type{<:RawByteStr})     = RawByte
+codepoint_type(::Type{<:RawWordStr})     = RawWord
+codepoint_type(::Type{<:RawCharStr})     = RawChar
+codepoint_type(::Type{<:BinaryStr})      = UInt8
 
-codepoint_type(::Type{ASCIIStr})         = ASCIIChr
-codepoint_type(::Type{LatinStr})         = LatinChr
-codepoint_type(::Type{_LatinStr})        = _LatinChr
-codepoint_type(::Type{UCS2Str})          = UCS2Chr
-codepoint_type(::Type{_UCS2Str})         = UCS2Chr
+codepoint_type(::Type{<:ASCIIStr})       = ASCIIChr
+codepoint_type(::Type{<:LatinStr})       = LatinChr
+codepoint_type(::Type{<:_LatinStr})      = _LatinChr
+codepoint_type(::Type{<:UCS2Str})        = UCS2Chr
+codepoint_type(::Type{<:_UCS2Str})       = UCS2Chr
 codepoint_type(::Type{<:UnicodeStrings}) = UTF32Chr
 
 codepoint_size(::Type{T}) where {T<:Union{String,Str}} = sizeof(codepoint_type(T))
@@ -64,9 +64,11 @@ get_codeunit(pnt::Ptr{<:CodeUnitTypes}) = unsafe_load(pnt)
 
 set_codeunit!(pnt::Ptr{<:CodeUnitTypes}, pos, ch) = unsafe_store!(pnt, ch, pos)
 set_codeunit!(dat::AbstractVector{<:CodeUnitTypes}, pos, ch) = (dat[pos] = ch)
+set_codeunit!(dat::String, pos, ch) = unsafe_store!(pointer(dat), pos, ch)
 
 set_codeunit!(pnt::Ptr{<:CodeUnitTypes}, ch) = unsafe_store!(pnt, ch)
 set_codeunit!(dat::AbstractVector{<:CodeUnitTypes}, ch) = (dat[1] = ch)
+set_codeunit!(dat::String, ch) = set_codeunit!(dat, 1, ch)
 
 isvalid(::Type{ASCIIStr}, str::Vector{ASCIIChr}) = true
 isvalid(::Type{LatinStrings}, str::Vector{T}) where {T<:Union{ASCIIChr,LatinChars}} = true
@@ -79,6 +81,11 @@ isvalid(::Type{T}, v::Signed) where {T<:WideChars} = v >= 0 && isvalid(T, Unsign
 isvalid(::Type{T}, v::Unsigned) where {T<:WideChars} =
     (v <= typemax(T)) & !is_surrogate_codeunit(v)
 
+isvalid(::Type{Char}, ch::T) where {T<:UnicodeChars} = true
+isvalid(::Type{Char}, ch::RawByte) = true
+isvalid(::Type{Char}, ch::RawWord) = !is_surrogate_codeunit(tobase(ch))
+isvalid(::Type{Char}, ch::RawChar) = isvalid(UTF32Chr, tobase(ch))
+
 convert(::Type{T}, v::S) where {T<:Integer, S<:CodePoint} = convert(T, tobase(v))
 convert(::Type{T}, v::Signed) where {T<:CodePoint} =
     (v >= 0 && isvalid(T, v%Unsigned)) ? convert(T, tobase(v)) : error("Invalid CodePoint:$T $v")
@@ -89,8 +96,8 @@ rem(x::S, ::Type{T}) where {S<:CodePoint, T<:Number}    = rem(reinterpret(basety
 rem(x::S, ::Type{T}) where {S<:Number, T<:CodePoint}    = reinterpret(T, x%basetype(T))
 rem(x::S, ::Type{T}) where {S<:CodePoint, T<:CodePoint} = reinterpret(T, x%basetype(T))
 
-UInt64(cu::T) where {T<:CodePoint} = tobase(cu)%UInt64
-Int64(cu::T) where {T<:CodePoint} =  tobase(cu)%Int64
+#UInt64(cu::T) where {T<:CodePoint} = tobase(cu)%UInt64
+#Int64(cu::T) where {T<:CodePoint} =  tobase(cu)%Int64
 
 RawByte(v)   = convert(RawByte, v)
 RawWord(v)   = convert(RawWord, v)
@@ -138,4 +145,5 @@ hash(x::CodePoint, h::UInt) =
 +(x::CodePoint, y::Integer) = CodePoint((Int32(x) + Int32(y))%UInt32)
 +(x::Integer, y::CodePoint) = y + x
 
-Base.show(io, cp::CodePoint) = show(io, Char(tobase(cp)))
+show(io::IO, cp::CodePoint)  = print(io, Char(tobase(cp)))
+print(io::IO, cp::CodePoint) = print(io, Char(tobase(cp)))

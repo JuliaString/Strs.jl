@@ -75,6 +75,3 @@ function calcstats(lines)
     CharStat(numlines, lenlines, emptylines, minlen, maxlen, maxbit(maxtyp & 0x1f),
              CharTypes(charstat...), CharTypes(linestat...))
 end
-
-enctyp(t) = t == 1 ? ASCIIStr : t == 2 ? _LatinStr : t < 5 ? _UCS2Str : _UTF32Str
-typnam(t) = t == 1 ? "ASCIIStr" : t == 2 ? "LatinStr" : t < 5 ? "UCS2Str" : "UTF32Str"
