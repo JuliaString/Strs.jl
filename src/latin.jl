@@ -8,14 +8,17 @@ Based in part on code for ASCIIString that used to be in Julia
 
 ## overload methods for efficiency ##
 
-# isascii is handled in utf8.jl
+isascii(str::_LatinStr)      = false
+islatin(str::LatinStrings)   = true
+isbmp(str::LatinStrings)     = true
+isunicode(str::LatinStrings) = true
 
 bytestring(s::LatinStrings) = s
 
 function search(str::LatinStrings, c::UInt32, i::Integer)
     len, dat = _lendata(str)
     i == len + 1 && return 0
-    1 <= i <= len && throw(BoundsError(s, i))
+    1 <= i <= len && boundserr(s, i)
     c <= 0xff ? search(dat, c%UInt8, i) : 0
 end
 
@@ -188,14 +191,14 @@ _write(io::IO, ch::UInt8) =
 write(io::IO, ch::LatinChars) = _write(io, tobase(ch))
 
 function convert(::Type{T}, ch::UInt32) where {T<:LatinStrings}
-    ch <= 0xff || throw(UnicodeError(UTF_ERR_INVALID_LATIN1))
+    ch <= 0xff || unierror(UTF_ERR_INVALID_LATIN1, ch)
     buf = _allocate(1)
     buf[1] = ch%UInt8
     T(buf)
 end
 
 function convert(::Type{ASCIIStr}, ch::UInt32)
-    ch <= 0x7f || throw(UnicodeError(UTF_ERR_INVALID_ASCII))
+    ch <= 0x7f || unierror(UTF_ERR_INVALID_ASCII, ch)
     buf = _allocate(1)
     buf[1] = ch%UInt8
     ASCIIStr(buf)
@@ -214,8 +217,8 @@ function convert(::Type{LatinStr}, str::String)
     # get number of bytes to allocate
     len, flags, num4byte, num3byte, num2byte, latinbyte =
         unsafe_checkstring(str, 1, sizeof(str))
-    num4byte + num3byte + num2byte == 0 || throw(UnicodeError(UTF_ERR_INVALID_LATIN1))
-    LatinStr((flags & (UTF_LONG | UTF_SURROGATE)) == 0
+    num4byte + num3byte + num2byte == 0 || unierror(UTF_ERR_INVALID_LATIN1)
+    LatinStr((flags & (UTF_LATIN1 | UTF_LONG | UTF_SURROGATE)) == 0
              ? _data(str)
              : _transcode(UInt8, dat, len + latinbyte))
 end
@@ -226,7 +229,7 @@ function convert(::Type{_LatinStr}, str::String)
     # get number of bytes to allocate
     len, flags, num4byte, num3byte, num2byte, latinbyte =
         unsafe_checkstring(str, 1, sizeof(str))
-    num4byte + num3byte + num2byte == 0 || throw(UnicodeError(UTF_ERR_INVALID_LATIN1))
+    num4byte + num3byte + num2byte == 0 || unierror(UTF_ERR_INVALID_LATIN1)
     T = latinbyte == 0 ? ASCIIStr : _LatinStr
     T((flags & (UTF_LONG | UTF_SURROGATE)) == 0
       ? _data(str)
@@ -248,7 +251,7 @@ end
 function convert(::Type{T}, str::AbstractString) where {T<:LatinStrings}
     # Might want to have invalids_as here
     len, flags = unsafe_checkstring(str, 1, endof(str))
-    (flags & ~(UTF_LONG|UTF_LATIN)) == 0 || throw(UnicodeError(UTF_ERR_INVALID_LATIN1))
+    (flags & ~(UTF_LONG | UTF_LATIN1)) == 0 || unierror(UTF_ERR_INVALID_LATIN1)
     buf = _allocate(len)
     out = 0
     @inbounds for ch in str

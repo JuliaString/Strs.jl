@@ -19,7 +19,7 @@ _endof(::CodeUnitSingle, str) = (@_inline_meta(); _len(str))
 @propagate_inbounds function _next(::CodeUnitSingle, T, str, pos)
     @_inline_meta()
     len, pnt = _lenpnt(str)
-    @boundscheck pos <= len || throw(BoundsError(str, pos))
+    @boundscheck pos <= len || boundserr(str, pos)
     try
         T(get_codeunit(pnt, pos)), pos + 1
     catch ex
@@ -34,15 +34,17 @@ end
 _length(::CodeUnitSingle, str) = (@_inline_meta(); _len(str))
 _isvalid(::CodeUnitSingle, str, i) = (@_inline_meta(); 1 <= i <= _len(str))
 
+@noinline ncharerr(n) = throw(ArgumentError(string("nchar (",n,") must be greater than 0")))
+
 _prevind(::CodeUnitSingle, str, i) = Int(i) - 1
 @propagate_inbounds function _prevind(::CodeUnitSingle, str, i, nchar)
-    @boundscheck nchar > 0 || throw(ArgumentError("nchar must be greater than 0"))
+    @boundscheck nchar > 0 || ncharerr(nchar)
     Int(i) - nchar
 end
 
 _nextind(::CodeUnitSingle, str, i) = Int(i) + 1
 @propagate_inbounds function _nextind(::CodeUnitSingle, str, i, nchar)
-    @boundscheck nchar > 0 || throw(ArgumentError("nchar must be greater than 0"))
+    @boundscheck nchar > 0 || ncharerr(nchar)
     Int(i) + nchar
 end
 

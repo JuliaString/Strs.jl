@@ -126,30 +126,30 @@ isvalid(::Type{T}, chr::T) where {T<:CodePoint} = _isvalid(ValidatedStyle(T), T,
 isvalid(str::T) where {T<:Str} = isvalid(T, str)
 isvalid(ch::T) where {T<:CodePoint} = isvalid(T, ch)
 
-# must check range if CS1 is smaller than CS2
-_isvalid(::T, ::Type{ASCIICharSet}, ::Type{<:CharSet}, str) where {T<:ValidatedStyle} =
+# must check range if CS1 is smaller than CS2, even if CS2 is valid for it's range
+(_isvalid(::T, ::Type{ASCIICharSet}, ::Type{S}, str)
+ where {S<:Union{LatinCharSet, UCS2CharSet, UnicodeCharSet}, T<:ValidatedStyle}) =
     isascii(str)
-_isvalid(::T, ::Type{LatinCharSet}, ::Type{<:CharSet}, str) where {T<:ValidatedStyle} =
+(_isvalid(::T, ::Type{LatinCharSet}, ::Type{S}, str)
+ where {S<:Union{UCS2CharSet, UnicodeCharSet}, T<:ValidatedStyle}) =
     islatin(str)
-_isvalid(::T, ::Type{UCS2CharSet}, ::Type{<:CharSet}, str) where {T<:ValidatedStyle} =
-    isucs2(str)
+_isvalid(::T, ::Type{UCS2CharSet}, ::Type{UnicodeCharSet}, str) where {T<:ValidatedStyle} =
+    isbmp(str)
 _isvalid(::T, ::Type{UnicodeCharSet}, ::Type{<:CharSet}, str) where {T<:ValidatedStyle} =
     isunicode(str)
 
-# no checking needed for cases where T is a superset of S
-(_isvalid(::AlwaysValid, ::Type{T}, ::Type{S}, str)
- where {T<:Union{LatinCharSet,LatinSubSet},
-        S<:Union{ASCIICharSet,LatinCharSet,LatinSubSet}}) =
-     true
+# no checking needed if same CharSet that is guaranteed to be valid
+_isvalid(::AlwaysValid, ::Type{T}, ::Type{T}, str) where {T<:CharSet} = true
 
-(_isvalid(::AlwaysValid, ::Type{T}, ::Type{S}, str)
- where {T<:Union{UCS2CharSet,UCS2SubSet},
-        S<:Union{LatinCharSet,UCS2CharSet,LatinSubSet,UCS2SubSet}}) =
-     true
+# no checking needed for cases where it is a superset of T
+(_isvalid(::AlwaysValid, ::Type{LatinCharSet}, ::Type{T}, str)
+ where {T<:Union{ASCIICharSet,LatinSubSet}}) = true
 
-(_isvalid(::AlwaysValid, ::Type{T}, ::S, str)
- where {T<:Union{UnicodeCharSet,UnicodeSubSet},
-        S<:Union{LatinCharSet,UCS2CharSet,UnicodeCharSet,LatinSubSet,UCS2SubSet,UnicodeSubSet}}) =
+(_isvalid(::AlwaysValid, ::Type{UCS2CharSet}, ::Type{T}, str)
+ where {T<:Union{ASCIICharSet,LatinCharSet,LatinSubSet,UCS2SubSet}}) = true
+
+(_isvalid(::AlwaysValid, ::Type{UnicodeCharSet}, ::Type{T}, str)
+ where {T<:Union{ASCIICharSet,LatinCharSet,UCS2CharSet,LatinSubSet,UCS2SubSet,UnicodeSubSet}}) =
      true
 
 (isvalid(::Type{S}, str::T)
@@ -160,5 +160,3 @@ _isvalid(::T, ::Type{UnicodeCharSet}, ::Type{<:CharSet}, str) where {T<:Validate
 
 isvalid(::Type{S}, chr::T) where {S<:CodePoint, T<:CodePoint} =
      _isvalid(ValidatedStyle(T), S, T, chr)
-
-                                          

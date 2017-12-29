@@ -38,12 +38,21 @@ Str(dat) = _str(dat)
 UniStr(dat) = _str(dat)
 
 """Convert to a UniStr if valid Unicode, otherwise return a RawByteStr"""
-function unsafe_str(str::T) where {T <: Union{Vector{UInt8}, BinaryStr, RawByteStr, String}}
+function unsafe_str(str::T;
+                    accept_long_null  = false,
+                    accept_surrogates = false,
+                    accept_long_char  = false
+                    accept_invalids   = true
+                    ) where {T <: Union{Vector{UInt8}, BinaryStr, RawByteStr, String}}
     siz, dat = _lendata(str)
     # handle zero length string quickly
     siz == 0 && return empty_ascii
     len, flags, num4byte, num3byte, num2byte, latin1byte, invalids =
-        unsafe_checkstring(dat, 1, siz; accept_long_char=true, accept_invalids=true)
+        unsafe_checkstring(dat, 1, siz;
+                           accept_long_null  = accept_long_null,
+                           accept_surrogates = accept_surrogates,
+                           accept_long_char  = accept_long_char,
+                           accept_invalids   = accept_invalids)
     if invalids != 0
         RawByteStr(dat)
     elseif flags == 0
@@ -66,13 +75,21 @@ function unsafe_str(str::T) where {T <: Union{Vector{UInt8}, BinaryStr, RawByteS
 end
 
 """Convert to a UniStr if valid Unicode, otherwise return a RawCharStr"""
-function unsafe_str(str::T) where {T<:Union{AbstractString,AbstractVector{<:Union{Char,UInt16,UInt32}}}}
+function unsafe_str(str::T;
+                    accept_long_null  = false,
+                    accept_surrogates = false,
+                    accept_long_char  = false
+                    accept_invalids   = true
+                    ) where {T<:Union{AbstractString,AbstractVector{<:Union{Char,UInt16,UInt32}}}}
     siz = length(str)
     # handle zero length string quickly
     siz == 0 && return empty_ascii
     len, flags, num4byte, num3byte, num2byte, latin1, invalids =
         unsafe_checkstring(str, 1, siz;
-                           accept_long_null=false, accept_surrogates=false, accept_invalids=true)
+                           accept_long_null  = accept_long_null,
+                           accept_surrogates = accept_surrogates,
+                           accept_long_char  = accept_long_char,
+                           accept_invalids   = accept_invalids)
     if flags == 0
         ASCIIStr(unsafe_copyto!(_allocate(siz), 1, str, 1, siz))
     elseif invalids

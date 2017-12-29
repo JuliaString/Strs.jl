@@ -13,43 +13,38 @@ const _latin_mask_32 = 0xffffff00_ffffff00
 const _bmp_mask_32   = 0xffff0000_ffff0000
 
 function isascii(str::UTF32Str)
-    len, pnt = _lenpnt(str)
-    qpnt = reinterpret(Ptr{UInt64}, pnt)
-    while len >= 8
-        unsafe_load(qpnt) & _ascii_mask_32 == 0 || return false
-        qpnt += 8
-        len -= 8
+    (siz = sizeof(str)) == 0 && return true
+    pnt, fin = _calcpnt(str, siz)
+    while (pnt += CHUNKSZ) < fin
+        (unsafe_load(pnt) & _ascii_mask_32) == 0 || return false
     end
-    len == 0 || unsafe_load(reinterpret(Ptr{UInt32}, pnt)) < 0x80
+    pnt == fin || unsafe_load(reinterpret(Ptr{UInt32}, pnt)) <= 0x7f
 end
 
 function islatin(str::UTF32Str)
-    len, pnt = _lenpnt(str)
-    qpnt = reinterpret(Ptr{UInt64}, pnt)
-    while len >= 8
-        unsafe_load(qpnt) & _latin_mask_32 == 0 || return false
-        qpnt += 8
-        len -= 8
+    (siz = sizeof(str)) == 0 && return true
+    pnt, fin = _calcpnt(str, siz)
+    while (pnt += CHUNKSZ) < fin
+        (unsafe_load(pnt) & _latin_mask_32) == 0 || return false
     end
-    len == 0 || unsafe_load(reinterpret(Ptr{UInt32}, pnt)) < 0x80
+    pnt == fin || unsafe_load(reinterpret(Ptr{UInt32}, pnt)) <= 0xff
 end
 
-function _all_bmp(len, pnt::Ptr{UInt32})
-    len == 0 && return false
-    qpnt = reinterpret(Ptr{UInt64}, pnt)
-    while len >= 8
-        unsafe_load(qpnt) & _bmp_mask_32 == 0 || return false
-        qpnt += 8
-        len -= 8
+function isbmp(str::UTF32Str)
+    (siz = sizeof(str)) == 0 && return true
+    pnt, fin = _calcpnt(str, siz)
+    while (pnt += CHUNKSZ) < fin
+        (unsafe_load(pnt) & _bmp_mask_32) == 0 || return false
     end
-    len == 0 || (unsafe_load(qpnt) & _mask_bytes(len) & _bmp_mask_32) == 0
+    pnt == fin || unsafe_load(reinterpret(Ptr{UInt32}, pnt)) <= 0xffff
 end
 
-isascii(str::_UTF32Str) = false
-islatin(str::_UTF32Str) = false
-isucs2(str::_UTF32Str)  = false
-isucs2(str::UTF32Str)   = _all_bmp(_lenpnt(str)...)
-isunicode(str::UTF32Strings) = true
+isunicode(str::UTF32Str)  = true
+
+isascii(str::_UTF32Str)   = false
+islatin(str::_UTF32Str)   = false
+isbmp(str::_UTF32Str)     = false
+isunicode(str::_UTF32Str) = true
 
 
 # Speed this up by accessing 64 bits or more at a time
@@ -64,7 +59,7 @@ end
 function search(str::UTF32Strings, ch::UInt32, i::Integer)
     len, pnt = _lenpnt(str)
     i == len + 1 && return 0
-    1 <= i <= len && throw(BoundsError(s, i))
+    1 <= i <= len && boundserr(s, i)
     (ch <= 0x10ffff && !is_surrogate_codeunit(ch)) || return 0
     @inbounds while i <= len
         get_codeunit(pnt, i) == ch && return i
@@ -76,7 +71,7 @@ end
 function rsearch(s::UTF32Strings, ch::UInt32, i::Integer)
     len, pnt = _lenpnt(str)
     i == len + 1 && return 0
-    1 <= i <= len && throw(BoundsError(s, i))
+    1 <= i <= len && boundserr(s, i)
     (ch <= 0x10ffff && !is_surrogate_codeunit(ch)) || return 0
     @inbounds while i > 0
         get_codeunit(pnt, i) == ch && return i
@@ -250,16 +245,14 @@ function convert(::Type{UTF32Str}, str::UTF16Str)
 end
 
 function convert(::Type{UTF16Str}, str::T) where {T<:UTF32Strings}
-    len, pnt = _lenpnt(str)
     # handle zero length string quickly
-    len == 0 && return empty_ucs2
+    (len = _len(str)) == 0 && return empty_utf16
     # get number of words to allocate
     # This can be faster just be checking how many > 0xffff
+    pnt = _pnt(str)
     nonbmp = _cnt_non_bmp(len, pnt)
     # optimized path, no surrogates
-    (nonbmp == 0
-     ? UCS2Str(_cvtsize(UInt16, pnt, len))
-     : UTF16Str(_encode(UInt16, pnt, len + nonbmp)))
+    UTF16Str(nonbmp == 0 ? _cvtsize(UInt16, pnt, len) : _encode(UInt16, pnt, len + nonbmp))
 end
 
 function convert(::Type{S}, str::T) where {S<:UCS2Strings,T<:UTF32Strings}
@@ -268,8 +261,8 @@ function convert(::Type{S}, str::T) where {S<:UCS2Strings,T<:UTF32Strings}
     # handle zero length string quickly
     len == 0 && return empty_str(S)
     # Check if conversion is valid
-    _any_non_bmp(len, pnt) && throw(UnicodeError(UTF_ERR_INVALID_UCS2))
-    S(_cvtsize(UInt16, pnt, len))
+    _all_bmp(str) || unierror(UTF_ERR_INVALID_UCS2)
+    S(_cvtsize(UInt16, _pnt(str), len))
 end
 
 const UniRawChar = Union{UInt32, Int32, Char}
@@ -311,7 +304,7 @@ function convert(::Type{T}, bytes::AbstractArray{UInt8}) where {T<:UTF32Strings}
     # this only deals with big or little-ending UTF-32
     # It really should detect at a minimum UTF-8, UTF-16 big and little
     len = length(bytes)
-    len & 3 == 0 || throw(UnicodeError(UTF_ERR_ODD_BYTES_32, len, 0))
+    len & 3 == 0 || unierror(UTF_ERR_ODD_BYTES_32, len, 0)
     len >>>= 2
     pnt = pointer(bytes)
     if reinterpret(UInt, pnt) & 3 == 0
@@ -320,7 +313,7 @@ function convert(::Type{T}, bytes::AbstractArray{UInt8}) where {T<:UTF32Strings}
         buf, out = _convert(reinterpret(Ptr{UInt32_U}, pnt), len, swappedtype(UInt32_U))
     end
     # Todo, this needs better handling
-    isvalid(T, out, len) || throw(UnicodeError(UTF_ERR_INVALID, 0, 0))
+    isvalid(T, out, len) || unierror(UTF_ERR_INVALID, 0, 0)
     T(buf)
 end
 

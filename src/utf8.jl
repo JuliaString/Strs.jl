@@ -38,37 +38,55 @@ xor 80 then << 1 then |
 
 const hi_mask = 0x8080_8080_8080_8080 
 
-@inline function _count_not_cont(v)
+@inline function _count_cont(v)
     val = xor(v, hi_mask)
-    count_ones(((val << 1) | val) & hi_mask)
+    count_ones((xor((val << 1) | val), hi_mask) & hi_mask)
 end
 
 function _length(::CodeUnitMulti, str::UTF8Str)
-    len, pnt = _lenpnt(str)
-    cnt = 0
-    qpnt = reinterpret(Ptr{UInt64}, pnt)
-    while len >= 8
-        cnt += _count_not_cont(unsafe_load(qpnt))
-        qpnt += 8
-        len -= 8
+    (siz = sizeof(str)) < 2 && return siz
+    pnt, fin = _calcpnt(str, siz)
+    cnt = siz
+    while (pnt += CHUNKSZ) < fin
+        cnt -= _count_cont(unsafe_load(pnt))
     end
-    len == 0 ? cnt : (cnt + _count_not_cont(unsafe_load(qpnt) & _mask_bytes(len)))
+    pnt == fin ? cnt : (cnt - _count_cont(unsafe_load(pnt) & _mask_bytes(siz)))
 end
 
-@inline _mask_bytes(n) = (1%UInt<<(n<<3))-0x1
-
-function isascii(str::T) where {T<:Union{UTF8Str, LatinStr, _LatinStr}}
-    len, pnt = _lenpnt(str)
-    qpnt = reinterpret(Ptr{UInt64}, pnt)
-    while len >= 8
-        println("isascii: ", len, ", ", qpnt, ", ",pointer(str),", ",pointer(str.data),", ",typeof(qpnt))
-        return false
-        (unsafe_load(qpnt) & hi_mask) == 0 || return false
-        qpnt += 8
-        len -= 8
+function isascii(str::T) where {T<:Union{UTF8Str, LatinStr}}
+    (siz = sizeof(str)) == 0 && return true
+    pnt, fin = _calcpnt(str, siz)
+    while (pnt += CHUNKSZ) < fin
+        (unsafe_load(pnt) & hi_mask) == 0 || return false
     end
-    len == 0 ? true : ((unsafe_load(qpnt) & _mask_bytes(len)) & hi_mask == 0)
+    pnt == fin || ((unsafe_load(pnt) & _mask_bytes(siz)) & hi_mask == 0)
 end
+
+function islatin(str::UTF8Str)
+    (siz = sizeof(str)) == 0 && return true
+    pnt, fin = _calcpnt(str, siz)
+    while (pnt += CHUNKSZ) < fin
+        val = unsafe_load(pnt)
+        if (val & hi_mask) != 0
+            # check for bytes >
+        end
+    end
+    pnt == fin || ((unsafe_load(pnt) & _mask_bytes(siz)) & hi_mask == 0)
+end
+
+function isbmp(str::UTF8Str)
+    (siz = sizeof(str)) == 0 && return true
+    pnt, fin = _calcpnt(str, siz)
+    while (pnt += CHUNKSZ) < fin
+        val = unsafe_load(pnt)
+        if (val & hi_mask) != 0
+            # check for bytes >
+        end
+    end
+    pnt == fin || ((unsafe_load(pnt) & _mask_bytes(siz)) & hi_mask == 0)
+end
+
+isunicode(str::UTF8Str) = true
 
 # Gets next codepoint
 @propagate_inbounds function _next(::CodeUnitMulti, T, str::UTF8Str, i::Int)
@@ -127,10 +145,9 @@ function getindex(s::UTF8Str, r::UnitRange{Int})
     isempty(r) && return empty_utf8
     i, j = first(r), last(r)
     len, dat = _lendata(s)
-    1 <= i <= len || throw(BoundsError(s, i))
-    is_valid_continuation(dat[i]) &&
-        throw(UnicodeError(UTF_ERR_INVALID_INDEX, i, dat[i]))
-    j > len || throw(BoundsError(s, j))
+    1 <= i <= len || boundserr(s, i)
+    is_valid_continuation(dat[i]) && unierror(UTF_ERR_INVALID_INDEX, i, dat[i])
+    j > len || boundserr(s, j)
     j = nextind(s, j) - 1
     UTF8Str(dat[i:j])
 end
@@ -139,10 +156,9 @@ function search(s::UTF8Str, c::UInt32, i::Integer)
     len, dat = _lendata(s)
     if 1 <= i <= len
         i == len + 1 && return 0
-        throw(BoundsError(s, i))
+        boundserr(s, i)
     end
-    is_valid_continuation(dat[i]) &&
-        throw(UnicodeError(UTF_ERR_INVALID_INDEX, i, dat[i]))
+    is_valid_continuation(dat[i]) && unierror(UTF_ERR_INVALID_INDEX, i, dat[i])
     c < 0x80 && return search(d, c%UInt8, i)
     while true
         i = search(dat, first_utf8_byte(c), i)
@@ -176,19 +192,19 @@ function reverse(s::UTF8Str)
         ch = dat[pos]
         if ch > 0xdf
             if ch < 0xf0
-                # (out -= 3) < 0 && throw(UnicodeError(UTF_ERR_SHORT, pos, ch))
+                # (out -= 3) < 0 && unierror(UTF_ERR_SHORT, pos, ch)
                 buf[out - 2], buf[out - 1], buf[out] = ch, dat[pos + 1], dat[pos + 2]
                 out -= 3
                 pos += 3
             else
-                # (out -= 4) < 0 && throw(UnicodeError(UTF_ERR_SHORT, pos, ch))
+                # (out -= 4) < 0 && unierror(UTF_ERR_SHORT, pos, ch)
                 buf[out - 3], buf[out - 2], buf[out - 1], buf[out] =
                     ch, dat[pos+1], dat[pos+2], dat[pos+3]
                 out -= 4 # Assume valid for UTF8Str!
                 pos += 4
             end
         elseif ch > 0x7f
-            # (out -= 2) < 0 && throw(UnicodeError(UTF_ERR_SHORT, pos, ch))
+            # (out -= 2) < 0 && unierror(UTF_ERR_SHORT, pos, ch)
             buf[out - 1], buf[out] = ch, dat[pos + 1]
             out -= 2
             pos += 2

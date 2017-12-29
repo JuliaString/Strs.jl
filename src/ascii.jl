@@ -15,7 +15,7 @@ bytestring(s::ASCIIStr) = s
 function search(s::ASCIIStr, c::UInt32, i::Integer)
     len, dat = _lendata(s)
     i == len + 1 && return 0
-    1 <= i <= len || throw(BoundsError(s, i))
+    1 <= i <= len || boundserr(s, i)
     c < 0x80 ? search(dat, c%UInt8, i) : 0
 end
 
@@ -103,7 +103,7 @@ write(io::IO, ch::ASCIIChr) = write(io, tobase(ch))
 ascii(str) = convert(ASCIIStr, str)
 function convert(::Type{ASCIIStr}, str::AbstractString)
     # Need to fix this to show where the non-ASCII character was found!
-    isascii(str) || throw(ArgumentError("invalid ASCII sequence"))
+    isascii(str) || unierror(UTF_ERR_INVALID_ASCII)
     len = length(str)
     buf = _allocate(len)
     out = 0
@@ -114,13 +114,13 @@ function convert(::Type{ASCIIStr}, str::AbstractString)
 end
 convert(::Type{ASCIIStr}, str::ASCIIStr) = str
 function convert(::Type{ASCIIStr}, str::T) where {T<:Union{LatinStr,UTF8Str}}
-    isascii(str) || throw(ArgumentError("invalid ASCII sequence"))
+    isascii(str) || unierror(UTF_ERR_INVALID_ASCII)
     ASCIIStr(_data(str))
 end
 function convert(::Type{ASCIIStr}, str::String)
     len, flags = unsafe_checkstring(str, 1, endof(str))
     flags == 0 && ASCIIStr(_data(str))
-    (flags & ~UTF_LONG) == 0 || throw(UnicodeError(UTF_ERR_INVALID_ASCII))
+    (flags & ~UTF_LONG) == 0 || unierror(UTF_ERR_INVALID_ASCII)
     # Handle any long encodings, such as \xc0\x80 for \0
     buf = _allocate(len)
     out = 0
@@ -135,7 +135,7 @@ ascii(pnt::Ptr{UInt8}) =
 ascii(pnt::Ptr{UInt8}, len::Integer) = begin
     pnt == C_NULL && throw(ArgumentError("cannot convert NULL to string"))
     vec = ccall(:jl_pchar_to_array, Vector{UInt8}, (Ptr{UInt8}, Csize_t), pnt, len)
-    isvalid(ASCIIStr, vec) || throw(ArgumentError("invalid ASCII sequence"))
+    isvalid(ASCIIStr, vec) || unierror(UTF_ERR_INVALID_ASCII)
     ASCIIStr(vec)
 end
 

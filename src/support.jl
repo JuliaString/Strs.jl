@@ -55,6 +55,9 @@ const UTF_UNICODE4  = 16  ##< non-BMP characters present
 const UTF_SURROGATE = 32  ##< surrogate pairs present
 const UTF_INVALID   = 64  ##< invalid sequences present
 
+@noinline boundserr(s, pos) = throw(BoundsError(s, pos))
+@noinline unierror(err, pos, ch) = throw(UnicodeError(err, pos, ch))
+
 # Get a UTF-8 continuation byte, give error if invalid, return updated character value
 @propagate_inbounds function check_continuation(dat, pos, ch, flag)
     @inbounds byt = get_codeunit(dat, pos)
@@ -62,7 +65,7 @@ const UTF_INVALID   = 64  ##< invalid sequences present
     if is_valid_continuation(byt)
         flag = false
     elseif !flag
-        throw(UnicodeError(UTF_ERR_CONT, pos, byt))
+        unierror(UTF_ERR_CONT, pos, byt)
     end
     (ch%UInt32 << 6) | (byt & 0x3f), pos, flag
 end
@@ -81,10 +84,10 @@ Input Arguments:
 
 Keyword Arguments:
 
-* `accept_long_null`  = `true`  # Modified UTF-8 (`\\0` represented as `b\"\\xc0\\x80\"`)
-* `accept_surrogates` = `true`  # `CESU-8`
-* `accept_long_char`  = `false` # Accept arbitrary long encodings
-* `accept_invalids`   = `false` # Accept invalid sequences (to be replaced on conversion)
+* `accept_long_null`  = `false`  # Modified UTF-8 (`\\0` represented as `b\"\\xc0\\x80\"`)
+* `accept_surrogates` = `false`  # `CESU-8`
+* `accept_long_char`  = `false`  # Accept arbitrary long encodings
+* `accept_invalids`   = `false`  # Accept invalid sequences (to be replaced on conversion)
 
 Returns:
 
@@ -97,8 +100,8 @@ Throws:
 function unsafe_checkstring end
 
 function unsafe_checkstring(dat::Union{AbstractVector{UInt8}, Ptr{UInt8}, String}, pos, endpos;
-                            accept_long_null  = true,
-                            accept_surrogates = true,
+                            accept_long_null  = false,
+                            accept_surrogates = false,
                             accept_long_char  = false,
                             accept_invalids   = false)
     flags = 0%UInt
@@ -112,7 +115,7 @@ function unsafe_checkstring(dat::Union{AbstractVector{UInt8}, Ptr{UInt8}, String
             if ch < 0xe0
                 # 2-byte UTF-8 sequence (i.e. characters 0x80-0x7ff)
                 if pos > endpos
-                    accept_invalids || throw(UnicodeError(UTF_ERR_SHORT, pos, ch))
+                    accept_invalids || unierror(UTF_ERR_SHORT, pos, ch)
                     invalids += 1
                     break
                 end
@@ -129,12 +132,12 @@ function unsafe_checkstring(dat::Union{AbstractVector{UInt8}, Ptr{UInt8}, String
                 elseif accept_invalids
                     invalids += 1
                 else
-                    throw(UnicodeError(UTF_ERR_LONG, pos, ch))
+                    unierror(UTF_ERR_LONG, pos, ch)
                 end
              elseif ch < 0xf0
                 # 3-byte UTF-8 sequence (i.e. characters 0x800-0xffff)
                 if pos + 1 > endpos
-                    accept_invalids || throw(UnicodeError(UTF_ERR_SHORT, pos, ch))
+                    accept_invalids || unierror(UTF_ERR_SHORT, pos, ch)
                     invalids += 1
                     break
                 end
@@ -145,21 +148,20 @@ function unsafe_checkstring(dat::Union{AbstractVector{UInt8}, Ptr{UInt8}, String
                 # check for surrogate pairs, make sure correct
                 if is_surrogate_codeunit(ch)
                     if !is_surrogate_lead(ch)
-                        accept_invalids || throw(UnicodeError(UTF_ERR_NOT_LEAD, pos-2, ch))
+                        accept_invalids || unierror(UTF_ERR_NOT_LEAD, pos-2, ch)
                         invalids += 1
                         continue
                     end
                     # next character *must* be a trailing surrogate character
                     if pos + 2 > endpos
-                        accept_invalids ||
-                            throw(UnicodeError(UTF_ERR_MISSING_SURROGATE, pos-2, ch))
+                        accept_invalids || unierror(UTF_ERR_MISSING_SURROGATE, pos-2, ch)
                         invalids += 1
                         break
                     end
                     byt = get_codeunit(dat, pos)
                     pos += 1
                     if byt != 0xed
-                        accept_invalids || throw(UnicodeError(UTF_ERR_NOT_TRAIL, pos, byt))
+                        accept_invalids || unierror(UTF_ERR_NOT_TRAIL, pos, byt)
                         invalids += 1
                         continue
                     end
@@ -168,10 +170,10 @@ function unsafe_checkstring(dat::Union{AbstractVector{UInt8}, Ptr{UInt8}, String
                     surr, pos, flg = check_continuation(dat, pos, surr, accept_invalids)
                     flg && (invalids += 1 ; continue)
                     if !is_surrogate_trail(surr)
-                        accept_invalids || throw(UnicodeError(UTF_ERR_NOT_TRAIL, pos-2, surr))
+                        accept_invalids || unierror(UTF_ERR_NOT_TRAIL, pos-2, surr)
                         invalids += 1
                     elseif !accept_surrogates
-                        accept_invalids || throw(UnicodeError(UTF_ERR_SURROGATE, pos-2, surr))
+                        accept_invalids || unierror(UTF_ERR_SURROGATE, pos-2, surr)
                         invalids += 1
                     else
                         flags |= UTF_SURROGATE
@@ -185,12 +187,12 @@ function unsafe_checkstring(dat::Union{AbstractVector{UInt8}, Ptr{UInt8}, String
                 elseif accept_invalids
                     invalids += 1
                 else
-                    throw(UnicodeError(UTF_ERR_LONG, pos-2, ch))
+                    unierror(UTF_ERR_LONG, pos-2, ch)
                 end
             elseif ch < 0xf5
                 # 4-byte UTF-8 sequence (i.e. characters > 0xffff)
                 if pos + 2 > endpos
-                    accept_invalids || throw(UnicodeError(UTF_ERR_SHORT, pos, ch))
+                    accept_invalids || unierror(UTF_ERR_SHORT, pos, ch)
                     invalids += 1
                     break
                 end
@@ -201,12 +203,12 @@ function unsafe_checkstring(dat::Union{AbstractVector{UInt8}, Ptr{UInt8}, String
                 ch, pos, flg = check_continuation(dat, pos, ch, accept_invalids)
                 flg && (invalids += 1 ; continue)
                 if ch > 0x10ffff
-                    accept_invalids || throw(UnicodeError(UTF_ERR_INVALID, pos-3, ch))
+                    accept_invalids || unierror(UTF_ERR_INVALID, pos-3, ch)
                     invalids += 1
                 elseif ch > 0xffff
                     num4byte += 1
                 elseif is_surrogate_codeunit(ch)
-                    accept_invalids || throw(UnicodeError(UTF_ERR_SURROGATE, pos-3, ch))
+                    accept_invalids || unierror(UTF_ERR_SURROGATE, pos-3, ch)
                     invalids += 1
                 elseif accept_long_char
                     # This is an overly long encoded character
@@ -219,12 +221,12 @@ function unsafe_checkstring(dat::Union{AbstractVector{UInt8}, Ptr{UInt8}, String
                 elseif accept_invalids
                     invalids += 1
                 else
-                    throw(UnicodeError(UTF_ERR_LONG, pos-2, ch))
+                    unierror(UTF_ERR_LONG, pos-2, ch)
                 end
             elseif accept_invalids
                 invalids += 1
             else
-                throw(UnicodeError(UTF_ERR_INVALID, pos, ch))
+                unierror(UTF_ERR_INVALID, pos, ch)
             end
         end
     end
@@ -241,8 +243,8 @@ const AbstractString1632{Tel<:Union{UInt16,UInt32}} =
     Union{AbstractVector{Tel}, AbstractString, Ptr{Tel}}
 
 function unsafe_checkstring(dat::AbstractString1632, pos, endpos;
-                            accept_long_null  = true,
-                            accept_surrogates = true,
+                            accept_long_null  = false,
+                            accept_surrogates = false,
                             accept_long_char  = false,
                             accept_invalids   = false)
     flags = 0%UInt
@@ -258,7 +260,7 @@ function unsafe_checkstring(dat::AbstractString1632, pos, endpos;
                 num2byte += 1
             elseif ch > 0x0ffff
                 if (ch > 0x10ffff)
-                    accept_invalids || throw(UnicodeError(UTF_ERR_INVALID, pos, ch))
+                    accept_invalids || unierror(UTF_ERR_INVALID, pos, ch)
                     invalids += 1
                 else
                     num4byte += 1
@@ -267,7 +269,7 @@ function unsafe_checkstring(dat::AbstractString1632, pos, endpos;
                 num3byte += 1
             elseif is_surrogate_lead(ch)
                 if pos > endpos
-                    accept_invalids || throw(UnicodeError(UTF_ERR_MISSING_SURROGATE, pos, ch))
+                    accept_invalids || unierror(UTF_ERR_MISSING_SURROGATE, pos, ch)
                     invalids += 1
                     break
                 end
@@ -275,7 +277,7 @@ function unsafe_checkstring(dat::AbstractString1632, pos, endpos;
                 ch = get_codeunit(dat, pos)
                 pos += 1
                 if !is_surrogate_trail(ch)
-                    accept_invalids || throw(UnicodeError(UTF_ERR_NOT_TRAIL, pos, ch))
+                    accept_invalids || unierror(UTF_ERR_NOT_TRAIL, pos, ch)
                     invalids += 1
                 elseif typeof(dat) <: AbstractVector{UInt16} # fix this test!
                     num4byte += 1
@@ -285,12 +287,12 @@ function unsafe_checkstring(dat::AbstractString1632, pos, endpos;
                 elseif accept_invalids
                     invalids += 1
                 else
-                    throw(UnicodeError(UTF_ERR_SURROGATE, pos, ch))
+                    unierror(UTF_ERR_SURROGATE, pos, ch)
                 end
             elseif accept_invalids
                 invalids += 1
             else
-                throw(UnicodeError(UTF_ERR_NOT_LEAD, pos, ch))
+                unierror(UTF_ERR_NOT_LEAD, pos, ch)
             end
         end
     end
@@ -393,9 +395,10 @@ Optional Input Arguments:
 
 Keyword Arguments:
 
-* `accept_long_null`  = `true`  # Modified UTF-8 (`\\0` represented as `b\"\\xc0\\x80\"`)
-* `accept_surrogates` = `true`  # `CESU-8`
-* `accept_long_char`  = `false` # Accept arbitrary long encodings
+* `accept_long_null`  = `false`  # Modified UTF-8 (`\\0` represented as `b\"\\xc0\\x80\"`)
+* `accept_surrogates` = `false`  # `CESU-8`
+* `accept_long_char`  = `false`  # Accept arbitrary long encodings
+* `accept_invalids`   = `false`  # Accept invalid sequences (to be replaced on conversion)
 
 Returns:
 
@@ -407,6 +410,9 @@ Throws:
 """
 function checkstring end
 
+@noinline argerror(startpos, endpos) =
+    throw(ArgumentError("End position ($endpos) is less than start position ($startpos)"))
+
 # No need to check bounds if using defaults
 checkstring(dat; kwargs...) = unsafe_checkstring(dat, 1, endof(dat); kwargs...)
 
@@ -414,8 +420,7 @@ checkstring(dat; kwargs...) = unsafe_checkstring(dat, 1, endof(dat); kwargs...)
 function checkstring(dat, startpos, endpos = endof(dat); kwargs...)
     checkbounds(dat, startpos)
     checkbounds(dat, endpos)
-    endpos < startpos &&
-        throw(ArgumentError("End position ($endpos) is less than start position ($startpos)"))
+    endpos < startpos && argerror(startpos, endpos)
     unsafe_checkstring(dat, startpos, endpos; kwargs...)
 end
 
@@ -534,3 +539,5 @@ last(s::Str, n::Integer) = s[max(1, prevind(s, ncodeunits(s)+1, n)):end]
 #reverseind(s::Str, i::Integer) = thisind(s, ncodeunits(s)-i+1)
 repeat(s::Str, r::Integer) = repeat(String(s), r)
 (^)(s::Union{Str,CodePoint}, r::Integer) = repeat(s, r)
+
+

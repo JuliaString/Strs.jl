@@ -324,11 +324,15 @@ else
 end
 
 """Pointer to codeunits of string"""
-_pnt(s::Vector{UInt8}) = pointer(s)
-_pnt(s::String)  = pointer(s)
+_pnt(s::Union{String,Vector{UInt8}}) = pointer(s)
 _pnt(s::ByteStr) = pointer(s.data)
 _pnt(s::WordStr) = reinterpret(Ptr{UInt16}, pointer(s.data))
 _pnt(s::QuadStr) = reinterpret(Ptr{UInt32}, pointer(s.data))
+
+const CHUNKSZ = sizeof(UInt64) # used for fast processing of strings
+
+_pnt64(s::Union{String,Vector{UInt8}}) = reinterpret(Ptr{UInt64}, pointer(s))
+_pnt64(s::Str) = reinterpret(Ptr{UInt64}, pointer(s.data))
 
 """Length of string in codeunits"""
 _len(s::Vector{UInt8}) = sizeof(s)
@@ -337,8 +341,17 @@ _len(s::ByteStr) = sizeof(s.data)
 _len(s::WordStr) = sizeof(s.data) >>> 1
 _len(s::QuadStr) = sizeof(s.data) >>> 2
 
-_lenpnt(s::Union{String, ByteStr, WordStr, UTF32Str, Vector{UInt8}}) = _len(s), _pnt(s)
-_lendata(s::Union{String, ByteStr, Vector{UInt8}}) = _len(s), _data(s)
+# For convenience
+@inline _sizpnt64(s) = sizeof(s), _pnt64(s)
+@inline _lenpnt(s) = _len(s), _pnt(s)
+@inline _lendata(s::Union{String, ByteStr, Vector{UInt8}}) = _len(s), _data(s)
+
+@inline function _calcpnt(str, siz)
+    pnt = _pnt64(str)
+    pnt - CHUNKSZ, pnt + siz
+end
+
+@inline _mask_bytes(n) = (1%UInt << ((n & (CHUNKSZ - 1)) << 3)) - 0x1
 
 function Str(v::Vector{UInt8})
     siz = sizeof(v)
