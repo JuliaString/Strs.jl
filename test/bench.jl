@@ -1,7 +1,29 @@
+#=
+Benchmarking routines for characters and strings
+
+Copyright 2017 Gandalf Software, Inc., Scott P. Jones
+Licensed under MIT License, see LICENSE.md
+
+THIS IS STILL VERY WIP AND HARDCODED!
+
+The variable userdir controls where to save different files downloaded from the internet,
+and store the renamed copies (stripped of ASCII lines) for later processing
+(I may change that part so that the it is done automatically, and the files are just renamed,
+or the files to be processed are picked up from a configuration file)
+
+books = load_books()      # This downloads and processes the books in the gutenbergbooks list
+save_books(books)         # This saves them in an output directory (samples) for later benchmarking
+res = benchmarkdir()      # Runs the benchmark functions on all the documents found in the directory
+save_results(fname, res)  # Saves the results to the given file
+
+res = load_results(fname) # Loads the results from the given file
+dispbench(res)            # Displays the results in a pretty format
+=#
+
 using Unicode
 using BenchmarkTools
 
-const test_legacy = true
+const test_legacy = false
 
 @static if test_legacy
     using LegacyStrings
@@ -10,6 +32,7 @@ end
 using StringLiterals
 using Strs
 import Strs: LineCounts, CharTypes, CharStat, calcstats
+import Strs: _LatinStr, _UCS2Str, _UTF32Str, _LatinChr
 
 create_vector(T, len) = Vector{T}(uninitialized, len)
 
@@ -24,7 +47,7 @@ const userdir = "/Users/scott/"
 const dpath   = joinpath(userdir, "textsamples")
 const gutpath = joinpath(userdir, "gutenberg")
 const outpath = joinpath(userdir, "samples")
-const sampledir = outpath
+const defsampledir = outpath
 
 const gutenbergbooks =
     (("files/2600/2600-0",        "English"), # War & Peace, some other languages in quotes
@@ -109,11 +132,6 @@ function save_books(books)
     end
 end
 
-#=
-books = load_books()
-save_books(books)
-=#
-
 show(io::IO, cnt::LineCounts) =
     pr"\(io)\%10d(cnt.bytes)\%12.3f(cnt.bytes/cnt.chars)"
 
@@ -122,12 +140,12 @@ function show(io::IO, s::CharTypes)
     pr"\(io)\%10d(s.utf32)\%10d(s.surr)\%10d(s.invalid)"
 end
 
-function show(io::IO, v::Tuple(String,CharStat})
+function show(io::IO, v::Tuple{String,CharStat})
     s = v[2]
     pr_ul(io, "File name              Lines     Chars   Avg C/L     Empty")
     pr_ul(io, "       Min       Max   MaxType\n")
     pr"\(io)\%-18s(v[1])\%10d(s.num)\%10d(s.len)\%10.3f(s.len/s.num)\%10d(s.empty)"
-    pr"\(io)\%10d(s.minlen)\%10d(s.maxlen)%10s(string(enctyp(s.maxtype)))\n\n"
+    pr"\(io)\%10d(s.minlen)\%10d(s.maxlen)\%10s(string(enctyp(s.maxtyp)))\n\n"
     pr_ul(io, "Character Types:       ")
     pr_ul(io, "ASCII    Latin1    2-Byte      UCS2     UTF32 Surrogate   Invalid\n")
     pr"\(io)Total characters: \(s.chars)\n"
@@ -137,7 +155,8 @@ end
 const pwc = print_with_color
 pwc(c, l) = pwc(c, STDOUT, l)
 
-pr_ul(l)  = pwc(:underline, l)
+pr_ul(io, l) = pwc(:underline, io, l)
+pr_ul(l)     = pwc(:underline, l)
 
 print_size_ratio(io, val) =
     pwc(val < .95 ? :green : val > 1.05 ? :red : :normal, io, f"\%6.3f(val)")
@@ -147,8 +166,7 @@ print_time_ratio(io, val) =
 print_size_ratio(val) = print_size_ratio(STDOUT, val)
 print_time_ratio(val) = print_time_ratio(STDOUT, val)
 
-print_ratio(val) =
-    pwc(val < .95 ? :green : val > 1.05 ? :red : :normal, STDOUT, f"\%12.3f(val)")
+print_ratio(val) = pwc(val < .95 ? :red : val > 1.05 ? :green : :normal, f"\%12.3f(val)")
 
 function dispres(xres)
     # (fname, stats, sizes, res)
@@ -162,10 +180,17 @@ function dispres(xres)
         len > maxlen && (maxlen = len; pos = i)
     end
     rs = res[pos][3]
-    pr_ul("\nType        B/Char")
-    for results in rs
-        pr_ul(f"\%10.10s(split(results[1])[1])")
+    nam1 = []
+    nam2 = []
+    for result in rs
+        names = split(result[1], '\n')
+        push!(nam1, names[1])
+        push!(nam2, length(names) > 1 ? names[2] : "")
     end
+    pr"\nType        B/Char"
+    for nam in nam1 ; pr"\%10s(nam)" ; end
+    pr_ul("\n                  ")
+    for nam in nam2 ; pr_ul(f"\%10s(nam)") ; end
     pr"\nResults:          "
     for results in rs
         pr"\%10d(results[2])"
@@ -192,10 +217,10 @@ function dispres(xres)
     pr"\n"
 end
 
-const divline = string(repeat('#', 88),'\n','\f')
+const divline = string(repeat('#', 100),'\n','\f')
 
 function dispbench(totres)
-    for res in totres
+    for res in totres[1]
         dispres(res)
         print(divline)
     end
@@ -306,26 +331,28 @@ function sumcodepnts(lines::Vector{<:AbstractString})
     t
 end
 
+searchres(x::UnitRange) = x.start
+searchres(x::Int) = x
+
 function searchlines(lines, v)
     t = 0
     for text in lines
-        t += search(text, v)
+        t += searchres(search(text, v))
     end
     t
 end
-
 
 function searchlines(lines::Vector{UniStr}, v)
     t = 0
     for text in lines
         if typeof(text) == ASCIIStr
-            t += search(text::ASCIIStr, v)
+            t += searchres(search(text::ASCIIStr, v))
         elseif typeof(text) == _LatinStr
-            t += search(text::_LatinStr, v)
+            t += searchres(search(text::_LatinStr, v))
         elseif typeof(text) == _UCS2Str
-            t += search(text::_UCS2Str, v)
+            t += searchres(search(text::_UCS2Str, v))
         else
-            t += search(text::_UTF32Str, v)
+            t += searchres(search(text::_UTF32Str, v))
         end
     end
     t
@@ -333,13 +360,15 @@ end
 
 # maybe change all this to be table driven and use @eval!
 
-searchchar(lines::Vector{String}) = searchlines(lines, '\ufffd')
-searchchar(lines::Vector{T}) where {T} = searchlines(lines, codepoint(T)('\ufffd'))
+searchchar(lines::Vector{String}) =
+    searchlines(lines, '\ufffd')
+searchchar(lines::Vector{T}) where {T} =
+    searchlines(lines, codepoint(T)('\ufffd'))
 searchchar(lines::Vector{T}) where {T<:Union{ASCIIStr,LatinStr,_LatinStr}} =
     searchlines(lines, ASCIIChr(0x1a))
 
-searchstr(lines::Vector{String})  = searchlines(lines, "thy")
-searchstr(lines::Vector{T}) where {T}  = searchlines(lines, T("thy"))
+searchstr(lines::Vector{String})      = searchlines(lines, "thy")
+searchstr(lines::Vector{T}) where {T} = searchlines(lines, T("thy"))
 
 # normalize
 # textwidth
@@ -421,12 +450,12 @@ function wrap(f, lines, cnts::LineCounts, t, msg, basetime=0%UInt)
         raw = @belapsed ($f)($lines)
         tim = round(UInt64, raw*1e9)
         push!(t, (msg, res, tim))
-        pr"\%-22s(msg*':') \%12d(res)"
+        pr"\%-22s(replace(msg, '\n' => ' ')*':') \%12d(res)"
         pr" \%12.3f(tim/1000000)"
         pr" \%12.3f(tim/cnts.lines)"
         pr" \%12.3f(tim/cnts.chars)"
         pr" \%12.3f(tim/cnts.bytes)"
-        basetime != 0 && print_ratio(STDOUT, basetime/tim)
+        basetime != 0 && print_ratio(basetime/tim)
         pr"\n"
     catch ex
         push!(t, (msg, 0, 0%UInt))
@@ -469,8 +498,8 @@ const tests =
 
 function testperf(lines::Vector{T}, cnts, docnam, basetime) where {T<:AbstractString}
     # Test performance
-    pr"""\%-22s(docnam) \%12s("Result") \%12s("ms total") """
-    pr"""\%12s("ns/line") \%12s("ns/char") \%12s("ns/byte")\n"""
+    pr_ul(f"""\%-22s(docnam) \%12s("Result") \%12s("ms total") """)
+    pr_ul(f"""\%12s("ns/line") \%12s("ns/char") \%12s("ns/byte")\n""")
     t = []
     # Make sure everything is already compiled
     for (tst, nam) in tests
@@ -497,6 +526,8 @@ end
 
 enctyp(t) = t == 1 ? ASCIIStr : t == 2 ? LatinStr : t < 5 ? UCS2Str : UTF32Str
 
+(::Type{UInt32})(v::T) where {T<:CodePoint} = Strs.tobase(v)%UInt32
+
 function benchdir(sampledir = defsampledir)
     totres = []
     totlines = []
@@ -506,7 +537,7 @@ function benchdir(sampledir = defsampledir)
         lines = readlines(joinpath(sampledir, fname))
         stats = calcstats(lines)
         show(STDOUT, (fname, stats))
-        list = [String, UniStr]
+        list = [String, UTF8Str, UTF16Str, UniStr]
         names = ["String", "UTF8Str", "UTF16Str", "UniStr"]
         MT = enctyp(stats.maxtyp)
         push!(list, MT)
@@ -530,8 +561,8 @@ function benchdir(sampledir = defsampledir)
         # Now calculate and display the size statistics for each
         sizes = [sum(sizeof, enclines) for enclines in enc]
         basesize = sizes[1]
-        pr"Types:      "
-        for nam in names ; pr"\%12s(nam)" ; end
+        pr_ul("\nTypes:      ")
+        for nam in names ; pr_ul(f"\%12s(nam)") ; end
         pr"\nBytes:      "
         for siz in sizes ; pr"\%12d(siz)" ; end
         pr"\nBytes/Char: "
@@ -552,17 +583,19 @@ function benchdir(sampledir = defsampledir)
         push!(totnames, names)
         push!(totsizes, sizes)
         push!(totlines, enc)
+
+        print(divline)
     end
     totres, totlines, totnames, totsizes
 end
 
-function saveresults(fname, res)
+function save_results(fname, res)
     open(fname, "w") do io
         serialize(io, res)
     end
 end
 
-function loadresults(fname)
+function load_results(fname)
     open(fname) do io
         deserialize(io)
     end

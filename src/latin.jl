@@ -220,7 +220,7 @@ function convert(::Type{LatinStr}, str::String)
     num4byte + num3byte + num2byte == 0 || unierror(UTF_ERR_INVALID_LATIN1)
     LatinStr((flags & (UTF_LATIN1 | UTF_LONG | UTF_SURROGATE)) == 0
              ? _data(str)
-             : _transcode(UInt8, dat, len + latinbyte))
+             : _transcode(UInt8, _data(str), len + latinbyte))
 end
 
 function convert(::Type{_LatinStr}, str::String)

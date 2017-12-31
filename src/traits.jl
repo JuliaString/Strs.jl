@@ -1,5 +1,10 @@
-# Copyright 2017 Gandalf Software, Inc., Scott P. Jones
+# Copyright 2017 Gandalf Software, Inc. (Scott Paul Jones)
 # Licensed under MIT License, see LICENSE.md
+
+# These use the "Holy Trait Trick", which was created by @timholy (Tim Holy),
+# which was made possible by the type system in Julia from @jeff.bezanson (Jeff Bezanson).
+
+# One is proud to stand on the shoulders of such people!
 
 ## Traits for string types ##
 
@@ -138,25 +143,30 @@ _isvalid(::T, ::Type{UCS2CharSet}, ::Type{UnicodeCharSet}, str) where {T<:Valida
 _isvalid(::T, ::Type{UnicodeCharSet}, ::Type{<:CharSet}, str) where {T<:ValidatedStyle} =
     isunicode(str)
 
-# no checking needed if same CharSet that is guaranteed to be valid
-_isvalid(::AlwaysValid, ::Type{T}, ::Type{T}, str) where {T<:CharSet} = true
-
 # no checking needed for cases where it is a superset of T
 (_isvalid(::AlwaysValid, ::Type{LatinCharSet}, ::Type{T}, str)
- where {T<:Union{ASCIICharSet,LatinSubSet}}) = true
+  where {T<:Union{ASCIICharSet,LatinSubSet}}) = true
 
 (_isvalid(::AlwaysValid, ::Type{UCS2CharSet}, ::Type{T}, str)
- where {T<:Union{ASCIICharSet,LatinCharSet,LatinSubSet,UCS2SubSet}}) = true
+  where {T<:Union{ASCIICharSet,LatinCharSet,LatinSubSet,UCS2SubSet}}) = true
 
 (_isvalid(::AlwaysValid, ::Type{UnicodeCharSet}, ::Type{T}, str)
- where {T<:Union{ASCIICharSet,LatinCharSet,UCS2CharSet,LatinSubSet,UCS2SubSet,UnicodeSubSet}}) =
-     true
+  where {T<:Union{ASCIICharSet,LatinCharSet,UCS2CharSet,LatinSubSet,UCS2SubSet,UnicodeSubSet}}) =
+    true
 
+# Different character sets
 (isvalid(::Type{S}, str::T)
- where {S<:Str{CSE1},T<:Str{CSE2}}
- where {CSE1<:CSE{CS1},CSE2<:CSE{CS2}}
- where {CS1, CS2}) =
-     _isvalid(ValidatedStyle(T), CS1, CS2, str)
+  where {S<:Str{CSE1},T<:Str{CSE2}}
+  where {CSE1<:CSE{CS1},CSE2<:CSE{CS2}}
+  where {CS1, CS2}) =
+    _isvalid(ValidatedStyle(T), CS1, CS2, str)
+
+# Same character set
+(isvalid(::Type{S}, str::T)
+  where {S<:Str{CSE1},T<:Str{CSE2}}
+  where {CSE1<:CSE{CS},CSE2<:CSE{CS}}
+  where {CS}) =
+     _isvalid(ValidatedStyle(T), CS, str)
 
 isvalid(::Type{S}, chr::T) where {S<:CodePoint, T<:CodePoint} =
      _isvalid(ValidatedStyle(T), S, T, chr)

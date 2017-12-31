@@ -40,7 +40,7 @@ const hi_mask = 0x8080_8080_8080_8080
 
 @inline function _count_cont(v)
     val = xor(v, hi_mask)
-    count_ones((xor((val << 1) | val), hi_mask) & hi_mask)
+    count_ones(xor(((val << 1) | val), hi_mask) & hi_mask)
 end
 
 function _length(::CodeUnitMulti, str::UTF8Str)

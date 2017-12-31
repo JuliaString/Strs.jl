@@ -4,7 +4,9 @@ Basic types for characters and strings
 Copyright 2017 Gandalf Software, Inc., Scott P. Jones
 Licensed under MIT License, see LICENSE.md
 
-Portion of encodings from collaboration on StringEncodings.jl with @nalimilan
+Encodings inspired from collaborations on the following packages:
+https://github.com/quinnj/Strings.jl with @quinnj (Jacob Quinn)
+https://github.com/nalimilan/StringEncodings.jl with @nalimilan (Milan Bouchet-Valat)
 =#
 export Str, UniStr, BinaryStr, ASCIIStr, LatinStr, UTF8Str, UCS2Str, UTF16Str, UTF32Str
 export RawByteStr, RawWordStr, RawCharStr
@@ -189,18 +191,15 @@ for nam in BuiltInTypes
     sym = Symbol("$(nam)Str")
     cse = Symbol("$(nam)CSE")
     @eval const $sym = Str{$cse, Nothing, Nothing, Nothing}
+    @eval show(io::IO, ::Type{$sym}) = print(io, $(Expr(:quote, Symbol(sym))))
 end
 
 """Union type for fast dispatching"""
 const UniStr = Union{ASCIIStr, _LatinStr, _UCS2Str, _UTF32Str}
+show(io::IO, ::Type{UniStr}) = print(io, :UniStr)
 
-#show(io::IO, str::Type{<:Str}) = print(io, convert(String, str))
 #=
-for nam in BuiltInTypes
-    sym = Symbol("$(nam)Str")
-    @eval show(io::IO, ::Type{$sym}) = print(io, $sym)
-end
-=#
+#show(io::IO, str::Type{<:Str}) = print(io, convert(String, str))
 
 show(io::IO, ::Type{RawByteStr}) = print(io, :RawByteStr)
 show(io::IO, ::Type{RawWordStr}) = print(io, :RawWordStr)
@@ -216,8 +215,8 @@ show(io::IO, ::Type{UTF32Str})   = print(io, :UTF32Str)
 show(io::IO, ::Type{_LatinStr})  = print(io, :_LatinStr)
 show(io::IO, ::Type{_UCS2Str})   = print(io, :_UCS2Str)
 show(io::IO, ::Type{_UTF32Str})  = print(io, :_UTF32Str)
+=#
 
-show(io::IO, ::Type{UniStr})     = print(io, :UniStr)
 
 if STR_DATA_VECTOR
     _allocate(len) = Vector{UInt8}(uninitialized, len)

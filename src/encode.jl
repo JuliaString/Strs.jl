@@ -41,7 +41,7 @@ UniStr(dat) = _str(dat)
 function unsafe_str(str::T;
                     accept_long_null  = false,
                     accept_surrogates = false,
-                    accept_long_char  = false
+                    accept_long_char  = false,
                     accept_invalids   = true
                     ) where {T <: Union{Vector{UInt8}, BinaryStr, RawByteStr, String}}
     siz, dat = _lendata(str)
@@ -78,7 +78,7 @@ end
 function unsafe_str(str::T;
                     accept_long_null  = false,
                     accept_surrogates = false,
-                    accept_long_char  = false
+                    accept_long_char  = false,
                     accept_invalids   = true
                     ) where {T<:Union{AbstractString,AbstractVector{<:Union{Char,UInt16,UInt32}}}}
     siz = length(str)
