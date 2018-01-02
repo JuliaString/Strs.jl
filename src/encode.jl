@@ -34,9 +34,6 @@ function _str(str::T) where {T<:Union{Vector{UInt8}, BinaryStr, RawByteStr, Stri
     end
 end
 
-Str(dat) = _str(dat)
-UniStr(dat) = _str(dat)
-
 """Convert to a UniStr if valid Unicode, otherwise return a RawByteStr"""
 function unsafe_str(str::T;
                     accept_long_null  = false,
@@ -95,13 +92,13 @@ function unsafe_str(str::T;
     elseif invalids
         if eltype(T) == Char
             buf, pnt = _allocate(UInt32, siz)
-            for (i, ch) in enumerate(str)
+            @inbounds for (i, ch) in enumerate(str)
                 set_codeunit!(pnt, i, UInt32(ch))
             end
             RawCharStr(buf)
         else
             buf, pnt = _allocate(eltype(T), siz)
-            for (i, ch) in enumerate(str)
+            @inbounds for (i, ch) in enumerate(str)
                 set_codeunit!(pnt, i, ch)
             end
             T == UInt32 ? RawCharStr(buf) : RawWordStr(buf)
@@ -121,5 +118,10 @@ function unsafe_str(str::T;
     end
 end
 
+# Fallback constructors for Str types, from any AbstractString
+(::Type{T})(str::S) where {T<:Str, S<:AbstractString} = convert(T, str)
+(::Type{T})(str::S) where {T<:Str, S<:Str} = convert(T, str)
+(::Type{T})(str::T) where {T<:Str} = str
+
 """Encode a String as a Str, picking the best representation"""
-Str(str::String) = unsafe_str(_data(str))
+UniStr(str::T where {T<:AbstractString}) = _str(str)

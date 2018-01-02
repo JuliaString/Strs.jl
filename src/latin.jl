@@ -15,15 +15,15 @@ isunicode(str::LatinStrings) = true
 
 bytestring(s::LatinStrings) = s
 
-function search(str::LatinStrings, c::UInt32, i::Integer)
-    len, dat = _lendata(str)
-    i == len + 1 && return 0
-    1 <= i <= len && boundserr(s, i)
-    c <= 0xff ? search(dat, c%UInt8, i) : 0
+function search(str::LatinStrings, ch::UInt32, pos::Integer)
+    len = _len(str)
+    pos == len + 1 && return 0
+    1 <= pos <= len && boundserr(str, pos)
+    ch <= 0xff ? search(_data(str), ch%UInt8, pos) : 0
 end
 
-rsearch(s::LatinStrings, c::UInt32, i::Integer) =
-    c <= 0xff ? rsearch(_data(s), c%UInt8, i) : 0
+rsearch(str::LatinStrings, ch::UInt32, pos::Integer) =
+    ch <= 0xff ? rsearch(_data(str), ch%UInt8, pos) : 0
 
 function string(c::UnicodeByteStrings...)
     length(c) == 1 && return c[1]
@@ -38,121 +38,7 @@ function string(c::UnicodeByteStrings...)
         unsafe_copyto!(buf, off, dat, 1, len)
         off += len
     end
-    _LatinStr(buf)
-end
-
-function ucfirst(str::LatinStr)
-    dat = _data(str)
-    isempty(dat) && return str
-    ch = get_codeunit(dat, 1)%LatinChr
-    if islower(ch%LatinChr)
-        t = copy(dat)
-        t[1] = ch - 32
-        LatinStr(t)
-    else
-        str
-    end
-end
-
-# Special handling for characters that can't map into Latin1
-function ucfirst(str::_LatinStr)
-    dat = _data(str)
-    isempty(dat) && return str
-    @inbounds ch = dat[1]
-    if islower(ch%LatinChr)
-        @inbounds t = copy(dat)
-        @inbounds t[1] = ch - 32
-        T(t)
-    elseif (ch == 0xb5) | (ch == 0xff)
-        buf, pnt = _allocate(UInt16, len)
-        set_codeunit!(pnt, 1, ifelse(ch == 0xb5, 0x39c, 0x178))
-        @inbounds for i = 2:len ; set_codeunit!(pnt, i, dat[i]%UInt16) ; end
-        UCS2Str(buf)
-    else
-        str
-    end
-end
-
-function lcfirst(str::T) where {T<:LatinStrings}
-    dat = _data(str)
-    (isempty(dat) || !isupper(dat[1]%LatinChr)) && return str
-    @inbounds t = copy(dat)
-    @inbounds t[1] += 32
-    T(t)
-end
-
-function _upper(::Type{LatinStr}, d, i, len)
-    td = copy(d)
-    @inbounds for j = i:len
-        islower(td[j]%LatinChr) && (td[j] -= 32)
-    end
-    LatinStr(td)
-end
-
-function _upper(::Type{_LatinStr}, d, i, len)
-    # Need to scan the rest of the string to see if _widenupper needs to be called
-    @inbounds begin
-        for j = i:len
-            ((ch = d[j]) == 0xb5) | (ch == 0xff) && return _widenupper(d, i, len)
-        end
-        td = copy(d)
-        for j = i:len
-            islower(td[j]%LatinChr) && (td[j] -= 32)
-        end
-    end
-    _LatinStr(td)
-end
-
-function _widenupper(dat, i, len)
-    buf, pnt = _allocate(UInt16, len)
-    @inbounds for j = 1:i-1
-        set_codeunit!(pnt, j, dat[j])
-    end
-    @inbounds for j = i:len
-        ch = dat[j]%UInt8
-        if ch == 0xb5
-            set_codeunit!(pnt, j, 0x39c)
-        elseif ch == 0xff
-            set_codeunit!(pnt, j, 0x178)
-        else
-            set_codeunit!(pnt, j, islower(ch%LatinChr) ? ch - 0x20 : ch)
-        end
-    end
-    UCS2Str(buf)
-end
-
-function uppercase(str::LatinStr)
-    len, dat = _lendata(str)
-    @inbounds for i = 1:len
-        islower(dat[1]%LatinChr) && return _upper(LatinStr, dat, i, len)
-    end
-    str
-end
-
-function uppercase(str::_LatinStr)
-    len, dat = _lendata(str)
-    @inbounds for i = 1:len
-        ch = dat[i]
-        ((ch == 0xb5) | (ch == 0xff)) && return _widenupper(dat, i, len)
-        islower(ch%LatinChr) && return _upper(_LatinStr, dat, i, len)
-    end
-    str
-end
-
-function _lower(::Type{T}, d, i) where {T<:LatinStrings}
-    td = copy(d)
-    @inbounds for j = i:length(td)
-        _islatinupper(td[j]) && (td[j] += 32)
-    end
-    T(td)
-end
-
-function lowercase(str::T) where {T<:LatinStrings}
-    len, dat = _lendata(str)
-    for i = 1:len
-        _islatinupper(dat[i]) && return _lower(T, dat, i)
-    end
-    str
+    LatinStr(buf)
 end
 
 reverse(s::T) where {T<:LatinStrings} = T(reverse(_data(s)))

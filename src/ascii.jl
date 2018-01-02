@@ -39,57 +39,6 @@ end
 
 string(c::ASCIIStr...) = length(c) == 1 ? c[1] : ASCIIStr(_string(c))
 
-@inline _islower(c::UInt8) = 'a'%UInt8 <= c <= 'z'%UInt8
-@inline _isupper(c::UInt8) = 'A'%UInt8 <= c <= 'Z'%UInt8
-
-function ucfirst(str::ASCIIStr)
-    dat = _data(str)
-    (isempty(dat) || !_islower(dat[1])) && return str
-    t = copy(dat)
-    t[1] -= 32
-    ASCIIStr(t)
-end
-
-function lcfirst(str::ASCIIStr)
-    dat = _data(str)
-    (isempty(dat) || !_isupper(dat[1])) && return str
-    t = copy(dat)
-    t[1] += 32
-    ASCIIStr(t)
-end
-
-function _upper(::Type{ASCIIStr}, d, i, len)
-    td = copy(d)
-    @inbounds for j = i:len
-        _islower(td[j]) && (td[j] -= 32)
-    end
-    ASCIIStr(td)
-end
-
-function uppercase(str::ASCIIStr)
-    len, dat = _lendata(str)
-    @inbounds for i = 1:len
-        _islower(dat[i]) && return _upper(ASCIIStr, dat, i, len)
-    end
-    str
-end
-
-function _lower(::Type{ASCIIStr}, d, i, len)
-    td = copy(d)
-    @inbounds for j = i:len
-        _isupper(td[j]) && (td[j] += 32)
-    end
-    ASCIIStr(td)
-end
-
-function lowercase(str::ASCIIStr)
-    len, dat = _lendata(s)
-    for i = 1:len
-        _isupper(dat[i]) && return _lower(ASCIIStr, dat, i, len)
-    end
-    str
-end
-
 reverse(s::ASCIIStr) = ASCIIStr(reverse(_data(s)))
 
 ## outputting ASCII strings ##

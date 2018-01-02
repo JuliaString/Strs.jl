@@ -55,8 +55,9 @@ end
 const _ascii_mask = 0xff80_ff80_ff80_ff80
 const _latin_mask = 0xff00_ff00_ff00_ff00
 const _trail_mask = 0xdc00_dc00_dc00_dc00
+const _hi_bit_16  = 0x8000_8000_8000_8000
 
-@inline _mask_surr(v)  = (v | v<<1 | v<<2 | v<<3 | v<<4 | v<<5) & 0x8000_8000_8000_8000
+@inline _mask_surr(v)  = xor((v | v<<1 | v<<2 | v<<3 | v<<4 | v<<5) & _hi_bit_16, _hi_bit_16)
 @inline _get_masked(qpnt) = _mask_surr(xor(unsafe_load(qpnt), _trail_mask))
 
 function _length(::CodeUnitMulti, str::UTF16Str)
@@ -136,13 +137,224 @@ function search(str::UCS2Strings, ch::UInt32, pos::Integer)
     wrd = ch%UInt16
     is_surrogate_codeunit(wrd) && return 0
     beg = _pnt(str) - 2
-    pnt = beg + pos<<1
-    fin = beg + len<<1
+    pnt = beg + (pos << 1)
+    fin = beg + (len << 1)
     @inbounds while pnt <= fin
         get_codeunit(pnt) == wrd && return (pnt - beg)>>1
         pnt += 2
     end
     0
+end
+
+@inline _islower_lu(ch) =  _islower_l(ch) | (ch == 0xb5) | (ch == 0xff)
+
+function _lower!(out::Ptr{T}, fin::Ptr{T}) where {T}
+    while out < fin
+        ch = get_codeunit(out)
+        if islatin(ch)
+            (_isupper_a(ch) | _isupper_l(ch)) && set_codeunit!(out, ch += 0x20)
+        elseif _check_mask(ch, Uni.LU, Uni.LT)
+            set_codeunit!(out, _lowercase_u(ch))
+        end
+        out += sizeof(T)
+    end
+end
+
+function _lower(::Type{T}, beg, pnt, fin, len) where {T<:UCS2Strings}
+    buf, out = _allocate(UInt16, len)
+    unsafe_copyto!(out, beg, len)
+    _lower!(out + (pnt - beg), fin)
+    T(buf)
+end
+
+function _lower(::Type{T}, beg, pnt, fin, len) where {T<:UTF32Strings}
+    buf, out = _allocate(UInt32, len)
+    unsafe_copyto!(out, beg, len)
+    _lower!(out + (pnt - beg), fin)
+    T(buf)
+end
+
+function lowercase(str::UCS2Str)
+    len, pnt = _lenpnt(str)
+    fin = out + (len << 1)
+    while out < fin
+        ch = get_codeunit(pnt)
+        (islatin(ch) ? (_isupper_a(ch) || _isupper_l(ch)) : isupper(ch)) &&
+            return _lower(UCS2Str, beg, pnt, fin, len)
+        pnt += 2
+    end
+    str
+end
+
+function _upper!(out::Ptr{T}, fin::Ptr{T}) where {T}
+    while out < fin
+        ch = get_codeunit(out)
+        if islatin(ch)
+            if _islower_a(ch) | _islower_l(ch)
+                set_codeunit!(out, ch -= 0x20)
+            elseif ch == 0xb5
+                set_codeunit!(out, 0x39c)
+            elseif ch == 0xff
+                set_codeunit!(out, 0x178)
+            end
+        elseif _cat(ch) == Uni.LL
+            set_codeunit!(out, _uppercase_u(ch))
+        end
+        out += sizeof(T)
+    end
+end
+
+function _upper(::Type{T}, beg, pnt, fin, len) where {T<:UCS2Strings}
+    buf, out = _allocate(UInt16, len)
+    unsafe_copyto!(out, beg, len)
+    _upper!(out + (pnt - beg), fin)
+    T(buf)
+end
+
+function _upper(::Type{T}, beg, pnt, fin, len) where {T<:UTF32Strings}
+    buf, out = _allocate(UInt32, len)
+    unsafe_copyto!(out, beg, len)
+    _upper!(out + (pnt - beg), fin)
+    T(buf)
+end
+
+function uppercase(str::UCS2Str)
+    len, pnt = _lenpnt(str)
+    pnt = beg
+    fin = beg + sizeof(str)
+    while pnt < fin
+        ch = get_codeunit(pnt)
+        (isascii(ch) ? _islower_a(ch) : (islatin(ch) ? _islower_lu(ch) : _islower_u(ch))) &&
+            return _upper(UCS2Str, beg, pnt, fin, len)
+        pnt += 2
+    end
+    str
+end
+function uppercase(str::UTF32Str)
+    len, pnt = _lenpnt(str)
+    pnt = beg
+    fin = beg + sizeof(str)
+    while pnt < fin
+        ch = get_codeunit(pnt)
+        (isascii(ch) ? _islower_a(ch) : (islatin(ch) ? _islower_lu(ch) : _islower_u(ch))) &&
+            return _upper(UTF32Str, beg, pnt, fin, len)
+        pnt += 4
+    end
+    str
+end
+
+# result must have at least one character > 0xff, so if the only character(s)
+# > 0xff became <= 0xff, then the result may need to be narrowed and returned as _LatinStr
+function lowercase(str::_UCS2Str)
+    len, pnt = _lenpnt(str)
+    pnt = beg
+    fin = beg + sizeof(str)
+    while pnt < fin
+        ch = get_codeunit(pnt)
+        # Todo, return as _LatinStr if necessary
+        (islatin(ch) ? (_isupper_a(ch) | _isupper_l(ch)) : _isupper_u(ch)) &&
+            return _lower(_UCS2Str, beg, pnt, fin, len)
+        pnt += 2
+    end
+    str
+end
+
+function lowercase(str::_UTF32Str)
+    len, pnt = _lenpnt(str)
+    pnt = beg
+    fin = beg + sizeof(str)
+    while pnt < fin
+        ch = get_codeunit(pnt)
+        # Todo, return as _LatinStr if necessary
+        (islatin(ch) ? (_isupper_a(ch) | _isupper_l(ch)) : _isupper_u(ch)) &&
+            return _lower(_UTF32Str, beg, pnt, fin, len)
+        pnt += 4
+    end
+    str
+end
+
+# characters 0xb5 and 0xff get treated specially
+function uppercase(str::_UCS2Str)
+    len, pnt = _lenpnt(str)
+    pnt = beg
+    fin = beg + (len << 1)
+    while pnt < fin
+        ch = get_codeunit(pnt)
+        (islatin(ch) ? (_islower_a(ch) | _islower_lu(ch)) : _islower_u(ch)) &&
+            return _upper(_UCS2Str, beg, pnt, fin, len)
+        pnt += 2
+    end
+    str
+end
+
+# These are more complex, and maybe belong in a separate UTF16Str.jl package
+
+function _lower(::Type{UTF16Str}, beg, pnt, fin, len)
+    buf, out = _allocate(UInt16, len)
+    unsafe_copyto!(out, beg, len)
+    out += (pnt - beg)
+    while out < fin
+        ch = get_codeunit(out)
+        if islatin(ch)
+            (_isupper_a(ch) | _isupper_l(ch)) && set_codeunit!(out, ch += 0x20)
+        elseif _check_mask(ch, Uni.LU, Uni.LT)
+            set_codeunit!(out, _lowercase_u(ch))
+        end
+        out += 2
+    end
+    T(buf)
+end
+
+function lowercase(str::UTF16Str)
+    len, beg = _lenpnt(str)
+    pnt = beg
+    fin = beg + (len << 1)
+    while pnt < fin
+        ch = get_codeunit(pnt)
+        (ch > 0xd7ff # May be surrogate pair
+         ? _is_upper_u(ch > 0xdfff ? get_supplementary(ch, get_codeunit(pnt += 2)) : ch%UInt32)
+         : (isascii(ch) ? _isupper_a(ch) : (islatin(ch) ? _isupper_l(ch) : _isupper_u(ch)))) &&
+             return _lower(UTF16Str, beg, pnt, len)
+        pnt += 2
+    end
+    str
+end
+
+function _upper(::Type{UTF16Str}, beg, pnt, fin, len)
+    buf, out = _allocate(UInt16, len)
+    unsafe_copyto!(out, beg, len)
+    out += (pnt - beg)
+    while out < fin
+        ch = get_codeunit(out)
+        if islatin(ch)
+            if _islower_a(ch) | _islower_l(ch)
+                set_codeunit!(out, ch -= 0x20)
+            elseif ch == 0xb5
+                set_codeunit!(out, 0x39c)
+            elseif ch == 0xff
+                set_codeunit!(out, 0x178)
+            end
+        elseif _cat(ch) == Uni.LL
+            set_codeunit!(out, _uppercase_u(ch))
+        end
+        out += 2
+    end
+    T(buf)
+end
+
+function uppercase(str::UTF16Str)
+    len, pnt = _lenpnt(str)
+    pnt = beg
+    fin = beg + (len << 1)
+    while pnt < fin
+        ch = get_codeunit(pnt)
+        (ch > 0xd7ff # May be surrogate pair
+         ? _is_lower_u(ch > 0xdfff ? get_supplementary(ch, get_codeunit(pnt += 2)) : ch%UInt32)
+         : (isascii(ch) ? _islower_a(ch) : (islatin(ch) ? _islower_lu(ch) : _islower_u(ch)))) &&
+             return _upper(UTF16Str, beg, pnt, fin, len)
+        pnt += 2
+    end
+    str
 end
 
 function rsearch(s::UCS2Strings, ch::UInt32, pos::Integer)
@@ -529,7 +741,7 @@ end
 function convert(::Type{T}, str::WordStr) where {T<:Union{Vector{UInt16},Array{UInt16}}}
     len = _len(str)
     res = similar(T, len)
-    unsafe_copy!(pointer(res), _pnt(str), len<<1)
+    unsafe_copyto!(pointer(res), _pnt(str), len<<1)
     res
 end
 

@@ -170,3 +170,25 @@ _isvalid(::T, ::Type{UnicodeCharSet}, ::Type{<:CharSet}, str) where {T<:Validate
 
 isvalid(::Type{S}, chr::T) where {S<:CodePoint, T<:CodePoint} =
      _isvalid(ValidatedStyle(T), S, T, chr)
+
+# For now, there is only support for immutable `Str`s, when mutable `Str`s are added.
+
+"""
+    MutableStyle(A)
+    MutableStyle(typeof(A))
+
+`MutableStyle` specifies the whether a string type is mutable or not
+
+    Strs.MutableStyle(::Type{<:MyString}) = MutableStr()
+
+The default is `ImmutableStr`
+"""
+abstract type MutableStyle end
+struct ImmutableStr <: MutableStyle end
+struct MutableStr   <: MutableStyle end
+
+MutableStyle(A::Str) = ImmutableStr()
+
+_isimmutable(::ImmutableStr, str::Type{T}) where {T<:Str} = true
+_isimmutable(::MutableStr, str::Type{T}) where {T<:Str} = false
+isimmutable(::Type{T}) where {T<:Str} = _isimmutable(MutableStyle(T))
