@@ -1,11 +1,13 @@
 The Strs.jl package is licensed under the MIT "Expat" License:
 
-Copyright (c) 2017: Gandalf Software, Inc. (Scott Paul Jones), and other contributors
+Copyright (c) 2017-2018: Gandalf Software, Inc. (Scott Paul Jones), and other contributors (see below)
 
 Some parts are derived/inspired from code that is:
-1) part of the open source Julia project (https://github.com/JuliaLang/julia), see https://github.com/JuliaLang/julia/blob/master/LICENSE.md (although note, the attribution of Scott Paul Jones' copyright to portions of that code is no longer visible in the list of contributors to Julia: https://github.com/JuliaLang/julia/contributors)
-2) code formally part of Julia, now placed in https://github.com/JuliaArchive/LegacyStrings.jl, which contains large portions written by @ScottPJones as well as parts written by other Julia contributors
-3) the https://github.com/nalimilan/StringEncodings.jl package, by @nalimilan (Milan Bouchet-Valat)
+
+1) part of the open source [Julia](https://github.com/JuliaLang/julia) project, see https://github.com/JuliaLang/julia/blob/master/LICENSE.md (since not all contributors to Julia are not displayed by https://github.com/JuliaLang/julia/contributors, instead use git (git log | grep "Author:" | sort -u) to get a full list)
+2) code formally part of Julia, now placed in [LegacyStrings](https://github.com/JuliaArchive/LegacyStrings.jl), which contains large portions written by [Scott Paul Jones](https://github.com/ScottPJones) as well as parts written by other Julia contributors
+3) the [StringEncodings](https://github.com/nalimilan/StringEncodings.jl) package, by [Milan Bouchet-Valat](https://github.com/nalimilan)
+4) the [Strings](https://github.com/quinnj/Strings.jl) package, by [Jacob Quinn](https://github.com/quinnj)
 
 Those are all under the MIT license (see below):
 
