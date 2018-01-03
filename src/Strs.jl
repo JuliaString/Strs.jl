@@ -59,7 +59,7 @@ import Base: containsnul, convert, endof, getindex, length, map, pointer, collec
              codeunit, start, next, done, nextind, prevind, reverseind, ind2chr, chr2ind,
              typemin, typemax, isvalid, rem, size, ndims, first, last, eltype, isempty, in,
              hash, isless, ==, -, +, *, cmp, promote_rule, one, repeat, filter, thisind,
-             print, show
+             print, show, isimmutable
     
 
 if isdefined(Base, :ncodeunits)
@@ -84,6 +84,7 @@ include("chars.jl")
 include("access.jl")
 include("traits.jl")
 include("unicode.jl")
+include("casefold.jl")    
 include("iters.jl")
 include("core.jl")
 include("support.jl")

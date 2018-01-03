@@ -167,11 +167,12 @@ print_size_ratio(val) = print_size_ratio(STDOUT, val)
 print_time_ratio(val) = print_time_ratio(STDOUT, val)
 
 print_ratio(val) = pwc(val < .95 ? :red : val > 1.05 ? :green : :normal, f"\%12.3f(val)")
+print_ratio_rev(val) = pwc(val < .95 ? :green : val > 1.05 ? :red : :normal, f"\%12.3f(val)")
 
-function dispres(xres)
+function dispres(io, xres)
     # (fname, stats, sizes, res)
     (fname, stats, sizes, res) = xres
-    show(STDOUT, (fname, stats))
+    show(io, (fname, stats))
     numchars = stats.len
     maxlen = 0
     pos = 0
@@ -187,65 +188,51 @@ function dispres(xres)
         push!(nam1, names[1])
         push!(nam2, length(names) > 1 ? names[2] : "")
     end
-    pr"\nType        B/Char"
-    for nam in nam1 ; pr"\%10s(nam)" ; end
-    pr_ul("\n                  ")
-    for nam in nam2 ; pr_ul(f"\%10s(nam)") ; end
+    pr"\(io)\nType        B/Char"
+    for nam in nam1 ; pr"\(io)\%10s(nam)" ; end
+    pr_ul(io, "\n                  ")
+    for nam in nam2 ; pr_ul(io, f"\%10s(nam)") ; end
     pr"\nResults:          "
     for results in rs
-        pr"\%10d(results[2])"
+        pr"\(io)\%10d(results[2])"
     end
     r1 = res[1]
     t1 = r1[3]
-    pr"\n\n\%-12.12s(r1[1])\%6.3f(sizes[1]/numchars)"
+    pr"\(io)\n\n\%-12.12s(r1[1])\%6.3f(sizes[1]/numchars)"
     for tim in t1
-        pr"\%10.3f(tim[3]/numchars)"
+        pr"\(io)\%10.3f(tim[3]/numchars)"
     end
     for i = 2:length(res)
         rn = res[i]
-        pr"\n\%-12.12s(rn[1])\%6.3f(sizes[i]/numchars)"
+        pr"\(io)\n\%-12.12s(rn[1])\%6.3f(sizes[i]/numchars)"
         #print_size_ratio(sizes[i]/numchars)
         tn = rn[3]
         minres = min(length(t1), length(tn))
         for i = 1:minres
-            print_time_ratio(t1[i][3]/tn[i][3])
+            print_time_ratio(io, t1[i][3]/tn[i][3])
         end
         for i = minres+1:length(tn)
-            pwc(:yellow, f"\%10.3f(tn[i][3]/numchars)")
+            pwc(:yellow, io, f"\%10.3f(tn[i][3]/numchars)")
         end
     end
-    pr"\n"
+    println(io)
 end
 
 const divline = string(repeat('#', 100),'\n','\f')
 
-function dispbench(totres)
+function dispbench(io, totres)
     for res in totres[1]
-        dispres(res)
-        print(divline)
+        dispres(io, res)
+        print(io, divline)
     end
 end
 
-function countlength1(lines::Vector{<:AbstractString})
+dispbench(totres) = dispbench(STDOUT, totres)
+
+function countlength(lines::Vector{<:AbstractString})
     cnt = 0
     for text in lines
         cnt += length(text)
-    end
-    cnt
-end
-
-function countlength2(lines::Vector{<:AbstractString})
-    cnt = 0
-    for text in lines
-        cnt += sklength(text)
-    end
-    cnt
-end
-
-function countlength3(lines::Vector{<:AbstractString})
-    cnt = 0
-    for text in lines
-        cnt += oldlength(text)
     end
     cnt
 end
@@ -259,18 +246,50 @@ function douppercase(lines::Vector{<:AbstractString})
     cnt
 end
 
-function countchars(lines::Vector{<:AbstractString})
+function iteratechars(text::AbstractString)
     cnt = 0
-    for text in lines, ch in text
-        cnt += 1
+    for ch in text
+        cnt += '0' <= ch <= '9'
     end
     cnt
 end
 
-function countcps(lines::Vector{<:AbstractString})
+function iteratechars(text::Str)
     cnt = 0
-    for text in lines, ch in codepoints(text)
-        cnt += 1
+    @inbounds for i=1:length(text)
+        cnt += '0' <= text[i] <= '9'
+    end
+    cnt
+end
+
+function iteratecps(text::AbstractString)
+    cnt = 0
+    for ch in codepoints(text)
+        cnt += '0' <= ch <= '9'
+    end
+    cnt
+end
+
+function iteratecus(text::AbstractString)
+    cnt = 0
+    for ch in codeunits(text)
+        cnt += '0' <= ch <= '9'
+    end
+    cnt
+end
+
+function countchars(lines::Vector{T}) where {T<:AbstractString}
+    cnt = 0
+    for text in lines
+        cnt += iteratechars(text)
+    end
+    cnt
+end
+
+function countcps(lines::Vector{T}) where {T<:AbstractString}
+    cnt = 0
+    for text in lines
+        cnt += iteratecps(text)
     end
     cnt
 end
@@ -283,10 +302,18 @@ function countsize1(lines::Vector{<:AbstractString})
     cnt
 end
 
+function countcodeunits(text::AbstractString)
+    cnt = 0
+    @inbounds for cu in codeunits(text)
+        cnt += cu
+    end
+    cnt
+end
+
 function countsize2(lines::Vector{<:AbstractString})
     cnt = 0
-    for text in lines, cu in codeunits(text)
-        cnt += 1
+    for text in lines
+        cnt += countcodeunits(text)
     end
     cnt
 end
@@ -299,34 +326,86 @@ function checkstr(fun, lines::Vector{<:AbstractString})
     cnt
 end
 
+function iteratefunchars(fun, text)
+    cnt = 0
+    for ch in text
+        cnt += fun(ch)
+    end
+    cnt
+end
+
+function iteratefuncps(fun, text)
+    cnt = 0
+    for ch in codepoints(text)
+        cnt += fun(ch)
+    end
+    cnt
+end
+
+function iteratefuncus(fun, text)
+    cnt = 0
+    for ch in codeunits(text)
+        cnt += fun(ch)
+    end
+    cnt
+end
+
 function checkchars(fun, lines::Vector{<:AbstractString})
     cnt = 0
-    for text in lines, ch in text
-        cnt += fun(ch)
+    for text in lines
+        cnt += iteratefunchars(fun, text)
     end
     cnt
 end
 
 function checkcp(fun, lines::Vector{<:AbstractString})
     cnt = 0
-    for text in lines, cp in codepoints(text)
-        cnt += fun(cp)
+    for text in lines
+        cnt += iteratefuncps(fun, text)
     end
     cnt
 end
 
-function sumcharvals(lines::Vector{<:AbstractString})
+function sumchars(text)
     t = 0
-    for text in lines, ch in text
+    for ch in text
+        t += UInt32(ch)
+    end
+    t
+end
+function sumcp(text)
+    t = 0
+    for ch in codepoints(text)
+        t += UInt32(ch)
+    end
+    t
+end
+function sumcu(text)
+    t = 0
+    for ch in codeunits(text)
         t += UInt32(ch)
     end
     t
 end
 
+function sumcharvals(lines::Vector{<:AbstractString})
+    t = 0
+    for text in lines
+        t += sumchars(text)
+    end
+    t
+end
 function sumcodepnts(lines::Vector{<:AbstractString})
     t = 0
-    for text in lines, cp in codepoints(text)
-        t += convert(UInt32, cp)
+    for text in lines
+        t += sumcp(text)
+    end
+    t
+end
+function sumcodeunits(lines::Vector{<:AbstractString})
+    t = 0
+    for text in lines
+        t += sumcu(text)
     end
     t
 end
@@ -423,8 +502,16 @@ function oldlength(s::UTF16Str)
     cnt
 end
 
+countsklength(l)  = checkstr(sklength, l)
+countoldlength(l) = checkstr(oldlength, l)
+
+countchars(l)   = checkstr(iteratechars, l)
+countcps(l)     = checkstr(iteratecps, l)
+countcus(l)     = checkstr(iteratecus, l)
+
 validstr(l)     = checkstr(isvalid, l)
 asciistr(l)     = checkstr(isascii, l)
+
 validchars(l)   = checkchars(isvalid, l)
 asciichars(l)   = checkchars(isascii, l)
 
@@ -443,65 +530,32 @@ checkprint(l)   = checkcp(isprint,   l)
 checkpunct(l)   = checkcp(ispunct,   l)
 checkgraph(l)   = checkcp(isgraph,   l)
 
-function wrap(f, lines, cnts::LineCounts, t, msg, basetime=0%UInt)
+function wrap(f, lines, io, cnts::LineCounts, t, msg, basetime=0%UInt)
     tst = ""
     try
         res = f(lines)
         raw = @belapsed ($f)($lines)
         tim = round(UInt64, raw*1e9)
         push!(t, (msg, res, tim))
-        pr"\%-22s(replace(msg, '\n' => ' ')*':') \%12d(res)"
-        pr" \%12.3f(tim/1000000)"
-        pr" \%12.3f(tim/cnts.lines)"
-        pr" \%12.3f(tim/cnts.chars)"
-        pr" \%12.3f(tim/cnts.bytes)"
+        pr"\(io)\%-22s(replace(msg, '\n' => ' ')*':') \%12d(res)"
+        pr"\(io) \%12.3f(tim/1000000)"
+        pr"\(io) \%12.3f(tim/cnts.lines)"
+        pr"\(io) \%12.3f(tim/cnts.chars)"
+        pr"\(io) \%12.3f(tim/cnts.bytes)"
         basetime != 0 && print_ratio(basetime/tim)
-        pr"\n"
+        pr"\(io)\n"
     catch ex
         push!(t, (msg, 0, 0%UInt))
-        println(sprint(showerror, ex, catch_backtrace()))
+        println(io, sprint(showerror, ex, catch_backtrace()))
     end
 end
 
-# For each set of lines: save number of characters (should be the same for all)
-# For each test (currently just counting via Char iteration, length)
-
-const tests =
-    (
-     (countsize1,   "sizeof"),
-     (countlength1, "length"),
-     (countchars,   "iteration\nChar"),
-     (sumcharvals,  "sum\nchar vals"),
-     (asciistr,     "isascii\nstring"),
-     (validstr,     "isvalid\nstring"),
-     #=
-     (countlength2, "length\nSK"),
-     (countlength3, "length\nOld"),
-     (checkascii,   "isascii\nchars"),
-     (checkcntrl,   "iscntrl\nchars"),
-     (checkvalid,   "isvalid\nchars"),
-     (checklower,   "islower\nchars"),
-     (checkupper,   "isupper\nchars"),
-     (checkalpha,   "isalpha\nchars"),
-     (checkalnum,   "isalnum\nchars"),
-     (checkspace,   "isspace\nchars"),
-     (checkprint,   "isprint\nchars"),
-     (checkpunct,   "ispunct\nchars"),
-     (checkgraph,   "isgraph\nchars"),
-     (checkdigit,   "isdigit\nchars"),
-     (checkxdigit,  "isxdigit\nchars"),
-     (dolowercase,  "lowercase\nstring"),
-     (douppercase,  "uppercase\nstring"),
-     (dotitlecase,  "titlecase\nstring"),
-     =#
-    )
-
-function testperf(lines::Vector{T}, cnts, docnam, basetime) where {T<:AbstractString}
+function testperf(lines::Vector{T}, io, cnts, docnam, basetime) where {T<:AbstractString}
     # Test performance
-    pr_ul(f"""\%-22s(docnam) \%12s("Result") \%12s("ms total") """)
-    pr_ul(f"""\%12s("ns/line") \%12s("ns/char") \%12s("ns/byte")\n""")
+    pr_ul(io, f"""\%-22s(docnam) \%12s("Result") \%12s("ms total") """)
+    pr_ul(io, f"""\%12s("ns/line") \%12s("ns/char") \%12s("ns/byte")\n""")
     t = []
-    # Make sure everything is already compiled
+    # Just run everything once
     for (tst, nam) in tests
         try
             tst(lines)
@@ -513,22 +567,212 @@ function testperf(lines::Vector{T}, cnts, docnam, basetime) where {T<:AbstractSt
     end
     pos = 0
     for (tst, nam) in tests
-        wrap(tst, lines, cnts, t, nam, basetime == nothing ? 0%UInt : basetime[pos += 1][3])
+        wrap(tst, lines, io, cnts, t, nam, basetime == nothing ? 0%UInt : basetime[pos += 1][3])
     end
+    #=
     if T != String
-        wrap(countsize2,  lines, cnts, t, "iteration\ncodeunits")
-        #wrap(countcps,    lines, cnts, t, "iteration\ncp")
-        wrap(sumcodepnts, lines, cnts, t, "sum\ncp")
+        wrap(countsize2,  lines, io, cnts, t, "iteration\ncodeunits")
+        #wrap(countcps,    lines, io, cnts, t, "iteration\ncp")
+        wrap(sumcodepnts, lines, io, cnts, t, "sum\ncp")
     end
+    =#
     pr"\n"
     docnam, cnts.bytes, t, ""
 end
 
+function sumsizes1(lines)
+    cnt = 0
+    for text in lines
+        cnt += sizeof(text)
+    end
+    cnt
+end
+
+sumsizes2(lines) = sum(sizeof, lines)
+
+function benchsizes(lines)
+    f = sumsizes1
+    t1 = @belapsed sumsizes1($lines)
+    t2 = @belapsed sumsizes2($lines)
+    t3 = @belapsed ($f)($lines)
+    t4 = @belapsed sum(sizeof, $lines)
+    t1, t2, t3, t4
+end
+
 enctyp(t) = t == 1 ? ASCIIStr : t == 2 ? LatinStr : t < 5 ? UCS2Str : UTF32Str
+          
+function encode_lines(list, lines)
+    numlines = length(lines)
+    enc = []
+    push!(enc, lines)
+    for i = 2:length(list)
+        T = list[i]
+        vec = create_vector(T, numlines)
+        @inbounds for j = 1:numlines
+            vec[j] = convert(T, lines[j])
+        end
+        push!(enc, vec)
+    end
+    enc
+end
 
-(::Type{UInt32})(v::T) where {T<:CodePoint} = Strs.tobase(v)%UInt32
+function checkboolchar(fun, lines)
+    res = []
+    for text in lines
+        len = length(text)
+        bv = BitVector(uninitialized, len)
+        for (i, ch) in enumerate(text)
+            bv[i] = fun(ch)
+        end
+        push!(res, bv)
+    end
+    res
+end
 
-function benchdir(sampledir = defsampledir)
+function checkline(::Type{Bool}, fun, lines)
+    len = length(lines)
+    bv = BitVector(uninitialized, len)
+    for (i, text) in enumerate(lines)
+        bv[i] = fun(text)
+    end
+    bv
+end
+
+function checkline(::Type{T}, fun, lines) where {T}
+    res = T[]
+    for text in lines
+        push!(res, fun(text))
+    end
+    res
+end
+
+function runcheckline(::Type{T}, lines, list) where {T}
+    totresults = []
+    for fun in list
+        push!(totresults, checkline(T, fun, lines))
+    end
+    totresults
+end
+
+function runcheckchar(lines, list)
+    totresults = []
+    for fun in list
+        push!(totresults, checkboolchar(fun, lines))
+    end
+    totresults
+end
+
+function runcheckcu(lines, list)
+    totresults = []
+    for fun in list
+        res = []
+        for text in lines
+            push!(res, [fun(cu) for cu in codeunits(text)])
+        end
+        push!(totresults, res)
+    end
+    totresults
+end
+
+function comparetestline(lines, results, list)
+    diff = []
+    for (i, fun) in enumerate(list)
+        fundiff = []
+        funres = results[i]
+        for (j, text) in enumerate(lines)
+            res = fun(text)
+            res == funres[j] || push!(fundiff, (j, text, res, funres[j]))
+        end
+        isempty(fundiff) || push!(diff, (i, fun, fundiff))
+    end
+    diff
+end
+
+function comparetestchar(lines, results, list)
+    diff = []
+    for (i, fun) in enumerate(list)
+        fundiff = []
+        lineres = results[i]
+        for (j, text) in enumerate(lines)
+            chdiff = []
+            chrres = lineres[j]
+            for (k, ch) in enumerate(text)
+                res = fun(ch)
+                res == chrres[k] || push!(chrdiff, (k, ch, res, chrres[k]))
+            end
+            isempty(chdiff) || push!(fundiff, (j, text, chdiff))
+        end
+        isempty(fundiff) || push!(diff, (i, fun, fundiff))
+    end
+    diff
+end
+
+function comparetestcu(lines, results, list)
+    diff = []
+    for (i, fun) in enumerate(list)
+        fundiff = []
+        lineres = results[i]
+        for (j, text) in enumerate(lines)
+            chdiff = []
+            chrres = lineres[j]
+            for (k, ch) in enumerate(codeunits(text))
+                res = fun(ch)
+                res == chrres[k] || push!(chrdiff, (k, ch, res, chrres[k]))
+            end
+            isempty(chdiff) || push!(fundiff, (j, text, chdiff))
+        end
+        isempty(fundiff) || push!(diff, (i, fun, fundiff))
+    end
+    diff
+end
+
+const strintlist  = (length, )
+const strboollist = (isascii, isvalid)
+const strmaplist  = (lowercase, uppercase) #, titlecase)
+const charlist    = (isascii, isvalid, iscntrl, islower, isupper, isalpha,
+                     isalnum, isspace, isprint, ispunct, isgraph, isdigit, isxdigit)
+const codeunitlist = (UInt32,)
+
+# Use String to calculate a baseline (note, sizeof needs to be checked separately, as only
+# UTF8Str should be the same).
+
+compareall(lines, res) =
+    (comparetestline(lines, res[1], strintlist),
+     comparetestline(lines, res[2], strboollist),
+     comparetestline(lines, res[3], strmaplist),
+     comparetestchar(lines, res[4], charlist),
+     comparetestcu(lines, res[5], codeunitlist),
+     eltype(lines) == UTF8Str ? comparetestline(lines, res[6], (sizeof, )) : [])
+
+function checktests(io = STDOUT, sampledir = defsampledir)
+    totres = []
+    for fname in readdir(sampledir)
+        lines = readlines(joinpath(sampledir, fname))
+        stats = calcstats(lines)
+        list = [String, UTF8Str, UTF16Str, UTF32Str, UniStr]
+        MT = enctyp(stats.maxtyp)
+        push!(list, MT)
+        isdefined(Main, :UTF8String) && push!(list, UTF8String, UTF16String, UTF32String)
+        enc = encode_lines(list, lines)
+        for i = 1:length(enc) ; print(typeof(enc[i]), " ") ; end ; println()
+        res = (runcheckline(Int, lines, strintlist),
+               runcheckline(Bool, lines, strboollist),
+               runcheckline(String, lines, strmaplist),
+               runcheckchar(lines, charlist),
+               runcheckcu(lines, codeunitlist),
+               runcheckline(Int, lines, (sizeof, )))
+        for i = 1:6 ; print(typeof(res[i]), " ") ; end
+        println()
+        cmp = []
+        for i = 2:length(list)
+            push!(cmp, compareall(enc[i], res))
+        end
+        push!(totres, (fname, res, cmp))
+    end
+    totres
+end
+
+function benchdir(io = STDOUT, sampledir = defsampledir)
     totres = []
     totlines = []
     totnames = []
@@ -536,47 +780,36 @@ function benchdir(sampledir = defsampledir)
     for fname in readdir(sampledir)
         lines = readlines(joinpath(sampledir, fname))
         stats = calcstats(lines)
-        show(STDOUT, (fname, stats))
-        list = [String, UTF8Str, UTF16Str, UniStr]
-        names = ["String", "UTF8Str", "UTF16Str", "UniStr"]
+        show(io, (fname, stats))
+        list = [String, UTF8Str, UTF16Str, UTF32Str, UniStr]
         MT = enctyp(stats.maxtyp)
         push!(list, MT)
-        push!(names, string(MT))
-        if isdefined(Main, :UTF8String)
-            push!(list, UTF8String, UTF16String, UTF32String)
-            push!(names, "UTF8String", "UTF16String", "UTF32String")
-        end
-        enc = []
+        isdefined(Main, :UTF8String) && push!(list, UTF8String, UTF16String, UTF32String)
         numchars = stats.len
         numlines = stats.num
-        push!(enc, lines)
-        for i = 2:length(list)
-            T = list[i]
-            vec = create_vector(T, numlines)
-            @inbounds for j = 1:numlines
-                vec[j] = convert(T, lines[j])
-            end
-            push!(enc, vec)
-        end
+        enc = encode_lines(list, lines)
         # Now calculate and display the size statistics for each
         sizes = [sum(sizeof, enclines) for enclines in enc]
         basesize = sizes[1]
-        pr_ul("\nTypes:      ")
-        for nam in names ; pr_ul(f"\%12s(nam)") ; end
-        pr"\nBytes:      "
-        for siz in sizes ; pr"\%12d(siz)" ; end
-        pr"\nBytes/Char: "
-        for siz in sizes ; pr"\%12.3f(siz/numchars)" ; end
-        pr"\nRelative:               "
-        for siz in sizes[2:end] ; print_ratio(siz/basesize) ; end
+        names = String[string(typ) for typ in list]
+
+        pr_ul(io, "\nTypes:      ")
+        for nam in names ; pr_ul(io, f"\%12s(nam)") ; end
+        pr"\(io)\nBytes:      "
+        for siz in sizes ; pr"\(io)\%12d(siz)" ; end
+        pr"\(io)\nBytes/Char: "
+        for siz in sizes ; pr"\(io)\%12.3f(siz/numchars)" ; end
+        pr"\(io)\nRelative:               "
+        for siz in sizes[2:end] ; print_ratio_rev(siz/basesize) ; end
         pr"\n\n"
 
         # Now test the performance for each
         res = Vector{Any}(uninitialized, length(list))
-        res[1] = testperf(enc[1], LineCounts(numlines, numchars, sizes[1]), names[1], nothing)
+        res[1] = testperf(enc[1], io, LineCounts(numlines, numchars, sizes[1]), names[1], nothing)
         basetime = res[1][3]
         for i = 2:length(list)
-            res[i] = testperf(enc[i], LineCounts(numlines, numchars, sizes[i]), names[i], basetime)
+            res[i] = testperf(enc[i], io, LineCounts(numlines, numchars, sizes[i]), names[i],
+                              basetime)
         end
         push!(totres, (fname, stats, sizes, res))
 

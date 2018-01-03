@@ -128,7 +128,7 @@ end
 convert(::Type{_UTF32Str}, str::AbstractString) = Str(str)
 
 # This needs to handle the fact that the String type can contain invalid data!
-function convert(::Type{T}, str::String) where {T<:UTF32Strings}
+function _convert_string_utf32(::Type{T}, str::String) where {T<:UTF32Strings}
     len, dat = _lendata(str)
     # handle zero length string quickly
     len == 0 && return empty_str(T)
@@ -137,6 +137,10 @@ function convert(::Type{T}, str::String) where {T<:UTF32Strings}
     # Optimize case where no characters > 0x7f, no invalid
     T(flags == 0 ? _cvtsize(UInt32, dat, len) : _encode(UInt32, dat, len))
 end
+
+# Avert problems with ambiguous method
+convert(::Type{UTF32Str}, str::String)  = _convert_string_utf32(UTF32Str, str)
+convert(::Type{_UTF32Str}, str::String) = _convert_string_utf32(_UTF32Str, str)
 
 @inline function get_cp(dat, pos)
     ch = get_codeunit(dat, pos += 1)%UInt32

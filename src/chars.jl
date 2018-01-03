@@ -96,8 +96,9 @@ rem(x::S, ::Type{T}) where {S<:CodePoint, T<:Number}    = rem(reinterpret(basety
 rem(x::S, ::Type{T}) where {S<:Number, T<:CodePoint}    = reinterpret(T, x%basetype(T))
 rem(x::S, ::Type{T}) where {S<:CodePoint, T<:CodePoint} = reinterpret(T, x%basetype(T))
 
-#UInt64(cu::T) where {T<:CodePoint} = tobase(cu)%UInt64
-#Int64(cu::T) where {T<:CodePoint} =  tobase(cu)%Int64
+(::Type{UInt32})(v::T) where {T<:CodePoint} = Strs.tobase(v)%UInt32
+(::Type{Int})(v::T) where {T<:CodePoint}    = Strs.tobase(v)%Int
+(::Type{UInt})(v::T) where {T<:CodePoint}   = Strs.tobase(v)%UInt
 
 RawByte(v)   = convert(RawByte, v)
 RawWord(v)   = convert(RawWord, v)
