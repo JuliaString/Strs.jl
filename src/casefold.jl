@@ -45,6 +45,7 @@ function _upper(::Type{ASCIIStr}, dat, i, len)
 end
 
 function uppercase(str::ASCIIStr)
+    println("uppercase(::ASCIIStr)")
     len, dat = _lendata(str)
     @inbounds for i = 1:len
         _islower_a(dat[i]) && return _upper(ASCIIStr, dat, i, len)
@@ -61,6 +62,7 @@ function _lower(::Type{ASCIIStr}, dat, i, len)
 end
 
 function lowercase(str::ASCIIStr)
+    println("lowercase(::ASCIIStr)")
     len, dat = _lendata(s)
     for i = 1:len
         _isupper_a(dat[i]) && return _lower(ASCIIStr, dat, i, len)
@@ -73,9 +75,9 @@ function ucfirst(str::LatinStr)
     isempty(dat) && return str
     ch = get_codeunit(dat, 1)%LatinChr
     if islower(ch%LatinChr)
-        t = copy(dat)
-        t[1] = ch - 32
-        LatinStr(t)
+        out = copy(dat)
+        out[1] = ch - 32
+        LatinStr(out)
     else
         str
     end
@@ -160,6 +162,7 @@ function _widenupper(dat, i, len)
 end
 
 function uppercase(str::LatinStr)
+    println("uppercase(::LatinStr)")
     len, dat = _lendata(str)
     @inbounds for i = 1:len
         islower(dat[1]%LatinChr) && return _upper(LatinStr, dat, i, len)
@@ -168,6 +171,7 @@ function uppercase(str::LatinStr)
 end
 
 function uppercase(str::_LatinStr)
+    println("uppercase(::_LatinStr)")
     len, dat = _lendata(str)
     @inbounds for i = 1:len
         ch = dat[i]
@@ -186,6 +190,7 @@ function _lower(::Type{T}, dat, i) where {T<:LatinStrings}
 end
 
 function lowercase(str::T) where {T<:LatinStrings}
+    println("lowercase(::$T)")
     dat = _data(str)
     for i = 1:_len(str)
         isupper(dat[i]%LatinChr) && return _lower(T, dat, i)
@@ -221,13 +226,18 @@ function _lower(::Type{T}, beg, pnt, fin, len) where {T<:UTF32Strings}
     T(buf)
 end
 
+# Placeholders until I write some optimal code for these
+lowercase(str::UTF8Str) = UTF8Str(lowercase(String(str.data)))
+uppercase(str::UTF8Str) = UTF8Str(uppercase(String(str.data)))
+
 function lowercase(str::UCS2Str)
-    len, pnt = _lenpnt(str)
-    fin = out + (len << 1)
-    while out < fin
+    println("lowercase(::UCS2Str)")
+    pnt = beg = _pnt(str)
+    fin = beg + sizeof(str)
+    while pnt < fin
         ch = get_codeunit(pnt)
         (islatin(ch) ? (_isupper_a(ch) || _isupper_l(ch)) : isupper(ch)) &&
-            return _lower(UCS2Str, beg, pnt, fin, len)
+            return _lower(UCS2Str, beg, pnt, fin, _len(str))
         pnt += 2
     end
     str
@@ -266,25 +276,39 @@ function _upper(::Type{T}, beg, pnt, fin, len) where {T<:UTF32Strings}
 end
 
 function uppercase(str::UCS2Str)
-    len, pnt = _lenpnt(str)
-    pnt = beg
+    println("uppercase(::UCS2Str)")
+    pnt = beg = _pnt(str)
     fin = beg + sizeof(str)
     while pnt < fin
         ch = get_codeunit(pnt)
         (isascii(ch) ? _islower_a(ch) : (islatin(ch) ? _islower_lu(ch) : _islower_u(ch))) &&
-            return _upper(UCS2Str, beg, pnt, fin, len)
+            return _upper(UCS2Str, beg, pnt, fin, _len(str))
         pnt += 2
     end
     str
 end
-function uppercase(str::UTF32Str)
-    len, pnt = _lenpnt(str)
-    pnt = beg
+
+function uppercase(str::T) where {T<:UTF32Strings}
+    println("uppercase(::$T)")
+    pnt = beg = _pnt(str)
     fin = beg + sizeof(str)
     while pnt < fin
         ch = get_codeunit(pnt)
         (isascii(ch) ? _islower_a(ch) : (islatin(ch) ? _islower_lu(ch) : _islower_u(ch))) &&
-            return _upper(UTF32Str, beg, pnt, fin, len)
+            return _upper(T, beg, pnt, fin, _len(str))
+        pnt += 4
+    end
+    str
+end
+
+function lowercase(str::T) where {T<:UTF32Strings}
+    println("lowercase(::$T)")
+    pnt = beg = _pnt(str)
+    fin = beg + sizeof(str)
+    while pnt < fin
+        ch = get_codeunit(pnt)
+        (islatin(ch) ? (_isupper_a(ch) | _isupper_l(ch)) : _isupper_u(ch)) &&
+            return _lower(T, beg, pnt, fin, _len(str))
         pnt += 4
     end
     str
@@ -293,42 +317,28 @@ end
 # result must have at least one character > 0xff, so if the only character(s)
 # > 0xff became <= 0xff, then the result may need to be narrowed and returned as _LatinStr
 function lowercase(str::_UCS2Str)
-    len, pnt = _lenpnt(str)
-    pnt = beg
+    println("lowercase(::_UCS2Str)")
+    pnt = beg = _pnt(str)
     fin = beg + sizeof(str)
     while pnt < fin
         ch = get_codeunit(pnt)
         # Todo, return as _LatinStr if necessary
         (islatin(ch) ? (_isupper_a(ch) | _isupper_l(ch)) : _isupper_u(ch)) &&
-            return _lower(_UCS2Str, beg, pnt, fin, len)
+            return _lower(_UCS2Str, beg, pnt, fin, _len(str))
         pnt += 2
-    end
-    str
-end
-
-function lowercase(str::_UTF32Str)
-    len, pnt = _lenpnt(str)
-    pnt = beg
-    fin = beg + sizeof(str)
-    while pnt < fin
-        ch = get_codeunit(pnt)
-        # Todo, return as _LatinStr if necessary
-        (islatin(ch) ? (_isupper_a(ch) | _isupper_l(ch)) : _isupper_u(ch)) &&
-            return _lower(_UTF32Str, beg, pnt, fin, len)
-        pnt += 4
     end
     str
 end
 
 # characters 0xb5 and 0xff get treated specially
 function uppercase(str::_UCS2Str)
-    len, pnt = _lenpnt(str)
-    pnt = beg
-    fin = beg + (len << 1)
+    println("uppercase(::_UCS2Str)")
+    pnt = beg = _pnt(str)
+    fin = beg + sizeof(str)
     while pnt < fin
         ch = get_codeunit(pnt)
         (islatin(ch) ? (_islower_a(ch) | _islower_lu(ch)) : _islower_u(ch)) &&
-            return _upper(_UCS2Str, beg, pnt, fin, len)
+            return _upper(_UCS2Str, beg, pnt, fin, _len(str))
         pnt += 2
     end
     str
@@ -344,24 +354,32 @@ function _lower(::Type{UTF16Str}, beg, pnt, fin, len)
         ch = get_codeunit(out)
         if islatin(ch)
             (_isupper_a(ch) | _isupper_l(ch)) && set_codeunit!(out, ch += 0x20)
+        elseif is_surrogate_trail(ch)
+            # pick up previous code unit (lead surrogate)
+            cp = get_supplementary(get_codeunit(out - 2), ch)
+            if _check_mask(cp, Uni.LU, Uni.LT)
+                cp = _lowercase_u(cp)
+                set_codeunit!(out - 2, (0xd7c0 + (cp >>> 10))%UInt16)
+                set_codeunit!(out,     (0xdc00 + (cp & 0x3ff))%UInt16)
+            end
         elseif _check_mask(ch, Uni.LU, Uni.LT)
             set_codeunit!(out, _lowercase_u(ch))
         end
         out += 2
     end
-    T(buf)
+    UTF16Str(buf)
 end
 
 function lowercase(str::UTF16Str)
-    len, beg = _lenpnt(str)
-    pnt = beg
-    fin = beg + (len << 1)
+    println("lowercase(::UTF16Str)")
+    pnt = beg = _pnt(str)
+    fin = beg + sizeof(str)
     while pnt < fin
         ch = get_codeunit(pnt)
         (ch > 0xd7ff # May be surrogate pair
          ? _is_upper_u(ch > 0xdfff ? get_supplementary(ch, get_codeunit(pnt += 2)) : ch%UInt32)
          : (isascii(ch) ? _isupper_a(ch) : (islatin(ch) ? _isupper_l(ch) : _isupper_u(ch)))) &&
-             return _lower(UTF16Str, beg, pnt, len)
+             return _lower(UTF16Str, beg, pnt, fin, _len(str))
         pnt += 2
     end
     str
@@ -381,24 +399,32 @@ function _upper(::Type{UTF16Str}, beg, pnt, fin, len)
             elseif ch == 0xff
                 set_codeunit!(out, 0x178)
             end
+        elseif is_surrogate_trail(ch)
+            # pick up previous code unit (lead surrogate)
+            cp = get_supplementary(get_codeunit(out - 2), ch)
+            if _cat(cp) == Uni.LL
+                cp = _uppercase_u(cp)
+                set_codeunit!(out - 2, (0xd7c0 + (cp >>> 10))%UInt16)
+                set_codeunit!(out,     (0xdc00 + (cp & 0x3ff))%UInt16)
+            end
         elseif _cat(ch) == Uni.LL
             set_codeunit!(out, _uppercase_u(ch))
         end
         out += 2
     end
-    T(buf)
+    UTF16Str(buf)
 end
 
 function uppercase(str::UTF16Str)
-    len, pnt = _lenpnt(str)
-    pnt = beg
-    fin = beg + (len << 1)
+    println("uppercase(::UTF16Str)")
+    pnt = beg = _pnt(str)
+    fin = beg + sizeof(str)
     while pnt < fin
         ch = get_codeunit(pnt)
         (ch > 0xd7ff # May be surrogate pair
          ? _is_lower_u(ch > 0xdfff ? get_supplementary(ch, get_codeunit(pnt += 2)) : ch%UInt32)
          : (isascii(ch) ? _islower_a(ch) : (islatin(ch) ? _islower_lu(ch) : _islower_u(ch)))) &&
-             return _upper(UTF16Str, beg, pnt, fin, len)
+             return _upper(UTF16Str, beg, pnt, fin, _len(str))
         pnt += 2
     end
     str

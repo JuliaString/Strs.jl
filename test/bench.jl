@@ -677,9 +677,11 @@ end
 function comparetestline(lines, results, list)
     diff = []
     for (i, fun) in enumerate(list)
+        pr"comparetestline: \(typeof(lines)): \(i) => \(fun)\n"
         fundiff = []
         funres = results[i]
         for (j, text) in enumerate(lines)
+            #pr"i:\(i), j:\(j) => \(fun)(\"\(text)\")\n"
             res = fun(text)
             res == funres[j] || push!(fundiff, (j, text, res, funres[j]))
         end
@@ -739,7 +741,7 @@ const codeunitlist = (UInt32,)
 compareall(lines, res) =
     (comparetestline(lines, res[1], strintlist),
      comparetestline(lines, res[2], strboollist),
-     comparetestline(lines, res[3], strmaplist),
+     (),#comparetestline(lines, res[3], strmaplist),
      comparetestchar(lines, res[4], charlist),
      comparetestcu(lines, res[5], codeunitlist),
      eltype(lines) == UTF8Str ? comparetestline(lines, res[6], (sizeof, )) : [])
@@ -754,15 +756,15 @@ function checktests(io = STDOUT, sampledir = defsampledir)
         push!(list, MT)
         isdefined(Main, :UTF8String) && push!(list, UTF8String, UTF16String, UTF32String)
         enc = encode_lines(list, lines)
-        for i = 1:length(enc) ; print(typeof(enc[i]), " ") ; end ; println()
+        #for i = 1:length(enc) ; print(typeof(enc[i]), " ") ; end ; println()
         res = (runcheckline(Int, lines, strintlist),
                runcheckline(Bool, lines, strboollist),
-               runcheckline(String, lines, strmaplist),
+               (),#runcheckline(String, lines, strmaplist),
                runcheckchar(lines, charlist),
                runcheckcu(lines, codeunitlist),
                runcheckline(Int, lines, (sizeof, )))
-        for i = 1:6 ; print(typeof(res[i]), " ") ; end
-        println()
+        #for i = 1:6 ; print(typeof(res[i]), " ") ; end
+        #println()
         cmp = []
         for i = 2:length(list)
             push!(cmp, compareall(enc[i], res))

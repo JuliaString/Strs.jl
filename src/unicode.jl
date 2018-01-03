@@ -255,8 +255,11 @@ const _punct_80 = 0x88c0088200000000
     (ch <= 0x3f ? ((1 << ch) & _punct_00) : ((1 << (ch - 0x40)) & _punct_40)) != 0
 @inline _ispunct_l(ch) = ch <= 0x7f ? _ispunct_a(ch) : (((1 << (ch-0x80)) & _punct_80) != 0)
 
+@inline _isspace_a(ch)  = (ch == 32) | (9 <= ch <= 13)
+@inline _isspace_l(ch)  = (ch == 0x85) | (ch == 0xa0)
+@inline _isspace_al(ch) = _isspace_a(ch) | _isspace_l(ch)
 @inline _isspace(ch) =
-    (ch == 32 | 9 <= ch <= 13) || (ch == 0x85 | ch == 0xa0) || (ch > 0xff && _cat(ch) == Uni.ZS)
+    ch > 0xff ? (_cat(ch) == Uni.ZS) : (ch > 0x7f ? _isspace_l(ch) : _isspace_a(ch))
 
 @inline _isprint_a(ch) = 0x20 <= ch < 0x7f
 @inline _isprint_l(ch) = _isprint_a(ch) | ((0xa0 <= ch <= 0xff) & (ch != 0xad))
@@ -265,25 +268,29 @@ const _punct_80 = 0x88c0088200000000
 
 @inline _isnumeric_l(ch) = _isdigit(ch) || (ch <= 0xbe && ((1<<(ch-0xb2)) & 0x1c83) != 0)
 
-@inline iscntrl(ch::CodePointTypes) = _iscntrl(tobase(ch))
-@inline isdigit(ch::CodePointTypes) = _isdigit(tobase(ch))
+@inline iscntrl(ch::CodePointTypes)  = _iscntrl(tobase(ch))
+@inline isdigit(ch::CodePointTypes)  = _isdigit(tobase(ch))
 @inline isxdigit(ch::CodePointTypes) = _isxdigit(tobase(ch))
 
-@inline isascii(ch::CodePointTypes) = tobase(ch) <= 0x7f
+@inline isascii(ch::CodePointTypes)  = tobase(ch) <= 0x7f
 @inline isascii(ch::ASCIIChr) = true
 
-@inline islatin(ch::CodePointTypes) = tobase(ch) <= 0xff
+@inline islatin(ch::CodePointTypes)  = tobase(ch) <= 0xff
 @inline islatin(ch::ASCIIChr)   = true
 @inline islatin(ch::LatinChars) = true
 
-@inline islower(ch::CodePointTypes) = islatin(ch) ? islower(ch%_LatinChr) : (_cat(ch) == Uni.LL)
-@inline islower(ch::ASCIIChr)   = _islower_a(tobase(ch))
-@inline islower(ch::LatinChars) = _islower_a(tobase(ch)) | _islatin_l(tobase(ch))
+@inline _islower_al(ch) = _islower_a(ch) | _islower_l(ch)
+@inline _islower_ch(ch) = islatin(ch) ? _islower_al(ch) : (_cat(ch) == Uni.LL)
+@inline _isupper_al(ch) = _isupper_a(ch) | _isupper_l(ch)
+@inline _isupper_ch(ch) = islatin(ch) ? _isupper_al(ch) : _check_mask(ch, Uni.LU, Uni.LT)
 
-@inline isupper(ch::CodePointTypes) =
-    islatin(ch) ? isupper(ch%_LatinChr) : _check_mask(ch, Uni.LU, Uni.LT)
-@inline isupper(ch::ASCIIChr)   = _isupper_a(ch)
-@inline isupper(ch::LatinChars) = _isupper_a(ch) | _isupper_l(ch)
+@inline islower(ch::CodePointTypes) = _islower_ch(tobase(ch))
+@inline islower(ch::ASCIIChr)       = _islower_a(tobase(ch))
+@inline islower(ch::LatinChars)     = _islower_al(tobase(ch))
+
+@inline isupper(ch::CodePointTypes) = _isupper_ch(tobase(ch))
+@inline isupper(ch::ASCIIChr)       = _isupper_a(tobase(ch))
+@inline isupper(ch::LatinChars)     = _isupper_al(tobase(ch))
 
 @inline isalpha(ch::CodePointTypes) =
     islatin(ch) ? isalpha(ch%_LatinChr) : _check_mask(ch, _isalpha_mask)
@@ -300,14 +307,14 @@ const _punct_80 = 0x88c0088200000000
 @inline isalnum(ch::ASCIIChr)   = isdigit(ch) | isalpha(ch)
 @inline isalnum(ch::LatinChars) = isalpha(ch) | isnumeric(ch)
 
-@inline ispunct(ch::CodePointTypes) =
-    islatin(ch) ? _ispunct_l(tobase(ch)) : _check_mask(ch, Uni.PC : Uni.PO)
+@inline _ispunct_ch(ch) = islatin(ch) ? _ispunct_l(ch) : _check_mask(ch, Uni.PC : Uni.PO)
+@inline ispunct(ch::CodePointTypes) = _ispunct_ch(tobase(ch))
 @inline ispunct(ch::ASCIIChr)   = _ispunct_a(tobase(ch))
 @inline ispunct(ch::LatinChars) = _ispunct_l(tobase(ch))
 
 @inline isspace(ch::CodePointTypes) = _isspace(tobase(ch))
-@inline isspace(ch::ASCIIChr)   = (ch == 32) | (9 <= ch <= 13)
-@inline isspace(ch::LatinChars) = (ch == 32) | (9 <= ch <= 13) | (ch == 0x85) | (ch == 0xa0)
+@inline isspace(ch::ASCIIChr)       = _isspace_a(tobase(ch))
+@inline isspace(ch::LatinChars)     = _isspace_al(tobase(ch))
 
 @inline isprint(ch::CodePointTypes) =
     islatin(ch) ? _isprint_l(tobase(ch)) : _check_mask(ch, Uni.LU : Uni.ZS)
