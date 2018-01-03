@@ -693,18 +693,24 @@ end
 function comparetestchar(lines, results, list)
     diff = []
     for (i, fun) in enumerate(list)
+        pr"comparetestchar: \(typeof(lines)): \(i) => \(fun)\n"
         fundiff = []
         lineres = results[i]
+        try
         for (j, text) in enumerate(lines)
-            chdiff = []
+            chrdiff = []
             chrres = lineres[j]
+            #typeof(text) == UTF16Str && pr"i:\(i), j:\(j), \(length(text))\n"
             for (k, ch) in enumerate(text)
                 res = fun(ch)
                 res == chrres[k] || push!(chrdiff, (k, ch, res, chrres[k]))
             end
-            isempty(chdiff) || push!(fundiff, (j, text, chdiff))
+            isempty(chrdiff) || push!(fundiff, (j, text, chrdiff))
         end
-        isempty(fundiff) || push!(diff, (i, fun, fundiff))
+            isempty(fundiff) || push!(diff, (i, fun, fundiff))
+        catch ex
+            pr"Failed test \(fun): \(sprint(showerror, ex, catch_backtrace()))"
+        end
     end
     diff
 end
@@ -715,13 +721,13 @@ function comparetestcu(lines, results, list)
         fundiff = []
         lineres = results[i]
         for (j, text) in enumerate(lines)
-            chdiff = []
+            chrdiff = []
             chrres = lineres[j]
             for (k, ch) in enumerate(codeunits(text))
                 res = fun(ch)
                 res == chrres[k] || push!(chrdiff, (k, ch, res, chrres[k]))
             end
-            isempty(chdiff) || push!(fundiff, (j, text, chdiff))
+            isempty(chrdiff) || push!(fundiff, (j, text, chrdiff))
         end
         isempty(fundiff) || push!(diff, (i, fun, fundiff))
     end
