@@ -1,3 +1,12 @@
+#=
+CodeUnit/CodePoint iterator support
+
+Copyright 2017 Gandalf Software, Inc., Scott P. Jones
+Licensed under MIT License, see LICENSE.md
+
+(CodeUnits/codeunits replaced by later code added to Julia)
+=#
+#=
 # CodeUnits -- return the code units of a string
 
 struct CodeUnits{S}
@@ -37,7 +46,7 @@ start(it::CodeUnits) = start(it.xs)
 done(it::CodeUnits, state) = done(it.xs, state)
 
 @propagate_inbounds next(it::CodeUnits, state) = (get_codeunit(_pnt(it.xs), state), state+1)
-
+=#
 
 # CodePoints -- return the code points of a string
 

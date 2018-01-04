@@ -46,7 +46,7 @@ Note: for good substring performance, some of the operations that are optimized 
 =#
 
 export ascii, latin1, utf8, ucs2, utf16, utf32, unsafe_str, islatin
-export codeunits, codepoints, codeunit_type, codeunit_size, @str_str
+export codeunit, codeunits, codepoints, @str_str
 
 macro str_str(string)
     :( unsafe_str($(esc(string))) )
@@ -84,7 +84,8 @@ include("chars.jl")
 include("access.jl")
 include("traits.jl")
 include("unicode.jl")
-include("casefold.jl")    
+include("casefold.jl")
+@static VERSION < v"v0.7.0-DEV" && include("codeunits.jl")
 include("iters.jl")
 include("core.jl")
 include("support.jl")

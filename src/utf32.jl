@@ -15,28 +15,28 @@ const _bmp_mask_32   = 0xffff0000_ffff0000
 function isascii(str::UTF32Str)
     (siz = sizeof(str)) == 0 && return true
     pnt, fin = _calcpnt(str, siz)
-    while (pnt += CHUNKSZ) < fin
+    while (pnt += CHUNKSZ) <= fin
         (unsafe_load(pnt) & _ascii_mask_32) == 0 || return false
     end
-    pnt == fin || unsafe_load(reinterpret(Ptr{UInt32}, pnt)) <= 0x7f
+    pnt - CHUNKSZ == fin || unsafe_load(reinterpret(Ptr{UInt32}, pnt)) <= 0x7f
 end
 
 function islatin(str::UTF32Str)
     (siz = sizeof(str)) == 0 && return true
     pnt, fin = _calcpnt(str, siz)
-    while (pnt += CHUNKSZ) < fin
+    while (pnt += CHUNKSZ) <= fin
         (unsafe_load(pnt) & _latin_mask_32) == 0 || return false
     end
-    pnt == fin || unsafe_load(reinterpret(Ptr{UInt32}, pnt)) <= 0xff
+    pnt - CHUNKSZ == fin || unsafe_load(reinterpret(Ptr{UInt32}, pnt)) <= 0xff
 end
 
 function isbmp(str::UTF32Str)
     (siz = sizeof(str)) == 0 && return true
     pnt, fin = _calcpnt(str, siz)
-    while (pnt += CHUNKSZ) < fin
+    while (pnt += CHUNKSZ) <= fin
         (unsafe_load(pnt) & _bmp_mask_32) == 0 || return false
     end
-    pnt == fin || unsafe_load(reinterpret(Ptr{UInt32}, pnt)) <= 0xffff
+    pnt- CHUNKSZ  == fin || unsafe_load(reinterpret(Ptr{UInt32}, pnt)) <= 0xffff
 end
 
 isunicode(str::UTF32Str)  = true
@@ -115,11 +115,8 @@ function convert(::Type{_UTF32Str}, ch::UInt32)
     end
 end
 
-# Is this even necessary anymore?  should have a convert(::Type{T}, s::T) where {T<:Str} = s
-#convert(::Type{UTF32Str}, s::UTF32Str) = s
-
 function convert(::Type{UTF32Str}, str::AbstractString)
-    len, flags = unsafe_checkstring(str, 1, endof(str))
+    len, flags = unsafe_checkstring(str)
     buf, pnt = _allocate(UInt32, len)
     out = 0
     @inbounds for ch in str ; set_codeunit!(pnt, out += 1, UInt32(ch)) ; end
@@ -129,13 +126,12 @@ convert(::Type{_UTF32Str}, str::AbstractString) = Str(str)
 
 # This needs to handle the fact that the String type can contain invalid data!
 function _convert_string_utf32(::Type{T}, str::String) where {T<:UTF32Strings}
-    len, dat = _lendata(str)
     # handle zero length string quickly
-    len == 0 && return empty_str(T)
+    (len = _len(str)) == 0 && return empty_str(T)
     # Validate UTF-8 encoding, and get number of words to create
-    len, flags = unsafe_checkstring(dat, 1, len)
+    len, flags = unsafe_checkstring(str, 1, len)
     # Optimize case where no characters > 0x7f, no invalid
-    T(flags == 0 ? _cvtsize(UInt32, dat, len) : _encode(UInt32, dat, len))
+    T(flags == 0 ? _cvtsize(UInt32, str, len) : _encode(UInt32, str, len))
 end
 
 # Avert problems with ambiguous method
@@ -171,18 +167,22 @@ end
 function _encode(::Type{UInt32}, dat, len)
     buf, pnt = _allocate(UInt32, len)
     # has multi-byte UTF-8 sequences
-    out = pos = 0
-    @inbounds while out < len
+    pos = 0
+    fin = pnt + (len<<2)
+    @inbounds while pnt < fin
         ch, pos = get_cp(dat, pos)
-        set_codeunit!(pnt, out += 1, ch)
+        set_codeunit!(pnt, ch)
+        pnt += 4
     end
     buf
 end
 
 # transcode to vector of UInt32 from validated UTF8
-function _transcode(::Type{T}, ::Type{UTF8Str}, pnt, dat, len) where {T<:CodePoint}
-    out = pos = 0
-    @inbounds while out < len
+function _transcode_32(::Type{UTF8Str}, dat, len)
+    buf, pnt = _allocate(UInt32, len)
+    pos = 0
+    fin = pnt + (len<<2)
+    @inbounds while pnt < fin
         ch = get_codeunit(dat, pos += 1)%UInt32
         # Handle ASCII characters
         if ch <= 0x7f
@@ -197,35 +197,37 @@ function _transcode(::Type{T}, ::Type{UTF8Str}, pnt, dat, len) where {T<:CodePoi
         else
             ch = get_utf8_4byte(dat, pos += 3, ch)
         end
-        set_codeunit!(pnt, out += 1, T(ch))
+        set_codeunit!(pnt, ch)
+        pnt += 4
     end
+    buf
 end
 
 # transcode to vector of UInt32 from validated UTF16
-function _transcode(::Type{T}, ::Type{UTF16Str}, pnt, dat, len) where {T<:CodePoint}
-    out = pos = 0
-    @inbounds while out < len
+function _transcode_32(::Type{UTF16Str}, dat, len)
+    buf, pnt = _allocate(UInt32, len)
+    pos = 0
+    fin = pnt + (len<<2)
+    @inbounds while pnt < fin
         ch = get_codeunit(dat, pos += 1)%UInt32
         # check for surrogate pair
         is_surrogate_lead(ch) &&
             (ch = get_supplementary(ch, get_codeunit(dat, pos += 1)))
-        set_codeunit!(pnt, out += 1, T(ch))
+        set_codeunit!(pnt, ch)
+        pnt += 4
     end
+    buf
 end
 
 # This can rely on the fact that a UTF8Str is always valid
 function convert(::Type{UTF32Str}, str::UTF8Str)
-    len, dat = _lendata(str)
     # handle zero length string quickly
-    len == 0 && return empty_utf32
+    (len = _len(str)) == 0 && return empty_utf32
     cnt = _length(CodeUnitMulti(), str)
-    # Optimize case where no characters > 0x7f
-    cnt == len && return UTF32Str(_cvtsize(UInt32, dat, len))
-    len = cnt
-    buf, pnt = _allocate(UInt32, len)
-    # has multi-byte UTF-8 sequences
-    _transcode(UInt32, UTF8Str, pnt, dat, len)
-    UTF32Str(buf)
+    # Optimize case where no characters > 0x7f, otherwise has multi-byte UTF-8 sequences
+    UTF32Str(cnt == len
+             ? _cvtsize(UInt32, _data(str), cnt)
+             : _transcode_32(UTF8Str, _data(str), cnt))
 end
 
 # This can rely on the fact that an ASCIIStr, LatinStr, UCS2Str is always valid
@@ -242,10 +244,9 @@ function convert(::Type{UTF32Str}, str::UTF16Str)
     # Get number of characters to create
     cnt = _length(CodeUnitMulti(), str)
     # No surrogate pairs, do optimized copy
-    len == cnt && return UTF32Str(_cvtsize(UInt32, dat, cnt))
-    buf, pnt = _allocate(UInt32, cnt)
-    _transcode(UInt32, UTF16Str, pnt, dat, cnt)
-    UTF32Str(buf)
+    UTF32Str(cnt == len
+             ? _cvtsize(UInt32, dat, cnt)
+             : _transcode_32(UTF16Str, dat, cnt))
 end
 
 function convert(::Type{UTF16Str}, str::T) where {T<:UTF32Strings}
@@ -269,31 +270,36 @@ function convert(::Type{S}, str::T) where {S<:UCS2Strings,T<:UTF32Strings}
     S(_cvtsize(UInt16, _pnt(str), len))
 end
 
-const UniRawChar = Union{UInt32, Int32, Char}
+const UniRawChar = Union{UInt32, Int32, Text4Chr, Char}
 
 function convert(::Type{T}, dat::AbstractVector{<:UniRawChar}) where {T<:UTF32Strings}
     len = length(dat)
     buf, pnt = _allocate(UInt32, len)
-    @inbounds while out < len
-        ch = get_codeunit(dat, pos += 1)%UInt32
-        set_codeunit!(pnt, out += 1, check_valid(ch, pos))
+    fin = pnt + (len<<2)
+    pos = 0
+    @inbounds while pnt < fin
+        ch = dat[pos += 1]%UInt32
+        set_codeunit!(pnt, check_valid(ch, pos))
+        pnt += 4
     end
     T(buf)
 end
 
+# Not sure this is valid anymore, want to avoid type piracy
 convert(::Type{T}, v::AbstractVector{<:UniRawChar}) where {T<:AbstractString} =
-    convert(T, utf32(v))
+    convert(T, convert(UTF32Str, v))
 
 function convert(::Type{Vector{UInt32}}, str::UTF32Strings)
-    len, pnt = _lenpnt(str)
+    len = _len(str)
     vec = Vector{UInt32}(uninitialized, len)
-    @inbounds unsafe_copyto!(pointer(vec), pnt, len)
+    @inbounds unsafe_copyto!(pointer(vec), _pnt(str), len)
     vec
 end
 
 # Is this supposed to allow creating strings sliced up in different ways?
 #convert(::Type{Array{UInt32}},  str::UTF32Str) = _data(str)
 
+# I don't think this will work for Char anymore, broken by #24999
 unsafe_convert(::Type{Ptr{T}}, s::UTF32Str) where {T<:UniRawChar} = convert(Ptr{T}, _pnt(s))
 
 # Should check for 0xxxxxfeff and 0xfffexxxx as well, might be 16-bit encoded
@@ -323,7 +329,7 @@ end
 
 function isvalid(::Type{<:UTF32Strings}, str::Vector{<:UniRawChar})
     @inbounds for c in str
-        ch = UInt32(c)
+        ch = c%UInt32
         (!is_surrogate_codeunit(ch) && ch <= 0x10ffff) || return false
     end
     true
@@ -332,10 +338,12 @@ end
 isvalid(str::Vector{Char}) = isvalid(UTF32Str, str)
 utf32(x) = convert(UTF32Str, x)
 
-utf32(p::Union{Ptr{Char}, Ptr{Int32}}, len::Integer) = utf32(reinterpret(Ptr{UInt32}, p), len)
-utf32(p::Union{Ptr{Char}, Ptr{Int32}}) = utf32(reinterpret(Ptr{UInt32}, p))
+# These are broken by #24999
 
-function utf32(p::Ptr{UInt32})
+#utf32(p::Union{Ptr{Char}, Ptr{Int32}}, len::Integer) = utf32(reinterpret(Ptr{UInt32}, p), len)
+#utf32(p::Union{Ptr{Char}, Ptr{Int32}}) = utf32(reinterpret(Ptr{UInt32}, p))
+
+function utf32(pnt::Ptr{UInt32})
     len = 0
     while (ch = unsafe_load(pnt, len += 1)) != 0
         check_valid(ch, len)
@@ -346,7 +354,7 @@ function utf32(p::Ptr{UInt32})
 end
 
 function map(fun, str::T) where {T<:UTF32Strings}
-    len, dat = _lendata(str)
+    len = _len(str)
     buf, pnt = _allocate(UInt32, len)
     @inbounds for i = 1:len
         set_codeunit!(pnt, i, check_valid(UInt32(fun(dat[i]))))
@@ -385,7 +393,7 @@ end
 # pointer conversions of ASCII/UTF8/UTF16/UTF32 strings:
 pointer(s::Union{ByteStr, WideStr}) = _pnt(s)
 pointer(s::ByteStr, i::Integer) = _pnt(s) + i - 1
-pointer(s::WideStr, i::Integer) = _pnt(s) + (i - 1)*codeunit_size(s)
+pointer(s::WideStr, i::Integer) = _pnt(s) + (i - 1)*sizeof(codeunit(s))
 
 # pointer conversions of SubString of ASCII/UTF8/UTF16/UTF32:
 pointer(x::SubString{<:ByteStr}) =
@@ -393,9 +401,9 @@ pointer(x::SubString{<:ByteStr}) =
 pointer(x::SubString{<:ByteStr}, i::Integer) =
     _pnt(x.string) + x.offset + (i-1)
 pointer(x::SubString{<:WideStr}) =
-    _pnt(x.string) + x.offset*codeunit_size(x.string)
+    _pnt(x.string) + x.offset*sizeof(codeunit(x.string))
 pointer(x::SubString{<:WideStr}, i::Integer) =
-    _pnt(x.string) + (x.offset + (i-1))*codeunit_size(x.string)
+    _pnt(x.string) + (x.offset + (i-1))*sizeof(codeunit(x.string))
 
 """
     utf32(s)

@@ -9,8 +9,8 @@ Based in part on code for UTF8String that used to be in Julia
 ## required core functionality ##
 
 function endof(str::UTF8Str)
-    len, dat = _lendata(str)
-    len == 0 && return len
+    (len = _len(str)) == 0 && return len
+    dat = _data(str)
     while is_valid_continuation(dat[len])
         len -= 1
     end
@@ -47,43 +47,44 @@ function _length(::CodeUnitMulti, str::UTF8Str)
     (siz = sizeof(str)) < 2 && return siz
     pnt, fin = _calcpnt(str, siz)
     cnt = siz
-    while (pnt += CHUNKSZ) < fin
+    while (pnt += CHUNKSZ) <= fin
         cnt -= _count_cont(unsafe_load(pnt))
     end
-    pnt == fin ? cnt : (cnt - _count_cont(unsafe_load(pnt) & _mask_bytes(siz)))
+    pnt - CHUNKSZ == fin ? cnt : (cnt - _count_cont(unsafe_load(pnt) & _mask_bytes(siz)))
 end
 
 function isascii(str::T) where {T<:Union{UTF8Str, LatinStr}}
     (siz = sizeof(str)) == 0 && return true
     pnt, fin = _calcpnt(str, siz)
-    while (pnt += CHUNKSZ) < fin
+    while (pnt += CHUNKSZ) <= fin
         (unsafe_load(pnt) & hi_mask) == 0 || return false
     end
-    pnt == fin || ((unsafe_load(pnt) & _mask_bytes(siz)) & hi_mask == 0)
+    pnt - CHUNKSZ == fin || ((unsafe_load(pnt) & _mask_bytes(siz)) & hi_mask == 0)
 end
+
+# Todo! Here you need to see that 0b11yyyyxx at least 1 y must be set,
+# which indicates a non-Latin1 character
+all_latin(val) = ((val & (val<<1) & (val<<2 | (val<<3) | (val<<4) | (val<<5))) & hi_mask) == 0
 
 function islatin(str::UTF8Str)
     (siz = sizeof(str)) == 0 && return true
     pnt, fin = _calcpnt(str, siz)
-    while (pnt += CHUNKSZ) < fin
-        val = unsafe_load(pnt)
-        if (val & hi_mask) != 0
-            # check for bytes >
-        end
+    while (pnt += CHUNKSZ) <= fin
+        all_latin(unsafe_load(pnt)) || return false
     end
-    pnt == fin || ((unsafe_load(pnt) & _mask_bytes(siz)) & hi_mask == 0)
+    pnt - CHUNKSZ == fin || all_latin(unsafe_load(pnt) & _mask_bytes(siz))
 end
+
+# All 4 top bits must be 1 (i.e. 0xfx) for this to be non-BMP
+all_bmp(val) = ((val | (val<<1) | (val<<2) | (val<<3)) & hi_mask) == 0
 
 function isbmp(str::UTF8Str)
     (siz = sizeof(str)) == 0 && return true
     pnt, fin = _calcpnt(str, siz)
-    while (pnt += CHUNKSZ) < fin
-        val = unsafe_load(pnt)
-        if (val & hi_mask) != 0
-            # check for bytes >
-        end
+    while (pnt += CHUNKSZ) <= fin
+        all_bmp(unsafe_load(pnt)) || return false
     end
-    pnt == fin || ((unsafe_load(pnt) & _mask_bytes(siz)) & hi_mask == 0)
+    pnt - CHUNKSZ == fin && all_bmp(unsafe_load(pnt) & _mask_bytes(siz))
 end
 
 isunicode(str::UTF8Str) = true
@@ -93,21 +94,16 @@ isunicode(str::UTF8Str) = true
     len, pnt = _lenpnt(str)
     @inbounds b1 = get_codeunit(pnt, i)%UInt32
     b1 < 0x80 && return T(b1), i+1
-    @inbounds ch = b1 << 6 + get_codeunit(pnt, i+1)
+    @inbounds ch = (b1 << 6) + get_codeunit(pnt, i+1)
     b1 < 0xe0 && return T(ch - 0x03080), i+2
-    @inbounds ch = ch << 6 + get_codeunit(pnt, i+2)
+    @inbounds ch = (ch << 6) + get_codeunit(pnt, i+2)
     b1 < 0xf0 && return T(ch - 0xe2080), i+3
     @inbounds return T((ch << 6) + get_codeunit(pnt, i+3) - 0x3c82080), i+4
 end
 
 @propagate_inbounds done(str::UTF8Str, i::Int) = done(_data(str), i)
-@propagate_inbounds next(it::CodeUnits{UTF8Str}, i::Int) = next(_data(it.xs), i)
-#@propagate_inbounds next(it::CodePoints{UTF8Str}, i::Int) = next(it.xs, i)
 
 length(it::CodePoints{String}, i::Int) = length(it.xs)
-
-@propagate_inbounds next(it::CodeUnits{String}, state) =
-    (codeunit(it.xs, state), state+1)
 
 @propagate_inbounds function next(it::CodePoints{String}, state)
     ch, state = next(it.xs, state)
@@ -136,28 +132,28 @@ bytestring(s::UTF8Str) = s
 
 lastidx(s::UTF8Str) = sizeof(s)
 
-function isvalid(s::UTF8Str, i::Integer)
-    len, dat = _lendata(s)
-    (1 <= i <= len) && !is_valid_continuation(dat[i])
-end
+isvalid(s::UTF8Str, i::Integer) = (1 <= i <= _len(s)) && !is_valid_continuation(_data(s)[i])
 
 function getindex(s::UTF8Str, r::UnitRange{Int})
     isempty(r) && return empty_utf8
     i, j = first(r), last(r)
-    len, dat = _lendata(s)
+    len = _len(s)
     1 <= i <= len || boundserr(s, i)
-    is_valid_continuation(dat[i]) && unierror(UTF_ERR_INVALID_INDEX, i, dat[i])
+    dat = _data(s)
+    ch = dat[i]
+    is_valid_continuation(ch) && unierror(UTF_ERR_INVALID_INDEX, i, ch)
     j > len || boundserr(s, j)
     j = nextind(s, j) - 1
     UTF8Str(dat[i:j])
 end
 
 function search(s::UTF8Str, c::UInt32, i::Integer)
-    len, dat = _lendata(s)
+    len = _len(s)
     if 1 <= i <= len
         i == len + 1 && return 0
         boundserr(s, i)
     end
+    dat = _data(s)
     is_valid_continuation(dat[i]) && unierror(UTF_ERR_INVALID_INDEX, i, dat[i])
     c < 0x80 && return search(d, c%UInt8, i)
     while true
@@ -183,11 +179,11 @@ string(c::_ByteStr...) = length(c) == 1 ? c[1]::UTF8Str : UTF8Str(_string(c))
     # ^^ at least one must be UTF-8 or the ASCII-only method would get called
 
 function reverse(s::UTF8Str)
-    len, dat = _lendata(s)
-    len <= 1 && return s
+    (len = _len(s)) <= 1 && return s
     buf = _allocate(len)
     out = len
     pos = 1
+    dat = _data(s)
     @inbounds while out > 0
         ch = dat[pos]
         if ch > 0xdf
@@ -281,21 +277,19 @@ function convert(::Type{UTF8Str}, dat::Vector{UInt8})
     len, flags, num4byte, num3byte, num2byte, latinbyte = unsafe_checkstring(dat, 1, _len(dat))
     # Copy, but eliminate over-long encodings and surrogate pairs
     UTF8Str((flags & (UTF_LONG | UTF_SURROGATE)) == 0
-            ? copy!(_allocate(sizeof(dat)), dat)
+            ? copyto!(_allocate(sizeof(dat)), dat)
             : _transcode(UInt8, dat, len + latinbyte + num2byte + num3byte*2 + num4byte*3))
 end
 
 function convert(::Type{UTF8Str}, str::String)
     # handle zero length string quickly
     isempty(str) && return empty_utf8
-    siz, dat = _lendata(str)
     # get number of bytes to allocate
-    len, flags, num4byte, num3byte, num2byte, latinbyte = unsafe_checkstring(dat, 1, siz)
-    #println("$len, $flags, $num4byte, $num3byte, $num2byte, $latinbyte")
+    len, flags, num4byte, num3byte, num2byte, latinbyte = unsafe_checkstring(str, 1, sizeof(str))
     # Copy, but eliminate over-long encodings and surrogate pairs
     # Speed this up if no surrogates, long encodings
     UTF8Str((flags & (UTF_LONG | UTF_SURROGATE)) == 0
-            ? dat
+            ? _data(str)
             : _transcode(UInt8, dat, len + latinbyte + num2byte + num3byte*2 + num4byte*3))
 end
 
@@ -303,14 +297,12 @@ function convert(::Type{UTF8Str}, str::AbstractString)
     # handle zero length string quickly
     isempty(str) && return empty_utf8
     # get number of bytes to allocate
-    len, flags, num4byte, num3byte, num2byte, latinbyte = unsafe_checkstring(str, 1, length(str))
-    #print("convert(UTF8Str, $(typeof(str))) -> ")
-    #println("$len, $flags, $num4byte, $num3byte, $num2byte, $latinbyte")
+    len, flags, num4byte, num3byte, num2byte, latinbyte = unsafe_checkstring(str)
     if flags == 0
         # Speed this up if only ASCII, no overlong encodings
         buf, pnt = _allocate(len)
         out = 0
-        for c in str
+        for ch in str
             set_codepoint!(pnt, out += 1, ch%UInt8)
         end
         UTF8Str(buf)
@@ -437,6 +429,6 @@ utf8(p::Ptr{UInt8}) =
     utf8(p, p == C_NULL ? Csize_t(0) : ccall(:strlen, Csize_t, (Ptr{UInt8},), p))
 
 function utf8(p::Ptr{UInt8}, len::Integer)
-    p == C_NULL && throw(ArgumentError("cannot convert NULL to string"))
+    p == C_NULL && nullerr()
     UTF8Str(ccall(:jl_pchar_to_array, Vector{UInt8}, (Ptr{UInt8}, Csize_t), p, len))
 end

@@ -100,18 +100,19 @@ struct CharSetBinary        <: CharSetStyle end
 """Raw bytes, words, or character string, unknown encoding/character set"""
 struct CharSetUnknown       <: CharSetStyle end
                                  
-CharSetStyle(A::AbstractString)  = CharSetStyle(typeof(A))
+CharSetStyle(A::AbstractString) = CharSetStyle(typeof(A))
+
 CharSetStyle(::Type{<:AbstractString}) = CharSetUnicode()
-CharSetStyle(::Type{String})     = CharSetUnicodePlus() # Encodes invalid characters also
-CharSetStyle(::Type{RawByteStr}) = CharSetUnknown()
-CharSetStyle(::Type{RawWordStr}) = CharSetUnknown()
-CharSetStyle(::Type{RawCharStr}) = CharSetUnknown() # Char or UInt32, since Char might be invalid
-CharSetStyle(::Type{BinaryStr})  = CharSetBinary()
-CharSetStyle(::Type{ASCIIStr})   = CharSetASCIICompat()
-CharSetStyle(::Type{LatinStr})   = CharSetISOCompat()
-CharSetStyle(::Type{UCS2Str})    = CharSetBMPCompat()
-CharSetStyle(::Type{_LatinStr})  = CharSetISOCompat()
-CharSetStyle(::Type{_UCS2Str})   = CharSetBMPCompat()
+CharSetStyle(::Type{String})    = CharSetUnicodePlus() # Encodes invalid characters also
+CharSetStyle(::Type{Text1Str})  = CharSetUnknown()
+CharSetStyle(::Type{Text2Str})  = CharSetUnknown()
+CharSetStyle(::Type{Text4Str})  = CharSetUnknown() # Char or UInt32, since Char might be invalid
+CharSetStyle(::Type{BinaryStr}) = CharSetBinary()
+CharSetStyle(::Type{ASCIIStr})  = CharSetASCIICompat()
+CharSetStyle(::Type{LatinStr})  = CharSetISOCompat()
+CharSetStyle(::Type{UCS2Str})   = CharSetBMPCompat()
+CharSetStyle(::Type{_LatinStr}) = CharSetISOCompat()
+CharSetStyle(::Type{_UCS2Str})  = CharSetBMPCompat()
 
 CharSetStyle(A::AbstractChar)   = CharSetStyle(typeof(A))
 CharSetStyle(::Type{<:AbstractChar}) = CharSetUnicode()
@@ -133,14 +134,14 @@ isvalid(ch::T) where {T<:CodePoint} = isvalid(T, ch)
 
 # must check range if CS1 is smaller than CS2, even if CS2 is valid for it's range
 (_isvalid(::T, ::Type{ASCIICharSet}, ::Type{S}, str)
- where {S<:Union{LatinCharSet, UCS2CharSet, UnicodeCharSet}, T<:ValidatedStyle}) =
+ where {S<:Union{LatinCharSet, UCS2CharSet, UTF32CharSet}, T<:ValidatedStyle}) =
     isascii(str)
 (_isvalid(::T, ::Type{LatinCharSet}, ::Type{S}, str)
- where {S<:Union{UCS2CharSet, UnicodeCharSet}, T<:ValidatedStyle}) =
+ where {S<:Union{UCS2CharSet, UTF32CharSet}, T<:ValidatedStyle}) =
     islatin(str)
-_isvalid(::T, ::Type{UCS2CharSet}, ::Type{UnicodeCharSet}, str) where {T<:ValidatedStyle} =
+_isvalid(::T, ::Type{UCS2CharSet}, ::Type{UTF32CharSet}, str) where {T<:ValidatedStyle} =
     isbmp(str)
-_isvalid(::T, ::Type{UnicodeCharSet}, ::Type{<:CharSet}, str) where {T<:ValidatedStyle} =
+_isvalid(::T, ::Type{UTF32CharSet}, ::Type{<:CharSet}, str) where {T<:ValidatedStyle} =
     isunicode(str)
 
 # no checking needed for cases where it is a superset of T
@@ -150,8 +151,8 @@ _isvalid(::T, ::Type{UnicodeCharSet}, ::Type{<:CharSet}, str) where {T<:Validate
 (_isvalid(::AlwaysValid, ::Type{UCS2CharSet}, ::Type{T}, str)
   where {T<:Union{ASCIICharSet,LatinCharSet,LatinSubSet,UCS2SubSet}}) = true
 
-(_isvalid(::AlwaysValid, ::Type{UnicodeCharSet}, ::Type{T}, str)
-  where {T<:Union{ASCIICharSet,LatinCharSet,UCS2CharSet,LatinSubSet,UCS2SubSet,UnicodeSubSet}}) =
+(_isvalid(::AlwaysValid, ::Type{UTF32CharSet}, ::Type{T}, str)
+  where {T<:Union{ASCIICharSet,LatinCharSet,UCS2CharSet,LatinSubSet,UCS2SubSet,UTF32SubSet}}) =
     true
 
 # Different character sets

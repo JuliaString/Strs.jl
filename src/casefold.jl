@@ -21,18 +21,24 @@ uppercase(ch::ASCIIChr) = ifelse(islower(ch), ASCIIChr(ch - 0x20), ch)
 titlecase(ch::ASCIIChr) = uppercase(ch)
 
 function ucfirst(str::ASCIIStr)
-    dat = _data(str)
-    (isempty(dat) || !_islower_a(dat[1])) && return str
-    out = copy(dat)
-    out[1] -= 0x20
+    (len = _len(str)) == 0 && return str
+    pnt = _pnt(str)
+    ch = get_codeunit(pnt)
+    _islower_a(ch) || return str
+    out = _allocate(len)
+    unsafe_copyto!(out, pnt, len)
+    set_codeunit!(out, ch - 0x20)
     ASCIIStr(out)
 end
 
 function lcfirst(str::ASCIIStr)
-    dat = _data(str)
-    (isempty(dat) || !_isupper_a(dat[1])) && return str
-    out = copy(dat)
-    out[1] += 0x20
+    (len = _len(str)) == 0 && return str
+    pnt = _pnt(str)
+    ch = get_codeunit(pnt)
+    _isupper_a(ch) || return str
+    out = _allocate(len)
+    unsafe_copyto!(out, pnt, len)
+    set_codeunit!(out, ch + 0x20)
     ASCIIStr(out)
 end
 
@@ -45,10 +51,9 @@ function _upper(::Type{ASCIIStr}, dat, i, len)
 end
 
 function uppercase(str::ASCIIStr)
-    #println("uppercase(::ASCIIStr)")
-    len, dat = _lendata(str)
+    len = _len(str)
     @inbounds for i = 1:len
-        _islower_a(dat[i]) && return _upper(ASCIIStr, dat, i, len)
+        _islower_a(str[i]) && return _upper(ASCIIStr, str, i, len)
     end
     str
 end
@@ -62,10 +67,8 @@ function _lower(::Type{ASCIIStr}, dat, i, len)
 end
 
 function lowercase(str::ASCIIStr)
-    #println("lowercase(::ASCIIStr)")
-    len, dat = _lendata(s)
-    for i = 1:len
-        _isupper_a(dat[i]) && return _lower(ASCIIStr, dat, i, len)
+    @inbounds for i = 1:len
+        _islower_a(str[i]) && return _upper(ASCIIStr, str, i, len)
     end
     str
 end
@@ -166,7 +169,6 @@ function _widenupper(dat, i, len)
 end
 
 function uppercase(str::LatinStr)
-    #println("uppercase(::LatinStr)")
     len, dat = _lendata(str)
     @inbounds for i = 1:len
         _can_upper(get_codeunit(dat, i)) && return _upper(LatinStr, dat, i, len)
@@ -175,7 +177,6 @@ function uppercase(str::LatinStr)
 end
 
 function uppercase(str::_LatinStr)
-    #println("uppercase(::_LatinStr)")
     len, dat = _lendata(str)
     @inbounds for i = 1:len
         ch = get_codeunit(dat, i)
@@ -232,8 +233,13 @@ function _lower(::Type{T}, beg, pnt, fin, len) where {T<:UTF32Strings}
 end
 
 # Placeholders until I write some optimal code for these
-lowercase(str::UTF8Str) = UTF8Str(lowercase(String(str.data)))
-uppercase(str::UTF8Str) = UTF8Str(uppercase(String(str.data)))
+function lowercase(str::UTF8Str)
+    UTF8Str(lowercase(String(str.data)))
+end
+
+function uppercase(str::UTF8Str)
+    UTF8Str(uppercase(String(str.data)))
+end
 
 function lowercase(str::UCS2Str)
     #println("lowercase(::UCS2Str)")

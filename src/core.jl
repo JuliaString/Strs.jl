@@ -1,4 +1,11 @@
-# Core functions
+#=
+Core functions
+
+Copyright 2017 Gandalf Software, Inc., Scott P. Jones, and others (
+Licensed under MIT License, see LICENSE.md
+
+Inspired by / derived from code in Julia
+=#
 
 # Need to optimize these to avoid doing array reinterpret
 #=
@@ -7,9 +14,6 @@ getindex(s::T, r) where {T} = T(getindex(_data(s), r))
 getindex(s::T, rge{Int}) where {T} = T(getindex(_data(s), r))
 getindex(s::T, indx::AbstractVector{Int}) where {T} = T(_data(s)[indx])
 =#
-
-@propagate_inbounds next(it::CodeUnits{T}, pos::Int) where {T<:Union{String,Str}} =
-    _next(CodePointStyle(T), codeunit_type(T), it.xs, pos)
 
 _endof(::CodeUnitSingle, str) = (@_inline_meta(); _len(str))
 
@@ -28,13 +32,11 @@ _endof(::CodeUnitSingle, str) = (@_inline_meta(); _len(str))
     end
 end
 
-@propagate_inbounds getindex(::CodeUnitMulti, T, str, i::Int) =
+@propagate_inbounds _getindex(::CodeUnitMulti, T, str, i::Int) =
     _next(CodeUnitMulti(), T, str, i)[1]
 
 _length(::CodeUnitSingle, str) = (@_inline_meta(); _len(str))
 _isvalid(::CodeUnitSingle, str, i) = (@_inline_meta(); 1 <= i <= _len(str))
-
-@noinline ncharerr(n) = throw(ArgumentError(string("nchar (",n,") must be greater than 0")))
 
 _prevind(::CodeUnitSingle, str, i) = Int(i) - 1
 @propagate_inbounds function _prevind(::CodeUnitSingle, str, i, nchar)
@@ -68,19 +70,19 @@ end
     (@_inline_meta(); _next(CodePointStyle(T), codepoint_type(T), str, i))
 @propagate_inbounds length(str::T) where {T<:Str} =
     (@_inline_meta(); _length(CodePointStyle(T), str))
-@propagate_inbounds isvalid(str::T, i::Integer) where {T<:Str} =
+@propagate_inbounds isvalid(str::T, i::Int) where {T<:Str} =
     (@_inline_meta(); _isvalid(CodePointStyle(T), str, i))
-@propagate_inbounds prevind(str::Str, i::Integer) where {T<:Str} =
+@propagate_inbounds prevind(str::T, i::Int) where {T<:Str} =
     (@_inline_meta(); _prevind(CodePointStyle(T), str, i))
-@propagate_inbounds nextind(str::Str, i::Integer) where {T<:Str} =
+@propagate_inbounds nextind(str::T, i::Int) where {T<:Str} =
     (@_inline_meta(); _nextind(CodePointStyle(T), str, i))
-@propagate_inbounds prevind(str::Str, i::Integer, nchar::Integer) where {T<:Str} =
+@propagate_inbounds prevind(str::T, i::Int, nchar::Int) where {T<:Str} =
     (@_inline_meta(); _prevind(CodePointStyle(T), str, i, nchar))
-@propagate_inbounds nextind(str::Str, i::Integer, nchar::Integer) where {T<:Str} =
+@propagate_inbounds nextind(str::T, i::Int, nchar::Int) where {T<:Str} =
     (@_inline_meta(); _nextind(CodePointStyle(T), str, i, nchar))
-@propagate_inbounds ind2chr(str::Str, i::Integer) where {T<:Str} =
+@propagate_inbounds ind2chr(str::T, i::Int) where {T<:Str} =
     _ind2chr(CodePointStyle(T), str, i)
-@propagate_inbounds chr2ind(str::Str, i::Integer) where {T<:Str} =
+@propagate_inbounds chr2ind(str::T, i::Int) where {T<:Str} =
     _chr2ind(CodePointStyle(T), str, i)
 
 # Handle substrings of Str

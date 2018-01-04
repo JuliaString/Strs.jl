@@ -34,6 +34,8 @@ using Strs
 import Strs: LineCounts, CharTypes, CharStat, calcstats
 import Strs: _LatinStr, _UCS2Str, _UTF32Str, _LatinChr
 
+const codeunits = Strs.codeunits
+
 create_vector(T, len) = Vector{T}(uninitialized, len)
 
 import Base: show
@@ -294,7 +296,7 @@ function countcps(lines::Vector{T}) where {T<:AbstractString}
     cnt
 end
 
-function countsize1(lines::Vector{<:AbstractString})
+function countsize(lines::Vector{<:AbstractString})
     cnt = 0
     for text in lines
         cnt += sizeof(text)
@@ -550,6 +552,39 @@ function wrap(f, lines, io, cnts::LineCounts, t, msg, basetime=0%UInt)
     end
 end
 
+# For each set of lines: save number of characters (should be the same for all)
+# For each test (currently just counting via Char iteration, length)
+
+const tests =
+    (
+     (countsize,   "sizeof"),
+     (countlength, "length"),
+#    (countsklength,  "length\nSK"),
+#    (countoldlength, "length\nOld"),
+     (countchars,   "iteration\nChar"),
+     (sumcharvals,  "sum\nchar vals"),
+     (asciistr,     "isascii\nstring"),
+     (validstr,     "isvalid\nstring"),
+     (checkascii,   "isascii\nchars"),
+     (checkvalid,   "isvalid\nchars"),
+     (checklower,   "islower\nchars"),
+     #=
+     (checkcntrl,   "iscntrl\nchars"),
+     (checkupper,   "isupper\nchars"),
+     (checkalpha,   "isalpha\nchars"),
+     (checkalnum,   "isalnum\nchars"),
+     (checkspace,   "isspace\nchars"),
+     (checkprint,   "isprint\nchars"),
+     (checkpunct,   "ispunct\nchars"),
+     (checkgraph,   "isgraph\nchars"),
+     (checkdigit,   "isdigit\nchars"),
+     (checkxdigit,  "isxdigit\nchars"),
+     =#
+#    (dolowercase,  "lowercase\nstring"),
+#    (douppercase,  "uppercase\nstring"),
+#    (dotitlecase,  "titlecase\nstring"),
+    )
+
 function testperf(lines::Vector{T}, io, cnts, docnam, basetime) where {T<:AbstractString}
     # Test performance
     pr_ul(io, f"""\%-22s(docnam) \%12s("Result") \%12s("ms total") """)
@@ -675,9 +710,9 @@ function runcheckcu(lines, list)
 end
 
 function comparetestline(lines, results, list)
+    pr"\tTest lines: \(eltype(lines)), \(list))"
     diff = []
     for (i, fun) in enumerate(list)
-        pr"comparetestline: \(typeof(lines)): \(i) => \(fun)\n"
         fundiff = []
         funres = results[i]
         for (j, text) in enumerate(lines)
@@ -687,13 +722,14 @@ function comparetestline(lines, results, list)
         end
         isempty(fundiff) || push!(diff, (i, fun, fundiff))
     end
+    pr" => \(diff)\n"
     diff
 end
 
 function comparetestchar(lines, results, list)
+    pr"\tTest chars: \(eltype(lines)), \(list)"
     diff = []
     for (i, fun) in enumerate(list)
-        pr"comparetestchar: \(typeof(lines)): \(i) => \(fun)\n"
         fundiff = []
         lineres = results[i]
         try
@@ -712,10 +748,12 @@ function comparetestchar(lines, results, list)
             pr"Failed test \(fun): \(sprint(showerror, ex, catch_backtrace()))"
         end
     end
+    pr" => \(diff)\n"
     diff
 end
 
 function comparetestcu(lines, results, list)
+    pr"\tTest codeunits: \(eltype(lines)), \(list)"
     diff = []
     for (i, fun) in enumerate(list)
         fundiff = []
@@ -731,6 +769,7 @@ function comparetestcu(lines, results, list)
         end
         isempty(fundiff) || push!(diff, (i, fun, fundiff))
     end
+    pr" => \(diff)\n"
     diff
 end
 
@@ -747,13 +786,14 @@ const codeunitlist = (UInt32,)
 compareall(lines, res) =
     (comparetestline(lines, res[1], strintlist),
      comparetestline(lines, res[2], strboollist),
-     (),#comparetestline(lines, res[3], strmaplist),
+     [],#comparetestline(lines, res[3], strmaplist),
      comparetestchar(lines, res[4], charlist),
-     comparetestcu(lines, res[5], codeunitlist),
+     eltype(lines) == UTF8Str ? comparetestcu(lines, res[5], codeunitlist) : [],
      eltype(lines) == UTF8Str ? comparetestline(lines, res[6], (sizeof, )) : [])
 
 function checktests(io = STDOUT, sampledir = defsampledir)
     totres = []
+    totcmp = []
     for fname in readdir(sampledir)
         lines = readlines(joinpath(sampledir, fname))
         stats = calcstats(lines)
@@ -762,22 +802,22 @@ function checktests(io = STDOUT, sampledir = defsampledir)
         push!(list, MT)
         isdefined(Main, :UTF8String) && push!(list, UTF8String, UTF16String, UTF32String)
         enc = encode_lines(list, lines)
-        #for i = 1:length(enc) ; print(typeof(enc[i]), " ") ; end ; println()
         res = (runcheckline(Int, lines, strintlist),
                runcheckline(Bool, lines, strboollist),
-               (),#runcheckline(String, lines, strmaplist),
+               [],
                runcheckchar(lines, charlist),
                runcheckcu(lines, codeunitlist),
                runcheckline(Int, lines, (sizeof, )))
-        #for i = 1:6 ; print(typeof(res[i]), " ") ; end
-        #println()
+        push!(totres, (fname, res))
         cmp = []
         for i = 2:length(list)
+            pr"\(io)Checking \(fname): \(list)\n"
             push!(cmp, compareall(enc[i], res))
         end
-        push!(totres, (fname, res, cmp))
+        push!(totres, (fname, res))
+        push!(totcmp, (fname, cmp))
     end
-    totres
+    totres, totcmp
 end
 
 function benchdir(io = STDOUT, sampledir = defsampledir)

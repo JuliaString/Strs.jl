@@ -5,37 +5,72 @@
 
 ## Error messages for Unicode / UTF support
 
-const UTF_ERR_SHORT             = "invalid UTF-8 sequence starting at index <<1>> (0x<<2>> missing one or more continuation bytes)"
-const UTF_ERR_CONT              = "invalid UTF-8 sequence starting at index <<1>> (0x<<2>> is not a continuation byte)"
-const UTF_ERR_LONG              = "invalid UTF-8 sequence, overlong encoding starting at index <<1>> (0x<<2>>)"
-const UTF_ERR_NOT_LEAD          = "not a leading Unicode surrogate code unit at index <<1>> (0x<<2>>)"
-const UTF_ERR_NOT_TRAIL         = "not a trailing Unicode surrogate code unit at index <<1>> (0x<<2>>)"
-const UTF_ERR_NOT_SURROGATE     = "not a valid Unicode surrogate code unit at index <<1>> (0x<<2>>)"
-const UTF_ERR_MISSING_SURROGATE = "missing trailing Unicode surrogate code unit after index <<1>> (0x<<2>>)"
-const UTF_ERR_INVALID           = "invalid Unicode character starting at index <<1>> (0x<<2>> > 0x10ffff)"
-const UTF_ERR_SURROGATE         = "surrogate encoding not allowed in UTF-8 or UTF-32, at index <<1>> (0x<<2>>)"
-const UTF_ERR_ODD_BYTES_16      = "UTF16String can't have odd number of bytes <<1>>"
-const UTF_ERR_ODD_BYTES_32      = "UTF32String must have multiple of 4 bytes <<1>>"
-const UTF_ERR_INVALID_CHAR      = "invalid Unicode character (0x<<2>> > 0x10ffff)"
-const UTF_ERR_INVALID_ASCII     = "invalid ASCII data (> 0x7f present)"
-const UTF_ERR_INVALID_8         = "invalid UTF-8 data"
-const UTF_ERR_INVALID_16        = "invalid UTF-16 data"
-const UTF_ERR_INVALID_UCS2      = "invalid UCS-2 character (surrogate present)"
-const UTF_ERR_INVALID_LATIN1    = "invalid Latin1 character (> 0xff present)"
-const UTF_ERR_INVALID_INDEX     = "invalid character index"
-const UTF_ERR_MAP_CHAR          = "map(f,s::AbstractString) requires f to return Char; try map(f,collect(s)) or a comprehension instead"
+const UTF_ERR_SHORT =
+  "invalid UTF-8 sequence starting at index <<1>> (0x<<2>>) missing one or more continuation bytes"
+const UTF_ERR_CONT =
+  "invalid UTF-8 sequence starting at index <<1>> (0x<<2>>) is not a continuation byte"
+const UTF_ERR_LONG =
+  "invalid UTF-8 sequence, overlong encoding starting at index <<1>> (0x<<2>>)"
+const UTF_ERR_NOT_LEAD =
+  "not a leading Unicode surrogate code unit at index <<1>> (0x<<2>>)"
+const UTF_ERR_NOT_TRAIL =
+  "not a trailing Unicode surrogate code unit at index <<1>> (0x<<2>>)"
+const UTF_ERR_NOT_SURROGATE =
+  "not a valid Unicode surrogate code unit at index <<1>> (0x<<2>>)"
+const UTF_ERR_MISSING_SURROGATE =
+  "missing trailing Unicode surrogate code unit after index <<1>> (0x<<2>>)"
+const UTF_ERR_INVALID =
+  "invalid Unicode character starting at index <<1>> (0x<<2>> > 0x10ffff)"
+const UTF_ERR_SURROGATE =
+  "surrogate encoding not allowed in UTF-8 or UTF-32, at index <<1>> (0x<<2>>)"
+const UTF_ERR_ODD_BYTES_16 =
+  "UTF16String can't have odd number of bytes <<1>>"
+const UTF_ERR_ODD_BYTES_32 =
+  "UTF32String must have multiple of 4 bytes <<1>>"
+const UTF_ERR_INVALID_ASCII =
+  "invalid ASCII character at index <<1>> (0x<<2>> > 0x7f)"
+const UTF_ERR_INVALID_LATIN1 =
+  "invalid Latin1 character at index <<1>> (0x<<2>> > 0xff)"
+const UTF_ERR_INVALID_CHAR =
+  "invalid Unicode character (0x<<2>> > 0x10ffff)"
+const UTF_ERR_INVALID_8 =
+  "invalid UTF-8 data"
+const UTF_ERR_INVALID_16 =
+  "invalid UTF-16 data"
+const UTF_ERR_INVALID_UCS2 =
+  "invalid UCS-2 character (surrogate present)"
+const UTF_ERR_INVALID_INDEX =
+  "invalid character index"
 
 if !isdefined(Base, :UnicodeError)
 struct UnicodeError <: Exception
     errmsg::AbstractString   ##< A UTF_ERR_ message
     errpos::Int32            ##< Position of invalid character
     errchr::UInt32           ##< Invalid character
+    UnicodeError(msg, pos, chr) = new(msg, pos%Int32, chr%UInt32)
+    UnicodeError(msg) = new(msg, 0%Int32, 0%UInt32)
 end
 
+_repmsg(msg, pos, chr) =
+    replace(replace(msg, "<<1>>" => string(pos)), "<<2>>" =>  hex(chr))
 show(io::IO, exc::UnicodeError) =
-    print(io, replace(replace(string("UnicodeError: ",exc.errmsg),
-                              "<<1>>",string(exc.errpos)),"<<2>>",hex(exc.errchr)))
+    print(io, "UnicodeError: ", _repmsg(exc.errmsg, exc.errpos, exc.errchr))
 end
+
+const UTF_ERR_DECOMPOSE_COMPOSE = "only one of decompose or compose may be true"
+const UTF_ERR_COMPAT_STRIPMARK  = "compat or stripmark true requires compose or decompose true"
+const UTF_ERR_NL_CONVERSION     = "only one newline conversion may be specified"
+const UTF_ERR_NORMALIZE         = " is not one of :NFC, :NFD, :NFKC, :NFKD"
+
+@noinline boundserr(s, pos) = throw(BoundsError(s, pos))
+@noinline unierror(err, pos, ch) = throw(UnicodeError(err, pos, ch))
+@noinline utf8err(err) = throw(UnicodeError(err))
+@noinline utf8err(err, v) = utf8err(string(":", v, err))
+@noinline nulerr() = utf8err("cannot convert NULL to string")
+@noinline ncharerr(n) = utf8err(string("nchar (", n, ") must be greater than 0"))
+@noinline codepoint_error(T, v) = utf8err(string("Invalid CodePoint: ", T, " 0x", hex(v)))
+@noinline argerror(startpos, endpos) =
+    utf8err(string("End position ", endpos, " is less than start position (", startpos, ")"))
 
 ## Functions to check validity of UTF-8, UTF-16, and UTF-32 encoded strings,
 #  and also to return information necessary to convert to other encodings
@@ -54,9 +89,6 @@ const UTF_UNICODE3  =  8  ##< characters in range 0x800-0xd7ff, 0xe000-0xffff
 const UTF_UNICODE4  = 16  ##< non-BMP characters present
 const UTF_SURROGATE = 32  ##< surrogate pairs present
 const UTF_INVALID   = 64  ##< invalid sequences present
-
-@noinline boundserr(s, pos) = throw(BoundsError(s, pos))
-@noinline unierror(err, pos, ch) = throw(UnicodeError(err, pos, ch))
 
 # Get a UTF-8 continuation byte, give error if invalid, return updated character value
 @propagate_inbounds function check_continuation(dat, pos, ch, flag)
@@ -98,6 +130,15 @@ Throws:
 * `UnicodeError`
 """
 function unsafe_checkstring end
+
+retcheck(totalchar, flags, invalids, latin1byte, num2byte, num3byte, num4byte) =
+    (totalchar,
+     ifelse(latin1byte == 0, 0, UTF_LATIN1) |
+     ifelse(num2byte   == 0, 0, UTF_UNICODE2) |
+     ifelse(num3byte   == 0, 0, UTF_UNICODE3) |
+     ifelse(num4byte   == 0, 0, UTF_UNICODE4) |
+     ifelse(invalids   == 0, 0, UTF_INVALID) | flags,
+     num4byte, num3byte, num2byte, latin1byte, invalids)
 
 function unsafe_checkstring(dat::Union{AbstractVector{UInt8}, Ptr{UInt8}, String}, pos, endpos;
                             accept_long_null  = false,
@@ -230,23 +271,14 @@ function unsafe_checkstring(dat::Union{AbstractVector{UInt8}, Ptr{UInt8}, String
             end
         end
     end
-    (totalchar,
-     ifelse(latin1byte == 0, 0, UTF_LATIN1) |
-     ifelse(num2byte   == 0, 0, UTF_UNICODE2) |
-     ifelse(num3byte   == 0, 0, UTF_UNICODE3) |
-     ifelse(num4byte   == 0, 0, UTF_UNICODE4) |
-     ifelse(invalids   == 0, 0, UTF_INVALID),
-     num4byte, num3byte, num2byte, latin1byte, invalids)
+    retcheck(totalchar, flags, invalids, latin1byte, num2byte, num3byte, num4byte)
 end
 
-const AbstractString1632{Tel<:Union{UInt16,UInt32}} =
-    Union{AbstractVector{Tel}, AbstractString, Ptr{Tel}}
-
-function unsafe_checkstring(dat::AbstractString1632, pos, endpos;
+function unsafe_checkstring(dat::Union{AbstractVector{T}, Ptr{T}}, pos, endpos;
                             accept_long_null  = false,
                             accept_surrogates = false,
                             accept_long_char  = false,
-                            accept_invalids   = false)
+                            accept_invalids   = false) where {T<:Union{UInt16,UInt32}}
     flags = 0%UInt
     totalchar = latin1byte = num2byte = num3byte = num4byte = invalids = 0
     @inbounds while pos <= endpos
@@ -296,13 +328,63 @@ function unsafe_checkstring(dat::AbstractString1632, pos, endpos;
             end
         end
     end
-    (totalchar,
-     ifelse(latin1byte == 0, 0, UTF_LATIN1) |
-     ifelse(num2byte   == 0, 0, UTF_UNICODE2) |
-     ifelse(num3byte   == 0, 0, UTF_UNICODE3) |
-     ifelse(num4byte   == 0, 0, UTF_UNICODE4) |
-     ifelse(invalids   == 0, 0, UTF_INVALID),
-     num4byte, num3byte, num2byte, latin1byte, invalids)
+    retcheck(totalchar, flags, invalids, latin1byte, num2byte, num3byte, num4byte)
+end
+
+function unsafe_checkstring(str::AbstractString;
+                            accept_long_null  = false,
+                            accept_surrogates = false,
+                            accept_long_char  = false,
+                            accept_invalids   = false)
+    flags = 0%UInt
+    totalchar = latin1byte = num2byte = num3byte = num4byte = invalids = 0
+    pos = start(str)
+    @inbounds while !done(str, pos)
+        chr, nxt = next(str, pos)
+        ch = chr%UInt32
+        totalchar += 1
+        if ch > 0x7f
+            if ch < 0x100
+                latin1byte += 1
+            elseif ch < 0x800
+                num2byte += 1
+            elseif ch > 0x0ffff
+                if (ch > 0x10ffff)
+                    accept_invalids || unierror(UTF_ERR_INVALID, pos, ch)
+                    invalids += 1
+                else
+                    num4byte += 1
+                end
+            elseif !is_surrogate_codeunit(ch)
+                num3byte += 1
+            elseif is_surrogate_lead(ch)
+                if done(str, nxt)
+                    accept_invalids || unierror(UTF_ERR_MISSING_SURROGATE, pos, ch)
+                    invalids += 1
+                    break
+                end
+                # next character *must* be a trailing surrogate character
+                chr, nxt = next(str, nxt)
+                if !is_surrogate_trail(chr)
+                    accept_invalids || unierror(UTF_ERR_NOT_TRAIL, pos, chr)
+                    invalids += 1
+                elseif accept_surrogates
+                    flags |= UTF_SURROGATE
+                    num4byte += 1
+                elseif accept_invalids
+                    invalids += 1
+                else
+                    unierror(UTF_ERR_SURROGATE, pos, ch)
+                end
+            elseif accept_invalids
+                invalids += 1
+            else
+                unierror(UTF_ERR_NOT_LEAD, pos, ch)
+            end
+        end
+        pos = nxt
+    end
+    retcheck(totalchar, flags, invalids, latin1byte, num2byte, num3byte, num4byte)
 end
 
 """
@@ -331,12 +413,7 @@ function count_chars(::Type{UTF8Str}, ::Type{S}, dat::Union{AbstractVector{S}, P
             num4byte += 1
         end
     end
-    (totalchar,
-     ifelse(latin1byte == 0, 0, UTF_LATIN1) |
-     ifelse(num2byte   == 0, 0, UTF_UNICODE2) |
-     ifelse(num3byte   == 0, 0, UTF_UNICODE3) |
-     ifelse(num4byte   == 0, 0, UTF_UNICODE4),
-     num4byte, num3byte, num2byte, latin1byte)
+    retcheck(totalchar, 0%UInt, 0, latin1byte, num2byte, num3byte, num4byte)
 end
 
 """
@@ -368,15 +445,10 @@ function count_chars(::Type{T}, ::Type{S}, dat::Union{AbstractVector{S}, Ptr{S}}
             num4byte += 1
         end
     end
-    (totalchar,
-     ifelse(latin1byte == 0, 0, UTF_LATIN1) |
-     ifelse(num2byte   == 0, 0, UTF_UNICODE2) |
-     ifelse(num3byte   == 0, 0, UTF_UNICODE3) |
-     ifelse(num4byte   == 0, 0, UTF_UNICODE4),
-     num4byte, num3byte, num2byte, latin1byte)
+    retcheck(totalchar, 0%UInt, 0, latin1byte, num2byte, num3byte, num4byte)
 end
 
-count_chars(T, dat, len) = count_chars(T, codeunit_type(T), dat, 1, len)
+count_chars(T, dat, len) = count_chars(T, codeunit(T), dat, 1, len)
 
 """
 Validates and calculates number of characters in a UTF-8,UTF-16 or UTF-32 encoded vector/string
@@ -410,9 +482,6 @@ Throws:
 """
 function checkstring end
 
-@noinline argerror(startpos, endpos) =
-    throw(ArgumentError("End position ($endpos) is less than start position ($startpos)"))
-
 # No need to check bounds if using defaults
 checkstring(dat; kwargs...) = unsafe_checkstring(dat, 1, endof(dat); kwargs...)
 
@@ -440,12 +509,13 @@ bytestring() = empty_ascii
 
 function bytestring(s::AbstractString...)
     str = Base.print_to_string(s...)
-    siz, dat = _lendata(str)
     # handle zero length string quickly
-    siz == 0 && return empty_ascii
-    len, flags, num4byte, num3byte, num2byte, latin1, invalids = unsafe_checkstring(dat, 1, siz)
+    (siz = sizeof(str)) == 0 && return empty_ascii
+    dat = _data(str)
+    len, flags, num4byte, num3byte, num2byte, latin1, invalids =
+        unsafe_checkstring(dat, 1, siz)
     if flags & ~UTF_INVALID == 0
-        invalids == 0 ? ASCIIStr(dat) : RawByteStr(dat)
+        invalids == 0 ? ASCIIStr(dat) : Text1Str(dat)
     else
         # This takes care of long encodings, CESU-8 surrogate characters, etc.
         UTF8Str(_transcode(UInt8, dat, len))
@@ -489,7 +559,7 @@ function _cmp(a::Str, b::AbstractString)
         done(b, j) && return 1
         c, i = next(a, i)
         d, j = next(b, j)
-        c ≠ d && return ifelse(c < d, -1, 1)
+        c != d && return ifelse(c < d, -1, 1)
     end
     return ifelse(done(b, j), 0, -1)
 end
