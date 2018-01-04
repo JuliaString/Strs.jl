@@ -239,9 +239,14 @@ const _isnumeric_mask = _cat_mask(Uni.ND : Uni.NO)
 @inline _islower_a(c) = 'a'%UInt8 <= c <= 'z'%UInt8
 @inline _isupper_a(c) = 'A'%UInt8 <= c <= 'Z'%UInt8
 
-@inline _islatin_l(c) = (0xdf <= c <= 0xfe & !(c == 0xf7))
-@inline _isupper_l(c::LatinChr) = (0xc0 <= c%UInt8 <= 0xde & !(c%UInt8 == 0xd7))
-@inline _isupper_l(c) = _isupper_l(c%LatinChr) | (c == 0xb5 || c == 0xff)
+@inline _isalpha_a(c) = _islower_a(c) | _isupper_a(c)
+@inline _isalpha_l(c) = ((0xc0 <= c <= 0xff) & (c != 0xf7) & (c != 0xd7)) | (c == 0xb5)
+
+@inline _isupper_l(c) = (0xc0 <= c%UInt8 <= 0xde & c != 0xd7)
+@inline _islower_l(c) = ((0xdf <= c <= 0xff) & (c != 0xf7)) | (c == 0xb5)
+
+# 0xb5, 0xdf, and 0xff cannot be uppercased in LatinStr, although they are lowercase
+@inline _can_upper(c) = _islower_a(c) | ((0xe0 <= c <= 0xfe) & (c != 0xf7))
 
 @inline _iscntrl(ch) = (ch <= 0x1f) | (0x7f <= ch <= 0x9f)
 @inline _isdigit(ch) = '0'%UInt8 <= ch <= '9'%UInt8
@@ -258,8 +263,7 @@ const _punct_80 = 0x88c0088200000000
 @inline _isspace_a(ch)  = (ch == 32) | (9 <= ch <= 13)
 @inline _isspace_l(ch)  = (ch == 0x85) | (ch == 0xa0)
 @inline _isspace_al(ch) = _isspace_a(ch) | _isspace_l(ch)
-@inline _isspace(ch) =
-    ch > 0xff ? (_cat(ch) == Uni.ZS) : (ch > 0x7f ? _isspace_l(ch) : _isspace_a(ch))
+@inline _isspace_ch(ch) = ch > 0xff ? (_cat(ch) == Uni.ZS) : _isspace_al(ch)
 
 @inline _isprint_a(ch) = 0x20 <= ch < 0x7f
 @inline _isprint_l(ch) = _isprint_a(ch) | ((0xa0 <= ch <= 0xff) & (ch != 0xad))
@@ -273,16 +277,20 @@ const _punct_80 = 0x88c0088200000000
 @inline isxdigit(ch::CodePointTypes) = _isxdigit(tobase(ch))
 
 @inline isascii(ch::CodePointTypes)  = tobase(ch) <= 0x7f
-@inline isascii(ch::ASCIIChr) = true
+@inline isascii(ch::ASCIIChr)        = true
 
 @inline islatin(ch::CodePointTypes)  = tobase(ch) <= 0xff
-@inline islatin(ch::ASCIIChr)   = true
-@inline islatin(ch::LatinChars) = true
+@inline islatin(ch::ASCIIChr)        = true
+@inline islatin(ch::LatinChars)      = true
+
+@inline _islower_u(ch)  = _cat(ch) == Uni.LL
+@inline _isupper_u(ch)  = _check_mask(ch, Uni.LU, Uni.LT)
 
 @inline _islower_al(ch) = _islower_a(ch) | _islower_l(ch)
-@inline _islower_ch(ch) = islatin(ch) ? _islower_al(ch) : (_cat(ch) == Uni.LL)
 @inline _isupper_al(ch) = _isupper_a(ch) | _isupper_l(ch)
-@inline _isupper_ch(ch) = islatin(ch) ? _isupper_al(ch) : _check_mask(ch, Uni.LU, Uni.LT)
+
+@inline _islower_ch(ch) = islatin(ch) ? _islower_al(ch) : _islower_u(ch)
+@inline _isupper_ch(ch) = islatin(ch) ? _isupper_al(ch) : _isupper_u(ch) 
 
 @inline islower(ch::CodePointTypes) = _islower_ch(tobase(ch))
 @inline islower(ch::ASCIIChr)       = _islower_a(tobase(ch))
@@ -292,39 +300,41 @@ const _punct_80 = 0x88c0088200000000
 @inline isupper(ch::ASCIIChr)       = _isupper_a(tobase(ch))
 @inline isupper(ch::LatinChars)     = _isupper_al(tobase(ch))
 
-@inline isalpha(ch::CodePointTypes) =
-    islatin(ch) ? isalpha(ch%_LatinChr) : _check_mask(ch, _isalpha_mask)
-@inline isalpha(ch::ASCIIChr)   = _islower_a(ch) | _isupper_a(ch)
-@inline isalpha(ch::LatinChars) = isalpha(ch%ASCIIChr) | _islatin_l(ch) | _isupper_l(ch)
+@inline _isalpha_al(ch) = _isalpha_a(ch) | _isalpha_l(ch)
+@inline _isalpha_ch(ch) = islatin(ch) ? _isalpha_al(ch) : _check_mask(ch, _isalpha_mask)
+@inline isalpha(ch::CodePointTypes) = _isalpha_ch(tobase(ch))   
+@inline isalpha(ch::ASCIIChr)   = _isalpha_a(tobase(ch))
+@inline isalpha(ch::LatinChars) = _isalpha_al(tobase(ch))
 
-@inline isnumeric(ch::CodePointTypes) =
-    islatin(ch) ? _isnumeric_l(tobase(ch)) : _check_mask(ch, _isnumeric_mask)
+@inline _isnumeric_ch(ch) = islatin(ch) ? _isnumeric_l(ch) : _check_mask(ch, _isnumeric_mask)
+@inline isnumeric(ch::CodePointTypes) = _isnumeric_ch(tobase(ch))
 @inline isnumeric(ch::ASCIIChr)   = _isdigit(tobase(ch))
 @inline isnumeric(ch::LatinChars) = _isnumeric_l(tobase(ch))
 
-@inline isalnum(ch::CodePointTypes) =
-    islatin(ch) ? isalnum(ch%_LatinChr) : _check_mask(ch, _isnumeric_mask | _isalpha_mask)
-@inline isalnum(ch::ASCIIChr)   = isdigit(ch) | isalpha(ch)
-@inline isalnum(ch::LatinChars) = isalpha(ch) | isnumeric(ch)
+@inline _isalnum_ch(ch) =
+    islatin(ch) ? _isalnum_al(ch) : _check_mask(ch, _isnumeric_mask | _isalpha_mask)
+@inline isalnum(ch::CodePointTypes) = _isalpha(tobase(ch))
+@inline isalnum(ch::ASCIIChr)       = isdigit(ch) | isalpha(ch)
+@inline isalnum(ch::LatinChars)     = isalpha(ch) | isnumeric(ch)
 
 @inline _ispunct_ch(ch) = islatin(ch) ? _ispunct_l(ch) : _check_mask(ch, Uni.PC : Uni.PO)
 @inline ispunct(ch::CodePointTypes) = _ispunct_ch(tobase(ch))
-@inline ispunct(ch::ASCIIChr)   = _ispunct_a(tobase(ch))
-@inline ispunct(ch::LatinChars) = _ispunct_l(tobase(ch))
+@inline ispunct(ch::ASCIIChr)       = _ispunct_a(tobase(ch))
+@inline ispunct(ch::LatinChars)     = _ispunct_l(tobase(ch))
 
-@inline isspace(ch::CodePointTypes) = _isspace(tobase(ch))
+@inline isspace(ch::CodePointTypes) = _isspace_ch(tobase(ch))
 @inline isspace(ch::ASCIIChr)       = _isspace_a(tobase(ch))
 @inline isspace(ch::LatinChars)     = _isspace_al(tobase(ch))
 
-@inline isprint(ch::CodePointTypes) =
-    islatin(ch) ? _isprint_l(tobase(ch)) : _check_mask(ch, Uni.LU : Uni.ZS)
-@inline isprint(ch::ASCIIChr)   = _isprint_a(tobase(ch))
-@inline isprint(ch::LatinChars) = _isprint_l(tobase(ch))
+@inline _isprint_ch(ch) = islatin(ch) ? _isprint_l(ch) : _check_mask(ch, Uni.LU : Uni.ZS)
+@inline isprint(ch::CodePointTypes) = _isprint_ch(tobase(ch))
+@inline isprint(ch::ASCIIChr)       = _isprint_a(tobase(ch))
+@inline isprint(ch::LatinChars)     = _isprint_l(tobase(ch))
 
-@inline isgraph(ch::CodePointTypes) =
-    islatin(ch) ? _isgraph_l(tobase(ch)) : _check_mask(ch, Uni.LU : Uni.SO)
-@inline isgraph(ch::ASCIIChr)   = _isgraph_a(tobase(ch))
-@inline isgraph(ch::LatinChars) = _isgraph_l(tobase(ch))
+@inline _isgraph_ch(ch) = islatin(ch) ? _isgraph_l(ch) : _check_mask(ch, Uni.LU : Uni.SO)
+@inline isgraph(ch::CodePointTypes) = _isgraph_ch(tobase(ch))
+@inline isgraph(ch::ASCIIChr)       = _isgraph_a(tobase(ch))
+@inline isgraph(ch::LatinChars)     = _isgraph_l(tobase(ch))
 
 _lowercase_u(ch) = ccall(:utf8proc_tolower, UInt32, (UInt32,), ch)
 _uppercase_u(ch) = ccall(:utf8proc_toupper, UInt32, (UInt32,), ch)
