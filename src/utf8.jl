@@ -90,15 +90,16 @@ end
 isunicode(str::UTF8Str) = true
 
 # Gets next codepoint
-@propagate_inbounds function _next(::CodeUnitMulti, T, str::UTF8Str, i::Int)
+@propagate_inbounds function _next(::CodeUnitMulti, T, str::UTF8Str, pos::Int)
     len, pnt = _lenpnt(str)
-    @inbounds b1 = get_codeunit(pnt, i)%UInt32
-    b1 < 0x80 && return T(b1), i+1
-    @inbounds ch = (b1 << 6) + get_codeunit(pnt, i+1)
-    b1 < 0xe0 && return T(ch - 0x03080), i+2
-    @inbounds ch = (ch << 6) + get_codeunit(pnt, i+2)
-    b1 < 0xf0 && return T(ch - 0xe2080), i+3
-    @inbounds return T((ch << 6) + get_codeunit(pnt, i+3) - 0x3c82080), i+4
+    pnt += pos - 1
+    @inbounds b1 = get_codeunit(pnt)%UInt32
+    b1 < 0x80 && return T(b1), pos + 1
+    @inbounds ch = (b1 << 6) + get_codeunit(pnt + 1)
+    b1 < 0xe0 && return T(ch - 0x03080), pos + 2
+    @inbounds ch = (ch << 6) + get_codeunit(pnt + 2)
+    b1 < 0xf0 && return T(ch - 0xe2080), pos + 3
+    @inbounds return T((ch << 6) + get_codeunit(pnt + 3) - 0x3c82080), pos + 4
 end
 
 @propagate_inbounds done(str::UTF8Str, i::Int) = done(_data(str), i)
@@ -132,19 +133,49 @@ bytestring(s::UTF8Str) = s
 
 lastidx(s::UTF8Str) = sizeof(s)
 
-isvalid(s::UTF8Str, i::Integer) = (1 <= i <= _len(s)) && !is_valid_continuation(_data(s)[i])
+@inline _isvalid(::CodeUnitMulti, str::UTF8Str, pos::Int) =
+    (1 <= pos <= _len(str)) && !is_valid_continuation(_data(str)[pos])
+
+@inline checkcont(pnt) = is_valid_continuation(get_codeunit(pnt))
+
+function _thisind(::CodeUnitMulti, str::UTF8Str, pos::Int)
+    @boundscheck 0 < pos <= len || boundserr(str, pos)
+    pnt = _pnt(str) + pos - 1
+    pos - checkcont(pnt) ? (checkcont(pnt - 1) ? (checkcont(pnt - 2) ? 3 : 2) : 1) : 0
+end
+
+function _nextind(T::CodeUnitMulti, str::UTF8Str, pos::Int)
+    pos == 0 && return 1
+    numcu = _len(str)
+    @boundscheck 1 <= pos <= numcu || boundserr(str, pos)
+    pnt = _pnt(str) + pos - 1
+    cu = get_codeunit(pnt)
+    pos + (cu < 0x80 ? 1
+           : (cu < 0xc0
+              ? (pos == numcu
+                ? 1 : (checkcont(pnt + 1) ? (2 + (pos < numcu - 1 && checkcont(pnt + 2))) : 1))
+              : ifelse(cu < 0xe0, 2, ifelse(cu < 0xf0, 3, 4))))
+end
+
+function _prevind(T::CodeUnitMulti, str::UTF8Str, pos::Int)
+    pos == 1 && return 0
+    numcu = _len(str)
+    @boundscheck 1 < pos <= (numcu + 1) || boundserr(str, pos)
+    _thisind(CodeUnitMulti(), str,
+             pos - (pos == (numcu + 1) || is_valid_continuation(get_codeunit(str, pos))))
+end
 
 function getindex(s::UTF8Str, r::UnitRange{Int})
     isempty(r) && return empty_utf8
     i, j = first(r), last(r)
     len = _len(s)
-    1 <= i <= len || boundserr(s, i)
+    @boundscheck 1 <= i <= len || boundserr(s, i)
     dat = _data(s)
     ch = dat[i]
     is_valid_continuation(ch) && unierror(UTF_ERR_INVALID_INDEX, i, ch)
-    j > len || boundserr(s, j)
+    @boundscheck j > len || boundserr(s, j)
     j = nextind(s, j) - 1
-    UTF8Str(dat[i:j])
+    Str(UTF8CSE, dat[i:j])
 end
 
 function search(s::UTF8Str, c::UInt32, i::Integer)
@@ -210,7 +241,7 @@ function reverse(s::UTF8Str)
             pos += 1
         end
     end
-    UTF8Str(buf)
+    Str(UTF8CSE, buf)
 end
 
 ## outputting UTF-8 strings ##
@@ -221,54 +252,59 @@ write(io::IO, s::UTF8Str) = write(io, _data(s))
 
 ## transcoding to UTF-8 ##
 
-function _transcode(::Type{UInt8}, dat::T, len) where {T<:Union{Ptr{UInt8}, Vector{UInt8}}}
+function _transcode_utf8(dat::Union{Ptr{UInt8}, Vector{UInt8}}, len)
     buf, pnt = _allocate(UInt8, len)
-    out = 0
+    fin = pnt + len
     pos = 0
-    @inbounds while out < len
+    @inbounds while pnt < fin
         ch = get_codeunit(dat, pos += 1)
         # Handle ASCII characters
         if ch <= 0x7f
-            set_codeunit!(pnt, out += 1, ch)
+            set_codeunit!(pnt, ch)
+            pnt += 1
         # Handle overlong < 0x100
         elseif ch < 0xc2
             ch = ((ch & 3) << 6) | (get_codeunit(dat, pos += 1) & 0x3f)
-            set_codeunit!(pnt, out += 1, ch)
+            set_codeunit!(pnt, ch)
+            pnt += 1
         # Handle 0x100-0x7ff
         elseif ch < 0xe0
-            set_codeunit!(pnt, out += 1, ch)
-            set_codeunit!(pnt, out += 1, get_codeunit(dat, pos += 1))
+            set_codeunit!(pnt, ch)
+            set_codeunit!(pnt + 1, get_codeunit(dat, pos += 1))
+            pnt += 2
         elseif ch != 0xed
-            set_codeunit!(pnt, out += 1, ch)
-            set_codeunit!(pnt, out += 1, get_codeunit(dat, pos += 1))
-            set_codeunit!(pnt, out += 1, get_codeunit(dat, pos += 1))
+            set_codeunit!(pnt, ch)
+            set_codeunit!(pnt + 1, get_codeunit(dat, pos += 1))
+            set_codeunit!(pnt + 2, get_codeunit(dat, pos += 1))
+            pnt += 3
             # Copy 4-byte encoded value
-            ch >= 0xf0 && set_codeunit!(pnt, out += 1, get_codeunit(dat, pos += 1))
+            ch >= 0xf0 && (set_codeunit!(pnt, get_codeunit(dat, pos += 1)) ; pnt += 1)
         # Handle surrogate pairs
         else
             ch = get_codeunit(dat, pos += 1)
             if ch < 0xa0 # not surrogate pairs
-                set_codeunit!(pnt, out += 1, 0xed)
-                set_codeunit!(pnt, out += 1, ch)
-                set_codeunit!(pnt, out += 1, get_codeunit(dat, pos += 1))
+                set_codeunit!(pnt, 0xed)
+                set_codeunit!(pnt + 1, ch)
+                set_codeunit!(pnt + 2, get_codeunit(dat, pos += 1))
+                pnt += 3
             else
                 # Pick up surrogate pairs (CESU-8 format)
                 ch32 = (((ch & 0x3f)%UInt32 << 16) | (get_ch(dat, pos, 1) << 10)) +
                         (get_ch(dat, pos, 3) << 6 | get_ch(dat, pos, 4)) - 0x01f0c00
                 pos += 4
-                output_utf8_4byte!(buf, out, ch32)
-                out += 4
+                pnt = output_utf8_4byte!(pnt, ch32)
             end
         end
     end
     buf
 end
 
-utf8(x) = convert(UTF8Str, x)
 convert(::Type{UTF8Str}, s::UTF8Str) = s
-convert(::Type{UTF8Str}, s::ASCIIStr) = UTF8Str(_data(s))
+convert(::Type{UTF8Str}, s::ASCIIStr) = Str(UTF8CSE, _data(s))
+
+# Note: this will have to change back to s.endof for v0.6!
 convert(::Type{SubString{UTF8Str}}, s::SubString{ASCIIStr}) =
-    SubString(utf8(s.string), s.offset + 1, s.endof + s.offset)
+    SubString(convert(UTF8Str, s.string), s.offset + 1, s.offset + s.ncodeunits)
 
 function convert(::Type{UTF8Str}, dat::Vector{UInt8})
     # handle zero length string quickly
@@ -276,9 +312,10 @@ function convert(::Type{UTF8Str}, dat::Vector{UInt8})
     # get number of bytes to allocate
     len, flags, num4byte, num3byte, num2byte, latinbyte = unsafe_checkstring(dat, 1, _len(dat))
     # Copy, but eliminate over-long encodings and surrogate pairs
-    UTF8Str((flags & (UTF_LONG | UTF_SURROGATE)) == 0
-            ? copyto!(_allocate(sizeof(dat)), dat)
-            : _transcode(UInt8, dat, len + latinbyte + num2byte + num3byte*2 + num4byte*3))
+    Str(UTF8CSE,
+        (flags & (UTF_LONG | UTF_SURROGATE)) == 0
+        ? copyto!(_allocate(sizeof(dat)), dat)
+        : _transcode_utf8(dat, len + latinbyte + num2byte + num3byte*2 + num4byte*3))
 end
 
 function convert(::Type{UTF8Str}, str::String)
@@ -288,9 +325,10 @@ function convert(::Type{UTF8Str}, str::String)
     len, flags, num4byte, num3byte, num2byte, latinbyte = unsafe_checkstring(str, 1, sizeof(str))
     # Copy, but eliminate over-long encodings and surrogate pairs
     # Speed this up if no surrogates, long encodings
-    UTF8Str((flags & (UTF_LONG | UTF_SURROGATE)) == 0
-            ? _data(str)
-            : _transcode(UInt8, dat, len + latinbyte + num2byte + num3byte*2 + num4byte*3))
+    Str(UTF8CSE,
+        ((flags & (UTF_LONG | UTF_SURROGATE)) == 0
+         ? _data(str)
+         : _transcode_utf8(dat, len + latinbyte + num2byte + num3byte*2 + num4byte*3)))
 end
 
 function convert(::Type{UTF8Str}, str::AbstractString)
@@ -301,41 +339,33 @@ function convert(::Type{UTF8Str}, str::AbstractString)
     if flags == 0
         # Speed this up if only ASCII, no overlong encodings
         buf, pnt = _allocate(len)
-        out = 0
         for ch in str
-            set_codepoint!(pnt, out += 1, ch%UInt8)
+            set_codeunit!(pnt, ch%UInt8)
+            pnt += 1
         end
-        UTF8Str(buf)
+        Str(UTF8CSE, buf)
     else
         # Copy, but eliminate over-long encodings and surrogate pairs
-        UTF8Str(_transcode(UInt8, str, len + latinbyte + num2byte + num3byte*2 + num4byte*3))
+        Str(UTF8CSE, _transcode_utf8(str, len + latinbyte + num2byte + num3byte*2 + num4byte*3))
     end
 end
 
-#=
-# This is broken and inefficient
-function convert(::Type{UTF8Str}, a::Vector{UInt8}, invalids_as::AbstractString)
-    l = length(a)
-    idx = 1
-    iscopy = false
-    while idx <= l
-        if !is_valid_continuation(a[idx])
-            nextidx = idx + 1 + utf8_trailing[a[idx]+1]
-            (nextidx <= (l+1)) && (idx = nextidx; continue)
-        end
-        !iscopy && (a = copy(a); iscopy = true)
-        endn = idx
-        while endn <= l
-            !is_valid_continuation(a[endn]) && break
-            endn += 1
-        end
-        (endn > idx) && (endn -= 1)
-        splice!(a, idx:endn, Vector{UInt8}(invalids_as))
-        l = length(a)
+@inline function _encode_char_utf8(pnt, ch::Union{UInt16, UInt32})
+    # Handle ASCII characters
+    if ch <= 0x7f
+        set_codeunit!(pnt, ch)
+        pnt + 1
+    # Handle 0x80-0x7ff
+    elseif ch < 0x800
+        pnt = output_utf8_2byte!(pnt, ch)
+    # Handle 0x10000-0x10ffff
+    elseif ch > 0xffff # this is only for T == UInt32, should not be generated for UInt16
+        pnt = output_utf8_4byte!(pnt, ch)
+    # Handle 0x800-0xd7ff, 0xe000-0xffff UCS-2 characters
+    else
+        pnt = output_utf8_3byte!(pnt, ch)
     end
-    UTF8Str(a)
 end
-=#
 
 """
 Converts an already validated vector of `UInt16` or `UInt32` to a `UTF8Str`
@@ -349,86 +379,25 @@ Returns:
 
 * `UTF8Str`
 """
-function _encode(::Type{UInt8}, dat::Union{Vector{T}, Ptr{T}},
-                 len) where {T<:Union{UInt16, UInt32}}
+function _encode_utf8(dat::Union{Vector{T}, Ptr{T}}, len) where {T<:Union{UInt16, UInt32}}
     buf, pnt = _allocate(UInt8, len)
     out = pos = 0
-    @inbounds while out < len
-        out = _encode_utf8(pnt, get_codeunit(dat, pos += 1), out)
+    fin = pnt + len
+    @inbounds while pnt < fin
+        pnt = _encode_char_utf8(pnt, get_codeunit(dat, pos += 1))
     end
     buf
 end
 
-function _transcode(::Type{UInt8}, dat::Union{Vector{T}, Ptr{T}},
-                    len) where {T<:Union{UInt16, UInt32}}
+function _transcode_utf8(dat::Union{Vector{T}, Ptr{T}}, len) where {T<:Union{UInt16, UInt32}}
     buf, pnt = _allocate(UInt8, len)
-    out = pos = 0
-    @inbounds while out < len
-        out = _transcode_utf8(pnt, get_codeunit(dat, pos += 1), out)
+    fin = pnt + len
+    pos = 0
+    @inbounds while pnt < fin
+        ch = get_codeunit(dat, pos += 1)
+        pnt = (is_surrogate_codeunit(ch)
+               ? output_utf8_4byte!(pnt, get_supplementary(ch, get_codeunit(dat, pos += 1)))
+               : _encode_char_utf8(pnt, ch))
     end
     buf
-end
-
-"""
-Converts an already validated vector of `UInt16` or `UInt32` to a `UTF8Str`
-
-Input Arguments:
-
-* `dat` Vector of code units (`UInt16` or `UInt32`)
-* `len` length of output in bytes
-"""
-function _transcode_utf8(pnt, ch::Union{UInt16, UInt32}, out)
-    # Handle ASCII characters
-    if ch <= 0x7f
-        set_codeunit!(pnt, out += 1, ch)
-        # Handle 0x80-0x7ff
-    elseif ch < 0x800
-        set_codeunit!(pnt, out += 1, 0xc0 | (ch >>> 6))
-        set_codeunit!(pnt, out += 1, 0x80 | (ch & 0x3f))
-        # Handle 0x10000-0x10ffff (if input is UInt32)
-    elseif ch > 0xffff # this is only for T == UInt32, should not be generated for UInt16
-        output_utf8_4byte!(pnt, out, ch)
-        out += 4
-        # Handle surrogate pairs
-    elseif is_surrogate_codeunit(ch)
-        output_utf8_4byte!(pnt, out, get_supplementary(ch, get_codeunit(dat, pos += 1)))
-        out += 4
-        # Handle 0x800-0xd7ff, 0xe000-0xffff UCS-2 characters
-    else
-        set_codeunit!(pnt, out += 1, 0xe0 | ((ch >>> 12) & 0x3f))
-        set_codeunit!(pnt, out += 1, 0x80 | ((ch >>> 6) & 0x3f))
-        set_codeunit!(pnt, out += 1, 0x80 | (ch & 0x3f))
-    end
-    out
-end
-
-@inline function _encode_utf8(buf, ch::Union{UInt16, UInt32}, out)
-    # Handle ASCII characters
-    if ch <= 0x7f
-        set_codeunit!(buf, out += 1, ch)
-        out
-    # Handle 0x80-0x7ff
-    elseif ch < 0x800
-        set_codeunit!(buf, out + 1, 0xc0 | (ch >>> 6))
-        set_codeunit!(buf, out + 2, 0x80 | (ch & 0x3f))
-        out + 2
-    # Handle 0x10000-0x10ffff
-    elseif ch > 0xffff # this is only for T == UInt32, should not be generated for UInt16
-        output_utf8_4byte!(buf, out, ch)
-        out + 4
-    # Handle 0x800-0xd7ff, 0xe000-0xffff UCS-2 characters
-    else
-        set_codeunit!(buf, out + 1, 0xe0 | ((ch >>> 12) & 0x3f))
-        set_codeunit!(buf, out + 2, 0x80 | ((ch >>> 6) & 0x3f))
-        set_codeunit!(buf, out + 3, 0x80 | (ch & 0x3f))
-        out + 3
-    end
-end
-
-utf8(p::Ptr{UInt8}) =
-    utf8(p, p == C_NULL ? Csize_t(0) : ccall(:strlen, Csize_t, (Ptr{UInt8},), p))
-
-function utf8(p::Ptr{UInt8}, len::Integer)
-    p == C_NULL && nullerr()
-    UTF8Str(ccall(:jl_pchar_to_array, Vector{UInt8}, (Ptr{UInt8}, Csize_t), p, len))
 end

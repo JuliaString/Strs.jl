@@ -110,7 +110,7 @@ struct Str{T,SubStr,Cache,Hash} <: AbstractString
         where {CSE_T<:CSE} =
       new{CSE_T,Nothing,Nothing,Nothing}(v,nothing,nothing,nothing))
 end
-(::Type{STR})(v::STR_DATA_TYPE) where {STR<:Str{T,S,C,H}} where {T<:CSE,S,C,H} = Str(T, v)
+#(::Type{STR})(v::STR_DATA_TYPE) where {STR<:Str{T,S,C,H}} where {T<:CSE,S,C,H} = Str(T, v)
 
 # This needs to be redone, with character sets and the code unit as part of the type
 
@@ -192,8 +192,12 @@ for (nam, low) in vcat(list, sublist)
     @eval const $sym = Str{$(symstr(nam, "CSE")), Nothing,  Nothing, Nothing}
     @eval const $(symstr("empty_", low)) = Str($(symstr(nam, "CSE")), empty_strvec)
     @eval const empty_str(::Type{$sym}) = $(symstr("empty_", low))
+    @eval (::Type{$sym})(v::Vector{UInt8}) = convert($sym, v)
 end
 for val in list ; @eval export $(symstr(val[1], "Str")) ; end
+
+@inline _convert(::Type{T}, a::Vector{UInt8}) where {T<:Str} =
+    Str(cse(T), copyto!(_allocate(sizeof(a)), a))
 
 const ByteStr = Union{Text1Str, BinaryStr, ASCIIStr, LatinStr, _LatinStr, UTF8Str}
 const WordStr = Union{Text2Str, UCS2Str, _UCS2Str, UTF16Str} # 16-bit code units
@@ -211,6 +215,8 @@ const ByteStrings        = Union{Text1Str, BinaryStr, UnicodeByteStrings}
 const UnicodeStrings     = Union{String, UTF8Str, UTF16Str, UTF32Strings}
 
 ## Get the character set / encoding used by a string type
+cse(::T) where {T<:Str{C}} where {C<:CSE} = C
+cse(::Type{T}) where {T<:Str{C}} where {C<:CSE} = C
 
 charset(::Type{<:AbstractString})  = UniPlusCharSet
 charset(::Type{T}) where {T<:Str{C}} where {C<:CSE{CS,E}} where {CS,E} = CS
@@ -277,23 +283,3 @@ _len(s::QuadStr) = sizeof(s.data) >>> 2
 @inline _calcpnt(str, siz) = (pnt = _pnt64(str) - CHUNKSZ;  (pnt, pnt + siz))
 
 @inline _mask_bytes(n) = (1%UInt << ((n & (CHUNKSZ - 1)) << 3)) - 0x1
-
-function Str(v::Vector{UInt8})
-    siz = sizeof(v)
-    buf = _allocate(siz)
-    @inbounds copyto!(buf, v, siz)
-    Text1Str(buf)
-end
-function Str(v::Vector{UInt16})
-    len = length(v)
-    buf, pnt = _allocate(UInt16, v)
-    @inbounds unsafe_copyto!(pnt, v, len)
-    Text2Str(buf)
-end
-function Str(v::Vector{UInt32})
-    len = length(v)
-    buf, pnt = _allocate(UInt32, len)
-    @inbounds unsafe_copyto!(buf, v, len)
-    Text4Str(buf)
-end
-

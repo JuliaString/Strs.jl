@@ -28,7 +28,7 @@ function ucfirst(str::ASCIIStr)
     out = _allocate(len)
     unsafe_copyto!(out, pnt, len)
     set_codeunit!(out, ch - 0x20)
-    ASCIIStr(out)
+    Str(ASCIICSE, out)
 end
 
 function lcfirst(str::ASCIIStr)
@@ -39,7 +39,7 @@ function lcfirst(str::ASCIIStr)
     out = _allocate(len)
     unsafe_copyto!(out, pnt, len)
     set_codeunit!(out, ch + 0x20)
-    ASCIIStr(out)
+    Str(ASCIICSE, out)
 end
 
 function _upper(::Type{ASCIIStr}, dat, i, len)
@@ -47,7 +47,7 @@ function _upper(::Type{ASCIIStr}, dat, i, len)
     @inbounds for j = i:len
         _islower_a(out[j]) && (out[j] -= 0x20)
     end
-    ASCIIStr(out)
+    Str(ASCIICSE, out)
 end
 
 function uppercase(str::ASCIIStr)
@@ -63,7 +63,7 @@ function _lower(::Type{ASCIIStr}, dat, i, len)
     @inbounds for j = i:len
         _isupper_a(out[j]) && (out[j] += 0x20)
     end
-    ASCIIStr(out)
+    Str(ASCIICSE, out)
 end
 
 function lowercase(str::ASCIIStr)
@@ -80,7 +80,7 @@ function ucfirst(str::LatinStr)
     if _can_upper(ch)
         out = copy(dat)
         out[1] = ch - 0x20
-        LatinStr(out)
+        Str(LatinCSE, out)
     else
         str
     end
@@ -88,20 +88,22 @@ end
 
 # Special handling for characters that can't map into Latin1
 function ucfirst(str::_LatinStr)
-    dat = _data(str)
-    isempty(dat) && return str
-    @inbounds ch = tobase(get_codeunit(dat))
+    (len = _len(str)) == 0 && return str
+    pnt = _pnt(str)
+    @inbounds ch = tobase(get_codeunit(pnt))
     if _can_upper(ch)
-        @inbounds out = copy(dat)
-        @inbounds out[1] = ch - 0x20
-        T(out)
+        out8 = _allocate(len)
+        unsafe_copyto!(pointer(out8), pnt, len)
+        set_codeunit!(out8, ch - 0x20)
+        Str(_LatinStr, out8)
     elseif (ch == 0xb5) | (ch == 0xff)
-        buf, pnt = _allocate(UInt16, len)
-        set_codeunit!(pnt, 1, ifelse(ch == 0xb5, 0x39c, 0x178))
+        buf, out = _allocate(UInt16, len)
+        set_codeunit!(out, ifelse(ch == 0xb5, 0x39c, 0x178))
+        # Perform the widen operation on the rest (should be done via SIMD)
         @inbounds for i = 2:len
-            set_codeunit!(pnt, i, get_codeunit(dat, i)%UInt16)
+            set_codeunit!(out += 2, get_codeunit(pnt += 2)%UInt16)
         end
-        _UCS2Str(buf)
+        Str(_UCS2CSE, buf)
     else
         str
     end
@@ -112,7 +114,7 @@ function lcfirst(str::T) where {T<:LatinStrings}
     (isempty(dat) || !isupper(get_codeunit(dat))) && return str
     @inbounds out = copy(dat)
     @inbounds out[1] += 0x20
-    T(out)
+    Str(cse(T), out)
 end
 
 lowercase(ch::T) where {T<:LatinChars} = T(_lowercase_l(tobase(ch)))
@@ -133,7 +135,7 @@ function _upper(::Type{LatinStr}, dat, i, len)
     @inbounds for j = i:len
         _can_upper(out[j]) && (out[j] -= 0x20)
     end
-    LatinStr(out)
+    Str(LatinCSE, out)
 end
 
 function _upper(::Type{_LatinStr}, dat, i, len)
@@ -147,7 +149,7 @@ function _upper(::Type{_LatinStr}, dat, i, len)
             _can_upper(out[j]) && (out[j] -= 0x20)
         end
     end
-    _LatinStr(out)
+    Str(_LatinCSE, out)
 end
 
 function _widenupper(dat, i, len)
@@ -165,7 +167,7 @@ function _widenupper(dat, i, len)
             set_codeunit!(pnt, j, _can_upper(ch) ? ch - 0x20 : ch)
         end
     end
-    _UCS2Str(buf)
+    Str(_UCS2CSE, buf)
 end
 
 function uppercase(str::LatinStr)
@@ -191,11 +193,10 @@ function _lower(::Type{T}, dat, i) where {T<:LatinStrings}
     @inbounds for j = i:length(out)
         _isupper_al(out[j]) && (out[j] += 0x20)
     end
-    T(out)
+    Str(cse(T), out)
 end
 
 function lowercase(str::T) where {T<:LatinStrings}
-    #println("lowercase(::$T)")
     dat = _data(str)
     for i = 1:_len(str)
         _isupper_al(dat[i]) && return _lower(T, dat, i)
@@ -222,27 +223,26 @@ function _lower(::Type{T}, beg, pnt, fin, len) where {T<:UCS2Strings}
     buf, out = _allocate(UInt16, len)
     unsafe_copyto!(out, beg, len)
     _lower!(out + (pnt - beg), fin)
-    T(buf)
+    Str(cse(T), buf)
 end
 
 function _lower(::Type{T}, beg, pnt, fin, len) where {T<:UTF32Strings}
     buf, out = _allocate(UInt32, len)
     unsafe_copyto!(out, beg, len)
     _lower!(out + (pnt - beg), fin)
-    T(buf)
+    Str(cse(T), buf)
 end
 
 # Placeholders until I write some optimal code for these
 function lowercase(str::UTF8Str)
-    UTF8Str(lowercase(String(str.data)))
+    Str(UTF8CSE, lowercase(String(str.data)))
 end
 
 function uppercase(str::UTF8Str)
-    UTF8Str(uppercase(String(str.data)))
+    Str(UTF8CSE, uppercase(String(str.data)))
 end
 
 function lowercase(str::UCS2Str)
-    #println("lowercase(::UCS2Str)")
     pnt = beg = _pnt(str)
     fin = beg + sizeof(str)
     while pnt < fin
@@ -276,18 +276,17 @@ function _upper(::Type{T}, beg, pnt, fin, len) where {T<:UCS2Strings}
     buf, out = _allocate(UInt16, len)
     unsafe_copyto!(out, beg, len)
     _upper!(out + (pnt - beg), fin)
-    T(buf)
+    Str(cse(T), buf)
 end
 
 function _upper(::Type{T}, beg, pnt, fin, len) where {T<:UTF32Strings}
     buf, out = _allocate(UInt32, len)
     unsafe_copyto!(out, beg, len)
     _upper!(out + (pnt - beg), fin)
-    T(buf)
+    Str(cse(T), buf)
 end
 
 function uppercase(str::UCS2Str)
-    #println("uppercase(::UCS2Str)")
     pnt = beg = _pnt(str)
     fin = beg + sizeof(str)
     while pnt < fin
@@ -300,7 +299,6 @@ function uppercase(str::UCS2Str)
 end
 
 function uppercase(str::T) where {T<:UTF32Strings}
-    #println("uppercase(::$T)")
     pnt = beg = _pnt(str)
     fin = beg + sizeof(str)
     while pnt < fin
@@ -311,7 +309,6 @@ function uppercase(str::T) where {T<:UTF32Strings}
 end
 
 function lowercase(str::T) where {T<:UTF32Strings}
-    #println("lowercase(::$T)")
     pnt = beg = _pnt(str)
     fin = beg + sizeof(str)
     while pnt < fin
@@ -326,7 +323,6 @@ end
 # result must have at least one character > 0xff, so if the only character(s)
 # > 0xff became <= 0xff, then the result may need to be narrowed and returned as _LatinStr
 function lowercase(str::_UCS2Str)
-    #println("lowercase(::_UCS2Str)")
     pnt = beg = _pnt(str)
     fin = beg + sizeof(str)
     while pnt < fin
@@ -341,7 +337,6 @@ end
 
 # characters 0xb5 and 0xff get treated specially
 function uppercase(str::_UCS2Str)
-    #println("uppercase(::_UCS2Str)")
     pnt = beg = _pnt(str)
     fin = beg + sizeof(str)
     while pnt < fin
@@ -374,11 +369,10 @@ function _lower(::Type{UTF16Str}, beg, pnt, fin, len)
         end
         out += 2
     end
-    UTF16Str(buf)
+    Str(UTF16CSE, buf)
 end
 
 function lowercase(str::UTF16Str)
-    #println("lowercase(::UTF16Str)")
     pnt = beg = _pnt(str)
     fin = beg + sizeof(str)
     while pnt < fin
@@ -419,11 +413,10 @@ function _upper(::Type{UTF16Str}, beg, pnt, fin, len)
         end
         out += 2
     end
-    UTF16Str(buf)
+    Str(UTF16CSE, buf)
 end
 
 function uppercase(str::UTF16Str)
-    #println("uppercase(::UTF16Str)")
     pnt = beg = _pnt(str)
     fin = beg + sizeof(str)
     while pnt < fin

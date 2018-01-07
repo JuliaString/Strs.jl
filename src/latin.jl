@@ -88,7 +88,7 @@ function convert(::Type{ASCIIStr}, ch::UInt32)
     ch <= 0x7f || unierror(UTF_ERR_INVALID_ASCII, ch)
     buf = _allocate(1)
     buf[1] = ch%UInt8
-    ASCIIStr(buf)
+    Str(ASCIICSE, buf)
 end
 
 ## transcoding to Latin1 ##
@@ -128,11 +128,9 @@ function convert(::Type{_LatinStr}, str::String)
     len, flags, num4byte, num3byte, num2byte, latinbyte =
         unsafe_checkstring(str, 1, sizeof(str))
     num4byte + num3byte + num2byte == 0 || unierror(UTF_ERR_INVALID_LATIN1)
-    T = latinbyte == 0 ? ASCIIStr : _LatinStr
-    T(flags == 0 ? _data(str) : _utf8_to_latin(_data(str), len))
+    Str(latinbyte == 0 ? ASCIICSE : _LatinCSE,
+        flags == 0 ? _data(str) : _utf8_to_latin(_data(str), len))
 end
-
-_convert(T, a::Vector{UInt8}) = (len = sizeof(a); T(copyto!(_allocate(len), a, len)))
 
 convert(::Type{LatinStr}, a::Vector{UInt8}) = _convert(LatinStr, a)
 convert(::Type{_LatinStr}, a::Vector{UInt8}) = _convert(isascii(a) ? ASCIIStr : _LatinStr, a)
@@ -146,14 +144,5 @@ function convert(::Type{T}, str::AbstractString) where {T<:LatinStrings}
     @inbounds for ch in str
         buf[out += 1] = ch%UInt8
     end
-    T(buf)
+    Str(T, buf)
 end
-
-latin1(x) = convert(_LatinStr, x)
-latin1(p::Ptr{UInt8}) =
-    latin1(p, p == C_NULL ? Csize_t(0) : ccall(:strlen, Csize_t, (Ptr{UInt8},), p))
-function latin1(p::Ptr{UInt8}, len::Integer)
-    p == C_NULL && nulerr()
-    _LatinStr(ccall(:jl_pchar_to_array, Vector{UInt8}, (Ptr{UInt8}, Csize_t), p, len))
-end
-

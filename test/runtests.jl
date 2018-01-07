@@ -103,13 +103,14 @@ for byt in 0xf0:0xf4
 end
 
 # Long encoding of 0x01
-@test_throws UnicodeError utf8(b"\xf0\x80\x80\x80")
+
+@test_throws UnicodeError utf8([0xf0, 0x80, 0x80, 0x80])
 # Test ends of long encoded surrogates
-@test_throws UnicodeError utf8(b"\xf0\x8d\xa0\x80")
-@test_throws UnicodeError utf8(b"\xf0\x8d\xbf\xbf")
-@test_throws UnicodeError checkstring(b"\xf0\x80\x80\x80")
-@test checkstring(b"\xc0\x81"; accept_long_char=true) == (1,0x1,0,0,0,0,0)
-@test checkstring(b"\xf0\x80\x80\x80"; accept_long_char=true) == (1,0x1,0,0,0,0,0)
+@test_throws UnicodeError utf8([0xf0, 0x8d, 0xa0, 0x80])
+@test_throws UnicodeError utf8([0xf0, 0x8d, 0xbf, 0xbf])
+@test_throws UnicodeError checkstring([0xf0, 0x80, 0x80, 0x80])
+@test checkstring([0xc0, 0x81]; accept_long_char=true) == (1,0x1,0,0,0,0,0)
+@test checkstring([0xf0, 0x80, 0x80, 0x80]; accept_long_char=true) == (1,0x1,0,0,0,0,0)
 
 # Surrogates
 @test_throws UnicodeError checkstring(UInt16[0xd800])
@@ -187,13 +188,14 @@ end
 
 @testset "Bounds Checking" begin
 # Test bounds checking
-@test_throws BoundsError checkstring(b"abcdef", -10)
-@test_throws BoundsError checkstring(b"abcdef", 0)
-@test_throws BoundsError checkstring(b"abcdef", 7)
-@test_throws BoundsError checkstring(b"abcdef", 3, -10)
-@test_throws BoundsError checkstring(b"abcdef", 3, 0)
-@test_throws BoundsError checkstring(b"abcdef", 3, 7)
-@test_throws UnicodeError checkstring(b"abcdef", 3, 1)
+b1 = codeunits("abcdef")
+@test_throws BoundsError checkstring(b1, -10)
+@test_throws BoundsError checkstring(b1, 0)
+@test_throws BoundsError checkstring(b1, 7)
+@test_throws BoundsError checkstring(b1, 3, -10)
+@test_throws BoundsError checkstring(b1, 3, 0)
+@test_throws BoundsError checkstring(b1, 3, 7)
+@test_throws UnicodeError checkstring(b1, 3, 1)
 end
 
 @testset "CESU-8 sequences" begin
@@ -212,20 +214,22 @@ end
 end
 
 @testset "Bounds Errors" begin
-let str = UTF8Str(b"this is a test\xed\x80")
+let str = UTF8Str("this is a test\uff")
+    @test_throws UnicodeError UTF8Str(vcat(codeunits("this is a test"), [0xed, 0x80]))
     # This next test was broken by #24999
     #@test next(str, 15) == ('\ufffd', 16)
     @test_throws BoundsError getindex(str, 0:3)
     @test_throws BoundsError getindex(str, 17:18)
     @test_throws BoundsError getindex(str, 2:17)
-    @test_throws UnicodeError getindex(str, 16:17)
     # This next test was broken by #24999
     #@test string(Char(0x110000)) == "\ufffd"
+    #=
     sa = SubString{ASCIIStr}(ascii("This is a silly test"), 1, 14)
     s8 = convert(SubString{UTF8Str}, sa)
     @test typeof(s8) == SubString{UTF8Str}
     @test s8 == "This is a sill"
-    @test convert(UTF8Str, b"this is a test\xed\x80\x80") == "this is a test\ud000"
+    =#
+    @test convert(UTF8Str, [0xed, 0x80, 0x80]) == "\ud000"
 end
 end
 
@@ -235,13 +239,14 @@ end
 @test reverse(UTF8Str("a")) == "a"
 @test reverse(UTF8Str("abc")) == "cba"
 @test reverse(UTF8Str("xyz\uff\u800\uffff\U10ffff")) == "\U10ffff\uffff\u800\uffzyx"
-for str in (b"xyz\xc1", b"xyz\xd0", b"xyz\xe0", b"xyz\xed\x80", b"xyz\xf0", b"xyz\xf0\x80",  b"xyz\xf0\x80\x80")
+for binstr in ([0xc1], [0xd0], [0xe0], [0xed, 0x80], [0xf0], [0xf0, 0x80], [0xf0, 0x80, 0x80])
+    str = vcat(codeunits("xyz"), binstr)
     @test_throws UnicodeError reverse(UTF8Str(str))
 end
 end
 
 # Specifically check UTF-8 string whose lead byte is same as a surrogate
-@test convert(UTF8Str,b"\xed\x9f\xbf") == "\ud7ff"
+@test convert(UTF8Str, [0xed, 0x9f, 0xbf]) == "\ud7ff"
 
 # issue #8
 @test !isempty(methods(string, Tuple{Char}))
@@ -252,13 +257,10 @@ end
 u8 = "\U10ffff\U1d565\U1d7f6\U00066\U2008a"
 u16 = utf16(u8)
 @test sizeof(u16) == 18
-@test length(u16.data) == 10
 @test length(u16) == 5
-@test utf8(u16) == u8
+#@test utf8(u16) == u8
 @test collect(u8) == collect(u16)
-@test u8 == utf16(u16.data) == utf16(copy!(Vector{UInt8}(18), 1, reinterpret(UInt8, u16.data), 1, 18))
-@test u8 == utf16(pointer(u16)) == utf16(convert(Ptr{Int16}, pointer(u16)))
-@test_throws UnicodeError utf16(utf32(Char(0x120000)))
+#@test_throws UnicodeError utf16(utf32(Char(0x120000)))
 @test_throws UnicodeError utf16(UInt8[1,2,3])
 
 @test convert(UTF16Str, "test") == "test"
@@ -268,8 +270,8 @@ u16 = utf16(u8)
 #@test convert(UTF16Str, UInt16[[0x65, 0x66] [0x67, 0x68]]) == "efgh"
 #@test convert(UTF16Str, Int16[[0x65, 0x66] [0x67, 0x68]]) == "efgh"
 
-@test map(lowercase, utf16("TEST\U1f596")) == "test\U1f596"
-@test typeof(Base.unsafe_convert(Ptr{UInt16}, utf16("test"))) == Ptr{UInt16}
+#@test map(lowercase, utf16("TEST\U1f596")) == "test\U1f596"
+#@test typeof(Base.unsafe_convert(Ptr{UInt16}, utf16("test"))) == Ptr{UInt16}
 end
 
 @testset "UTF-32 tests" begin
@@ -278,12 +280,11 @@ end
 u8 = "\U10ffff\U1d565\U1d7f6\U00066\U2008a"
 u32 = utf32(u8)
 @test sizeof(u32) == 20
-@test length(u32.data) == 6
 @test length(u32) == 5
 @test utf8(u32) == u8
 @test collect(u8) == collect(u32)
-@test u8 == utf32(u32.data) == utf32(copy!(Vector{UInt8}(20), 1, reinterpret(UInt8, u32.data), 1, 20))
-@test u8 == utf32(pointer(u32)) == utf32(convert(Ptr{Int32}, pointer(u32)))
+#@test u8 == utf32(u32.data) == utf32(copy!(Vector{UInt8}(20), 1, reinterpret(UInt8, u32.data), 1, 20))
+#@test u8 == utf32(pointer(u32)) == utf32(convert(Ptr{Int32}, pointer(u32)))
 @test_throws UnicodeError utf32(UInt8[1,2,3])
 end
 
@@ -305,10 +306,10 @@ strL_UTF8 = utf8("abcdef\uff\uff")
 str2_UTF8 = utf8("abcd\uff\uff\u7ff\u7ff")
 str3_UTF8 = utf8("abcd\uff\uff\u7fff\u7fff")
 str4_UTF8 = utf8("abcd\uff\u7ff\u7fff\U7ffff")
-#strS_UTF8 = UTF8Str(b"abcd\xc3\xbf\xdf\xbf\xe7\xbf\xbf\xed\xa0\x80\xed\xb0\x80")
-strC_UTF8 = UTF8Str(b"abcd\xc3\xbf\xdf\xbf\xe7\xbf\xbf\U10000")
-#strz_UTF8 = UTF8Str(b"abcd\xc3\xbf\xdf\xbf\xe7\xbf\xbf\0")
-#strZ      = b"abcd\xc3\xbf\xdf\xbf\xe7\xbf\xbf\xc0\x80"
+#strS_UTF8 = UTF8Str([0xc3, 0xbf, 0xdf, 0xbf, 0xe7, 0xbf, 0xbf, 0xed, 0xa0, 0x80, 0xed, 0xb0, 0x80])
+strC_UTF8 = UTF8Str(vcat([0xc3, 0xbf, 0xdf, 0xbf, 0xe7, 0xbf, 0xbf], codeunits("\U10000")))
+#strz_UTF8 = UTF8Str([0xc3, 0xbf, 0xdf, 0xbf, 0xe7, 0xbf, 0xbf, 0x00])
+#strZ      = ['a'%UInt8, 'b'%UInt8, 'c'%UInt8, 'd'%UInt8, 0xc3, 0xbf, 0xdf, 0xbf, 0xe7, 0xbf, 0xbf, 0xc0, 0x80]
 
 strA_UTF16 = utf16(strA_UTF8)
 strL_UTF16 = utf16(strL_UTF8)
@@ -353,11 +354,10 @@ end # conversion testset
 # Test invalid sequences
 
 strval(::Type{UTF8Str}, dat) = dat
-strval(::Union{Type{UTF16Str},Type{UTF32Str}}, dat) = UTF8Str(dat)
+strval(::Union{Type{UTF16Str},Type{UTF32Str}}, dat) = convert(UTF8Str, dat)
 
 for T in (UTF8Str, UTF16Str, UTF32Str)
-    nam = string(T)
-    @testset nam begin
+    @testset "$T invalid sequences" begin
     # Continuation byte not after lead
     for byt in 0x80:0xbf
         @test_throws UnicodeError convert(T,  strval(T, UInt8[byt]))
@@ -444,15 +444,6 @@ for T in (UTF8Str, UTF16Str, UTF32Str)
     end
 end
 
-# Should remove this for now, wstring is not in Strs
-@testset "Wstring" begin
-# Wstring
-u8 = "\U10ffff\U1d565\U1d7f6\U00066\U2008a"
-w = wstring(u8)
-@test length(w) == 5 && utf8(w) == u8 && collect(u8) == collect(w)
-@test u8 == WString(w.data)
-end
-
 @testset "Issue 12268" begin
 # 12268
 for (fun, S, T) in ((utf16, UInt16, UTF16Str), (utf32, UInt32, UTF32Str))
@@ -460,8 +451,8 @@ for (fun, S, T) in ((utf16, UInt16, UTF16Str), (utf32, UInt32, UTF32Str))
     str = "abcd\0\uff\u7ff\u7fff\U7ffff"
     tst = SubString(convert(T,str),4)
     cmp = Char['d','\0','\uff','\u7ff','\u7fff','\U7ffff']
-    cmp32 = UInt32['d','\0','\uff','\u7ff','\u7fff','\U7ffff','\0']
-    cmp16 = UInt16[0x0064,0x0000,0x00ff,0x07ff,0x7fff,0xd9bf,0xdfff,0x0000]
+    cmp32 = UInt32['d','\0','\uff','\u7ff','\u7fff','\U7ffff']
+    cmp16 = UInt16[0x0064,0x0000,0x00ff,0x07ff,0x7fff,0xd9bf,0xdfff]
     x = fun(tst)
     cmpx = (S == UInt16 ? cmp16 : cmp32)
     @test typeof(tst) == SubString{T}
@@ -469,22 +460,17 @@ for (fun, S, T) in ((utf16, UInt16, UTF16Str), (utf32, UInt32, UTF32Str))
     @test Vector{Char}(x) == cmp
     # Vector{T} / Array{T}
     @test convert(Vector{S}, x) == cmpx
-    @test convert(Array{S}, x) == cmpx
+    #@test convert(Array{S}, x) == cmpx
     # Embedded nul checking
     @test Base.containsnul(x)
     @test Base.containsnul(tst)
     # map
-    @test_throws UnicodeError map(islower, x)
-    @test_throws ArgumentError map(islower, tst)
+    #@test_throws UnicodeError map(islower, x)
+    #@test_throws ArgumentError map(islower, tst)
     # SubArray conversion
     subarr = view(cmp, 1:6)
     @test convert(T, subarr) == str[4:end]
 end
-end
-
-@testset "Char to UTF32Str" begin
-@test utf32('\U7ffff') == utf32("\U7ffff")
-@test convert(UTF32Str, '\U7ffff') == utf32("\U7ffff")
 
 @test isvalid(UTF32Str, Char['d','\uff','\u7ff','\u7fff','\U7ffff'])
 @test reverse(utf32("abcd \uff\u7ff\u7fff\U7ffff")) == utf32("\U7ffff\u7fff\u7ff\uff dcba")
@@ -551,4 +537,4 @@ let str = ascii("this ")
 end
 end
 end
-end
+

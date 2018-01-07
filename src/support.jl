@@ -63,11 +63,13 @@ const UTF_ERR_NL_CONVERSION     = "only one newline conversion may be specified"
 const UTF_ERR_NORMALIZE         = " is not one of :NFC, :NFD, :NFKC, :NFKD"
 
 @noinline boundserr(s, pos) = throw(BoundsError(s, pos))
+@noinline unierror(err)          = throw(UnicodeError(err))
 @noinline unierror(err, pos, ch) = throw(UnicodeError(err, pos, ch))
 @noinline utf8err(err) = throw(UnicodeError(err))
 @noinline utf8err(err, v) = utf8err(string(":", v, err))
 @noinline nulerr() = utf8err("cannot convert NULL to string")
 @noinline ncharerr(n) = utf8err(string("nchar (", n, ") must be greater than 0"))
+@noinline neginderr(s, n) = utf8err("Index ($n) must be non negative")
 @noinline codepoint_error(T, v) = utf8err(string("Invalid CodePoint: ", T, " 0x", hex(v)))
 @noinline argerror(startpos, endpos) =
     utf8err(string("End position ", endpos, " is less than start position (", startpos, ")"))
@@ -515,10 +517,10 @@ function bytestring(s::AbstractString...)
     len, flags, num4byte, num3byte, num2byte, latin1, invalids =
         unsafe_checkstring(dat, 1, siz)
     if flags & ~UTF_INVALID == 0
-        invalids == 0 ? ASCIIStr(dat) : Text1Str(dat)
+        Str(invalids == 0 ? ASCIICSE : Text1CSE, dat)
     else
         # This takes care of long encodings, CESU-8 surrogate characters, etc.
-        UTF8Str(_transcode(UInt8, dat, len))
+        Str(UTF8CSE, _transcode_utf8(dat, len))
     end
 end
 
@@ -565,8 +567,12 @@ function _cmp(a::Str, b::AbstractString)
 end
 _cmp(a::AbstractString, b::Str) = -_cmp(b, a)
 
+# Todo: handle comparisions of UTF16 specially, to compare first non-matching character
+# as if comparing Char to Char, to get ordering correct when dealing with > 0xffff non-BMP
+# characters
+
 # Fast version, compare bytes directly
-# (note, have to be handle things a bit different when add substrings to the Str type)
+# (note, will have to handle things a bit differently when substrings are added to the Str type)
 #function _cmp(a::T, b::T) where {T<:Str}
 #end
 
@@ -610,4 +616,44 @@ last(s::Str, n::Integer) = s[max(1, prevind(s, ncodeunits(s)+1, n)):end]
 repeat(s::Str, r::Integer) = repeat(String(s), r)
 (^)(s::Union{Str,CodePoint}, r::Integer) = repeat(s, r)
 
+# Definitions for C compatible strings, that don't allow embedded
+# '\0', and which are terminated by a '\0'
+containsnul(str::ByteStr) = containsnul(unsafe_convert(Ptr{Cchar}, str), sizeof(str))
+
+# Check 4 characters at a time
+function containsnul(str::WordStr)
+    (siz = sizeof(str)) == 0 && return true
+    pnt, fin = _calcpnt(str, siz)
+    while (pnt += CHUNKSZ) <= fin
+        ((v = unsafe_load(pnt))%UInt16 == 0 || (v>>>16)%UInt16 == 0 ||
+         (v>>>32)%UInt16 == 0 || (v>>>48) == 0) && return true
+    end
+    pnt - CHUNKSZ != fin &&
+        ((v = (unsafe_load(pnt) | ~_mask_bytes(siz)))%UInt16 == 0 ||
+         (v>>>16)%UInt16 == 0 || (v>>>32)%UInt16 == 0)
+end
+
+function containsnul(str::QuadStr)
+    (siz = sizeof(str)) == 0 && return true
+    pnt, fin = _calcpnt(str, siz)
+    while (pnt += CHUNKSZ) <= fin
+        ((v = unsafe_load(pnt))%UInt32 == 0 || (v>>>32) == 0) && return true
+    end
+    pnt - CHUNKSZ != fin && unsafe_load(reinterpret(Ptr{UInt32}, pnt)) == 0x00000
+end
+
+# pointer conversions of ASCII/UTF8/UTF16/UTF32 strings:
+pointer(s::Union{ByteStr, WideStr}) = _pnt(s)
+pointer(s::ByteStr, i::Integer) = _pnt(s) + i - 1
+pointer(s::WideStr, i::Integer) = _pnt(s) + (i - 1)*sizeof(codeunit(s))
+
+# pointer conversions of SubString of ASCII/UTF8/UTF16/UTF32:
+pointer(x::SubString{<:ByteStr}) =
+    _pnt(x.string) + x.offset
+pointer(x::SubString{<:ByteStr}, i::Integer) =
+    _pnt(x.string) + x.offset + (i-1)
+pointer(x::SubString{<:WideStr}) =
+    _pnt(x.string) + x.offset*sizeof(codeunit(x.string))
+pointer(x::SubString{<:WideStr}, i::Integer) =
+    _pnt(x.string) + (x.offset + (i-1))*sizeof(codeunit(x.string))
 

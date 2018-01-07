@@ -38,6 +38,8 @@ end
 _length(::CodeUnitSingle, str) = (@_inline_meta(); _len(str))
 _isvalid(::CodeUnitSingle, str, i) = (@_inline_meta(); 1 <= i <= _len(str))
 
+_thisind(::CodeUnitSingle, str, i) = Int(i)
+
 _prevind(::CodeUnitSingle, str, i) = Int(i) - 1
 @propagate_inbounds function _prevind(::CodeUnitSingle, str, i, nchar)
     @boundscheck nchar > 0 || ncharerr(nchar)
@@ -70,8 +72,10 @@ end
     (@_inline_meta(); _next(CodePointStyle(T), codepoint_type(T), str, i))
 @propagate_inbounds length(str::T) where {T<:Str} =
     (@_inline_meta(); _length(CodePointStyle(T), str))
-@propagate_inbounds isvalid(str::T, i::Int) where {T<:Str} =
+@propagate_inbounds isvalid(str::T, i::Integer) where {T<:Str} =
     (@_inline_meta(); _isvalid(CodePointStyle(T), str, i))
+@propagate_inbounds thisind(str::T, i::Int) where {T<:Str} =
+    (@_inline_meta(); _prevind(CodePointStyle(T), str, i))
 @propagate_inbounds prevind(str::T, i::Int) where {T<:Str} =
     (@_inline_meta(); _prevind(CodePointStyle(T), str, i))
 @propagate_inbounds nextind(str::T, i::Int) where {T<:Str} =
@@ -107,7 +111,10 @@ isvalid(str::SubString{<:Str}, i::Integer) = (start(str) <= i <= endof(str))
 @propagate_inbounds function _collectstr(::CodeUnitMulti, ::Type{S}, str::T) where {S,T<:Str}
     len = _length(CodeUnitMulti(), str)
     vec = Vector{S}(uninitialized, len)
-    _transcode(vec, _pnt(str), len)
+    pos = 1
+    @inbounds for i = 1:len
+        vec[i], pos = _next(CodeUnitMulti(), S, str, pos)
+    end
     vec
 end
 

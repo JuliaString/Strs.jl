@@ -11,10 +11,11 @@ and store the renamed copies (stripped of ASCII lines) for later processing
 (I may change that part so that the it is done automatically, and the files are just renamed,
 or the files to be processed are picked up from a configuration file)
 
-books = load_books()      # This downloads and processes the books in the gutenbergbooks list
-save_books(books)         # This saves them in an output directory (samples) for later benchmarking
-res = benchmarkdir()      # Runs the benchmark functions on all the documents found in the directory
-save_results(fname, res)  # Saves the results to the given file
+books = load_books()     # This downloads and processes the books in the gutenbergbooks list
+save_books(books)        # This saves them in an output directory (samples) for later benchmarking
+tst = checktests()       # Runs a bunch of tests, compares results to the results from String
+res = benchdir()         # Runs the benchmark functions on all the documents found in the directory
+save_results(fname, res) # Saves the results to the given file
 
 res = load_results(fname) # Loads the results from the given file
 dispbench(res)            # Displays the results in a pretty format
@@ -33,8 +34,6 @@ using StringLiterals
 using Strs
 import Strs: LineCounts, CharTypes, CharStat, calcstats
 import Strs: _LatinStr, _UCS2Str, _UTF32Str, _LatinChr
-
-const codeunits = Strs.codeunits
 
 create_vector(T, len) = Vector{T}(uninitialized, len)
 
@@ -328,6 +327,16 @@ function checkstr(fun, lines::Vector{<:AbstractString})
     cnt
 end
 
+function iteratenextind(text)
+    cnt = 0
+    len = sizeof(text)
+    pos = 0
+    while (pos = nextind(text, pos)) < sizeof(text)
+        cnt += 1
+    end
+    cnt
+end
+
 function iteratefunchars(fun, text)
     cnt = 0
     for ch in text
@@ -507,6 +516,7 @@ end
 countsklength(l)  = checkstr(sklength, l)
 countoldlength(l) = checkstr(oldlength, l)
 
+checknextind(l) = checkstr(iteratenextind, l)
 countchars(l)   = checkstr(iteratechars, l)
 countcps(l)     = checkstr(iteratecps, l)
 countcus(l)     = checkstr(iteratecus, l)
@@ -559,6 +569,7 @@ const tests =
     (
      (countsize,   "sizeof"),
      (countlength, "length"),
+     (checknextind, "nextind\nchars"),
 #    (countsklength,  "length\nSK"),
 #    (countoldlength, "length\nOld"),
      (countchars,   "iteration\nChar"),
