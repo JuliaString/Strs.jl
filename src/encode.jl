@@ -4,6 +4,32 @@ Constructors for Str strings
 Copyright 2017 Gandalf Software, Inc., Scott P. Jones
 Licensed under MIT License, see LICENSE.md
 =#
+
+function _encode_ascii_latin(dat, len)
+    buf, out = _allocate(UInt8, len)
+    fin = out + len
+    pos = 0
+    @inbounds while out < fin
+        ch8 = dat[pos += 1]
+        set_codeunit!(out, (ch8 <= 0x7f ? ch8 : (((ch8 & 3) << 6) | (dat[pos += 1] & 0x3f))))
+        out += 1
+    end
+    buf
+end
+
+function _encode_ascii_latin(pnt::Ptr{UInt8}, len)
+    buf, out = _allocate(UInt8, len)
+    fin = out + len
+    @inbounds while out < fin
+        ch8 = get_codeunit(pnt)
+        set_codeunit!(out,
+                      (ch8 <= 0x7f ? ch8 : (((ch8 & 3) << 6) | (get_codeunit(pnt += 1) & 0x3f))))
+        pnt += 1
+        out += 1
+    end
+    buf
+end
+
 function _str(str::T) where {T<:Union{Vector{UInt8}, BinaryStr, Text1Str, String}}
     # handle zero length string quickly
     (siz = sizeof(str)) == 0 && return empty_ascii
@@ -18,17 +44,7 @@ function _str(str::T) where {T<:Union{Vector{UInt8}, BinaryStr, Text1Str, String
     elseif num3byte + num2byte != 0
         Str(_UCS2CSE, _encode_utf16(pnt, len))
     else
-        buf, out = _allocate(UInt8, len)
-        fin = out + len - 1
-        @inbounds while (out += 1) < fin
-            ch8 = get_codeunit(pnt)
-            set_codeunit!(out,
-                          (ch8 <= 0x7f
-                           ? ch8
-                           : (((ch8 & 3) << 6) | (get_codeunit(pnt += 1) & 0x3f))))
-            pnt += 1
-        end
-        Str(latin1byte == 0 ? ASCIICSE : _LatinCSE, buf)
+        Str(latin1byte == 0 ? ASCIICSE : _LatinCSE, _encode_ascii_latin(pnt, len))
     end
 end
 
@@ -58,7 +74,7 @@ function convert(::Type{Str}, str::AbstractString)
     # handle zero length string quickly
     isempty(str) && return empty_ascii
     len, flags = unsafe_checkstring(str)
-    str_encode(str, len, flags)
+    _str_encode(str, len, flags)
 end
 convert(::Type{Str}, str::String) = _str(str)
 convert(::Type{Str}, str::T) where {T<:Str} = str
@@ -68,8 +84,8 @@ convert(::Type{UniStr}, str::T) where {T<:Union{ASCIIStr,_LatinStr,_UCS2Str,_UTF
 function convert(::Type{UniStr}, str::T) where {T<:Str}
     # handle zero length string quickly
     isempty(str) && return empty_ascii
-    len, flags = count_chars(T, str, _len(str))
-    str_encode(str, len, flags)
+    len, flags = count_chars(T, _pnt(str), _len(str))
+    _str_encode(str, len, flags)
 end
 
 """Convert to a UniStr if valid Unicode, otherwise return a Text1Str"""
@@ -99,13 +115,7 @@ function unsafe_str(str::T;
     elseif num2byte + num3byte != 0
         Str(_UCS2CSE, _encode_utf16(dat, len))
     else
-        buf = _allocate(len)
-        out = pos = 0
-        @inbounds while out < len
-            ch8 = get_codeunit(dat, pos += 1)
-            buf[out += 1] = ch8 <= 0x7f ? ch8 : (((ch8 & 3) << 6) | (dat[pos += 1] & 0x3f))
-        end
-        Str(latin1byte == 0 ? ASCIICSE : _LatinCSE, buf)
+        Str(latin1byte == 0 ? ASCIICSE : _LatinCSE, _encode_ascii_latin(_pnt(str), len))
     end
 end
 
@@ -146,13 +156,7 @@ function unsafe_str(str::T;
     elseif num2byte + num3byte != 0
         Str(_UCS2CSE, _encode_utf16(dat, len))
     else
-        buf = _allocate(len)
-        out = pos = 0
-        @inbounds while out < len
-            ch8 = dat[pos += 1]
-            buf[out += 1] = ch8 <= 0x7f ? ch8 : (((ch8 & 3) << 6) | (dat[pos += 1] & 0x3f))
-        end
-        Str(latin1byte == 0 ? ASCIICSE : _LatinCSE, buf)
+        Str(latin1byte == 0 ? ASCIICSE : _LatinCSE, _encode_ascii_latin(dat, len))
     end
 end
 

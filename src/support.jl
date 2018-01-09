@@ -551,8 +551,6 @@ end
 (*)(s1::Union{C1, S1}, ss::Union{C2, S2}...) where {C1<:CodePoint,C2<:CodePoint,S1<:Str,S2<:Str} =
     string(s1, ss...)
 
-one(::Union{T,Type{T}}) where {T<:Str} = empty_(T)
-
 function _cmp(a::Str, b::AbstractString)
     a === b && return 0
     i = start(a)

@@ -35,7 +35,8 @@ using Strs
 import Strs: LineCounts, CharTypes, CharStat, calcstats
 import Strs: _LatinStr, _UCS2Str, _UTF32Str, _LatinChr
 
-create_vector(T, len) = Vector{T}(uninitialized, len)
+uninit(T, len) = T(uninitialized, len)
+create_vector(T, len) = uninit(Vector{T}, len)
 
 import Base: show
 
@@ -329,9 +330,10 @@ end
 
 function iteratenextind(text)
     cnt = 0
-    len = sizeof(text)
-    pos = 0
-    while (pos = nextind(text, pos)) < sizeof(text)
+    len = ncodeunits(text)
+    pos = 1
+    while pos <= len
+        pos = nextind(text, pos)
         cnt += 1
     end
     cnt
@@ -666,7 +668,7 @@ function checkboolchar(fun, lines)
     res = []
     for text in lines
         len = length(text)
-        bv = BitVector(uninitialized, len)
+        bv = uninit(BitVector, len)
         for (i, ch) in enumerate(text)
             bv[i] = fun(ch)
         end
@@ -677,7 +679,7 @@ end
 
 function checkline(::Type{Bool}, fun, lines)
     len = length(lines)
-    bv = BitVector(uninitialized, len)
+    bv = uninit(BitVector, len)
     for (i, text) in enumerate(lines)
         bv[i] = fun(text)
     end
@@ -720,25 +722,34 @@ function runcheckcu(lines, list)
     totresults
 end
 
-function comparetestline(lines, results, list)
-    pr"\tTest lines: \(eltype(lines)), \(list))"
+striplist(list) = replace(string(list), "Base.Unicode." => "")
+function comparetestline(lines, results, list, displist)
+    pr"  Lines:     \(displist)"
     diff = []
     for (i, fun) in enumerate(list)
         fundiff = []
         funres = results[i]
         for (j, text) in enumerate(lines)
-            #pr"i:\(i), j:\(j) => \(fun)(\"\(text)\")\n"
             res = fun(text)
-            res == funres[j] || push!(fundiff, (j, text, res, funres[j]))
+            res == funres[j] ||
+                push!(fundiff, typeof(res) == Bool ? (j, text) : (j, text, res, funres[j]))
         end
         isempty(fundiff) || push!(diff, (i, fun, fundiff))
     end
-    pr" => \(diff)\n"
+    if isempty(diff)
+        pwc(:green, "\r\u2714\n")
+    else
+        pwc(:red, "\e[s\rX\e[u")
+        io = IOBuffer()
+        print(io, " => ", diff)
+        str = String(take!(io))
+        println(str[1:200])
+    end
     diff
 end
 
-function comparetestchar(lines, results, list)
-    pr"\tTest chars: \(eltype(lines)), \(list)"
+function comparetestchar(lines, results, list, displist)
+    pr"  Chars:     \(displist)"
     diff = []
     for (i, fun) in enumerate(list)
         fundiff = []
@@ -747,10 +758,10 @@ function comparetestchar(lines, results, list)
         for (j, text) in enumerate(lines)
             chrdiff = []
             chrres = lineres[j]
-            #typeof(text) == UTF16Str && pr"i:\(i), j:\(j), \(length(text))\n"
             for (k, ch) in enumerate(text)
                 res = fun(ch)
-                res == chrres[k] || push!(chrdiff, (k, ch, res, chrres[k]))
+                res == chrres[k] ||
+                    push!(chrdiff, typeof(res) == Bool ? (k, ch) : (k, ch, res, chrres[k]))
             end
             isempty(chrdiff) || push!(fundiff, (j, text, chrdiff))
         end
@@ -759,12 +770,20 @@ function comparetestchar(lines, results, list)
             pr"Failed test \(fun): \(sprint(showerror, ex, catch_backtrace()))"
         end
     end
-    pr" => \(diff)\n"
+    if isempty(diff)
+        pwc(:green, "\r\u2714\n")
+    else
+        pwc(:red, "\e[s\rX\e[u")
+        io = IOBuffer()
+        print(io, " => ", diff)
+        str = String(take!(io))
+        println(str[1:200])
+    end
     diff
 end
 
-function comparetestcu(lines, results, list)
-    pr"\tTest codeunits: \(eltype(lines)), \(list)"
+function comparetestcu(lines, results, list, displist)
+    pr"  CodeUnits: \(displist)"
     diff = []
     for (i, fun) in enumerate(list)
         fundiff = []
@@ -774,33 +793,47 @@ function comparetestcu(lines, results, list)
             chrres = lineres[j]
             for (k, ch) in enumerate(codeunits(text))
                 res = fun(ch)
-                res == chrres[k] || push!(chrdiff, (k, ch, res, chrres[k]))
+                res == chrres[k] ||
+                    push!(chrdiff, typeof(res) == Bool ? (k, ch) : (k, ch, res, chrres[k]))
             end
             isempty(chrdiff) || push!(fundiff, (j, text, chrdiff))
         end
         isempty(fundiff) || push!(diff, (i, fun, fundiff))
     end
-    pr" => \(diff)\n"
+    if isempty(diff)
+        pwc(:green, "\r\u2714\n")
+    else
+        pwc(:red, "\e[s\rX\e[u")
+        io = IOBuffer()
+        print(io, " => ", diff)
+        str = String(take!(io))
+        println(str[1:200])
+    end
     diff
 end
 
-const strintlist  = (length, )
-const strboollist = (isascii, isvalid)
-const strmaplist  = (lowercase, uppercase) #, titlecase)
-const charlist    = (isascii, isvalid, iscntrl, islower, isupper, isalpha,
-                     isalnum, isspace, isprint, ispunct, isgraph, isdigit, isxdigit)
-const codeunitlist = (UInt32,)
+const testlist =
+    (((length, ), "length"),
+     ((isascii, isvalid), "isascii, isvalid"),
+     ((lowercase, uppercase #=titlecase=#), "lowercase, uppercase"),
+     ((isascii, isvalid, iscntrl, islower, isupper, isalpha,
+       isalnum, isspace, isprint, ispunct, isgraph, isdigit, isxdigit),
+      "is(ascii|valid|cntrl|lower|upper|alpha|alnum|space|print|punct|graph|digit|xdigit)"),
+     ((UInt32, ), "UInt32"),
+     ((sizeof, ), "sizeof"))
 
 # Use String to calculate a baseline (note, sizeof needs to be checked separately, as only
 # UTF8Str should be the same).
 
-compareall(lines, res) =
-    (comparetestline(lines, res[1], strintlist),
-     comparetestline(lines, res[2], strboollist),
-     [],#comparetestline(lines, res[3], strmaplist),
-     comparetestchar(lines, res[4], charlist),
-     eltype(lines) == UTF8Str ? comparetestcu(lines, res[5], codeunitlist) : [],
-     eltype(lines) == UTF8Str ? comparetestline(lines, res[6], (sizeof, )) : [])
+function compareall(io, lines, res)
+    pr"\(io)\(eltype(lines))\n"
+    (comparetestline(lines, res[1], testlist[1]...),
+     comparetestline(lines, res[2], testlist[2]...),
+     [],#comparetestline(lines, res[3], testlist[3]...),
+     comparetestchar(lines, res[4], testlist[4]...),
+     eltype(lines) == UTF8Str ? comparetestcu(lines, res[5], testlist[5]...) : [],
+     eltype(lines) == UTF8Str ? comparetestline(lines, res[6], testlist[6]...) : [])
+end
 
 function checktests(io = STDOUT, sampledir = defsampledir)
     totres = []
@@ -813,17 +846,17 @@ function checktests(io = STDOUT, sampledir = defsampledir)
         push!(list, MT)
         isdefined(Main, :UTF8String) && push!(list, UTF8String, UTF16String, UTF32String)
         enc = encode_lines(list, lines)
-        res = (runcheckline(Int, lines, strintlist),
-               runcheckline(Bool, lines, strboollist),
+        res = (runcheckline(Int, lines, testlist[1][1]),
+               runcheckline(Bool, lines, testlist[2][1]),
                [],
-               runcheckchar(lines, charlist),
-               runcheckcu(lines, codeunitlist),
-               runcheckline(Int, lines, (sizeof, )))
+               runcheckchar(lines, testlist[4][1]),
+               runcheckcu(lines,   testlist[5][1]),
+               runcheckline(Int, lines, testlist[6][1]))
         push!(totres, (fname, res))
         cmp = []
+        pr"\(io)Checking \(fname):\n"
         for i = 2:length(list)
-            pr"\(io)Checking \(fname): \(list)\n"
-            push!(cmp, compareall(enc[i], res))
+            push!(cmp, compareall(io, enc[i], res))
         end
         push!(totres, (fname, res))
         push!(totcmp, (fname, cmp))
@@ -863,7 +896,7 @@ function benchdir(io = STDOUT, sampledir = defsampledir)
         pr"\n\n"
 
         # Now test the performance for each
-        res = Vector{Any}(uninitialized, length(list))
+        res = create_vector(Any, length(list))
         res[1] = testperf(enc[1], io, LineCounts(numlines, numchars, sizes[1]), names[1], nothing)
         basetime = res[1][3]
         for i = 2:length(list)

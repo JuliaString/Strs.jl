@@ -6,72 +6,6 @@ Licensed under MIT License, see LICENSE.md
 Based in part on code for UTF16String that used to be in Julia
 =#
 
-# Get rest of character ch from 3-byte UTF-8 sequence in dat
-@inline function get_utf8_3byte(pnt, ch)
-    @inbounds return (((ch & 0xf)%UInt16 << 12)
-                      | ((get_codeunit(pnt - 1)%UInt16 & 0x3f) << 6)
-                      | (get_codeunit(pnt) & 0x3f))
-end
-# Get rest of character ch from 4-byte UTF-8 sequence in dat
-@inline function get_utf8_4byte(pnt, ch)
-    @inbounds return (((ch & 0x7)%UInt32 << 18)
-                      | ((get_codeunit(pnt - 2)%UInt32 & 0x3f) << 12)
-                      | ((get_codeunit(pnt - 1)%UInt32 & 0x3f) << 6)
-                      | (get_codeunit(pnt) & 0x3f))
-end
-
-# Output a character as a 2-byte UTF-8 sequence
-@inline function output_utf8_2byte!(pnt, ch)
-    @inbounds begin
-        set_codeunit!(pnt,     0xc0 | (ch >>> 6))
-        set_codeunit!(pnt + 1, 0x80 | (ch & 0x3f))
-        pnt + 2
-    end
-end
-
-# Output a character as a 3-byte UTF-8 sequence
-@inline function output_utf8_3byte!(pnt, ch)
-    @inbounds begin
-        set_codeunit!(pnt,     0xe0 | ((ch >>> 12) & 0x3f))
-        set_codeunit!(pnt + 1, 0x80 | ((ch >>> 6) & 0x3f))
-        set_codeunit!(pnt + 2, 0x80 | (ch & 0x3f))
-        pnt + 3
-    end
-end
-
-# Output a character as a 4-byte UTF-8 sequence
-@inline function output_utf8_4byte!(pnt, ch)
-    @inbounds begin
-        set_codeunit!(pnt,     0xf0 | (ch >>> 18))
-        set_codeunit!(pnt + 1, 0x80 | ((ch >>> 12) & 0x3f))
-        set_codeunit!(pnt + 2, 0x80 | ((ch >>> 6) & 0x3f))
-        set_codeunit!(pnt + 3, 0x80 | (ch & 0x3f))
-        pnt + 4
-    end
-end
-
-@inline _write_utf_2(io, ch) =
-    write(io, 0xc0 | (ch >>> 6)%UInt8, 0x80 | (ch & 0x3f)%UInt8)
-
-@inline _write_utf_3(io, ch) =
-    write(io, 0xe0 | ((ch >>> 12) & 0x3f)%UInt8,
-              0x80 | ((ch >>> 6) & 0x3f)%UInt8,
-              0x80 | (ch & 0x3f)%UInt8)
-
-@inline _write_utf_4(io, ch) =
-    write(io, 0xf0 | (ch >>> 18)%UInt8,
-              0x80 | ((ch >>> 12) & 0x3f)%UInt8,
-              0x80 | ((ch >>> 6) & 0x3f)%UInt8,
-              0x80 | (ch & 0x3f)%UInt8)
-
-@inline _write_ucs2(io, ch) =
-    ch <= 0x7f ? write(io, ch%UInt8) : ch <= 0x7ff ? _write_utf2(io, ch) : _write_utf3(io, ch)
-
-@inline _write_utf32(io, ch) = ch <= 0xffff ? _write_ucs2(io, ch) : _write_utf4(io, ch)
-
-@inline write(io::IO, ch::UCS2Chr) = _write_ucs2(io, tobase(ch))
-@inline write(io::IO, ch::UTF32Chr) = _write_utf32(io, tobase(ch))
-
 const _ascii_mask = 0xff80_ff80_ff80_ff80
 const _latin_mask = 0xff00_ff00_ff00_ff00
 const _trail_mask = 0xdc00_dc00_dc00_dc00
@@ -93,6 +27,8 @@ end
 
 function isascii(str::T) where {T<:Union{Text2Str, UCS2Str, UTF16Str}}
     (siz = sizeof(str)) == 0 && return true
+    siz < CHUNKSZ && return ((unsafe_load(_pnt64(str)) & _mask_bytes(siz)) & _ascii_mask) == 0
+
     pnt, fin = _calcpnt(str, siz)
     while (pnt += CHUNKSZ) <= fin
         (unsafe_load(pnt) & _ascii_mask) == 0 || return false
@@ -102,6 +38,8 @@ end
 
 function islatin(str::T) where {T<:Union{Text2Str, UCS2Str, UTF16Str}}
     (siz = sizeof(str)) == 0 && return true
+    siz < CHUNKSZ && return ((unsafe_load(_pnt64(str)) & _mask_bytes(siz)) & _latin_mask) == 0
+
     pnt, fin = _calcpnt(str, siz)
     while (pnt += CHUNKSZ) <= fin
         (unsafe_load(pnt) & _latin_mask) == 0 || return false
@@ -112,6 +50,8 @@ end
 # Check for any surrogate characters
 function isbmp(str::UTF16Str)
     (siz = sizeof(str)) == 0 && return true
+    siz < CHUNKSZ && return (_get_masked(_pnt64(str)) & _mask_bytes(siz)) == 0
+
     pnt, fin = _calcpnt(str, siz)
     while (pnt += CHUNKSZ) <= fin
         _get_masked(pnt) == 0 || return false
@@ -139,36 +79,38 @@ end
 get_supplementary(lead::Unsigned, trail::Unsigned) = (UInt32(lead-0xd7f7)<<10 + trail)
 
 function _next(::CodeUnitMulti, T, str::UTF16Str, pos::Int)
-    pos <= (len = _len(str)) || boundserr(str, pos)
+    @boundscheck pos <= _len(str) || boundserr(str, pos)
     pnt = _pnt(str)
-    @inbounds ch = get_codeunit(pnt, pos)
-    is_surrogate_lead(ch) || return (T(ch), pos + 1)
-    @inbounds ct = get_codeunit(pnt, pos + 1)
-    T(get_supplementary(ch, ct)), pos + 2
+    ch = get_codeunit(pnt, pos)
+    (is_surrogate_lead(ch)
+     ? (T(get_supplementary(ch, get_codeunit(pnt, pos + 1))), pos + 2)
+     : (T(ch), pos + 1))
 end
 
 @inline function _thisind(::CodeUnitMulti, str::UTF16Str, pos::Int)
-    @boundscheck 0 <= pos <= _len(str) || boundserr(str, pos)
-    pos + 1 + is_surrogate_codeunit(get_codeunit(_pnt(str), pos))
+    @boundscheck 1 <= pos <= _len(str) || boundserr(str, pos)
+    pos - is_surrogate_trail(get_codeunit(_pnt(str), pos))
 end
 
 @inline function _nextind(::CodeUnitMulti, str::UTF16Str, pos::Int)
-    @boundscheck 0 <= pos <= _len(str) || boundserr(str, pos)
-    pos + 1 + is_surrogate_codeunit(get_codeunit(_pnt(str), pos))
+    pos == 0 && return 1
+    @boundscheck 1 <= pos <= _len(str) || boundserr(str, pos)
+    pos + 1 + is_surrogate_lead(get_codeunit(_pnt(str), pos))
 end
 
 @inline function _prevind(::CodeUnitMulti, str::UTF16Str, pos::Int)
-    @boundscheck 1 <= pos <= _len(str) || boundserr(str, pos)
-    pos - 1 - is_surrogate_codeunit(get_codeunit(_pnt(str), pos))
+    (pos -= 1) == 0 && return 0
+    numcu = _len(str)
+    @boundscheck 0 < pos <= numcu || boundserr(str, pos + 1)
+    pos - is_surrogate_trail(get_codeunit(_pnt(str), pos))
 end
 
 # Todo: _prevind with nchar argument
 function _nextind(::CodeUnitMulti, str::UTF16Str, pos::Int, cnt::Int)
     cnt < 0 && neginderr(str, cnt)
-    numcu = _len(str)
-    @boundscheck 0 <= pos <= numcu || boundserr(str, pos)
+    @boundscheck 0 <= pos <= _len(str) || boundserr(str, pos)
     cnt == 0 && return thisind(str, pos) == pos ? pos : unierr("Invalid position", str, pos)
-    pos + cnt + is_surrogate_codeunit(get_codeunit(_pnt(str), pos + cnt))
+    pos + cnt + is_surrogate_lead(get_codeunit(_pnt(str), pos + cnt))
 end
 
 function search(str::UCS2Strings, ch::UInt32, pos::Integer)
@@ -328,7 +270,7 @@ function write(io::IO, str::UTF32Strings)
     len, pnt = _lenpnt(str)
     cnt = 0
     @inbounds for i = 1:len
-        cnt += write_utf32(io, get_codeunit(pnt))
+        cnt += _write_utf32(io, get_codeunit(pnt))
         pnt += 4
     end
     cnt
@@ -346,7 +288,7 @@ function write(io::IO, str::UTF16Str)
             write(io, ch%UInt8)
         elseif ch <= 0x7ff
             _write_utf_2(io, ch)
-        elseif 0xd800 <= ch <= 0xd7ff
+        elseif is_surrogate_lead(ch)
             _write_utf_4(io, get_supplementary(ch, get_codeunit(pnt += 2)))
         else
             _write_utf_3(io, ch)
@@ -360,13 +302,13 @@ function convert(::Type{UTF16Str}, ch::UInt32)
     check_valid(ch, 0)
     if ch <= 0x0ffff
         buf, pnt = _allocate(UInt16, 1)
-        set_codeunit!(pnt, 1, ch%UInt16)
+        set_codeunit!(pnt, ch%UInt16)
         Str(UCS2CSE, buf)
     else
         buf, pnt = _allocate(UInt16, 2)
         # output surrogate pair
-        set_codeunit!(pnt, 1, (0xd7c0 + (ch >>> 10))%UInt16)
-        set_codeunit!(pnt, 2, (0xdc00 + (ch & 0x3ff))%UInt16)
+        set_codeunit!(pnt,     (0xd7c0 + (ch >>> 10))%UInt16)
+        set_codeunit!(pnt + 1, (0xdc00 + (ch & 0x3ff))%UInt16)
         Str(UTF16CSE, buf)
     end
 end
@@ -388,6 +330,7 @@ function convert(::Type{T}, ch::UInt32) where {T<:UCS2Strings}
 end
 
 function convert(::Type{T}, str::AbstractString) where {T<:UCS2Strings}
+    isempty(str) && return empty_str(T)
     # Might want to have an invalids_as argument
     len, flags, num4byte = unsafe_checkstring(str)
     num4byte == 0 || unierror(UTF_ERR_INVALID_UCS2)
@@ -418,7 +361,7 @@ function convert(::Type{T}, str::UTF16Str) where {T<:UCS2Strings}
     # handle zero length string quickly
     (siz = sizeof(str)) == 0 && return empty_str(T)
     # Check if conversion is valid
-    _all_bmp(str) || unierror(UTF_ERR_INVALID_UCS2)
+    isbmp(str) || unierror(UTF_ERR_INVALID_UCS2)
     Str(cse(T), _cvtsize(UInt16, _pnt(str), len))
 end
 
@@ -452,6 +395,7 @@ function isvalid(::Type{UTF16Str}, data::Ptr{UInt16}, len)
 end
 
 function convert(::Type{UTF16Str}, str::AbstractString)
+    isempty(str) && return empty_utf16
     len, flags, num4byte = unsafe_checkstring(str)
     buf, pnt = _allocate(UInt16, len + num4byte)
     @inbounds for ch in str
@@ -521,6 +465,7 @@ function _encode_utf16(pnt::Ptr{UInt8}, len)
         end
         set_codeunit!(out, ch)
         out += 2
+        pnt += 1
     end
     buf
 end
@@ -564,7 +509,6 @@ Returns:
 function _encode_utf16(dat::Ptr{UInt32}, len)
     buf, pnt = _allocate(UInt16, len)
     fin = pnt + (len<<1)
-    pos = 0
     @inbounds while pnt < fin
         ch = get_codeunit(dat)
         dat += 4
@@ -595,6 +539,7 @@ convert(::Type{UTF16Str}, str::UCS2Strings) = Str(UTF16CSE, str.data)
 unsafe_convert(::Type{Ptr{UInt16}}, s::UTF16Str) = _pnt(s)
 
 function convert(::Type{UTF16Str}, dat::AbstractVector{UInt16})
+    isempty(dat) && return empty_utf16
     len, flags, num4byte = unsafe_checkstring(dat, 1, endof(dat))
     # Optimize case where no surrogate characters
     Str(UTF16CSE, flags == 0 ? _cvtsize(UInt16, dat, len) : _encode_utf16(dat, len + num4byte))
@@ -615,7 +560,7 @@ function _convert(pnt::Ptr{T}, len) where {T}
 end
 
 function convert(::Type{UTF16Str}, bytes::AbstractArray{UInt8})
-    isempty(bytes) && return _empty_utf16
+    isempty(bytes) && return empty_utf16
     # Note: there are much better ways of detecting what the likely encoding is here,
     # this only deals with big or little-ending UTF-32
     # It really should detect at a minimum UTF-8, UTF-16 big and little
@@ -642,14 +587,14 @@ end
 end
 
 """Handle case where result vector is longer"""
-function _maprest(fun, len, dat, buf, pnt, out, pos, uc)
+function _maprest(fun, len, buf, pnt, out, uc)
     rst = Vector{UInt16}()
     pushchar!(rst, uc)
     while pos <= len
-        ch = get_codeunit(dat, pos)%UInt32
+        ch = get_codeunit(pnt)%UInt32
         # check for surrogate pair
         is_surrogate_lead(ch) &&
-            (ch = get_supplementary(ch, get_codeunit(pnt, pos += 1)))
+            (ch = get_supplementary(ch, get_codeunit(pnt += 2)))
         pushchar!(rst, check_valid(UInt32(fun(ch)), pos))
     end
     # We now have a vector to add to the end of buf
@@ -661,28 +606,33 @@ function _maprest(fun, len, dat, buf, pnt, out, pos, uc)
 end
 
 function map(fun, str::T) where {T<:Union{UCS2Str,_UCS2Str,UTF16Str}}
-    len, dat = _lenpnt(str)
-    buf, pnt = _allocate(UInt16, len)
-    out = pos = 0
+    (len == _len(str)) == 0 && return empty_str(T)
+    pnt = _pnt(str)
+    buf, out = _allocate(UInt16, len)
     surrflag = false
-    while pos <= len
-        ch = get_codeunit(dat, pos)%UInt32
+    fin = pnt + sizeof(str)
+    outend = out + sizeof(str)
+    while pnt < fin
+        ch = get_codeunit(pnt)%UInt32
         # check for surrogate pair
         T == UTF16Str && is_surrogate_lead(ch) &&
-            (ch = get_supplementary(ch, get_codeunit(pnt, pos += 1)))
+            (ch = get_supplementary(ch, get_codeunit(pnt += 2)))
         # Note: no checking for invalid here, UTF16Str is always valid
         uc = check_valid(UInt32(fun(ch)), pos)
         if uc < 0x10000
-            out < len || return _maprest(fun, len, dat, buf, pnt, out, pos, uc)
+            out < outend || return _maprest(fun, len, buf, pnt, out, uc)
+            set_codeunit!(out, uc%UInt16)
+            out += 2
         else
-            out + 2 <= len || return _maprest(fun, len, dat, buf, pnt, out, pos, uc)
-            set_codeunit!(pnt, out += 1, (0xd7c0 + (uc >> 10))%UInt16)
-            uc = 0xdc00 + (uc & 0x3ff)
+            out + 2 < outend || return _maprest(fun, len, buf, pnt, out, uc)
+            set_codeunit!(out,     (0xd7c0 + (uc >> 10))%UInt16)
+            set_codeunit!(out + 1, (0xdc00 + (uc & 0x3ff))%UInt16)
             surrflag = true
+            out += 4
         end
-        set_codeunit!(pnt, out += 1, uc%UInt16)
     end
-    out < len && resize!(buf, out<<1)
+    outlen = out - pointer(buf)
+    out < len && resize!(buf, outlen << 1)
     if !surrflag
         Str(cse(T), buf)
     elseif T == _UCS2Str

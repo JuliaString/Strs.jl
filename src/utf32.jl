@@ -116,6 +116,7 @@ function convert(::Type{_UTF32Str}, ch::UInt32)
 end
 
 function convert(::Type{UTF32Str}, str::AbstractString)
+    isempty(str) && return empty_utf32
     len, flags = unsafe_checkstring(str)
     buf, pnt = _allocate(UInt32, len)
     out = 0
@@ -146,14 +147,14 @@ convert(::Type{_UTF32Str}, str::String) = _convert_string_utf32(_UTF32Str, str)
     elseif ch < 0xe0 # Handle range 0x80-0x7ff
         ((ch & 0x1f) << 6) | (get_codeunit(pnt + 1) & 0x3f), pnt + 2
     elseif ch < 0xf0 # Handle range 0x800-0xffff
-        ch = get_utf8_3byte(pnt += 3, ch)%UInt32
+        ch = get_utf8_3byte(pnt += 2, ch)%UInt32
         # Handle surrogate pairs (should have been encoded in 4 bytes)
         (is_surrogate_lead(ch)
             # Build up 32-bit character from ch and trailing surrogate in next 3 bytes
-         ? (get_supplementary(ch, get_utf8_3byte(pnt + 3, get_codeunit(pnt)%UInt32)), pnt + 3)
-         : (ch, pnt))
+         ? (get_supplementary(ch, get_utf8_3byte(pnt + 3, get_codeunit(pnt + 1)%UInt32)), pnt + 4)
+         : (ch, pnt + 1))
     else # Handle range 0x10000-0x10ffff
-        get_utf8_4byte(pnt + 4, ch), pnt + 4
+        get_utf8_4byte(pnt + 3, ch), pnt + 4
     end
 end
 
@@ -177,20 +178,18 @@ function _transcode_utf32(::Type{UTF8Str}, pnt, len)
         ch = get_codeunit(pnt)%UInt32
         # Handle ASCII characters
         if ch <= 0x7f
-            # Do nothing
-            pnt += 1
+            set_codeunit!(out, ch)
         # Handle range 0x80-0x7ff
         elseif ch < 0xe0
-            ch = ((ch & 0x1f) << 6) | (get_codeunit(pnt + 1) & 0x3f)
-            pnt += 2
+            set_codeunit!(out, ((ch & 0x1f) << 6) | (get_codeunit(pnt += 1) & 0x3f))
         elseif ch < 0xf0
             # Handle range 0x800-0xffff
-            ch = get_utf8_3byte(pnt += 3, ch)%UInt32
+            set_codeunit!(out, get_utf8_3byte(pnt += 2, ch)%UInt32)
         else
             # Handle range 0x10000-0x10ffff
-            ch = get_utf8_4byte(pnt += 4, ch)
+            set_codeunit!(out, get_utf8_4byte(pnt += 3, ch))
         end
-        set_codeunit!(out, ch)
+        pnt += 1
         out += 4
     end
     buf
@@ -201,10 +200,10 @@ function _transcode_utf32(::Type{UTF16Str}, pnt, len)
     buf, out = _allocate(UInt32, len)
     fin = out + (len<<2)
     @inbounds while out < fin
-        ch = get_codeunit(pnt += 1)
-        is_surrogate_lead(ch) &&
-            (ch = get_supplementary(ch, get_codeunit(pnt += 1)))
+        ch = get_codeunit(pnt)
+        is_surrogate_lead(ch) && (ch = get_supplementary(ch, get_codeunit(pnt += 2)))
         set_codeunit!(out, ch)
+        pnt += 2
         out += 4
     end
     buf
@@ -240,7 +239,7 @@ function convert(::Type{UTF32Str}, str::UTF16Str)
     # No surrogate pairs, do optimized copy
     Str(UTF32CSE, cnt == len
         ? _cvtsize(UInt32, _pnt(str), cnt)
-        : _transcode_utf32(UTF16Str, _pnt(dat), cnt))
+        : _transcode_utf32(UTF16Str, _pnt(str), cnt))
 end
 
 function convert(::Type{UTF16Str}, str::T) where {T<:UTF32Strings}
@@ -256,18 +255,17 @@ end
 
 function convert(::Type{S}, str::T) where {S<:UCS2Strings,T<:UTF32Strings}
     # Might want to have an invalids_as argument
-    len, pnt = _lenpnt(str)
     # handle zero length string quickly
-    len == 0 && return empty_str(S)
+    (len = _len(str)) == 0 && return empty_str(S)
     # Check if conversion is valid
-    _all_bmp(str) || unierror(UTF_ERR_INVALID_UCS2)
+    isbmp(str) || unierror(UTF_ERR_INVALID_UCS2)
     Str(cse(S), _cvtsize(UInt16, _pnt(str), len))
 end
 
 const UniRawChar = Union{UInt32, Int32, Text4Chr, Char}
 
 function convert(::Type{T}, dat::AbstractVector{<:UniRawChar}) where {T<:UTF32Strings}
-    len = length(dat)
+    (len = length(dat)) == 0 && empty_str(T)
     buf, pnt = _allocate(UInt32, len)
     fin = pnt + (len<<2)
     pos = 0
@@ -300,7 +298,7 @@ _convert(pnt::Ptr{T}, len, T1) where {T<:Union{UInt32,UInt32_U,UInt32_S,UInt32_U
      : (ch == 0x0feff ? _convert(pnt + 4, len - 1) : _convert(pnt, len)))
 
 function convert(::Type{T}, bytes::AbstractArray{UInt8}) where {T<:UTF32Strings}
-    isempty(bytes) && return _empty_utf32
+    isempty(bytes) && return empty_utf32
     # Note: there are much better ways of detecting what the likely encoding is here,
     # this only deals with big or little-ending UTF-32
     # It really should detect at a minimum UTF-8, UTF-16 big and little

@@ -22,14 +22,8 @@ _endof(::CodeUnitSingle, str) = (@_inline_meta(); _len(str))
 
 @propagate_inbounds function _next(::CodeUnitSingle, T, str, pos)
     @_inline_meta()
-    len, pnt = _lenpnt(str)
-    @boundscheck pos <= len || boundserr(str, pos)
-    try
-        T(get_codeunit(pnt, pos)), pos + 1
-    catch ex
-        println("Type: ", T, ":", pos, ":", _data(str))
-        rethrow(ex)
-    end
+    @boundscheck 0 < pos <= _len(str) || boundserr(str, pos)
+    T(get_codeunit(str, pos)), pos + 1
 end
 
 @propagate_inbounds _getindex(::CodeUnitMulti, T, str, i::Int) =
@@ -102,7 +96,7 @@ isvalid(str::SubString{<:Str}, i::Integer) = (start(str) <= i <= endof(str))
     _chr2ind(CodePointStyle(T), str, i)
 
 @propagate_inbounds _reverseind(::CodeUnitSingle, str::T, i) where {T<:Str} =
-    (@_inline_meta(); _length(CodeUnitSingle(), str) + 1 - i)
+    (@_inline_meta(); _len(str) + 1 - i)
 @propagate_inbounds reverseind(str::T, i::Integer) where {T<:Str} =
     _reverseind(CodePointStyle(T), str, i)
 @propagate_inbounds reverseind(str::S, i::Integer) where {S<:SubString{T}} where {T<:Str} =

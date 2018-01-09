@@ -6,6 +6,77 @@ Licensed under MIT License, see LICENSE.md
 Based in part on code for UTF8String that used to be in Julia
 =#
 
+# UTF-8 support functions
+
+# Get rest of character ch from 2-byte UTF-8 sequence in dat
+@inline get_utf8_2byte(pnt, ch) =
+    @inbounds return (((ch & 0x3f)%UInt16 << 6) | (get_codeunit(pnt) & 0x3f))
+
+# Get rest of character ch from 3-byte UTF-8 sequence in dat
+@inline get_utf8_3byte(pnt, ch) =
+    @inbounds return (((ch & 0xf)%UInt16 << 12)
+                      | ((get_codeunit(pnt - 1)%UInt16 & 0x3f) << 6)
+                      | (get_codeunit(pnt) & 0x3f))
+
+# Get rest of character ch from 4-byte UTF-8 sequence in dat
+@inline get_utf8_4byte(pnt, ch) =
+    @inbounds return (((ch & 0x7)%UInt32 << 18)
+                      | ((get_codeunit(pnt - 2)%UInt32 & 0x3f) << 12)
+                      | ((get_codeunit(pnt - 1)%UInt32 & 0x3f) << 6)
+                      | (get_codeunit(pnt) & 0x3f))
+
+# Output a character as a 2-byte UTF-8 sequence
+@inline function output_utf8_2byte!(pnt, ch)
+    @inbounds begin
+        set_codeunit!(pnt,     0xc0 | (ch >>> 6))
+        set_codeunit!(pnt + 1, 0x80 | (ch & 0x3f))
+        pnt + 2
+    end
+end
+
+# Output a character as a 3-byte UTF-8 sequence
+@inline function output_utf8_3byte!(pnt, ch)
+    @inbounds begin
+        set_codeunit!(pnt,     0xe0 | ((ch >>> 12) & 0x3f))
+        set_codeunit!(pnt + 1, 0x80 | ((ch >>> 6) & 0x3f))
+        set_codeunit!(pnt + 2, 0x80 | (ch & 0x3f))
+        pnt + 3
+    end
+end
+
+# Output a character as a 4-byte UTF-8 sequence
+@inline function output_utf8_4byte!(pnt, ch)
+    @inbounds begin
+        set_codeunit!(pnt,     0xf0 | (ch >>> 18))
+        set_codeunit!(pnt + 1, 0x80 | ((ch >>> 12) & 0x3f))
+        set_codeunit!(pnt + 2, 0x80 | ((ch >>> 6) & 0x3f))
+        set_codeunit!(pnt + 3, 0x80 | (ch & 0x3f))
+        pnt + 4
+    end
+end
+
+@inline _write_utf_2(io, ch) =
+    write(io, 0xc0 | (ch >>> 6)%UInt8, 0x80 | (ch & 0x3f)%UInt8)
+
+@inline _write_utf_3(io, ch) =
+    write(io, 0xe0 | ((ch >>> 12) & 0x3f)%UInt8,
+              0x80 | ((ch >>> 6) & 0x3f)%UInt8,
+              0x80 | (ch & 0x3f)%UInt8)
+
+@inline _write_utf_4(io, ch) =
+    write(io, 0xf0 | (ch >>> 18)%UInt8,
+              0x80 | ((ch >>> 12) & 0x3f)%UInt8,
+              0x80 | ((ch >>> 6) & 0x3f)%UInt8,
+              0x80 | (ch & 0x3f)%UInt8)
+
+@inline _write_ucs2(io, ch) =
+    ch <= 0x7f ? write(io, ch%UInt8) : ch <= 0x7ff ? _write_utf_2(io, ch) : _write_utf_3(io, ch)
+
+@inline _write_utf32(io, ch) = ch <= 0xffff ? _write_ucs2(io, ch) : _write_utf_4(io, ch)
+
+@inline write(io::IO, ch::UCS2Chr) = _write_ucs2(io, tobase(ch))
+@inline write(io::IO, ch::UTF32Chr) = _write_utf32(io, tobase(ch))
+
 ## required core functionality ##
 
 function endof(str::UTF8Str)
@@ -17,7 +88,7 @@ function endof(str::UTF8Str)
     len
 end
 
-utf_trail(c::UInt8) = (0xe5000000 >>> ((c & 0xf0) >> 3))
+utf_trail(c::UInt8) = (0xe5000000 >>> ((c & 0xf0) >> 3)) & 0x3
 
 #=
 _cont(byt, n) = (byt >>> n)%UInt8 != 0x80
@@ -91,15 +162,20 @@ isunicode(str::UTF8Str) = true
 
 # Gets next codepoint
 @propagate_inbounds function _next(::CodeUnitMulti, T, str::UTF8Str, pos::Int)
-    len, pnt = _lenpnt(str)
-    pnt += pos - 1
-    @inbounds b1 = get_codeunit(pnt)%UInt32
-    b1 < 0x80 && return T(b1), pos + 1
-    @inbounds ch = (b1 << 6) + get_codeunit(pnt + 1)
-    b1 < 0xe0 && return T(ch - 0x03080), pos + 2
-    @inbounds ch = (ch << 6) + get_codeunit(pnt + 2)
-    b1 < 0xf0 && return T(ch - 0xe2080), pos + 3
-    @inbounds return T((ch << 6) + get_codeunit(pnt + 3) - 0x3c82080), pos + 4
+    len = _len(str)
+    @boundscheck 0 < pos <= len || boundserr(str, pos)
+    pnt = _pnt(str) + pos - 1
+    ch = get_codeunit(pnt)
+    if ch < 0x80
+        T(ch), pos + 1
+    # elseif ch < 0xc0 # This means an incorrect position was passed, next documents won't happen
+    elseif ch < 0xe0
+        T(get_utf8_2byte(pnt + 1, ch)), pos + 2
+    elseif ch < 0xf0
+        T(get_utf8_3byte(pnt + 2, ch)), pos + 3
+    else
+        T(get_utf8_4byte(pnt + 3, ch)), pos + 4
+    end
 end
 
 @propagate_inbounds done(str::UTF8Str, i::Int) = done(_data(str), i)
@@ -111,27 +187,22 @@ length(it::CodePoints{String}, i::Int) = length(it.xs)
     UTF32Chr(ch%UInt32), state
 end
 
-@inline function first_utf8_byte(ch::UInt32)
-    c < 0x80    ? c%UInt8 :
-    c < 0x800   ? ((c>>6)  | 0xc0)%UInt8 :
-    c < 0x10000 ? ((c>>12) | 0xe0)%UInt8 :
-                  ((c>>18) | 0xf0)%UInt8
-end
+@inline first_utf8_byte(ch::UInt32) =
+    (ch > 0x7f
+     ? (ch > 0x7ff ? (ch > 0xffff ? ((ch>>18) | 0xf0) : ((ch>>12) | 0xe0)) : ((ch>>6) | 0xc0))
+     : ch)%UInt8
 
-function reverseind(s::UTF8Str, i::Integer)
-    j = lastidx(s) + 1 - i
-    d = _data(s)
-    while is_valid_continuation(d[j])
-        j -= 1
-    end
-    j
+function _reverseind(::CodeUnitMulti, str::UTF8Str, pos::Int)
+    pnt = _pnt(s) + _len(str) + 1 - pos
+    pos - (is_valid_continuation(pnt)
+           ? (is_valid_continuation(pnt - 1) ? (is_valid_continuation(pnt - 2) ? 3 : 2) : 1) : 0)
 end
 
 ## overload methods for efficiency ##
 
-bytestring(s::UTF8Str) = s
+bytestring(str::UTF8Str) = str
 
-lastidx(s::UTF8Str) = sizeof(s)
+lastidx(str::UTF8Str) = sizeof(str)
 
 @inline _isvalid(::CodeUnitMulti, str::UTF8Str, pos::Int) =
     (1 <= pos <= _len(str)) && !is_valid_continuation(_data(str)[pos])
@@ -161,21 +232,20 @@ function _prevind(T::CodeUnitMulti, str::UTF8Str, pos::Int)
     pos == 1 && return 0
     numcu = _len(str)
     @boundscheck 1 < pos <= (numcu + 1) || boundserr(str, pos)
-    _thisind(CodeUnitMulti(), str,
+    _thisind(T, str,
              pos - (pos == (numcu + 1) || is_valid_continuation(get_codeunit(str, pos))))
 end
 
-function getindex(s::UTF8Str, r::UnitRange{Int})
-    isempty(r) && return empty_utf8
-    i, j = first(r), last(r)
-    len = _len(s)
-    @boundscheck 1 <= i <= len || boundserr(s, i)
-    dat = _data(s)
-    ch = dat[i]
-    is_valid_continuation(ch) && unierror(UTF_ERR_INVALID_INDEX, i, ch)
-    @boundscheck j > len || boundserr(s, j)
-    j = nextind(s, j) - 1
-    Str(UTF8CSE, dat[i:j])
+function getindex(str::UTF8Str, rng::UnitRange{Int})
+    isempty(rng) && return SubString(empty_utf8, 1, 0)
+    beg = first(rng) 
+    len = _len(str)
+    @boundscheck 1 <= beg <= len || boundserr(str, beg)
+    dat = _data(str)
+    @inbounds is_valid_continuation(dat[beg]) && unierror(UTF_ERR_INVALID_INDEX, beg, dat[beg])
+    lst = last(rng)
+    @boundscheck beg > lst > len || boundserr(str, lst)
+    SubString(str, beg, nextind(str, lst) - 1)
 end
 
 function search(s::UTF8Str, c::UInt32, i::Integer)

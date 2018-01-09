@@ -67,6 +67,8 @@ set_codeunit!(pnt::Ptr{<:CodeUnitTypes}, ch) = unsafe_store!(pnt, ch)
 set_codeunit!(dat::AbstractVector{<:CodeUnitTypes}, ch) = (dat[1] = ch)
 set_codeunit!(dat::String, ch) = set_codeunit!(dat, 1, ch)
 
+isvalid(::Type{T}) where {T<:UnicodeChars} = true
+
 isvalid(::Type{ASCIIStr}, str::Vector{ASCIIChr}) = true
 isvalid(::Type{LatinStrings}, str::Vector{T}) where {T<:Union{ASCIIChr,LatinChars}} = true
 isvalid(::Type{UCS2Str}, str::Vector{T}) where {T<:Union{ASCIIChr,LatinChars,UCS2Chr}} = true
