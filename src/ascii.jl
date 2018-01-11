@@ -8,15 +8,13 @@ Based in part on code for ASCIIString that used to be in Julia
 
 ## overload methods for efficiency ##
 
-isascii(s::ASCIIStr) = true
-
 bytestring(s::ASCIIStr) = s
 
 function search(s::ASCIIStr, c::UInt32, i::Integer)
-    len, dat = _lendata(s)
+    len = _len(s)
     i == len + 1 && return 0
     1 <= i <= len || boundserr(s, i)
-    c < 0x80 ? search(dat, c%UInt8, i) : 0
+    c < 0x80 ? search(_data(s), c%UInt8, i) : 0
 end
 
 rsearch(s::ASCIIStr, c::UInt32, i::Integer) =
@@ -30,16 +28,16 @@ function _string(c)
     v = _allocate(n)
     o = 1
     for s in c
-        len, dat = _lendata(s)
-        unsafe_copy!(v, o, dat, 1, len)
+        len = _len(s)
+        unsafe_copy!(v, o, _data(s), 1, len)
         o += len
     end
     v
 end
 
-string(c::ASCIIStr...) = length(c) == 1 ? c[1] : ASCIIStr(_string(c))
+string(c::ASCIIStr...) = length(c) == 1 ? c[1] : Str(ASCIICSE, _string(c))
 
-reverse(s::ASCIIStr) = ASCIIStr(reverse(_data(s)))
+reverse(s::ASCIIStr) = Str(ASCIICSE, reverse(_data(s)))
 
 ## outputting ASCII strings ##
 
@@ -49,43 +47,36 @@ write(io::IO, ch::ASCIIChr) = write(io, tobase(ch))
 
 ## transcoding to ASCII ##
 
-ascii(str) = convert(ASCIIStr, str)
 function convert(::Type{ASCIIStr}, str::AbstractString)
     # Need to fix this to show where the non-ASCII character was found!
-    isascii(str) || unierror(UTF_ERR_INVALID_ASCII)
+    isempty(str) && return empty_ascii
     len = length(str)
     buf = _allocate(len)
     out = 0
     @inbounds for ch in str
+        isascii(ch) || unierror(UTF_ERR_INVALID_ASCII, pos, ch)
         buf[out += 1] = ch%UInt8
     end
-    ASCIIStr(buf)
+    Str(ASCIICSE, buf)
 end
-convert(::Type{ASCIIStr}, str::ASCIIStr) = str
-function convert(::Type{ASCIIStr}, str::T) where {T<:Union{LatinStr,UTF8Str}}
-    isascii(str) || unierror(UTF_ERR_INVALID_ASCII)
-    ASCIIStr(_data(str))
-end
+
+convert(::Type{ASCIIStr}, str::T) where {T<:Union{LatinStr,UTF8Str}} =
+    isascii(dat) ? _convert(ASCIIStr, _data(str)) : unierror(UTF_ERR_INVALID_ASCII)
+
+convert(::Type{ASCIIStr}, dat::Vector{UInt8}) =
+    isascii(dat) ? _convert(ASCIIStr, dat) : unierror(UTF_ERR_INVALID_ASCII)
+
 function convert(::Type{ASCIIStr}, str::String)
-    len, flags = unsafe_checkstring(str, 1, endof(str))
-    flags == 0 && ASCIIStr(_data(str))
+    len, flags = unsafe_checkstring(str, 1, sizeof(str))
+    flags == 0 && Str(ASCIICSE, _data(str))
     (flags & ~UTF_LONG) == 0 || unierror(UTF_ERR_INVALID_ASCII)
-    # Handle any long encodings, such as \xc0\x80 for \0
+    # Handle any long encodings, such as \xc0\x80 for \0 (maybe that should only be for unsafe_str)
     buf = _allocate(len)
     out = 0
     @inbounds for ch in str
         buf[out += 1] = ch%UInt8
     end
-    ASCIIStr(buf)
-end
-
-ascii(pnt::Ptr{UInt8}) =
-    ascii(pnt, pnt == C_NULL ? Csize_t(0) : ccall(:strlen, Csize_t, (Ptr{UInt8},), pnt))
-ascii(pnt::Ptr{UInt8}, len::Integer) = begin
-    pnt == C_NULL && throw(ArgumentError("cannot convert NULL to string"))
-    vec = ccall(:jl_pchar_to_array, Vector{UInt8}, (Ptr{UInt8}, Csize_t), pnt, len)
-    isvalid(ASCIIStr, vec) || unierror(UTF_ERR_INVALID_ASCII)
-    ASCIIStr(vec)
+    Str(ASCIICSE, buf)
 end
 
 # This should really use a keyword argument, and allow for the following possibilities:
@@ -105,7 +96,7 @@ function _convert_ascii(a, invlen, invdat)
     # Note: this doesn't make a copy if only ascii characters,
     # so that changes later to the vector will affect the string!
     # that is only safe if the vector came from something else immutable
-    cnt == 0 && return ASCIIStr(a)
+    cnt == 0 && return Str(ASCIICSE, a)
     v = _allocate(len + cnt*invlen)
     out = 1
     @inbounds for i = 1:len
@@ -117,7 +108,7 @@ function _convert_ascii(a, invlen, invdat)
             out += invlen
         end
     end
-    ASCIIStr(v)
+    Str(ASCIICSE, v)
 end
 
 convert(::Type{ASCIIStr}, a::Vector{UInt8}, invalids_as::String) =

@@ -1,4 +1,11 @@
-# Core functions
+#=
+Core functions
+
+Copyright 2017 Gandalf Software, Inc., Scott P. Jones, and others (
+Licensed under MIT License, see LICENSE.md
+
+Inspired by / derived from code in Julia
+=#
 
 # Need to optimize these to avoid doing array reinterpret
 #=
@@ -8,9 +15,6 @@ getindex(s::T, rge{Int}) where {T} = T(getindex(_data(s), r))
 getindex(s::T, indx::AbstractVector{Int}) where {T} = T(_data(s)[indx])
 =#
 
-@propagate_inbounds next(it::CodeUnits{T}, pos::Int) where {T<:Union{String,Str}} =
-    _next(CodePointStyle(T), codeunit_type(T), it.xs, pos)
-
 _endof(::CodeUnitSingle, str) = (@_inline_meta(); _len(str))
 
 @propagate_inbounds _getindex(::CodeUnitSingle, T, str, i::Int) =
@@ -18,23 +22,17 @@ _endof(::CodeUnitSingle, str) = (@_inline_meta(); _len(str))
 
 @propagate_inbounds function _next(::CodeUnitSingle, T, str, pos)
     @_inline_meta()
-    len, pnt = _lenpnt(str)
-    @boundscheck pos <= len || boundserr(str, pos)
-    try
-        T(get_codeunit(pnt, pos)), pos + 1
-    catch ex
-        println("Type: ", T, ":", pos, ":", _data(str))
-        rethrow(ex)
-    end
+    @boundscheck 0 < pos <= _len(str) || boundserr(str, pos)
+    T(get_codeunit(str, pos)), pos + 1
 end
 
-@propagate_inbounds getindex(::CodeUnitMulti, T, str, i::Int) =
+@propagate_inbounds _getindex(::CodeUnitMulti, T, str, i::Int) =
     _next(CodeUnitMulti(), T, str, i)[1]
 
 _length(::CodeUnitSingle, str) = (@_inline_meta(); _len(str))
 _isvalid(::CodeUnitSingle, str, i) = (@_inline_meta(); 1 <= i <= _len(str))
 
-@noinline ncharerr(n) = throw(ArgumentError(string("nchar (",n,") must be greater than 0")))
+_thisind(::CodeUnitSingle, str, i) = Int(i)
 
 _prevind(::CodeUnitSingle, str, i) = Int(i) - 1
 @propagate_inbounds function _prevind(::CodeUnitSingle, str, i, nchar)
@@ -70,17 +68,19 @@ end
     (@_inline_meta(); _length(CodePointStyle(T), str))
 @propagate_inbounds isvalid(str::T, i::Integer) where {T<:Str} =
     (@_inline_meta(); _isvalid(CodePointStyle(T), str, i))
-@propagate_inbounds prevind(str::Str, i::Integer) where {T<:Str} =
+@propagate_inbounds thisind(str::T, i::Int) where {T<:Str} =
     (@_inline_meta(); _prevind(CodePointStyle(T), str, i))
-@propagate_inbounds nextind(str::Str, i::Integer) where {T<:Str} =
+@propagate_inbounds prevind(str::T, i::Int) where {T<:Str} =
+    (@_inline_meta(); _prevind(CodePointStyle(T), str, i))
+@propagate_inbounds nextind(str::T, i::Int) where {T<:Str} =
     (@_inline_meta(); _nextind(CodePointStyle(T), str, i))
-@propagate_inbounds prevind(str::Str, i::Integer, nchar::Integer) where {T<:Str} =
+@propagate_inbounds prevind(str::T, i::Int, nchar::Int) where {T<:Str} =
     (@_inline_meta(); _prevind(CodePointStyle(T), str, i, nchar))
-@propagate_inbounds nextind(str::Str, i::Integer, nchar::Integer) where {T<:Str} =
+@propagate_inbounds nextind(str::T, i::Int, nchar::Int) where {T<:Str} =
     (@_inline_meta(); _nextind(CodePointStyle(T), str, i, nchar))
-@propagate_inbounds ind2chr(str::Str, i::Integer) where {T<:Str} =
+@propagate_inbounds ind2chr(str::T, i::Int) where {T<:Str} =
     _ind2chr(CodePointStyle(T), str, i)
-@propagate_inbounds chr2ind(str::Str, i::Integer) where {T<:Str} =
+@propagate_inbounds chr2ind(str::T, i::Int) where {T<:Str} =
     _chr2ind(CodePointStyle(T), str, i)
 
 # Handle substrings of Str
@@ -96,7 +96,7 @@ isvalid(str::SubString{<:Str}, i::Integer) = (start(str) <= i <= endof(str))
     _chr2ind(CodePointStyle(T), str, i)
 
 @propagate_inbounds _reverseind(::CodeUnitSingle, str::T, i) where {T<:Str} =
-    (@_inline_meta(); _length(CodeUnitSingle(), str) + 1 - i)
+    (@_inline_meta(); _len(str) + 1 - i)
 @propagate_inbounds reverseind(str::T, i::Integer) where {T<:Str} =
     _reverseind(CodePointStyle(T), str, i)
 @propagate_inbounds reverseind(str::S, i::Integer) where {S<:SubString{T}} where {T<:Str} =
@@ -105,7 +105,10 @@ isvalid(str::SubString{<:Str}, i::Integer) = (start(str) <= i <= endof(str))
 @propagate_inbounds function _collectstr(::CodeUnitMulti, ::Type{S}, str::T) where {S,T<:Str}
     len = _length(CodeUnitMulti(), str)
     vec = Vector{S}(uninitialized, len)
-    _transcode(vec, _pnt(str), len)
+    pos = 1
+    @inbounds for i = 1:len
+        vec[i], pos = _next(CodeUnitMulti(), S, str, pos)
+    end
     vec
 end
 

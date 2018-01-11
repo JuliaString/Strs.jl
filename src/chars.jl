@@ -7,24 +7,22 @@ In part based on code for Char in Julia
 =#
 ncodeunits(str::T) where {T<:Str} = _len(str)
 
+"""Default value for Str types"""
+codeunit(::Type{<:Str})     = UInt8
+
 """Type of codeunits"""
-codeunit_type(::Type{String})    = UInt8
-codeunit_type(::Type{<:ByteStr}) = UInt8
-codeunit_type(::Type{<:WordStr}) = UInt16
-codeunit_type(::Type{<:QuadStr}) = UInt32
+codeunit(::Type{<:WordStr}) = UInt16
+codeunit(::Type{<:QuadStr}) = UInt32
+codeunit(::Type{UniStr})    = UInt32 # Note, the real type could be UInt8, UInt16, or UInt32
 
-"""Size of codeunits"""
-codeunit_size(::Type{T}) where {T<:Union{String,Str}} = sizeof(codeunit_type(T))
+codeunit(::S) where {S<:Str} = codeunit(S)
 
-basetype(::Type{ASCIIChr})  = UInt8
-basetype(::Type{LatinChr})  = UInt8
-basetype(::Type{_LatinChr}) = UInt8
-basetype(::Type{UCS2Chr})   = UInt16
-basetype(::Type{UTF32Chr})  = UInt32
-
-basetype(::Type{RawByte}) = UInt8
-basetype(::Type{RawWord}) = UInt16
-basetype(::Type{RawChar}) = UInt32
+"""Default value for Str types"""
+basetype(::Type{<:CodePoint}) = UInt8
+basetype(::Type{UCS2Chr})     = UInt16
+basetype(::Type{Text2Chr})    = UInt16
+basetype(::Type{UTF32Chr})    = UInt32
+basetype(::Type{Text4Chr})    = UInt32
 
 basetype(::Type{T}) where {T<:CodeUnitTypes} = T
 
@@ -34,13 +32,12 @@ tobase(v::T) where {T<:CodeUnitTypes} = v
 typemin(::Type{T}) where {T<:CodePoint} = reinterpret(T, typemin(basetype(T)))
 typemax(::Type{T}) where {T<:CodePoint} = reinterpret(T, typemax(basetype(T)))
 
-typemax(::Type{T}) where {T<:Union{LatinChars,UCS2Chr}} = reinterpret(T, typemax(basetype(T)))
 typemax(::Type{ASCIIChr}) = reinterpret(ASCIIChr, 0x7f)
 typemax(::Type{UTF32Chr}) = reinterpret(UTF32Chr, 0x10ffff)
 
-codepoint_type(::Type{<:RawByteStr})     = RawByte
-codepoint_type(::Type{<:RawWordStr})     = RawWord
-codepoint_type(::Type{<:RawCharStr})     = RawChar
+codepoint_type(::Type{<:Text1Str})       = Text1Chr
+codepoint_type(::Type{<:Text2Str})       = Text2Chr
+codepoint_type(::Type{<:Text4Str})       = Text4Chr
 codepoint_type(::Type{<:BinaryStr})      = UInt8
 
 codepoint_type(::Type{<:ASCIIStr})       = ASCIIChr
@@ -70,6 +67,8 @@ set_codeunit!(pnt::Ptr{<:CodeUnitTypes}, ch) = unsafe_store!(pnt, ch)
 set_codeunit!(dat::AbstractVector{<:CodeUnitTypes}, ch) = (dat[1] = ch)
 set_codeunit!(dat::String, ch) = set_codeunit!(dat, 1, ch)
 
+isvalid(::Type{T}) where {T<:UnicodeChars} = true
+
 isvalid(::Type{ASCIIStr}, str::Vector{ASCIIChr}) = true
 isvalid(::Type{LatinStrings}, str::Vector{T}) where {T<:Union{ASCIIChr,LatinChars}} = true
 isvalid(::Type{UCS2Str}, str::Vector{T}) where {T<:Union{ASCIIChr,LatinChars,UCS2Chr}} = true
@@ -82,15 +81,15 @@ isvalid(::Type{T}, v::Unsigned) where {T<:WideChars} =
     (v <= typemax(T)) & !is_surrogate_codeunit(v)
 
 isvalid(::Type{Char}, ch::T) where {T<:UnicodeChars} = true
-isvalid(::Type{Char}, ch::RawByte) = true
-isvalid(::Type{Char}, ch::RawWord) = !is_surrogate_codeunit(tobase(ch))
-isvalid(::Type{Char}, ch::RawChar) = isvalid(UTF32Chr, tobase(ch))
+isvalid(::Type{Char}, ch::Text1Chr) = true
+isvalid(::Type{Char}, ch::Text2Chr) = !is_surrogate_codeunit(tobase(ch))
+isvalid(::Type{Char}, ch::Text4Chr) = isvalid(UTF32Chr, tobase(ch))
 
 convert(::Type{T}, v::S) where {T<:Integer, S<:CodePoint} = convert(T, tobase(v))
 convert(::Type{T}, v::Signed) where {T<:CodePoint} =
-    (v >= 0 && isvalid(T, v%Unsigned)) ? convert(T, tobase(v)) : error("Invalid CodePoint:$T $v")
+    (v >= 0 && isvalid(T, v%Unsigned)) ? convert(T, tobase(v)) : codepoint_error(T, v)
 convert(::Type{T}, v::Unsigned) where {T<:CodePoint} =
-    isvalid(T, v) ? reinterpret(T, basetype(T)(v)) : error("Invalid CodePoint:$T $v")
+    isvalid(T, v) ? reinterpret(T, basetype(T)(v)) : codepoint_error(T, v)
 
 rem(x::S, ::Type{T}) where {S<:CodePoint, T<:Number}    = rem(reinterpret(basetype(S), x), T)
 rem(x::S, ::Type{T}) where {S<:Number, T<:CodePoint}    = reinterpret(T, x%basetype(T))
@@ -100,24 +99,20 @@ rem(x::S, ::Type{T}) where {S<:CodePoint, T<:CodePoint} = reinterpret(T, x%baset
 (::Type{Int})(v::T) where {T<:CodePoint}    = Strs.tobase(v)%Int
 (::Type{UInt})(v::T) where {T<:CodePoint}   = Strs.tobase(v)%UInt
 
-RawByte(v)   = convert(RawByte, v)
-RawWord(v)   = convert(RawWord, v)
-RawChar(v)   = convert(RawChar, v)
-ASCIIChr(v)  = convert(ASCIIChr, v)
-LatinChr(v)  = convert(LatinChr, v)
-_LatinChr(v) = convert(_LatinChr, v)
-UCS2Chr(v)   = convert(UCS2Chr, v)
-UTF32Chr(v)  = convert(UTF32Chr, v)
+for nam in (:Text1, :Text2, :Text4, :ASCII, :Latin, :_Latin, :UCS2, :UTF32)
+    sym = Symbol(string(nam, "Chr"))
+    @eval $sym(v) = convert($sym, v)
+end
 
 size(cp::CodePoint) = ()
-size(cp::CodePoint, dim) = convert(Int, dim) < 1 ? throw(BoundsError()) : 1
+size(cp::CodePoint, dim) = convert(Int, dim) < 1 ? boundserr(cp, dim) : 1
 ndims(cp::CodePoint) = 0
 ndims(::Type{<:CodePoint}) = 0
 length(cp::CodePoint) = 1
 endof(cp::CodePoint) = 1
 getindex(cp::CodePoint) = cp
-getindex(cp::CodePoint, i::Integer) = i == 1 ? cp : throw(BoundsError(i))
-getindex(cp::CodePoint, I::Integer...) = all(x -> x == 1, I) ? cp : throw(BoundsError())
+getindex(cp::CodePoint, i::Integer) = i == 1 ? cp : boundserr(cp, i)
+getindex(cp::CodePoint, I::Integer...) = all(x -> x == 1, I) ? cp : boundserr(cp, I)
 first(cp::CodePoint) = cp
 last(cp::CodePoint) = cp
 eltype(::Type{CodePoint}) = CodePoint

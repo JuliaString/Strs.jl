@@ -40,9 +40,9 @@ Currently, there are the following types:
 * `UTF8Str`    a string with only valid Unicode characters, the same as `UTF32Str`, however encoded using UTF-8, conforming to the Unicode Organization's standard, i.e. no long encodings, surrogates, or invalid bytes.
 * `UTF16Str`   a string similar to `UTF8Str, encoded via UTF-16, also conforming to the Unicode standard, i.e. no out of order or isolated surrogates.
 
-* `RawByteStr` a text string that may contain any sequence of bytes
-* `RawWordStr` a text string that may contain any sequence of 16-bit words
-* `RawCharStr` a text string that may contain any sequence of 32-bit words
+* `Text1Str`   a text string that may contain any sequence of bytes
+* `Text2Str`   a text string that may contain any sequence of 16-bit words
+* `Text4Str`   a text string that may contain any sequence of 32-bit words
 
 * `UniStr`     a Union type, that can be one of the following 4 types, `ASCIIStr`, and 3 internal types:
 * `_LatinStr`  a byte string that must contain at least one character > 0x7f

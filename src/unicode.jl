@@ -159,12 +159,9 @@ function normalize(::Type{T}, str::T;
                    lump::Bool        = false,
                    stripmark::Bool   = false,
                    ) where {T<:Str}
-    (compose & decompose) &&
-        throw(ArgumentError("only one of decompose or compose may be true"))
-    (!(compat | stripmark) & (compat | stripmark)) &&
-        throw(ArgumentError("compat or stripmark true requires compose or decompose true"))
-    newline2ls + newline2ps + newline2lf > 1 &&
-        throw(ArgumentError("only one newline conversion may be specified"))
+    (compose & decompose) && utf8err(UTF_ERR_DECOMPOSE_COMPOSE)
+    (!(compat | stripmark) & (compat | stripmark)) && utf8err(UTF_ERR_COMPAT_STRIPMARK)
+    newline2ls + newline2ps + newline2lf > 1 && utf8err(UTF_ERR_NL_CONVERSION)
     flags =
         ifelse(stable,      Uni.STABLE, 0) |
         ifelse(compat,      Uni.COMPAT, 0) |
@@ -190,7 +187,7 @@ normalize(str::Str, nf::Symbol) =
                  nf == :NFD ? (Uni.STABLE | Uni.DECOMPOSE) :
                  nf == :NFKC ? (Uni.STABLE | Uni.COMPOSE | Uni.COMPAT) :
                  nf == :NFKD ? (Uni.STABLE | Uni.DECOMPOSE | Uni.COMPAT) :
-                 throw(ArgumentError(":$nf is not one of :NFC, :NFD, :NFKC, :NFKD")))
+                 utf8err(UTF_ERR_NORMALIZE, nf))
 
 ############################################################################
 
@@ -207,7 +204,7 @@ textwidth(str::LatinStrings) = length(str)
 ############################################################################
 
 @inline _cat(ch::CodePointTypes) = ccall(:utf8proc_category, Cint, (UInt32,), tobase(ch))
-@inline _cat(ch::Union{UInt32, RawChar}) = ch <= '\U10ffff' ? _cat(ch%UTF32Chr) : Cint(30)
+@inline _cat(ch::Union{UInt32, Text4Chr}) = ch <= '\U10ffff' ? _cat(ch%UTF32Chr) : Cint(30)
 
 # returns code in 0:30 giving Unicode category
 @inline category_code(ch::CodePointTypes) = _cat(ch)
@@ -215,9 +212,13 @@ textwidth(str::LatinStrings) = length(str)
 @inline _cat_abbr(ch::CodePointTypes) =
     unsafe_string(ccall(:utf8proc_category_string, Cstring, (UInt32,), tobase(ch)))
 
+@inline _lowercase_u(ch) = ccall(:utf8proc_tolower, UInt32, (UInt32,), ch)
+@inline _uppercase_u(ch) = ccall(:utf8proc_toupper, UInt32, (UInt32,), ch)
+@inline _titlecase_u(ch) = ccall(:utf8proc_totitle, UInt32, (UInt32,), ch)
+
 # more human-readable representations of the category code
 @inline category_abbrev(ch::CodePointTypes) = _cat_abbr(ch)
-@inline category_abbrev(ch::Union{UInt32, RawChar}) = ch <= '\U10ffff' ? _cat_abbr(ch) : "In"
+@inline category_abbrev(ch::Union{UInt32, Text4Chr}) = ch <= '\U10ffff' ? _cat_abbr(ch) : "In"
 
 category_string(ch::CodePointTypes) = category_strings[category_code(ch) + 1]
 
@@ -233,95 +234,84 @@ _cat_mask(a) = a
 
 ## libc character class predicates ##
 
+# 0xb5, 0xdf, and 0xff cannot be uppercased in LatinStr, although they are lowercase
+@inline _can_upper(c) = _islower_a(c) | ((0xe0 <= c <= 0xfe) & (c != 0xf7))
+
+@inline _iscntrl(ch) = (ch <= 0x1f) | (0x7f <= ch <= 0x9f)
+@inline _isdigit(ch) = (ch - '0'%UInt8) <= 9
+@inline _isxdigit(ch) = _isdigit(ch) | (ch - 'A'%UInt8 < 6) | (ch - 'a'%UInt8 < 6)
+
 const _isalpha_mask   = _cat_mask(Uni.LU : Uni.LO)
 const _isnumeric_mask = _cat_mask(Uni.ND : Uni.NO)
 
-@inline _islower_a(c) = 'a'%UInt8 <= c <= 'z'%UInt8
-@inline _isupper_a(c) = 'A'%UInt8 <= c <= 'Z'%UInt8
+############################################################################
+# Definitions for characters in the ASCII subset of Unicode
 
-@inline _islatin_l(c) = (0xdf <= c <= 0xfe & !(c == 0xf7))
-@inline _isupper_l(c::LatinChr) = (0xc0 <= c%UInt8 <= 0xde & !(c%UInt8 == 0xd7))
-@inline _isupper_l(c) = _isupper_l(c%LatinChr) | (c == 0xb5 || c == 0xff)
-
-@inline _iscntrl(ch) = (ch <= 0x1f) | (0x7f <= ch <= 0x9f)
-@inline _isdigit(ch) = '0'%UInt8 <= ch <= '9'%UInt8
-@inline _isxdigit(ch) =
-    _isdigit(ch) | ('A'%UInt8 <= ch <= 'F'%UInt8) | ('a'%UInt8 <= ch <= 'f'%UInt)
-
-const _punct_00 = 0x8c00f7ee00000000
-const _punct_40 = 0x28000000b8000001
-const _punct_80 = 0x88c0088200000000
-@inline _ispunct_a(ch) =
-    (ch <= 0x3f ? ((1 << ch) & _punct_00) : ((1 << (ch - 0x40)) & _punct_40)) != 0
-@inline _ispunct_l(ch) = ch <= 0x7f ? _ispunct_a(ch) : (((1 << (ch-0x80)) & _punct_80) != 0)
-
-@inline _isspace(ch) =
-    (ch == 32 | 9 <= ch <= 13) || (ch == 0x85 | ch == 0xa0) || (ch > 0xff && _cat(ch) == Uni.ZS)
-
+const _isnumeric_a = _isdigit
+@inline _ispunct_a(ch) = ((1%UInt128 << ch) & 0x2800_0000_b800_0001_8c00_f7ee_0000_0000) != 0
+@inline _isspace_a(ch) = (ch == 32) | (9 <= ch <= 13)
+@inline _islower_a(ch) = (ch - 'a'%UInt8) < 26
+@inline _isupper_a(ch) = (ch - 'A'%UInt8) < 26
+@inline _isalpha_a(ch) = _islower_a(ch) | _isupper_a(ch)
+@inline _isalnum_a(ch) = _isdigit(ch) | _isalpha_a(ch)
 @inline _isprint_a(ch) = 0x20 <= ch < 0x7f
-@inline _isprint_l(ch) = _isprint_a(ch) | ((0xa0 <= ch <= 0xff) & (ch != 0xad))
 @inline _isgraph_a(ch) = 0x20 < ch < 0x7f
-@inline _isgraph_l(ch) = _isgraph_a(ch) | ((0xa0 < ch <= 0xff) & (ch != 0xad))
 
-@inline _isnumeric_l(ch) = _isdigit(ch) || (ch <= 0xbe && ((1<<(ch-0xb2)) & 0x1c83) != 0)
+############################################################################
+# Definitions for characters in the Latin1 subset of Unicode, but not in the ASCII subset
 
-@inline iscntrl(ch::CodePointTypes) = _iscntrl(tobase(ch))
-@inline isdigit(ch::CodePointTypes) = _isdigit(tobase(ch))
+@inline _isnumeric_l(ch) = (ch <= 0xbe && ((1<<(ch-0xb2)) & 0x1c83) != 0)
+@inline _ispunct_l(ch)   = ((1 << (ch-0x80)) & 0x88c0_0882_0000_0000) != 0
+@inline _isspace_l(ch)   = (ch == 0x85) | (ch == 0xa0)
+@inline _islower_l(c)    = ((0xdf <= c <= 0xff) & (c != 0xf7)) | (c == 0xb5)
+@inline _isupper_l(c)    = (0xc0 <= c%UInt8 <= 0xde) & (c != 0xd7)
+@inline _isalpha_l(c)    = ((0xc0 <= c <= 0xff) & (c != 0xf7) & (c != 0xd7)) | (c == 0xb5)
+@inline _isalnum_l(c)    = _isalpha_l(c) || _isnumeric_l(c)
+@inline _isprint_l(ch)   = ((0xa0 <= ch <= 0xff) & (ch != 0xad))
+@inline _isgraph_l(ch)   = ((0xa0 < ch <= 0xff) & (ch != 0xad))
+
+############################################################################
+# Definitions for any Unicode codepoint (requires call to utf8proc) (only used for non-Latin1)
+
+@inline _isnumeric_u(ch) = _check_mask(ch, _isnumeric_mask)
+@inline _ispunct_u(ch)   = _check_mask(ch, Uni.PC : Uni.PO)
+@inline _isspace_u(ch)   = _cat(ch) == Uni.ZS
+@inline _islower_u(ch)   = _cat(ch) == Uni.LL
+@inline _isupper_u(ch)   = _check_mask(ch, Uni.LU, Uni.LT)
+@inline _isalpha_u(ch)   = _check_mask(ch, _isalpha_mask)
+@inline _isalnum_u(ch)   = _check_mask(ch, _isnumeric_mask | _isalpha_mask)
+@inline _isprint_u(ch)   = _check_mask(ch, Uni.LU : Uni.ZS)
+@inline _isgraph_u(ch)   = _check_mask(ch, Uni.LU : Uni.SO)
+
+############################################################################
+# Fallback definitions for all CodePoint types
+
+@inline iscntrl(ch::CodePointTypes)  = _iscntrl(tobase(ch))
+@inline isdigit(ch::CodePointTypes)  = _isdigit(tobase(ch))
 @inline isxdigit(ch::CodePointTypes) = _isxdigit(tobase(ch))
 
-@inline isascii(ch::CodePointTypes) = tobase(ch) <= 0x7f
-@inline isascii(ch::ASCIIChr) = true
+@inline isascii(ch::CodePointTypes)  = tobase(ch) <= 0x7f
+@inline isascii(ch::ASCIIChr)        = true
 
-@inline islatin(ch::CodePointTypes) = tobase(ch) <= 0xff
-@inline islatin(ch::ASCIIChr)   = true
-@inline islatin(ch::LatinChars) = true
+@inline islatin(ch::CodePointTypes)  = tobase(ch) <= 0xff
+@inline islatin(ch::ASCIIChr)        = true
+@inline islatin(ch::LatinChars)      = true
 
-@inline islower(ch::CodePointTypes) = islatin(ch) ? islower(ch%_LatinChr) : (_cat(ch) == Uni.LL)
-@inline islower(ch::ASCIIChr)   = _islower_a(tobase(ch))
-@inline islower(ch::LatinChars) = _islower_a(tobase(ch)) | _islatin_l(tobase(ch))
+const _catfuns = (:numeric, :punct, :space, :lower, :upper, :alpha, :alnum, :print, :graph)
 
-@inline isupper(ch::CodePointTypes) =
-    islatin(ch) ? isupper(ch%_LatinChr) : _check_mask(ch, Uni.LU, Uni.LT)
-@inline isupper(ch::ASCIIChr)   = _isupper_a(ch)
-@inline isupper(ch::LatinChars) = _isupper_a(ch) | _isupper_l(ch)
-
-@inline isalpha(ch::CodePointTypes) =
-    islatin(ch) ? isalpha(ch%_LatinChr) : _check_mask(ch, _isalpha_mask)
-@inline isalpha(ch::ASCIIChr)   = _islower_a(ch) | _isupper_a(ch)
-@inline isalpha(ch::LatinChars) = isalpha(ch%ASCIIChr) | _islatin_l(ch) | _isupper_l(ch)
-
-@inline isnumeric(ch::CodePointTypes) =
-    islatin(ch) ? _isnumeric_l(tobase(ch)) : _check_mask(ch, _isnumeric_mask)
-@inline isnumeric(ch::ASCIIChr)   = _isdigit(tobase(ch))
-@inline isnumeric(ch::LatinChars) = _isnumeric_l(tobase(ch))
-
-@inline isalnum(ch::CodePointTypes) =
-    islatin(ch) ? isalnum(ch%_LatinChr) : _check_mask(ch, _isnumeric_mask | _isalpha_mask)
-@inline isalnum(ch::ASCIIChr)   = isdigit(ch) | isalpha(ch)
-@inline isalnum(ch::LatinChars) = isalpha(ch) | isnumeric(ch)
-
-@inline ispunct(ch::CodePointTypes) =
-    islatin(ch) ? _ispunct_l(tobase(ch)) : _check_mask(ch, Uni.PC : Uni.PO)
-@inline ispunct(ch::ASCIIChr)   = _ispunct_a(tobase(ch))
-@inline ispunct(ch::LatinChars) = _ispunct_l(tobase(ch))
-
-@inline isspace(ch::CodePointTypes) = _isspace(tobase(ch))
-@inline isspace(ch::ASCIIChr)   = (ch == 32) | (9 <= ch <= 13)
-@inline isspace(ch::LatinChars) = (ch == 32) | (9 <= ch <= 13) | (ch == 0x85) | (ch == 0xa0)
-
-@inline isprint(ch::CodePointTypes) =
-    islatin(ch) ? _isprint_l(tobase(ch)) : _check_mask(ch, Uni.LU : Uni.ZS)
-@inline isprint(ch::ASCIIChr)   = _isprint_a(tobase(ch))
-@inline isprint(ch::LatinChars) = _isprint_l(tobase(ch))
-
-@inline isgraph(ch::CodePointTypes) =
-    islatin(ch) ? _isgraph_l(tobase(ch)) : _check_mask(ch, Uni.LU : Uni.SO)
-@inline isgraph(ch::ASCIIChr)   = _isgraph_a(tobase(ch))
-@inline isgraph(ch::LatinChars) = _isgraph_l(tobase(ch))
-
-_lowercase_u(ch) = ccall(:utf8proc_tolower, UInt32, (UInt32,), ch)
-_uppercase_u(ch) = ccall(:utf8proc_toupper, UInt32, (UInt32,), ch)
-_titlecase_u(ch) = ccall(:utf8proc_totitle, UInt32, (UInt32,), ch)
+for fnam in _catfuns
+    isfnam  = Symbol(string("is", fnam))
+    namroot  = string("_is", fnam)
+    fnam_a  = Symbol(string(namroot, "_a"))
+    fnam_al = Symbol(string(namroot, "_al"))
+    fnam_ch = Symbol(string(namroot, "_ch"))
+        
+    @eval $(fnam_al)(ch) = isascii(ch) ? $(fnam_a)(ch) : $(Symbol(string(namroot, "_l")))(ch)
+    @eval $(fnam_ch)(ch) = islatin(ch) ? $(fnam_al)(ch) : $(Symbol(string(namroot, "_u")))(ch)
+    @eval $(isfnam)(ch::CodePointTypes) = $(fnam_ch)(tobase(ch))
+    @eval $(isfnam)(ch::ASCIIChr)      = $(fnam_a)(tobase(ch))
+    @eval $(isfnam)(ch::LatinChars)    = $(fnam_al)(tobase(ch))
+end
 
 ############################################################################
 # iterators for grapheme segmentation
