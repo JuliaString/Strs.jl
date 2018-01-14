@@ -1,7 +1,12 @@
 # This file includes code that was formerly a part of Julia.
 # License is MIT: http://julialang.org/license
 
+@static if VERSION < v"0.7.0-DEV"
+using Base.Test
+else
 using Test
+end
+
 using Strs
 import Strs: ascii, checkstring, UTF_ERR_SHORT, UnicodeError
 
@@ -457,7 +462,9 @@ for (fun, S, T) in ((utf16, UInt16, UTF16Str), (utf32, UInt32, UTF32Str))
     cmpx = (S == UInt16 ? cmp16 : cmp32)
     @test typeof(tst) == SubString{T}
     @test convert(T, tst) == str[4:end]
-    @test Vector{Char}(x) == cmp
+    for (i, ch) in enumerate(cmp)
+        @test ch == x[i]
+    end
     # Vector{T} / Array{T}
     @test convert(Vector{S}, x) == cmpx
     #@test convert(Array{S}, x) == cmpx

@@ -16,9 +16,6 @@ const LITTLE_ENDIAN = !BIG_ENDIAN
 
 const STR_DATA_VECTOR = true
 
-symstr(s...) = Symbol(string(s...))
-quotesym(s...) = Expr(:quote, symstr(s...))
-
 struct CharSet{CS}   end
 struct Encoding{Enc} end
 struct CSE{CS, ENC}  end
@@ -165,7 +162,7 @@ const UniStr = Union{ASCIIStr, _LatinStr, _UCS2Str, _UTF32Str}
 show(io::IO, ::Type{UniStr}) = print(io, :UniStr)
 
 if STR_DATA_VECTOR
-    _allocate(len) = Vector{UInt8}(uninitialized, len)
+    _allocate(len) = create_vector(UInt8, len)
 else
     _allocate(len) = Base._string_n((len-1)%Csize_t)
 end
@@ -252,11 +249,13 @@ sizeof(s::Str) = sizeof(s.data)
 """Codeunits of string as a Vector"""
 _data(s::Vector{UInt8}) = s
 if STR_DATA_VECTOR
-    _data(s::String)  = unsafe_wrap(Vector{UInt8}, s)
+    _data(s::String)  =
+        @static VERSION < v"0.7.0-DEV" ? Vector{UInt8}(s) : unsafe_wrap(Vector{UInt8}, s)
     _data(s::ByteStr) = s.data
 else
     _data(s::String)  = s
-    _data(s::ByteStr) = unsafe_wrap(Vector{UInt8}, s.data)
+    _data(s::ByteStr) =
+        @static VERSION < v"0.7.0-DEV" ? Vector{UInt8}(s.data) : unsafe_wrap(Vector{UInt8}, s.data)
 end
 
 """Pointer to codeunits of string"""
@@ -278,7 +277,6 @@ _len(s::QuadStr) = sizeof(s.data) >>> 2
 
 # For convenience
 @inline _lenpnt(s) = _len(s), _pnt(s)
-@inline _lendata(s::Union{String, ByteStr, Vector{UInt8}}) = _len(s), _data(s)
 
 @inline _calcpnt(str, siz) = (pnt = _pnt64(str) - CHUNKSZ;  (pnt, pnt + siz))
 

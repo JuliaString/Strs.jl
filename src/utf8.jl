@@ -27,32 +27,26 @@ Based in part on code for UTF8String that used to be in Julia
 
 # Output a character as a 2-byte UTF-8 sequence
 @inline function output_utf8_2byte!(pnt, ch)
-    @inbounds begin
-        set_codeunit!(pnt,     0xc0 | (ch >>> 6))
-        set_codeunit!(pnt + 1, 0x80 | (ch & 0x3f))
-        pnt + 2
-    end
+    set_codeunit!(pnt,     0xc0 | (ch >>> 6))
+    set_codeunit!(pnt + 1, 0x80 | (ch & 0x3f))
+    pnt + 2
 end
 
 # Output a character as a 3-byte UTF-8 sequence
 @inline function output_utf8_3byte!(pnt, ch)
-    @inbounds begin
-        set_codeunit!(pnt,     0xe0 | ((ch >>> 12) & 0x3f))
-        set_codeunit!(pnt + 1, 0x80 | ((ch >>> 6) & 0x3f))
-        set_codeunit!(pnt + 2, 0x80 | (ch & 0x3f))
-        pnt + 3
-    end
+    set_codeunit!(pnt,     0xe0 | ((ch >>> 12) & 0x3f))
+    set_codeunit!(pnt + 1, 0x80 | ((ch >>> 6) & 0x3f))
+    set_codeunit!(pnt + 2, 0x80 | (ch & 0x3f))
+    pnt + 3
 end
 
 # Output a character as a 4-byte UTF-8 sequence
 @inline function output_utf8_4byte!(pnt, ch)
-    @inbounds begin
-        set_codeunit!(pnt,     0xf0 | (ch >>> 18))
-        set_codeunit!(pnt + 1, 0x80 | ((ch >>> 12) & 0x3f))
-        set_codeunit!(pnt + 2, 0x80 | ((ch >>> 6) & 0x3f))
-        set_codeunit!(pnt + 3, 0x80 | (ch & 0x3f))
-        pnt + 4
-    end
+    set_codeunit!(pnt,     0xf0 | (ch >>> 18))
+    set_codeunit!(pnt + 1, 0x80 | ((ch >>> 12) & 0x3f))
+    set_codeunit!(pnt + 2, 0x80 | ((ch >>> 6) & 0x3f))
+    set_codeunit!(pnt + 3, 0x80 | (ch & 0x3f))
+    pnt + 4
 end
 
 @inline _write_utf_2(io, ch) =
@@ -322,52 +316,53 @@ write(io::IO, s::UTF8Str) = write(io, _data(s))
 
 ## transcoding to UTF-8 ##
 
-function _transcode_utf8(dat::Union{Ptr{UInt8}, Vector{UInt8}}, len)
-    buf, pnt = _allocate(UInt8, len)
-    fin = pnt + len
-    pos = 0
-    @inbounds while pnt < fin
-        ch = get_codeunit(dat, pos += 1)
+function _transcode_utf8(pnt::Ptr{UInt8}, len)
+    buf, out = _allocate(UInt8, len)
+    fin = out + len
+    @inbounds while out < fin
+        ch = get_codeunit(pnt)
         # Handle ASCII characters
         if ch <= 0x7f
-            set_codeunit!(pnt, ch)
-            pnt += 1
+            set_codeunit!(out, ch)
+            out += 1
         # Handle overlong < 0x100
         elseif ch < 0xc2
-            ch = ((ch & 3) << 6) | (get_codeunit(dat, pos += 1) & 0x3f)
-            set_codeunit!(pnt, ch)
-            pnt += 1
+            ch = ((ch & 3) << 6) | (get_codeunit(pnt += 1) & 0x3f)
+            set_codeunit!(out, ch)
+            out += 1
         # Handle 0x100-0x7ff
         elseif ch < 0xe0
-            set_codeunit!(pnt, ch)
-            set_codeunit!(pnt + 1, get_codeunit(dat, pos += 1))
-            pnt += 2
+            set_codeunit!(out, ch)
+            set_codeunit!(out + 1, get_codeunit(pnt += 1))
+            out += 2
         elseif ch != 0xed
-            set_codeunit!(pnt, ch)
-            set_codeunit!(pnt + 1, get_codeunit(dat, pos += 1))
-            set_codeunit!(pnt + 2, get_codeunit(dat, pos += 1))
-            pnt += 3
+            set_codeunit!(out, ch)
+            set_codeunit!(out + 1, get_codeunit(pnt += 1))
+            set_codeunit!(out + 2, get_codeunit(pnt += 1))
+            out += 3
             # Copy 4-byte encoded value
-            ch >= 0xf0 && (set_codeunit!(pnt, get_codeunit(dat, pos += 1)) ; pnt += 1)
+            ch >= 0xf0 && (set_codeunit!(out, get_codeunit(pnt += 1)) ; out += 1)
         # Handle surrogate pairs
         else
-            ch = get_codeunit(dat, pos += 1)
+            ch = get_codeunit(pnt += 1)
             if ch < 0xa0 # not surrogate pairs
-                set_codeunit!(pnt, 0xed)
-                set_codeunit!(pnt + 1, ch)
-                set_codeunit!(pnt + 2, get_codeunit(dat, pos += 1))
-                pnt += 3
+                set_codeunit!(out, 0xed)
+                set_codeunit!(out + 1, ch)
+                set_codeunit!(out + 2, get_codeunit(pnt += 1))
+                out += 3
             else
                 # Pick up surrogate pairs (CESU-8 format)
-                ch32 = (((ch & 0x3f)%UInt32 << 16) | (get_ch(dat, pos, 1) << 10)) +
-                        (get_ch(dat, pos, 3) << 6 | get_ch(dat, pos, 4)) - 0x01f0c00
-                pos += 4
-                pnt = output_utf8_4byte!(pnt, ch32)
+                ch32 = (((ch & 0x3f)%UInt32 << 16) | (get_ch(pnt + 1) << 10)) +
+                    (get_ch(pnt + 3) << 6 | get_ch(pnt + 4)) - 0x01f0c00
+                pnt += 4
+                out = output_utf8_4byte!(out, ch32)
             end
         end
+        pnt += 1
     end
     buf
 end
+_transcode_utf8(dat::Vector{UInt8}, len) = _transcode_utf8(pointer(dat), len)
 
 convert(::Type{UTF8Str}, s::UTF8Str) = s
 convert(::Type{UTF8Str}, s::ASCIIStr) = Str(UTF8CSE, _data(s))
@@ -420,7 +415,9 @@ function convert(::Type{UTF8Str}, str::AbstractString)
     end
 end
 
-@inline function _encode_char_utf8(pnt, ch::Union{UInt16, UInt32})
+const WideCodeUnit = Union{UInt16, UInt32}
+
+@inline function _encode_char_utf8(pnt, ch::WideCodeUnit)
     # Handle ASCII characters
     if ch <= 0x7f
         set_codeunit!(pnt, ch)
@@ -449,25 +446,27 @@ Returns:
 
 * `UTF8Str`
 """
-function _encode_utf8(dat::Union{Vector{T}, Ptr{T}}, len) where {T<:Union{UInt16, UInt32}}
-    buf, pnt = _allocate(UInt8, len)
-    out = pos = 0
-    fin = pnt + len
-    @inbounds while pnt < fin
-        pnt = _encode_char_utf8(pnt, get_codeunit(dat, pos += 1))
+function _encode_utf8(pnt::Ptr{T}, len) where {T<:WideCodeUnit}
+    buf, out = _allocate(UInt8, len)
+    fin = out + len
+    while out < fin
+        out = _encode_char_utf8(out, get_codeunit(pnt))
+        pnt += sizeof(T)
     end
     buf
 end
+_encode_utf8(dat::Vector{<:WideCodeUnit}, len) = _encode_utf8(pointer(dat), len)
 
-function _transcode_utf8(dat::Union{Vector{T}, Ptr{T}}, len) where {T<:Union{UInt16, UInt32}}
-    buf, pnt = _allocate(UInt8, len)
-    fin = pnt + len
-    pos = 0
-    @inbounds while pnt < fin
-        ch = get_codeunit(dat, pos += 1)
-        pnt = (is_surrogate_codeunit(ch)
-               ? output_utf8_4byte!(pnt, get_supplementary(ch, get_codeunit(dat, pos += 1)))
-               : _encode_char_utf8(pnt, ch))
+function _transcode_utf8(pnt::Ptr{T}, len) where {T<:WideCodeUnit}
+    buf, out = _allocate(UInt8, len)
+    fin = out + len
+    while out < fin
+        ch = get_codeunit(pnt)
+        out = (is_surrogate_codeunit(ch)
+               ? output_utf8_4byte!(out, get_supplementary(ch, get_codeunit(pnt += sizeof(T))))
+               : _encode_char_utf8(out, ch))
+        pnt += sizeof(T)
     end
     buf
 end
+_transcode_utf8(dat::Vector{<:WideCodeUnit}, len) = _transcode_utf8(pointer(dat), len)

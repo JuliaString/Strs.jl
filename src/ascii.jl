@@ -51,11 +51,11 @@ function convert(::Type{ASCIIStr}, str::AbstractString)
     # Need to fix this to show where the non-ASCII character was found!
     isempty(str) && return empty_ascii
     len = length(str)
-    buf = _allocate(len)
-    out = 0
+    buf, pnt = _allocate(UInt8, len)
     @inbounds for ch in str
-        isascii(ch) || unierror(UTF_ERR_INVALID_ASCII, pos, ch)
-        buf[out += 1] = ch%UInt8
+        isascii(ch) || unierror(UTF_ERR_INVALID_ASCII, pnt - pointer(buf) + 1, ch)
+        set_codeunit!(pnt, ch%UInt8)
+        pnt += 1
     end
     Str(ASCIICSE, buf)
 end
@@ -68,13 +68,13 @@ convert(::Type{ASCIIStr}, dat::Vector{UInt8}) =
 
 function convert(::Type{ASCIIStr}, str::String)
     len, flags = unsafe_checkstring(str, 1, sizeof(str))
-    flags == 0 && Str(ASCIICSE, _data(str))
+    flags == 0 && return Str(ASCIICSE, _data(str))
     (flags & ~UTF_LONG) == 0 || unierror(UTF_ERR_INVALID_ASCII)
     # Handle any long encodings, such as \xc0\x80 for \0 (maybe that should only be for unsafe_str)
-    buf = _allocate(len)
-    out = 0
+    buf, pnt = _allocate(UInt8, len)
     @inbounds for ch in str
-        buf[out += 1] = ch%UInt8
+        set_codeunit!(pnt, ch%UInt8)
+        pnt += 1
     end
     Str(ASCIICSE, buf)
 end

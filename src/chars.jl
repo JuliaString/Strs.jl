@@ -5,10 +5,14 @@ Copyright 2017 Gandalf Software, Inc., Scott P. Jones
 Licensed under MIT License, see LICENSE.md
 In part based on code for Char in Julia
 =#
-ncodeunits(str::T) where {T<:Str} = _len(str)
+@static if VERSION < v"0.7.0-DEV"
+    codeunit(::AbstractString) = UInt8
+    ncodeunits(str::AbstractString) = sizeof(str)
+end
 
 """Default value for Str types"""
-codeunit(::Type{<:Str})     = UInt8
+codeunit(::Type{<:Str}) = UInt8
+ncodeunits(str::T) where {T<:Str} = _len(str)
 
 """Type of codeunits"""
 codeunit(::Type{<:WordStr}) = UInt16
