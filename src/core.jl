@@ -1,7 +1,8 @@
 #=
 Core functions
 
-Copyright 2017 Gandalf Software, Inc., Scott P. Jones, and others (
+
+Copyright 2017 Gandalf Software, Inc., Scott P. Jones, and others (see Julia contributors)
 Licensed under MIT License, see LICENSE.md
 
 Inspired by / derived from code in Julia
@@ -104,7 +105,7 @@ isvalid(str::SubString{<:Str}, i::Integer) = (start(str) <= i <= endof(str))
 
 @propagate_inbounds function _collectstr(::CodeUnitMulti, ::Type{S}, str::T) where {S,T<:Str}
     len = _length(CodeUnitMulti(), str)
-    vec = Vector{S}(uninitialized, len)
+    vec = create_vector(S, len)
     pos = 1
     @inbounds for i = 1:len
         vec[i], pos = _next(CodeUnitMulti(), S, str, pos)
@@ -114,7 +115,7 @@ end
 
 @propagate_inbounds function _collectstr(::CodeUnitSingle, ::Type{S}, str::T) where {S,T<:Str}
     len, pnt = _lenpnt(str)
-    vec = Vector{S}(uninitialized, len)
+    vec = create_vector(S, len)
     cpt = codepoint_type(T)
     if S == cpt
         @inbounds unsafe_copyto!(reinterpret(Ptr{basetype(cpt)}, pointer(vec)), pnt, len)

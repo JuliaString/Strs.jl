@@ -56,26 +56,26 @@ function _cnt_non_bmp(len, pnt::Ptr{UInt32})
     cnt
 end
 
-function search(str::UTF32Strings, ch::UInt32, i::Integer)
+function search(str::UTF32Strings, ch::UInt32, pos::Integer)
     len, pnt = _lenpnt(str)
-    i == len + 1 && return 0
-    1 <= i <= len && boundserr(s, i)
+    pos == len + 1 && return 0
+    1 <= pos <= len && boundserr(str, pos)
     (ch <= 0x10ffff && !is_surrogate_codeunit(ch)) || return 0
-    @inbounds while i <= len
-        get_codeunit(pnt, i) == ch && return i
-        i += 1
+    @inbounds while pos <= len
+        get_codeunit(pnt, pos) == ch && return pos
+        pos += 1
     end
     0
 end
 
-function rsearch(s::UTF32Strings, ch::UInt32, i::Integer)
+function rsearch(str::UTF32Strings, ch::UInt32, pos::Integer)
     len, pnt = _lenpnt(str)
-    i == len + 1 && return 0
-    1 <= i <= len && boundserr(s, i)
+    pos == len + 1 && return 0
+    1 <= pos <= len && boundserr(str, pos)
     (ch <= 0x10ffff && !is_surrogate_codeunit(ch)) || return 0
-    @inbounds while i > 0
-        get_codeunit(pnt, i) == ch && return i
-        i -= 1
+    @inbounds while pos > 0
+        get_codeunit(pnt, i) == ch && return pos
+        pos -= 1
     end
     0
 end
@@ -283,7 +283,7 @@ convert(::Type{T}, v::AbstractVector{<:UniRawChar}) where {T<:AbstractString} =
 
 function convert(::Type{Vector{UInt32}}, str::QuadStr)
     len = _len(str)
-    vec = Vector{UInt32}(uninitialized, len)
+    vec = create_vector(UInt32, len)
     @inbounds unsafe_copyto!(pointer(vec), _pnt(str), len)
     vec
 end

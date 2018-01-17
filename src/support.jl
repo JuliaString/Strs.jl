@@ -42,7 +42,10 @@ const UTF_ERR_INVALID_UCS2 =
 const UTF_ERR_INVALID_INDEX =
   "invalid character index"
 
-if !isdefined(Base, :UnicodeError)
+if isdefined(Base, :UnicodeError)
+    Base.UnicodeError(msg) = UnicodeError(msg, 0%Int32, 0%UInt32)
+else
+
 struct UnicodeError <: Exception
     errmsg::AbstractString   ##< A UTF_ERR_ message
     errpos::Int32            ##< Position of invalid character
@@ -62,17 +65,16 @@ const UTF_ERR_COMPAT_STRIPMARK  = "compat or stripmark true requires compose or 
 const UTF_ERR_NL_CONVERSION     = "only one newline conversion may be specified"
 const UTF_ERR_NORMALIZE         = " is not one of :NFC, :NFD, :NFKC, :NFKD"
 
-@noinline boundserr(s, pos) = throw(BoundsError(s, pos))
+@noinline boundserr(s, pos)      = throw(BoundsError(s, pos))
 @noinline unierror(err)          = throw(UnicodeError(err))
 @noinline unierror(err, pos, ch) = throw(UnicodeError(err, pos, ch))
-@noinline utf8err(err) = throw(UnicodeError(err))
-@noinline utf8err(err, v) = utf8err(string(":", v, err))
-@noinline nulerr() = utf8err("cannot convert NULL to string")
-@noinline ncharerr(n) = utf8err(string("nchar (", n, ") must be greater than 0"))
-@noinline neginderr(s, n) = utf8err("Index ($n) must be non negative")
-@noinline codepoint_error(T, v) = utf8err(string("Invalid CodePoint: ", T, " 0x", hex(v)))
+@noinline unierror(err, v)       = unierror(string(":", v, err))
+@noinline nulerr()               = unierror("cannot convert NULL to string")
+@noinline ncharerr(n)            = unierror(string("nchar (", n, ") must be greater than 0"))
+@noinline neginderr(s, n)        = unierror("Index ($n) must be non negative")
+@noinline codepoint_error(T, v)  = unierror(string("Invalid CodePoint: ", T, " 0x", hex(v)))
 @noinline argerror(startpos, endpos) =
-    utf8err(string("End position ", endpos, " is less than start position (", startpos, ")"))
+    unierror(string("End position ", endpos, " is less than start position (", startpos, ")"))
 
 ## Functions to check validity of UTF-8, UTF-16, and UTF-32 encoded strings,
 #  and also to return information necessary to convert to other encodings

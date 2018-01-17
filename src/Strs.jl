@@ -45,39 +45,49 @@ Note: for good substring performance, some of the operations that are optimized 
 (or more) at a time, will need to deal with masking the initial chunk, not just the final chunk.
 =#
 
-export ascii, latin1, utf8, ucs2, utf16, utf32, unsafe_str, islatin
-export codeunit, codeunits, codepoints, @str_str
+export ascii, latin1, utf8, ucs2, utf16, utf32, unsafe_str, islatin, isbmp, isunicode
+export codeunit, codeunits, codepoints, @str_str, @condimport
+
+symstr(s...) = Symbol(string(s...))
+quotesym(s...) = Expr(:quote, symstr(s...))
 
 macro str_str(string)
     :( unsafe_str($(esc(string))) )
 end
 
-using Base: @_inline_meta, @propagate_inbounds
+"""Import the symbol from Base if defined, otherwise export it"""
+macro condimport(sym)
+    :( if isdefined(Base, $(quotesym(sym))) ; import Base: $sym ; else ; export $sym ; end )
+end        
+
+"""Import the symbol from module if defined, otherwise export it"""
+macro condimport(mod, sym)
+    :( if isdefined($mod, $(quotesym(sym))) ; import $mod: $sym ; else ; export $sym ; end )
+end
+
+using Base: @_inline_meta, @propagate_inbounds, @_propagate_inbounds_meta
 
 import Base: containsnul, convert, endof, getindex, length, map, pointer, collect,
              reverse, rsearch, search, sizeof, string, unsafe_convert, unsafe_load, write,
-             codeunit, start, next, done, nextind, prevind, reverseind, ind2chr, chr2ind,
+             codeunit, start, next, done, nextind, prevind, reverseind,
              typemin, typemax, isvalid, rem, size, ndims, first, last, eltype, isempty, in,
-             hash, isless, ==, -, +, *, cmp, promote_rule, one, repeat, filter, thisind,
+             hash, isless, ==, -, +, *, cmp, promote_rule, one, repeat, filter,
              print, show, isimmutable
     
+@condimport ind2chr
+@condimport chr2ind
+@condimport thisind
+@condimport ncodeunits
+@condimport bytestring
 
-if isdefined(Base, :ncodeunits)
-    import Base: ncodeunits
-else
-    export ncodeunits
-end
-if !isdefined(Base, :unsafe_copyto!)
-    const unsafe_copyto! = unsafe_copy!
-end
-if !isdefined(Base, :AbstractChar)
-    abstract type AbstractChar end
-    export AbstractChar
-end
-if isdefined(Base, :bytestring)
-    import Base: bytestring
-    export bytestring
-end
+isdefined(Base, :copyto!)        || (const copyto! = copy!)
+isdefined(Base, :unsafe_copyto!) || (const unsafe_copyto! = unsafe_copy!)
+isdefined(Base, :AbstractChar)   || (abstract type AbstractChar end ; export AbstractChar)
+isdefined(Base, :Nothing)        || (const Nothing = Void)
+
+uninit(T, len) = @static VERSION < v"0.7.0-DEV" ? T(len) : T(uninitialized, len)
+
+create_vector(T, len) = uninit(Vector{T}, len)
 
 include("types.jl")
 include("chars.jl")
