@@ -126,8 +126,8 @@ utf8proc_map(str::UTF8Str, options::Integer) = utf8proc_map(UTF8Str, str, option
 
 ############################################################################
 
-import isalpha, isdigit, isxdigit, isalnum, iscntrl, ispunct, isspace, isprint, isgraph,
-       islower, isupper, lowercase, uppercase, titlecase, lcfirst, ucfirst, isascii
+import Base: isalpha, isdigit, isxdigit, isalnum, iscntrl, ispunct, isspace, isprint, isgraph,
+             islower, isupper, lowercase, uppercase, titlecase, lcfirst, ucfirst, isascii
 
 @condimport isnumeric
 @condimport textwidth
