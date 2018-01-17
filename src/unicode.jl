@@ -112,7 +112,7 @@ function utf8proc_map(::Type{T}, str, options::Integer) where {T<:Str}
     nwords = ccall(:utf8proc_decompose, Int, (Ptr{UInt8}, Int, Ptr{UInt8}, Int, Cint),
                    str, sizeof(str), C_NULL, 0, options)
     nwords < 0 && utf8proc_error(nwords)
-    buffer = Base.StringVector(nwords*4)
+    buffer = _allocate(nwords*4)
     nwords = ccall(:utf8proc_decompose, Int, (Ptr{UInt8}, Int, Ptr{UInt8}, Int, Cint),
                    str, sizeof(str), buffer, nwords, options)
     nwords < 0 && utf8proc_error(nwords)
@@ -128,19 +128,26 @@ utf8proc_map(str::UTF8Str, options::Integer) = utf8proc_map(UTF8Str, str, option
 
 const _mod = @static isdefined(Base, :Unicode) ? "Base.Unicode" : "Base"
 const _list =
-    "normalize, graphemes, isassigned, islower, isupper, isalpha, isdigit, " *
+    "normalize, graphemes, islower, isupper, isalpha, isdigit, " *
     "isxdigit, isalnum, iscntrl, ispunct, isspace, isprint, isgraph, " *
     "lowercase, uppercase, titlecase, lcfirst, ucfirst, isascii"
 
 eval(Meta.parse("import $_mod: $_list"))
 eval(Meta.parse("export $_list"))
+@condimport isnumeric
+@condimport textwidth
+export isgraphemebreak
 
-@static if _mod == "Base"
+@static if isdefined(Base, :isnumber)
     import Base: isnumber
-else
-    import Base.Unicode: isnumeric, textwidth
+    isnumber(val::CodePoint) = isnumeric(val)
 end
-export isnumeric, textwidth
+@static if isdefined(Base.Unicode, :isassigned)
+    import Base.Unicode: isassigned
+else
+    import Base: is_assigned_char, isassigned
+    is_assigned_char(ch) = isassigned(ch)
+end
 
 ############################################################################
 
@@ -159,9 +166,9 @@ function normalize(::Type{T}, str::T;
                    lump::Bool        = false,
                    stripmark::Bool   = false,
                    ) where {T<:Str}
-    (compose & decompose) && utf8err(UTF_ERR_DECOMPOSE_COMPOSE)
-    (!(compat | stripmark) & (compat | stripmark)) && utf8err(UTF_ERR_COMPAT_STRIPMARK)
-    newline2ls + newline2ps + newline2lf > 1 && utf8err(UTF_ERR_NL_CONVERSION)
+    (compose & decompose) && unierror(UTF_ERR_DECOMPOSE_COMPOSE)
+    (!(compat | stripmark) & (compat | stripmark)) && unierror(UTF_ERR_COMPAT_STRIPMARK)
+    newline2ls + newline2ps + newline2lf > 1 && unierror(UTF_ERR_NL_CONVERSION)
     flags =
         ifelse(stable,      Uni.STABLE, 0) |
         ifelse(compat,      Uni.COMPAT, 0) |
@@ -187,7 +194,7 @@ normalize(str::Str, nf::Symbol) =
                  nf == :NFD ? (Uni.STABLE | Uni.DECOMPOSE) :
                  nf == :NFKC ? (Uni.STABLE | Uni.COMPOSE | Uni.COMPAT) :
                  nf == :NFKD ? (Uni.STABLE | Uni.DECOMPOSE | Uni.COMPAT) :
-                 utf8err(UTF_ERR_NORMALIZE, nf))
+                 unierror(UTF_ERR_NORMALIZE, nf))
 
 ############################################################################
 

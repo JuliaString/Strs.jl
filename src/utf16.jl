@@ -109,13 +109,13 @@ end
 function _nextind(::CodeUnitMulti, str::UTF16Str, pos::Int, cnt::Int)
     cnt < 0 && neginderr(str, cnt)
     @boundscheck 0 <= pos <= _len(str) || boundserr(str, pos)
-    cnt == 0 && return thisind(str, pos) == pos ? pos : unierr("Invalid position", str, pos)
+    cnt == 0 && return thisind(str, pos) == pos ? pos : unierror("Invalid position", str, pos)
     pos + cnt + is_surrogate_lead(get_codeunit(_pnt(str), pos + cnt))
 end
 
 function search(str::UCS2Strings, ch::UInt32, pos::Integer)
     pos == (len = _len(str)) + 1 && return 0
-    pos <= i <= len && boundserr(str, pos)
+    pos <= pos <= len && boundserr(str, pos)
     # Check for invalid characters, which could not be in a UCS2Str
     ch <= 0x0ffff || return 0
     wrd = ch%UInt16
@@ -130,10 +130,10 @@ function search(str::UCS2Strings, ch::UInt32, pos::Integer)
     0
 end
 
-function rsearch(s::UCS2Strings, ch::UInt32, pos::Integer)
+function rsearch(str::UCS2Strings, ch::UInt32, pos::Integer)
     len, pnt = _lenpnt(str)
     pos == len + 1 && return 0
-    1 <= pos <= len && boundserr(s, pos)
+    1 <= pos <= len && boundserr(str, pos)
     # Check for invalid characters, which could not be in a UCS2Str
     ch <= 0x0ffff || return 0
     wrd = ch%UInt16
@@ -145,54 +145,54 @@ function rsearch(s::UCS2Strings, ch::UInt32, pos::Integer)
     0
 end
 
-function search(str::UTF16Str, ch::UInt32, i::Integer)
+function search(str::UTF16Str, ch::UInt32, pos::Integer)
     len, pnt = _lenpnt(str)
-    i == len + 1 && return 0
-    1 <= i <= len && boundserr(s, i)
+    pos == len + 1 && return 0
+    1 <= pos <= len && boundserr(str, pos)
     # Check for invalid characters, which could not be in a UTF16Str
     ch <= 0x010ffff || return 0
     is_surrogate_codeunit(ch) && return 0
     # Check for fast case, character in BMP
     if ch <= 0x0ffff
         wrd = ch%UInt16
-        @inbounds while i <= len
-            get_codeunit(pnt, i) == wrd && return i
-            i += 1
+        @inbounds while pos <= len
+            get_codeunit(pnt, pos) == wrd && return pos
+            pos += 1
         end
     else
         wrd  = (0xd7c0 + (ch >> 10))%UInt16
         surr = (0xdc00 + (ch & 0x3ff))%UInt16
-        @inbounds while i < len
-            if get_codeunit(pnt, i) == wrd
-                get_codeunit(pnt, i + 1) == surr && return i
-                i += 1
+        @inbounds while pos < len
+            if get_codeunit(pnt, pos) == wrd
+                get_codeunit(pnt, pos + 1) == surr && return pos
+                pos += 1
             end
-            i += 1
+            pos += 1
         end
     end
     0
 end
 
-function rsearch(s::UTF16Str, ch::UInt32, i::Integer)
+function rsearch(str::UTF16Str, ch::UInt32, pos::Integer)
     len, pnt = _lenpnt(str)
-    i == len + 1 && return 0
-    1 <= i <= len && boundserr(s, i)
+    pos == len + 1 && return 0
+    1 <= pos <= len && boundserr(str, pos)
     # Check for invalid characters, which could not be in a UCS2Str
     ch <= 0x10ffff || return 0
     is_surrogate_codeunit(ch) && return 0
     # Check for fast case, character in BMP
     if ch <= 0x0ffff
         wrd = ch%UInt16
-        @inbounds while i > 0
-            get_codeunit(pnt, i) == wrd && return i
-            i -= 1
+        @inbounds while pos > 0
+            get_codeunit(pnt, pos) == wrd && return pos
+            pos -= 1
         end
     else
         wrd  = (0xd7c0 + (ch >> 10))%UInt16
         surr = (0xdc00 + (ch & 0x3ff))%UInt16
-        @inbounds while i > 1
-            get_codeunit(pnt, i) == surr && get_codeunit(pnt, i -= 1) == wrd && return i
-            i -= 1
+        @inbounds while pos > 1
+            get_codeunit(pnt, pos) == surr && get_codeunit(pnt, pos -= 1) == wrd && return pos
+            pos -= 1
         end
     end
     0
@@ -527,7 +527,7 @@ end
 # Copies because not safe to expose the internal array (would allow mutation)
 function convert(::Type{Vector{UInt16}}, str::WordStr)
     len = _len(str)
-    vec = Vector{UInt16}(uninitialized, len)
+    vec = create_vector(UInt16, len)
     @inbounds unsafe_copyto!(pointer(vec), _pnt(str), len)
     vec
 end

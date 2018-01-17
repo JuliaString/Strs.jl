@@ -171,7 +171,8 @@ function _widenupper(dat, i, len)
 end
 
 function uppercase(str::LatinStr)
-    len, dat = _lendata(str)
+    len = _len(str)
+    dat = _data(str)
     @inbounds for i = 1:len
         _can_upper(get_codeunit(dat, i)) && return _upper(LatinStr, dat, i, len)
     end
@@ -179,7 +180,8 @@ function uppercase(str::LatinStr)
 end
 
 function uppercase(str::_LatinStr)
-    len, dat = _lendata(str)
+    len = _len(str)
+    dat = _data(str)
     @inbounds for i = 1:len
         ch = get_codeunit(dat, i)
         ((ch == 0xb5) | (ch == 0xff)) && return _widenupper(dat, i, len)
