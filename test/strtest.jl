@@ -1,42 +1,35 @@
 ver = "v0.$(VERSION.minor)"
-dir = "/Users/scott/.julia/"
-loc = "/j/"
+dir = Pkg.dir() # "/Users/scott/.julia/"
+loc = "https://github.com/JuliaString/" # /j
 
-const list = ["StrTables"]
+const jllist = ["StrTables"]
+const jllist2 = ["Format", "StringLiterals", "Strs"]
 const buildlist = ["LaTeX_Entities", "Emoji_Entities", "HTML_Entities", "Unicode_Entities"]
-const jllist = ["Format", "StringLiterals", "Strs"]
 const extras = ["StrICU"]
 
-const pkglist = vcat(list, buildlist, extras, jllist)
+const pkglist = vcat(jllist,buildlist, jllist2, extras)
 const datasrc = joinpath(loc, "Unicode_Entities", "data", "UnicodeData.txt")
 const datadst = joinpath(dir, ver, "data")
 
 function loadall()
     for pkg in pkglist
+        try
+            Pkg.installed(pkg) == nothing || Pkg.free(pkg)
+        catch ex
+            println("$pkg is not registered")
+        end
+        Pkg.rm(pkg)
         p = joinpath(dir, ver, pkg)
         run(`rm -rf $p`)
-    end
-
-    for pkg in vcat(list, buildlist, extras)
-        Pkg.clone(joinpath(loc, pkg))
-    end
-
-    for pkg in jllist
         Pkg.clone(joinpath(loc, string(pkg, ".jl")))
     end
 
-    run(`cp -p $datasrc $datadst`)
-
-    run(`rm -rf $dir/lib/$ver`)
+    #run(`cp -p $datasrc $datadst`)
 
     Pkg.installed("LightXML") == nothing || Pkg.free("LightXML")
     Pkg.rm("LightXML")
-    Pkg.clone(joinpath(loc, "LightXML.jl"))
-
-    for pkg in vcat(list, buildlist, "LightXML", "Format", "StringLiterals")
-        Pkg.checkout(pkg, "spj/v7update")
-    end
-    Pkg.checkout("Strs", "spj/fixv06")
+    Pkg.clone(joinpath("https://github.com/ScottPJones/", "LightXML.jl"))
+    Pkg.checkout("LightXML", "spj/v7update")
 
     for pkg in vcat(buildlist, extras)
         Pkg.build(pkg)
