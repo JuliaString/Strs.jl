@@ -126,14 +126,10 @@ utf8proc_map(str::UTF8Str, options::Integer) = utf8proc_map(UTF8Str, str, option
 
 ############################################################################
 
-const _mod = @static isdefined(Base, :Unicode) ? "Base.Unicode" : "Base"
-const _list =
-    "normalize, graphemes, islower, isupper, isalpha, isdigit, " *
-    "isxdigit, isalnum, iscntrl, ispunct, isspace, isprint, isgraph, " *
-    "lowercase, uppercase, titlecase, lcfirst, ucfirst, isascii"
+import normalize, graphemes, islower, isupper, isalpha, isdigit,
+       isxdigit, isalnum, iscntrl, ispunct, isspace, isprint, isgraph,
+       lowercase, uppercase, titlecase, lcfirst, ucfirst, isascii
 
-eval(Meta.parse("import $_list"))
-eval(Meta.parse("export $_list"))
 @condimport isnumeric
 @condimport textwidth
 export isgraphemebreak
@@ -144,7 +140,7 @@ export isgraphemebreak
 end
 @static if VERSION < v"0.7.0-DEV"
     import Base: is_assigned_char, isassigned
-    is_assigned_char(ch) = isassigned(ch)
+    is_assigned_char(ch::CodePoint) = isassigned(ch)
 else
     import Base.Unicode: isassigned
 end
