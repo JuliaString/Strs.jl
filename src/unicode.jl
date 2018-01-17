@@ -132,7 +132,7 @@ const _list =
     "isxdigit, isalnum, iscntrl, ispunct, isspace, isprint, isgraph, " *
     "lowercase, uppercase, titlecase, lcfirst, ucfirst, isascii"
 
-eval(Meta.parse("import $_mod: $_list"))
+eval(Meta.parse("import $_list"))
 eval(Meta.parse("export $_list"))
 @condimport isnumeric
 @condimport textwidth
@@ -142,11 +142,11 @@ export isgraphemebreak
     import Base: isnumber
     isnumber(val::CodePoint) = isnumeric(val)
 end
-@static if isdefined(Base.Unicode, :isassigned)
-    import Base.Unicode: isassigned
-else
+@static if VERSION < v"0.7.0-DEV"
     import Base: is_assigned_char, isassigned
     is_assigned_char(ch) = isassigned(ch)
+else
+    import Base.Unicode: isassigned
 end
 
 ############################################################################
