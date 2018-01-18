@@ -2,8 +2,6 @@ const ver = "v0.$(VERSION.minor)"
 const git = "https://github.com/JuliaString/"
 const pkgdir = Pkg.dir()
 
-_replace(s, p)  = @static VERSION < v"0.7.0-DEV" ? replace(s, p.first, p.second) : replace(s, p)
-
 const pkglist =
     ["StrTables", "LaTeX_Entities", "Emoji_Entities", "HTML_Entities", "Unicode_Entities",
      "Format", "StringLiterals", "Strs", "StrICU"]
@@ -89,9 +87,10 @@ function loadpkg(pkg, loc=git, branch=nothing)
     p = joinpath(pkgdir, pkg)
     run(`rm -rf $p`)
     Pkg.clone(joinpath(loc, string(pkg, ".jl")))
-    j = joinpath(pkgdir, _replace(pkgdir, ver, joinpath("lib", ver), string(pkg, ".ji")))
-    println(j)
-    #run(`rm -rf $j`)
+    j = (@static VERSION < v"0.7.0-DEV"
+         ? replace(pkgdir, ver, joinpath("lib", ver))
+         : replace(pkgdir, ver => joinpath("lib", ver)))
+    run(`rm -rf $(joinpath(j, string(pkg, ".ji")))`)
     branch == nothing || Pkg.checkout(pkg, branch)
     Pkg.build(pkg)
 end
