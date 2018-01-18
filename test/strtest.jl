@@ -2,6 +2,8 @@ const ver = "v0.$(VERSION.minor)"
 const git = "https://github.com/JuliaString/"
 const pkgdir = Pkg.dir()
 
+_replace(s, p)  = @static VERSION < v"0.7.0-DEV" ? replace(s, p.first, p.second) : replace(s, p)
+
 const pkglist =
     ["StrTables", "LaTeX_Entities", "Emoji_Entities", "HTML_Entities", "Unicode_Entities",
      "Format", "StringLiterals", "Strs", "StrICU"]
@@ -17,7 +19,7 @@ function loadall(loc=git)
             println("$pkg is not registered")
         end
         Pkg.rm(pkg)
-        p = joinpath(pkgdir, ver, pkg)
+        p = joinpath(pkgdir, pkg)
         run(`rm -rf $p`)
     end
 
@@ -73,24 +75,25 @@ function testall()
     testlatex()
     testemoji()
     for str in pkglist
-        include(joinpath(pkgdir, ver, str, "test", "runtests.jl"))
+        include(joinpath(pkgdir, str, "test", "runtests.jl"))
     end
 end
 
 """Load up a non-registered package"""
-function loadpkg(pkg, loc=git, branch=nothing, build=false)
+function loadpkg(pkg, loc=git, branch=nothing)
     try
         Pkg.installed(pkg) == nothing || Pkg.free(pkg)
     catch ex
         println("$pkg is not registered")
     end
-    p = joinpath(pkgdir, ver, pkg)
+    p = joinpath(pkgdir, pkg)
     run(`rm -rf $p`)
     Pkg.clone(joinpath(loc, string(pkg, ".jl")))
-    j = joinpath(pkgdir, "lib", ver, string(pkg, ".ji"))
-    run(`rm -rf $j`)
+    j = joinpath(pkgdir, _replace(pkgdir, ver, joinpath("lib", ver), string(pkg, ".ji")))
+    println(j)
+    #run(`rm -rf $j`)
     branch == nothing || Pkg.checkout(pkg, branch)
-    build && Pkg.build(pkg)
+    Pkg.build(pkg)
 end
 
 macro usestr()
