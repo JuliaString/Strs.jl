@@ -1,17 +1,13 @@
-ver = "v0.$(VERSION.minor)"
-dir = Pkg.dir() # "/Users/scott/.julia/"
-loc = "https://github.com/JuliaString/" # /j
+const ver = "v0.$(VERSION.minor)"
+const git = "https://github.com/JuliaString/"
+const pkgdir = Pkg.dir()
 
-const jllist = ["StrTables"]
-const jllist2 = ["Format", "StringLiterals", "Strs"]
-const buildlist = ["LaTeX_Entities", "Emoji_Entities", "HTML_Entities", "Unicode_Entities"]
-const extras = ["StrICU"]
+const pkglist =
+    ["StrTables", "LaTeX_Entities", "Emoji_Entities", "HTML_Entities", "Unicode_Entities",
+     "Format", "StringLiterals", "Strs", "StrICU"]
 
-const pkglist = vcat(jllist,buildlist, jllist2, extras)
-const datasrc = joinpath(loc, "Unicode_Entities", "data", "UnicodeData.txt")
-const datadst = joinpath(dir, ver, "data")
-
-function loadall()
+function loadall(loc=git)
+    # Get rid of any old copies of the package
     for pkg in pkglist
         try
             Pkg.installed(pkg) == nothing || Pkg.free(pkg)
@@ -19,19 +15,20 @@ function loadall()
             println("$pkg is not registered")
         end
         Pkg.rm(pkg)
-        p = joinpath(dir, ver, pkg)
+        p = joinpath(pkgdir, ver, pkg)
         run(`rm -rf $p`)
-        Pkg.clone(joinpath(loc, string(pkg, ".jl")))
     end
-
-    #run(`cp -p $datasrc $datadst`)
 
     Pkg.installed("LightXML") == nothing || Pkg.free("LightXML")
     Pkg.rm("LightXML")
     Pkg.clone(joinpath("https://github.com/ScottPJones/", "LightXML.jl"))
     Pkg.checkout("LightXML", "spj/v7update")
 
-    for pkg in vcat(buildlist, extras)
+    for pkg in pkglist
+        Pkg.clone(joinpath(loc, string(pkg, ".jl")))
+    end
+
+    for pkg in pkglist
         Pkg.build(pkg)
     end
 end
@@ -74,16 +71,22 @@ function testall()
     testlatex()
     testemoji()
     for str in pkglist
-        include(joinpath(dir,ver,str,"test","runtests.jl"))
+        include(joinpath(pkgdir, ver, str, "test", "runtests.jl"))
     end
 end
 
 """Load up a non-registered package"""
-function loadpkg(pkg, build=false, branch=nothing)
-    p = joinpath(dir, ver, pkg)
+function loadpkg(pkg, loc=git, branch=nothing, build=false)
+    try
+        Pkg.installed(pkg) == nothing || Pkg.free(pkg)
+    catch ex
+        println("$pkg is not registered")
+    end
+    p = joinpath(pkgdir, ver, pkg)
     run(`rm -rf $p`)
     Pkg.clone(joinpath(loc, string(pkg, ".jl")))
-    run(`rm -rf $dir/lib/$ver/$pkg.ji`)
+    j = joinpath(pkgdir, "lib", ver, string(pkg, ".ji"))
+    run(`rm -rf $j`)
     branch == nothing || Pkg.checkout(pkg, branch)
     build && Pkg.build(pkg)
 end
