@@ -70,7 +70,7 @@ end
 @propagate_inbounds isvalid(str::T, i::Integer) where {T<:Str} =
     (@_inline_meta(); _isvalid(CodePointStyle(T), str, i))
 @propagate_inbounds thisind(str::T, i::Int) where {T<:Str} =
-    (@_inline_meta(); _prevind(CodePointStyle(T), str, i))
+    (@_inline_meta(); _thisind(CodePointStyle(T), str, i))
 @propagate_inbounds prevind(str::T, i::Int) where {T<:Str} =
     (@_inline_meta(); _prevind(CodePointStyle(T), str, i))
 @propagate_inbounds nextind(str::T, i::Int) where {T<:Str} =

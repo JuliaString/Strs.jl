@@ -225,9 +225,16 @@ end
 function _prevind(T::CodeUnitMulti, str::UTF8Str, pos::Int)
     pos == 1 && return 0
     numcu = _len(str)
+    pos == numcu + 1 && @inbounds return _thisind(T, str, numcu)
     @boundscheck 1 < pos <= (numcu + 1) || boundserr(str, pos)
-    _thisind(T, str,
-             pos - (pos == (numcu + 1) || is_valid_continuation(get_codeunit(str, pos))))
+    pnt = _pnt(str) + pos - 1
+    if checkcont(pnt)
+        pos - (checkcont(pnt - 1) ? (checkcont(pnt - 2) ? 3 : 2) : 1)
+    elseif pos == 2
+        1
+    else
+        pos - (checkcont(pnt - 1) ? (checkcont(pnt - 2) ? (checkcont(pnt - 3) ? 4 : 3) : 2) : 1)
+    end
 end
 
 function getindex(str::UTF8Str, rng::UnitRange{Int})
