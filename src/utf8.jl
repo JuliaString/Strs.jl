@@ -204,7 +204,7 @@ lastidx(str::UTF8Str) = sizeof(str)
 @inline checkcont(pnt) = is_valid_continuation(get_codeunit(pnt))
 
 function _thisind(::CodeUnitMulti, str::UTF8Str, pos::Int)
-    @boundscheck 0 < pos <= len || boundserr(str, pos)
+    @boundscheck 0 < pos <= _len(str) || boundserr(str, pos)
     pnt = _pnt(str) + pos - 1
     pos - checkcont(pnt) ? (checkcont(pnt - 1) ? (checkcont(pnt - 2) ? 3 : 2) : 1) : 0
 end
