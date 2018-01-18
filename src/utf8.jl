@@ -206,7 +206,7 @@ lastidx(str::UTF8Str) = sizeof(str)
 function _thisind(::CodeUnitMulti, str::UTF8Str, pos::Int)
     @boundscheck 0 < pos <= _len(str) || boundserr(str, pos)
     pnt = _pnt(str) + pos - 1
-    pos - checkcont(pnt) ? (checkcont(pnt - 1) ? (checkcont(pnt - 2) ? 3 : 2) : 1) : 0
+    pos - (checkcont(pnt) ? (checkcont(pnt - 1) ? (checkcont(pnt - 2) ? 3 : 2) : 1) : 0)
 end
 
 function _nextind(T::CodeUnitMulti, str::UTF8Str, pos::Int)
