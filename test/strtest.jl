@@ -6,6 +6,8 @@ const pkglist =
     ["StrTables", "LaTeX_Entities", "Emoji_Entities", "HTML_Entities", "Unicode_Entities",
      "Format", "StringLiterals", "Strs", "StrICU"]
 
+const mparse = @static VERSION < v"0.7.0-DEV" ? parse : Meta.parse
+
 function loadall(loc=git)
     # Get rid of any old copies of the package
     for pkg in pkglist
@@ -97,7 +99,7 @@ macro usestr()
     for pkg in pkglist
         print(io, pkg, ", ")
     end
-    :( $(take!(io)[1:end-2]) )
+    :( $(mparse(String(take!(io)[1:end-2]))) )
 end
 
 nothing

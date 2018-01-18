@@ -45,8 +45,10 @@ Note: for good substring performance, some of the operations that are optimized 
 (or more) at a time, will need to deal with masking the initial chunk, not just the final chunk.
 =#
 
-export ascii, latin1, utf8, ucs2, utf16, utf32, unsafe_str, islatin, isbmp, isunicode
-export codeunit, codeunits, codepoints, @str_str, @condimport
+# Convenience functions
+export utf8, utf16, utf32
+
+export unsafe_str, codeunit, codeunits, codepoints, @str_str, @condimport
 
 symstr(s...) = Symbol(string(s...))
 quotesym(s...) = Expr(:quote, symstr(s...))
