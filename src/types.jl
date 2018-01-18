@@ -122,7 +122,9 @@ const _subsetnam = [:_Latin, :_UCS2, :_UTF32]
 const _mbwname   = [:UTF8, :UTF16] # Multi-byte/word
 
 for (names, siz) in ((_cpname1, 8), (_cpname2, 16), (_cpname4, 32)), nam in names
-    @eval primitive type $(symstr(nam, "Chr")) <: CodePoint $siz end
+    chrnam = symstr(nam, "Chr")
+    @eval primitive type $chrnam <: CodePoint $siz end
+    @eval export $chrnam
 end
 primitive type _LatinChr <: CodePoint 8 end
 
@@ -132,6 +134,8 @@ const LatinChars   = Union{LatinChr, _LatinChr}
 const ByteChars    = Union{ASCIIChr, LatinChr, _LatinChr, Text1Chr}
 const WideChars    = Union{UCS2Chr, UTF32Chr}
 const UnicodeChars = Union{ASCIIChr, LatinChars, UCS2Chr, UTF32Chr}
+
+export UnicodeChars
 
 const BuiltInTypes = vcat(_cpname1, _cpname2, _cpname4, _subsetnam, _mbwname)
 
