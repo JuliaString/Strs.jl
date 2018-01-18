@@ -77,6 +77,12 @@ function testall()
     end
 end
 
+@static if VERSION < v"0.7.0-DEV"
+    const _rep = replace
+else
+    _rep(str, a, b) = replace(str, a => b)
+end
+
 """Load up a non-registered package"""
 function loadpkg(pkg, loc=git, branch=nothing)
     try
@@ -87,10 +93,8 @@ function loadpkg(pkg, loc=git, branch=nothing)
     p = joinpath(pkgdir, pkg)
     run(`rm -rf $p`)
     Pkg.clone(joinpath(loc, string(pkg, ".jl")))
-    j = (@static VERSION < v"0.7.0-DEV"
-         ? replace(pkgdir, ver, joinpath("lib", ver))
-         : replace(pkgdir, ver => joinpath("lib", ver)))
-    run(`rm -rf $(joinpath(j, string(pkg, ".ji")))`)
+    j = joinpath(_rep(pkgdir, ver, joinpath("lib", ver)), string(pkg, ".ji"))
+    run(`rm -rf $j`)
     branch == nothing || Pkg.checkout(pkg, branch)
     Pkg.build(pkg)
 end
