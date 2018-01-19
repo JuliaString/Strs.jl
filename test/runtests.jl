@@ -2,13 +2,15 @@
 # License is MIT: http://julialang.org/license
 
 @static if VERSION < v"0.7.0-DEV"
-using Base.Test
+    using Base.Test
 else
-using Test
+    using Test
 end
 
 using Strs
 import Strs: ascii, checkstring, UTF_ERR_SHORT, UnicodeError
+
+include("basics.jl")
 
 @testset "Strs" begin
 @testset "Unicode Strings" begin
@@ -544,4 +546,3 @@ let str = ascii("this ")
 end
 end
 end
-
