@@ -131,7 +131,12 @@ import Base: isalpha, isdigit, isxdigit, isalnum, iscntrl, ispunct, isspace, isp
 
 @condimport isnumeric
 @condimport textwidth
-@condimport graphemes
+
+@static if isdefined(Base, :Unicode) && isdefined(Base.Unicode, :graphemes)
+    import Base.Unicode: graphemes
+else
+    import Base: graphemes
+end
 
 export isgraphemebreak
 
