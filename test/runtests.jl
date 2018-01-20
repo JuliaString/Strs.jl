@@ -1,11 +1,7 @@
 # This file includes code that was formerly a part of Julia.
 # License is MIT: http://julialang.org/license
 
-@static if VERSION < v"0.7.0-DEV"
-using Base.Test
-else
-using Test
-end
+@static VERSION < v"0.7.0-DEV" ? (using Base.Test) : (using Test)
 
 using Strs
 import Strs: ascii, checkstring, UTF_ERR_SHORT, UnicodeError

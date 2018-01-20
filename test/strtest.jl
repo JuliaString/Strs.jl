@@ -7,6 +7,12 @@ const pkglist =
      "Format", "StringLiterals", "Strs", "StrICU"]
 
 const mparse = @static VERSION < v"0.7.0-DEV" ? parse : Meta.parse
+@static if VERSION < v"0.7.0-DEV"
+    const _rep = replace
+else
+    _rep(str, a, b) = replace(str, a => b)
+end
+
 
 function loadall(loc=git)
     # Get rid of any old copies of the package
@@ -35,52 +41,39 @@ function loadall(loc=git)
     end
 end
 
-function testlatex()
-    le = LaTeX_Entities ; ln = le.lookupname ; mt = le.matches
-    an1 = collect(keys(Base.REPLCompletions.latex_symbols))
-    an2 = [x[2:end] for x in an1]
-    vn = collect(values(Base.REPLCompletions.latex_symbols))
-    mn = collect(le._tab.nam)
-    println(setdiff(an2,mn))
-    println(setdiff(mn,an2))
-    for (i, key) in enumerate(an2)
-        val = vn[i]
-        vnew = ln(key)
-        val != vnew &&
-            println(i,"\t",length(val),":",hex(val[1]),":",val,"\t",length(vnew),
-		    ":",hex(vnew[1]),":",vnew,"\t",key)
-    end
+function _dispchr(val)
+    len = length(val)
+    print("\t",len)
+    len != 0 && print(":", hex(val[1]), ":", val)
 end
 
-function testemoji()
-    ee = Emoji_Entities ; ln = ee.lookupname ; mt = ee.matches
-    an1 = collect(keys(Base.REPLCompletions.emoji_symbols))
-    an2 = [x[3:end-1] for x in an1]
-    vn = collect(values(Base.REPLCompletions.emoji_symbols))
-    mn = collect(ee._tab.nam)
-    println(setdiff(an2,mn))
-    println(setdiff(mn,an2))
-    for (i, key) in enumerate(an2)
-        val = vn[i]
-        vnew = ln(key)
-        val != vnew &&
-            println(i,"\t",length(val),":",hex(val[1]),":",val,"\t",length(vnew),
-		    ":",hex(vnew[1]),":",vnew,"\t",key)
+function testtable(m::Module, symtab, fun)
+    tab = collect(m._tab.nam)
+    juliatab = [fun(k) for k in keys(symtab)]
+    onlyjulia = setdiff(tab, juliatab)
+    onlytable = setdiff(juliatab, tab)
+    both = intersect(juliatab, tab)
+    println("Entities present in Julia table, not present in this table: ", length(onlyjulia))
+    isempty(onlyjulia) || println(onlyjulia)
+    println()
+    println("Entities present in this table, not present in Julia table: ", length(onlytable))
+    isempty(onlytable) || println(onlytable)
+    println()
+    lookup = m.lookupname
+    for (vkey, vold) in symtab
+        key = fun(vkey)
+        vnew = lookup(key)
+        vold != vnew && println(_dispchr(vold), _dispchr(vnew), "\t", key)
     end
 end
 
 function testall()
-    testlatex()
-    testemoji()
-    for str in pkglist
-        include(joinpath(pkgdir, str, "test", "runtests.jl"))
+    # Compare tables against what's currently in Base (for this version of Julia)
+    testtable(LaTeX_Entities, Base.REPLCompletions.latex_symbols, (x)->x[2:end])
+    testtable(Emoji_Entities, Base.REPLCompletions.emoji_symbols, (x)->x[3:end-1])
+    for pkg in pkglist
+        Pkg.test(pkg)
     end
-end
-
-@static if VERSION < v"0.7.0-DEV"
-    const _rep = replace
-else
-    _rep(str, a, b) = replace(str, a => b)
 end
 
 """Load up a non-registered package"""
