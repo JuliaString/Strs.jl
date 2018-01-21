@@ -51,28 +51,29 @@ function _dispchr(val)
 end
 
 function testtable(m::Module, symtab, fun, f2)
-    tab = collect(m._tab.nam)
+    def = m.default
+    tab = collect(StrTables._get_names(def))
     juliatab = [fun(k) for k in keys(symtab)]
     onlytable = setdiff(tab, juliatab)
     onlyjulia = setdiff(juliatab, tab)
-    lookup = m.lookupname
     println("Entities present in Julia table, not present in this table: ", length(onlyjulia))
     for key in onlyjulia
         val = symtab[f2(key)]
         l = _dispchr(val)
-        println(repeat(" ", 22 - l), key)
+        println(repeat(" ", 32 - l), key)
     end
     println()
     println("Entities present in this table, not present in Julia table: ", length(onlytable))
     for key in onlytable
-        val = lookup(key)
+        val = lookupname(def, key)
         l = _dispchr(val)
-        println(repeat(" ", 22 - l), key)
+        println(repeat(" ", 32 - l), key)
     end
     println()
-    for (i, vold) in enumerate(symtab)
+    for (i, keyval) in enumerate(symtab)
         key  = juliatab[i]
-        vnew = lookup(key)
+        vold = keyval[2]
+        vnew = lookupname(def, key)
         if vold != vnew
             print(rpad(key, 28))
             l = _dispchr(vold)
@@ -83,6 +84,7 @@ function testtable(m::Module, symtab, fun, f2)
             println()
         end
     end
+    println()
 end
 
 function testall()
@@ -101,7 +103,6 @@ function loadpkg(pkg, loc=git, branch=nothing)
     try
         Pkg.installed(pkg) == nothing || Pkg.free(pkg)
     catch ex
-        println("$pkg is not registered")
     end
     p = joinpath(pkgdir, pkg)
     run(`rm -rf $p`)
