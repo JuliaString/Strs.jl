@@ -1,48 +1,68 @@
-string_types = [ASCIIStr, LatinStr, UTF8Str, UCS2Str, UTF16Str, UniStr]
+@static if VERSION < v"0.7.0-DEV"
+    using Base.Test
+else
+    using Test
+end
+
+using Strs
+
+test_string_length = 100
+
+#string_types = [ASCIIStr, LatinStr, UTF8Str, UCS2Str, UTF16Str, UTF32Str, UniStr]
+#string_types = [ASCIIStr, LatinStr, UTF8Str, UCS2Str, UTF16Str, UTF32Str]
+string_types = [ASCIIStr, LatinStr]
+
+##  create type specific test strings
+test_strings_base = Dict()
+for string_type in string_types
+    tmax = UInt32(typemax(Strs.codepoint_type(string_type)))
+    random_seq = rand(1:tmax, test_string_length)
+    test_string = []
+    for random_val in random_seq
+        push!(test_string, Char(random_val))
+    end
+    test_string = join(test_string)
+    test_strings_base["$string_type"] = test_string
+end
+
+
+test_strings_dict = Dict(
+    "ASCIIStr" => [test_strings_base["ASCIIStr"]],
+    "LatinStr" => [test_strings_base["ASCIIStr"], test_strings_base["LatinStr"]]
+)
 
 @testset "constructors" begin
-    for T in string_types
-        @test convert(T, [0x61,0x62,0x63,0x21]) == "abc!"
-        @test convert(T, "abc!") == "abc!"
+    for string_type in string_types
+        #@test convert(string_type, [0x61,0x62,0x63,0x21]) == "abc!"
+        #@test convert(string_type, "abc!") == "abc!"
 
-        emptystr = convert(T, "")
+        emptystr = convert(string_type, "")
         @test isempty(emptystr)
-        #@test eltype(GenericString) == Char
-        str_ab = convert(T, "ab")
-        str_abc = convert(T, "abc")
+        str_ab = convert(string_type, "ab")
+        str_abc = convert(string_type, "abc")
         @test start("abc") == 1
-        #@test cmp("ab","abc") == -1
-        #@test "abc" === "abc"
-        #@test "ab"  !== "abc"
-        #@test string("ab", 'c') === "abc"
-        #@test string() === ""
-        #codegen_egal_of_strings(x, y) = (x===y, x!==y)
-        #@test codegen_egal_of_strings(string("ab", 'c'), "abc") === (true, false)
-        let strs = [convert(T, ""), convert(T, "a"), convert(T, "a b c"), convert(T, "до свидания")]
-            for x in strs, y in strs
-                @test (x === y) == (object_id(x) == object_id(y))
-            end
-        end
+        # let strs = [convert(string_type, ""),
+        #             convert(string_type, "a"),
+        #             convert(string_type, "a b c"),
+        #             convert(string_type, "до свидания")]
+        #     for x in strs, y in strs
+        #         @test (x === y) == (object_id(x) == object_id(y))
+        #     end
+        # end
     end
 end
 
 @testset "{starts,ends}with" begin
-    for T in string_types
-        string_abcd = convert(T, "abcd")
-        string_ab = convert(T, "ab")
-        string_cd = convert(T, "cd")
-        string_abcdA = convert(T, "ab\0cd")
-        @test startswith(string_abcd, 'a')
-        @test startswith(string_abcd, "a")
-        @test startswith(string_abcd, "ab")
-        @test !startswith(string_ab, "abcd")
-        @test !startswith(string_abcd, "bc")
-        @test endswith(string_abcd, 'd')
-        @test endswith(string_abcd, "d")
-        @test endswith(string_abcd, "cd")
-        @test !endswith(string_abcd, "dc")
-        @test !endswith(string_cd, "abcd")
-        @test startswith(string_abcdA, "ab\0c")
-        @test !startswith(string_abcdA, "ab\0d")
+    i = 1
+    for string_type in string_types
+        test_strings = test_strings_dict["$string_type"]
+        for test_string in test_strings
+            converted_string = convert(string_type, test_string)
+            @test startswith(converted_string, test_string[1])
+            @test !startswith(converted_string, test_string[end])
+            @test endswith(converted_string, test_string[end])
+            @test !endswith(converted_string, test_string[1])
+            i += 1
+        end
     end
 end
