@@ -9,10 +9,10 @@ const pkglist =
 const mparse = @static VERSION < v"0.7.0-DEV" ? parse : Meta.parse
 @static if VERSION < v"0.7.0-DEV"
     const _rep = replace
+    const textwidth = strwidth
 else
     _rep(str, a, b) = replace(str, a => b)
 end
-
 
 function loadall(loc=git)
     # Get rid of any old copies of the package
@@ -42,35 +42,55 @@ function loadall(loc=git)
 end
 
 function _dispchr(val)
-    len = length(val)
-    print("\t",len)
-    len != 0 && print(":", hex(val[1]), ":", val)
+    isempty(val) && return 0
+    print("\e[s", val, "\e[u\e[2C")
+    for ch in val
+        print(lpad(hex(ch%UInt32, 4), 6))
+    end
+    2+6*length(val)
 end
 
-function testtable(m::Module, symtab, fun)
+function testtable(m::Module, symtab, fun, f2)
     tab = collect(m._tab.nam)
     juliatab = [fun(k) for k in keys(symtab)]
-    onlyjulia = setdiff(tab, juliatab)
-    onlytable = setdiff(juliatab, tab)
-    both = intersect(juliatab, tab)
+    onlytable = setdiff(tab, juliatab)
+    onlyjulia = setdiff(juliatab, tab)
+    lookup = m.lookupname
     println("Entities present in Julia table, not present in this table: ", length(onlyjulia))
-    isempty(onlyjulia) || println(onlyjulia)
+    for key in onlyjulia
+        val = symtab[f2(key)]
+        l = _dispchr(val)
+        println(repeat(" ", 22 - l), key)
+    end
     println()
     println("Entities present in this table, not present in Julia table: ", length(onlytable))
-    isempty(onlytable) || println(onlytable)
+    for key in onlytable
+        val = lookup(key)
+        l = _dispchr(val)
+        println(repeat(" ", 22 - l), key)
+    end
     println()
-    lookup = m.lookupname
-    for (vkey, vold) in symtab
-        key = fun(vkey)
+    for (i, vold) in enumerate(symtab)
+        key  = juliatab[i]
         vnew = lookup(key)
-        vold != vnew && println(_dispchr(vold), _dispchr(vnew), "\t", key)
+        if vold != vnew
+            print(rpad(key, 28))
+            l = _dispchr(vold)
+            if !isempty(vnew)
+                print(repeat(" ", 22 - l))
+                _dispchr(vnew)
+            end
+            println()
+        end
     end
 end
 
 function testall()
     # Compare tables against what's currently in Base (for this version of Julia)
-    testtable(LaTeX_Entities, Base.REPLCompletions.latex_symbols, (x)->x[2:end])
-    testtable(Emoji_Entities, Base.REPLCompletions.emoji_symbols, (x)->x[3:end-1])
+    testtable(LaTeX_Entities, Base.REPLCompletions.latex_symbols,
+              (x)->x[2:end], (x)->"\\$x")
+    testtable(Emoji_Entities, Base.REPLCompletions.emoji_symbols,
+              (x)->x[3:end-1], (x)->"\\:$x:")
     for pkg in pkglist
         Pkg.test(pkg)
     end
