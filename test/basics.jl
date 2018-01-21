@@ -1,11 +1,3 @@
-@static if VERSION < v"0.7.0-DEV"
-    using Base.Test
-else
-    using Test
-end
-
-using Strs
-
 test_string_length = 100
 
 #string_types = [ASCIIStr, LatinStr, UTF8Str, UCS2Str, UTF16Str, UTF32Str, UniStr]
