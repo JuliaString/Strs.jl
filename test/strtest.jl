@@ -7,12 +7,7 @@ const pkglist =
      "Format", "StringLiterals", "Strs", "StrICU"]
 
 const mparse = @static VERSION < v"0.7.0-DEV" ? parse : Meta.parse
-@static if VERSION < v"0.7.0-DEV"
-    const _rep = replace
-    const textwidth = strwidth
-else
-    _rep(str, a, b) = replace(str, a => b)
-end
+_rep(str, a, b) = @static VERSION < v"0.7.0-DEV" ? replace(str, a, b) : replace(str, a => b)
 
 function loadall(loc=git)
     # Get rid of any old copies of the package
@@ -20,7 +15,6 @@ function loadall(loc=git)
         try
             Pkg.installed(pkg) == nothing || Pkg.free(pkg)
         catch ex
-            println("$pkg is not registered")
         end
         Pkg.rm(pkg)
         p = joinpath(pkgdir, pkg)
@@ -41,50 +35,65 @@ function loadall(loc=git)
     end
 end
 
-function _dispchr(val)
-    isempty(val) && return 0
-    print("\e[s", val, "\e[u\e[2C")
+print_chr(val) = isempty(val) || print("\e[s", val, "\e[u\e[2C")
+
+function str_chr(val)
+    isempty(val) && return ("", 0, "")
+    io = IOBuffer()
     for ch in val
-        print(lpad(hex(ch%UInt32, 4), 6))
+        print(io, hex(ch%UInt32,4), ':')
     end
-    2+6*length(val)
+    str = String(take!(io))[1:end-1]
+    val, length(str), str
 end
 
 function testtable(m::Module, symtab, fun, f2)
     def = m.default
+    get_old(k) = symtab[f2(k)]
+    get_new(k) = lookupname(def, k)
     tab = collect(StrTables._get_names(def))
     juliatab = [fun(k) for k in keys(symtab)]
-    onlytable = setdiff(tab, juliatab)
     onlyjulia = setdiff(juliatab, tab)
-    println("Entities present in Julia table, not present in this table: ", length(onlyjulia))
-    for key in onlyjulia
-        val = symtab[f2(key)]
-        l = _dispchr(val)
-        println(repeat(" ", 32 - l), key)
-    end
-    println()
-    println("Entities present in this table, not present in Julia table: ", length(onlytable))
-    for key in onlytable
-        val = lookupname(def, key)
-        l = _dispchr(val)
-        println(repeat(" ", 32 - l), key)
-    end
-    println()
-    for (i, keyval) in enumerate(symtab)
-        key  = juliatab[i]
-        vold = keyval[2]
-        vnew = lookupname(def, key)
-        if vold != vnew
-            print(rpad(key, 28))
-            l = _dispchr(vold)
-            if !isempty(vnew)
-                print(repeat(" ", 22 - l))
-                _dispchr(vnew)
-            end
-            println()
+    if !isempty(onlyjulia)
+        tabjulia = [(key, str_chr(get_old(key))) for key in onlyjulia]
+        maxjulia = mapreduce((v)->v[2][2], max, tabjulia)
+        println("Entities present in Julia table, not present in this table: ", length(onlyjulia))
+        for (key, v) in tabjulia
+            (val, len, str) = v
+            println("\e[s", val, "\e[u\e[2C ", rpad(str, maxjulia), " ", key)
         end
+        println()
     end
-    println()
+    onlytable = setdiff(tab, juliatab)
+    if !isempty(onlytable)
+        tabnew = [(key, str_chr(get_new(key))) for key in onlytable]
+        maxnew = mapreduce((v)->v[2][2], max, tabnew)
+        println("Entities present in this table, not present in Julia table: ", length(onlytable))
+        for (key, v) in tabnew
+            (val, len, str) = v
+            println("\e[s", val, "\e[u\e[2C ", rpad(str, maxnew), " ", key)
+        end
+        println()
+    end
+    bothtab = intersect(juliatab, tab)
+    tabdiff = []
+    for key in bothtab
+        vold = get_old(key)
+        vnew = get_new(key)
+        vold == vnew || push!(tabdiff, (key, str_chr(vold), str_chr(vnew)))
+    end
+    if !isempty(tabdiff)
+        maxdiff1 = mapreduce((v)->v[2][2], max, tabdiff)
+        maxdiff2 = mapreduce((v)->v[3][2], max, tabdiff)
+        println("Entities present in both tables, with different values: ", length(tabdiff))
+        for (key, v1, v2) in tabdiff
+            (val, len, str) = v1
+            print("\e[s", val, "\e[u\e[2C ", rpad(str, maxdiff1), "   ")
+            (val, len, str) = v2
+            println("\e[s", val, "\e[u\e[2C ", rpad(str, maxdiff2), "   ", key)
+        end
+        println()
+    end
 end
 
 function testall()
