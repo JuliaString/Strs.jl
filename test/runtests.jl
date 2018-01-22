@@ -4,23 +4,18 @@
 @static VERSION < v"0.7.0-DEV" ? (using Base.Test) : (using Test)
 
 using Strs
-import Strs: ascii, checkstring, UTF_ERR_SHORT, UnicodeError
+import Strs: ascii, checkstring, UTF_ERR_SHORT, UnicodeError, codepoint_adj, codepoint_rng
 
 # Function to help generating strings for tests
-randchar(::Type{T}) where {T<:Union{Char, UTF32Chr}} =
-    (c = rand(0x00000:0x10f7ff); T(ifelse(c < 0xd800, c, c+0x800)))
-randchar(::Type{UCS2Chr}) =
-    (c = rand(0x0000:0xf7ff); UCS2Chr(ifelse(c < 0xd800, c, c+0x800)))
-randchar(::Type{T}) where {T<:CodePoint} =
-    T(rand(0x0:UInt8(typemax(T)))
+randchar(::Type{T}) where {T} = codepoint_adj(T, rand(codepoint_rng(T)))
 
-@testset "Invalid sequences" include("invalid.jl")
-@testset "Valid sequences"   include("valid.jl")
-@testset "Bounds Errors"     include("bounds.jl")
-@testset "UTF-16 tests"      include("utf16.jl")
-@testset "UTF-32 tests"      include("utf32.jl")
-@testset "Conversion errors" include("convert.jl")
-@testset "Pointer functions" include("pointer.jl")
+@testset "Invalid sequences" begin include("invalid.jl") end
+@testset "Valid sequences"   begin include("valid.jl")   end
+@testset "Bounds Errors"     begin include("bounds.jl")  end
+@testset "UTF-16 tests"      begin include("utf16.jl")   end
+@testset "UTF-32 tests"      begin include("utf32.jl")   end
+@testset "Conversion errors" begin include("convert.jl") end
+@testset "Pointer functions" begin include("pointer.jl") end
 
 @testset "Unicode Strings" begin
 # Unicode errors
@@ -93,7 +88,7 @@ for (fun, S, T) in ((utf16, UInt16, UTF16Str), (utf32, UInt32, UTF32Str))
     subarr = view(cmp, 1:6)
     @test convert(T, subarr) == str[4:end]
 end
+end
 
 @test isvalid(UTF32Str, Char['d','\uff','\u7ff','\u7fff','\U7ffff'])
 @test reverse(utf32("abcd \uff\u7ff\u7fff\U7ffff")) == utf32("\U7ffff\u7fff\u7ff\uff dcba")
-
