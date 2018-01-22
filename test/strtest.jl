@@ -52,7 +52,7 @@ function testtable(m::Module, symtab, fun, f2)
     def = m.default
     get_old(k) = symtab[f2(k)]
     get_new(k) = lookupname(def, k)
-    tab = collect(StrTables._get_names(def))
+    tab = collect(def.nam)
     juliatab = [fun(k) for k in keys(symtab)]
     onlyjulia = setdiff(juliatab, tab)
     if !isempty(onlyjulia)
