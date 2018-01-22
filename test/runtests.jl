@@ -9,6 +9,8 @@ import Strs: ascii, checkstring, UTF_ERR_SHORT, UnicodeError, codepoint_adj, cod
 # Function to help generating strings for tests
 randchar(::Type{T}) where {T} = codepoint_adj(T, rand(codepoint_rng(T)))
 
+include("basics.jl")
+
 @testset "Invalid sequences" begin include("invalid.jl") end
 @testset "Valid sequences"   begin include("valid.jl")   end
 @testset "Bounds Errors"     begin include("bounds.jl")  end
