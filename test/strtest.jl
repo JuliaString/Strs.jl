@@ -8,6 +8,7 @@ const pkglist =
 
 const mparse = @static VERSION < v"0.7.0-DEV" ? parse : Meta.parse
 _rep(str, a, b) = @static VERSION < v"0.7.0-DEV" ? replace(str, a, b) : replace(str, a => b)
+const RC = @static VERSION < v"0.7.0-DEV" ? Base.REPLCompletions : REPL.REPLCompletions
 
 function loadall(loc=git)
     # Get rid of any old copies of the package
@@ -98,10 +99,8 @@ end
 
 function testall()
     # Compare tables against what's currently in Base (for this version of Julia)
-    testtable(LaTeX_Entities, Base.REPLCompletions.latex_symbols,
-              (x)->x[2:end], (x)->"\\$x")
-    testtable(Emoji_Entities, Base.REPLCompletions.emoji_symbols,
-              (x)->x[3:end-1], (x)->"\\:$x:")
+    testtable(LaTeX_Entities, RC.latex_symbols, (x)->x[2:end], (x)->"\\$x")
+    testtable(Emoji_Entities, RC.emoji_symbols, (x)->x[3:end-1], (x)->"\\:$x:")
     for pkg in pkglist
         Pkg.test(pkg)
     end
