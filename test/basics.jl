@@ -2,17 +2,13 @@ test_string_length = 100
 
 #string_types = [ASCIIStr, LatinStr, UTF8Str, UCS2Str, UTF16Str, UTF32Str, UniStr]
 #string_types = [ASCIIStr, LatinStr, UTF8Str, UCS2Str, UTF16Str, UTF32Str]
-string_types = [ASCIIStr, LatinStr]
+string_types = [ASCIIStr, LatinStr, UTF8Str]
 
 ##  create type specific test strings
 test_strings_base = Dict{String, Any}()
 for T in string_types
-    tmax = UInt32(typemax(Strs.codepoint_type(T)))
-    if tmax > 0xd7ff
-        tmax = tmax - 0x800
-    end
     test_string = []
-    for i in 1:tmax
+    for i in 1:test_string_length
         push!(test_string, randchar(Strs.codepoint_type(T)))
     end
     test_string = join(test_string)
@@ -22,7 +18,8 @@ end
 
 test_strings_dict = Dict(
     "ASCIIStr" => [test_strings_base["ASCIIStr"]],
-    "LatinStr" => [test_strings_base["ASCIIStr"], test_strings_base["LatinStr"]]
+    "LatinStr" => [test_strings_base["ASCIIStr"], test_strings_base["LatinStr"]],
+    "UTF8Str" => [test_strings_base["ASCIIStr"], test_strings_base["LatinStr"], test_strings_base["UTF8Str"]]
 )
 
 @testset "constructors" begin
