@@ -121,6 +121,15 @@ first(cp::CodePoint) = cp
 last(cp::CodePoint) = cp
 eltype(::Type{CodePoint}) = CodePoint
 
+_uni_rng(tm) = 0x00000:ifelse(m < 0xd800, m, m-0x800)
+codepoint_rng(::Type{T}) where {T<:CodePoint} = _uni_rng(typemax(T)%UInt32)
+codepoint_rng(::Type{Char}) = _uni_rng(0x10ffff)
+codepoint_rng(::Type{Text2Chr}) = 0%UInt16:typemax(UInt16)
+codepoint_rng(::Type{Text4Chr}) = 0%UInt32:typemax(UInt32)
+
+codepoint_adj(::Type{T}, ch) where {T} = ifelse(ch < 0xd800, ch, ch+0x800)%T
+codepoint_adj(::Type{T}, ch) where {T<:Union{Text2Chr,Text4Chr}} = ch%T
+
 start(cp::CodePoint) = false
 next(cp::CodePoint, state) = (cp, true)
 done(cp::CodePoint, state) = state

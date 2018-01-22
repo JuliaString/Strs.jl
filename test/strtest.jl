@@ -102,7 +102,12 @@ function testall()
     testtable(LaTeX_Entities, RC.latex_symbols, (x)->x[2:end], (x)->"\\$x")
     testtable(Emoji_Entities, RC.emoji_symbols, (x)->x[3:end-1], (x)->"\\:$x:")
     for pkg in pkglist
-        Pkg.test(pkg)
+        try
+            Pkg.test(pkg)
+        catch ex
+            println(pkg, " failed")
+            println(sprint(showerror, ex, catch_backtrace()))
+        end
     end
 end
 
