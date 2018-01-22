@@ -8,10 +8,12 @@ string_types = [ASCIIStr, LatinStr]
 test_strings_base = Dict{String, Any}()
 for T in string_types
     tmax = UInt32(typemax(Strs.codepoint_type(T)))
-    random_seq = rand(1:tmax, test_string_length)
+    if tmax > 0xd7ff
+        tmax = tmax - 0x800
+    end
     test_string = []
-    for random_val in random_seq
-        push!(test_string, Char(random_val))
+    for i in 1:tmax
+        push!(test_string, randchar(Strs.codepoint_type(T)))
     end
     test_string = join(test_string)
     test_strings_base["$T"] = test_string
@@ -32,7 +34,6 @@ test_strings_dict = Dict(
         @test isempty(emptystr)
         str_ab = convert(T, "ab")
         str_abc = convert(T, "abc")
-        @test start("abc") == 1
         # let strs = [convert(T, ""),
         #             convert(T, "a"),
         #             convert(T, "a b c"),
@@ -51,9 +52,12 @@ end
         for test_string in test_strings
             converted_string = convert(T, test_string)
             @test startswith(converted_string, test_string[1])
-            @test !startswith(converted_string, test_string[end])
             @test endswith(converted_string, test_string[end])
-            @test !endswith(converted_string, test_string[1])
+            ##   TODO needs test which would run in case the start and end chars are the same
+            if test_string[1] != test_string[end]
+                @test !startswith(converted_string, test_string[end])
+                @test !endswith(converted_string, test_string[1])
+            end
             i += 1
         end
     end
