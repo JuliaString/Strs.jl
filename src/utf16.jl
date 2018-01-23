@@ -248,7 +248,7 @@ function isvalid(::Type{<:UCS2Strings}, pnt::Ptr{UInt16}, len)
     true
 end
 
-function check_valid(ch, pos)
+@inline function check_valid(ch, pos)
     is_surrogate_codeunit(ch) && unierror(UTF_ERR_SURROGATE, pos, ch)
     ch <= 0x10ffff || unierror(UTF_ERR_INVALID, pos, ch)
     ch
@@ -587,20 +587,21 @@ end
 end
 
 """Handle case where result vector is longer"""
-function _maprest(fun, len, buf, pnt, out, uc)
+function _maprest(fun, str, len, pnt, fin, buf, out, uc)
     rst = Vector{UInt16}()
     pushchar!(rst, uc)
-    while pos <= len
+    while pnt < fin
         ch = get_codeunit(pnt)%UInt32
         # check for surrogate pair
         is_surrogate_lead(ch) &&
             (ch = get_supplementary(ch, get_codeunit(pnt += 2)))
-        pushchar!(rst, check_valid(UInt32(fun(ch)), pos))
+        pushchar!(rst, check_valid(UInt32(fun(ch)), (pnt - pointer(str))>>>1))
+        pnt += 2
     end
     # We now have a vector to add to the end of buf
     lenrst = length(rst)
     totbuf, totpnt = _allocate(UInt16, len + lenrst)
-    unsafe_copyto!(totpnt, 1, pnt, 1, out)
+    unsafe_copyto!(totpnt, 1, pnt, 1, (out - pointer(buf))>>>1)
     unsafe_copyto!(totpnt, out + 1, pointer(rst), 1, lenrst)
     Str(UTF16CSE, totbuf)
 end
@@ -618,18 +619,19 @@ function map(fun, str::T) where {T<:Union{UCS2Str,_UCS2Str,UTF16Str}}
         T == UTF16Str && is_surrogate_lead(ch) &&
             (ch = get_supplementary(ch, get_codeunit(pnt += 2)))
         # Note: no checking for invalid here, UTF16Str is always valid
-        uc = check_valid(UInt32(fun(ch)), pos)
+        uc = check_valid(UInt32(fun(ch)), (pnt - pointer(str))>>>1)
         if uc < 0x10000
-            out < outend || return _maprest(fun, len, buf, pnt, out, uc)
+            out < outend || return _maprest(fun, str, len, buf, pnt, fin, out, uc)
             set_codeunit!(out, uc%UInt16)
             out += 2
         else
-            out + 2 < outend || return _maprest(fun, len, buf, pnt, out, uc)
+            out + 2 < outend || return _maprest(fun, str, len, buf, pnt, fin, out, uc)
             set_codeunit!(out,     (0xd7c0 + (uc >> 10))%UInt16)
-            set_codeunit!(out + 1, (0xdc00 + (uc & 0x3ff))%UInt16)
+            set_codeunit!(out + 2, (0xdc00 + (uc & 0x3ff))%UInt16)
             surrflag = true
             out += 4
         end
+        pnt += 2
     end
     outlen = out - pointer(buf)
     out < len && resize!(buf, outlen << 1)
