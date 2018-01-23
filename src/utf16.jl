@@ -633,8 +633,7 @@ function map(fun, str::T) where {T<:Union{UCS2Str,_UCS2Str,UTF16Str}}
         end
         pnt += 2
     end
-    outlen = out - pointer(buf)
-    out < len && resize!(buf, outlen << 1)
+    out < outend && resize!(buf, out - pointer(buf))
     if !surrflag
         Str(cse(T), buf)
     elseif T == _UCS2Str
