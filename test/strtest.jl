@@ -8,6 +8,7 @@ const pkglist =
 
 const mparse = @static VERSION < v"0.7.0-DEV" ? parse : Meta.parse
 _rep(str, a, b) = @static VERSION < v"0.7.0-DEV" ? replace(str, a, b) : replace(str, a => b)
+@static VERSION < v"0.7.0-DEV" || (using REPL)
 const RC = @static VERSION < v"0.7.0-DEV" ? Base.REPLCompletions : REPL.REPLCompletions
 
 function loadall(loc=git)
