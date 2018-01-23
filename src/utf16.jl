@@ -606,7 +606,7 @@ function _maprest(fun, len, buf, pnt, out, uc)
 end
 
 function map(fun, str::T) where {T<:Union{UCS2Str,_UCS2Str,UTF16Str}}
-    (len == _len(str)) == 0 && return empty_str(T)
+    (len = _len(str)) == 0 && return empty_str(T)
     pnt = _pnt(str)
     buf, out = _allocate(UInt16, len)
     surrflag = false
