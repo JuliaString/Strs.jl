@@ -21,7 +21,7 @@ codeunit(::Type{UniStr})    = UInt32 # Note, the real type could be UInt8, UInt1
 
 codeunit(::S) where {S<:Str} = codeunit(S)
 
-"""Default value for Str types"""
+"""Default value for CodePoint types"""
 basetype(::Type{<:CodePoint}) = UInt8
 basetype(::Type{UCS2Chr})     = UInt16
 basetype(::Type{Text2Chr})    = UInt16
