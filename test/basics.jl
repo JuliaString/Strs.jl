@@ -7,11 +7,6 @@ char_types = [ASCIIStr, LatinStr, UTF8Str]
 ##  create type specific test strings
 test_strings_base = Dict{String, Any}()
 for T in char_types
-    # test_string = []
-    # for i in 1:test_string_length
-    #     push!(test_string, randchar(Strs.codepoint_type(T)))
-    # end
-    # test_string = join(test_string)
     test_strings_base["$T"] = join([randchar(Strs.codepoint_type(T)) for i in 1:test_string_length])
 end
 
@@ -25,7 +20,7 @@ test_strings_dict = Dict(
 @testset "constructors" begin
     for T in char_types
         #@test convert(T, [0x61,0x62,0x63,0x21]) == "abc!"
-        #@test convert(T, "abc!") == "abc!"
+        @test convert(T, "abc!") == "abc!"
 
         emptystr = convert(T, "")
         @test isempty(emptystr)
