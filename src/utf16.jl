@@ -205,7 +205,7 @@ function reverseind(str::UTF16Str, i::Integer)
 end
 
 function reverse(str::UTF16Str)
-    (len == _len(str)) == 0 && return str
+    (len = _len(str)) == 0 && return str
     pnt = _pnt(str)
     buf, out = _allocate(UInt16, len)
     @inbounds for i = 1:len-1
