@@ -21,28 +21,21 @@ res = load_results(fname) # Loads the results from the given file
 dispbench(res)            # Displays the results in a pretty format
 =#
 
-using Unicode
 using BenchmarkTools
 
 const test_legacy = false
 
-@static if test_legacy
-    using LegacyStrings
-end
+@static test_legacy && (using LegacyStrings)
 
 using StringLiterals
 using Strs
 import Strs: LineCounts, CharTypes, CharStat, calcstats
 import Strs: _LatinStr, _UCS2Str, _UTF32Str, _LatinChr
 
-uninit(T, len) = T(uninitialized, len)
+uninit(T, len)  = @static VERSION < v"0.7.0-DEV" ? T(len) : T(uninitialized, len)
 create_vector(T, len) = uninit(Vector{T}, len)
 
 import Base: show
-
-if !isdefined(Base, :isascii)
-    import Base.Unicode: isascii
-end
 
 const userdir = "/Users/scott/"
 
@@ -220,6 +213,7 @@ function dispres(io, xres)
     println(io)
 end
 
+@static VERSION < v"0.7.0-DEV" && (Base.repeat(x::Char, cnt::Int) = x^cnt)
 const divline = string(repeat('#', 100),'\n','\f')
 
 function dispbench(io, totres)
@@ -235,6 +229,15 @@ function countlength(lines::Vector{<:AbstractString})
     cnt = 0
     for text in lines
         cnt += length(text)
+    end
+    cnt
+end
+
+function dolowercase(lines::Vector{<:AbstractString})
+    cnt = 0
+    for (i, text) in enumerate(lines)
+        val = lowercase(text)
+        cnt += (val == text)
     end
     cnt
 end
@@ -515,9 +518,12 @@ function oldlength(s::UTF16Str)
     cnt
 end
 
+freverse(str) = sizeof(reverse(str))
+
 countsklength(l)  = checkstr(sklength, l)
 countoldlength(l) = checkstr(oldlength, l)
 
+checkreverse(l) = checkstr(freverse, l)
 checknextind(l) = checkstr(iteratenextind, l)
 countchars(l)   = checkstr(iteratechars, l)
 countcps(l)     = checkstr(iteratecps, l)
@@ -572,6 +578,7 @@ const tests =
      (countsize,   "sizeof"),
      (countlength, "length"),
      (checknextind, "nextind\nchars"),
+     (checkreverse, "length\nreverse"),
 #    (countsklength,  "length\nSK"),
 #    (countoldlength, "length\nOld"),
      (countchars,   "iteration\nChar"),
@@ -593,8 +600,8 @@ const tests =
      (checkdigit,   "isdigit\nchars"),
      (checkxdigit,  "isxdigit\nchars"),
      =#
-#    (dolowercase,  "lowercase\nstring"),
-#    (douppercase,  "uppercase\nstring"),
+     (dolowercase,  "lowercase\nstring"),
+     (douppercase,  "uppercase\nstring"),
 #    (dotitlecase,  "titlecase\nstring"),
     )
 
@@ -815,7 +822,7 @@ end
 const testlist =
     (((length, ), "length"),
      ((isascii, isvalid), "isascii, isvalid"),
-     ((lowercase, uppercase #=titlecase=#), "lowercase, uppercase"),
+     ((lowercase, uppercase, reverse), "lowercase, uppercase, reverse"),
      ((isascii, isvalid, iscntrl, islower, isupper, isalpha,
        isalnum, isspace, isprint, ispunct, isgraph, isdigit, isxdigit),
       "is(ascii|valid|cntrl|lower|upper|alpha|alnum|space|print|punct|graph|digit|xdigit)"),
@@ -829,7 +836,7 @@ function compareall(io, lines, res)
     pr"\(io)\(eltype(lines))\n"
     (comparetestline(lines, res[1], testlist[1]...),
      comparetestline(lines, res[2], testlist[2]...),
-     [],#comparetestline(lines, res[3], testlist[3]...),
+     comparetestline(lines, res[3], testlist[3]...),
      comparetestchar(lines, res[4], testlist[4]...),
      eltype(lines) == UTF8Str ? comparetestcu(lines, res[5], testlist[5]...) : [],
      eltype(lines) == UTF8Str ? comparetestline(lines, res[6], testlist[6]...) : [])
@@ -848,7 +855,7 @@ function checktests(io = STDOUT, sampledir = defsampledir)
         enc = encode_lines(list, lines)
         res = (runcheckline(Int, lines, testlist[1][1]),
                runcheckline(Bool, lines, testlist[2][1]),
-               [],
+               runcheckline(Any, lines, testlist[3][1]),
                runcheckchar(lines, testlist[4][1]),
                runcheckcu(lines,   testlist[5][1]),
                runcheckline(Int, lines, testlist[6][1]))

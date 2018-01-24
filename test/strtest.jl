@@ -6,6 +6,8 @@ const pkglist =
     ["StrTables", "LaTeX_Entities", "Emoji_Entities", "HTML_Entities", "Unicode_Entities",
      "Format", "StringLiterals", "Strs", "StrICU"]
 
+const deps = (("LightXML", "spj/v7update"), ("JSON", "spj/fixdeps"))
+
 const mparse = @static VERSION < v"0.7.0-DEV" ? parse : Meta.parse
 _rep(str, a, b) = @static VERSION < v"0.7.0-DEV" ? replace(str, a, b) : replace(str, a => b)
 @static VERSION < v"0.7.0-DEV" || (using REPL)
@@ -13,7 +15,7 @@ const RC = @static VERSION < v"0.7.0-DEV" ? Base.REPLCompletions : REPL.REPLComp
 
 function loadall(loc=git)
     # Get rid of any old copies of the package
-    for pkg in pkglist
+    for pkg in vcat(pkglist, "JSON", "LightXML")
         try
             Pkg.installed(pkg) == nothing || Pkg.free(pkg)
         catch ex
@@ -23,10 +25,10 @@ function loadall(loc=git)
         run(`rm -rf $p`)
     end
 
-    Pkg.installed("LightXML") == nothing || Pkg.free("LightXML")
-    Pkg.rm("LightXML")
-    Pkg.clone(joinpath("https://github.com/ScottPJones/", "LightXML.jl"))
-    Pkg.checkout("LightXML", "spj/v7update")
+    for (pkg, brn) in deps
+        Pkg.clone(joinpath("https://github.com/ScottPJones/", string(pkg, ".jl")))
+        Pkg.checkout(pkg, brn)
+    end
 
     for pkg in pkglist
         Pkg.clone(joinpath(loc, string(pkg, ".jl")))

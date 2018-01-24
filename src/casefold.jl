@@ -237,11 +237,11 @@ end
 
 # Placeholders until I write some optimal code for these
 function lowercase(str::UTF8Str)
-    Str(UTF8CSE, lowercase(String(str.data)))
+    Str(UTF8CSE, _data(lowercase(String(str.data))))
 end
 
 function uppercase(str::UTF8Str)
-    Str(UTF8CSE, uppercase(String(str.data)))
+    Str(UTF8CSE, _data(uppercase(String(str.data))))
 end
 
 function lowercase(str::UCS2Str)
