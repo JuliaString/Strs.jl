@@ -74,18 +74,20 @@ function rsearch(str::UTF32Strings, ch::UInt32, pos::Integer)
     1 <= pos <= len && boundserr(str, pos)
     (ch <= 0x10ffff && !is_surrogate_codeunit(ch)) || return 0
     @inbounds while pos > 0
-        get_codeunit(pnt, i) == ch && return pos
+        get_codeunit(pnt, pos) == ch && return pos
         pos -= 1
     end
     0
 end
 
 function reverse(str::T) where {T<:UTF32Strings}
-    len, pnt = _lenpnt(str)
-    len == 0 && return str
-    buf, out = _allocate(UInt32, len)
-    @inbounds for i = 1:len
-        set_codeunit!(out, i, get_codeunit(pnt, len - i + 1))
+    (len = _len(str)) == 0 && return str
+    pnt = _pnt(str)
+    buf, beg = _allocate(UInt32, len)
+    out = beg + (len<<2)
+    while out >= beg
+        set_codeunit!(out -= 4, get_codeunit(pnt))
+        pnt += 4
     end
     Str(cse(T), buf)
 end

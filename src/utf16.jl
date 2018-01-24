@@ -207,15 +207,13 @@ end
 function reverse(str::UTF16Str)
     (len = _len(str)) == 0 && return str
     pnt = _pnt(str)
-    buf, out = _allocate(UInt16, len)
-    @inbounds for i = 1:len-1
-        ch = get_codeunit(pnt, len - i)
-        if is_surrogate_lead(ch)
-            set_codeunit!(out, i,     get_codeunit(out, i - 1))
-            set_codeunit!(out, i - 1, ch)
-        else
-            set_codeunit!(out, i,     ch)
-        end
+    buf, beg = _allocate(UInt16, len)
+    out = beg + (len<<1)
+    while out >= beg
+        ch = get_codeunit(pnt)
+        is_surrogate_lead(ch) && set_codeunit!(out -= 2, get_codeunit(pnt += 2))
+        set_codeunit!(out -= 2, ch)
+        pnt += 2
     end
     Str(UTF16CSE, buf)
 end
@@ -223,9 +221,11 @@ end
 function reverse(str::T) where {T<:UCS2Strings}
     (len = _len(str)) == 0 && return str
     pnt = _pnt(str)
-    buf, out = _allocate(UInt16, len)
-    @inbounds for i = 1:len
-        set_codeunit!(out, i, get_codeunit(pnt, len - i + 1))
+    buf, beg = _allocate(UInt16, len)
+    out = beg + (len<<1)
+    while out >= beg
+        set_codeunit!(out -= 2, get_codeunit(pnt))
+        pnt += 2
     end
     Str(cse(T), buf)
 end
