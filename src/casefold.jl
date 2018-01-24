@@ -350,9 +350,10 @@ end
 
 # These are more complex, and maybe belong in a separate UTF16Str.jl package
 
-function _lower(::Type{UTF16Str}, beg, pnt, fin, len)
+function _lower(::Type{UTF16Str}, beg, pnt, len)
     buf, out = _allocate(UInt16, len)
     unsafe_copyto!(out, beg, len)
+    fin = out + (len<<1)
     out += (pnt - beg)
     while out < fin
         ch = get_codeunit(out)
@@ -382,15 +383,16 @@ function lowercase(str::UTF16Str)
         (ch > 0xd7ff # May be surrogate pair
          ? _is_upper_u(ch > 0xdfff ? ch%UInt32 : get_supplementary(ch, get_codeunit(pnt += 2)))
          : (isascii(ch) ? _isupper_a(ch) : (islatin(ch) ? _isupper_l(ch) : _isupper_u(ch)))) &&
-             return _lower(UTF16Str, beg, pnt, fin, _len(str))
+             return _lower(UTF16Str, beg, pnt, _len(str))
         pnt += 2
     end
     str
 end
 
-function _upper(::Type{UTF16Str}, beg, pnt, fin, len)
+function _upper(::Type{UTF16Str}, beg, pnt, len)
     buf, out = _allocate(UInt16, len)
     unsafe_copyto!(out, beg, len)
+    fin = out + (len<<1)
     out += (pnt - beg)
     while out < fin
         ch = get_codeunit(out)
@@ -426,7 +428,7 @@ function uppercase(str::UTF16Str)
         (ch > 0xd7ff # May be surrogate pair
          ? _is_lower_u(ch > 0xdfff ? ch%UInt32 : get_supplementary(ch, get_codeunit(pnt += 2)))
          : _can_upper_ch(ch)) &&
-             return _upper(UTF16Str, beg, pnt, fin, _len(str))
+             return _upper(UTF16Str, beg, pnt, _len(str))
         pnt += 2
     end
     str
