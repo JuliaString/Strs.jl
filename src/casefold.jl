@@ -274,14 +274,14 @@ function _upper!(out::Ptr{T}, fin::Ptr{T}) where {T}
     end
 end
 
-function _upper(::Type{T}, beg, pnt, fin, len) where {T<:UCS2Strings}
+function _upper(::Type{T}, beg, pnt, len) where {T<:UCS2Strings}
     buf, out = _allocate(UInt16, len)
     unsafe_copyto!(out, beg, len)
     _upper!(out + (pnt - beg), out + (len<<1))
     Str(cse(T), buf)
 end
 
-function _upper(::Type{T}, beg, pnt, fin, len) where {T<:UTF32Strings}
+function _upper(::Type{T}, beg, pnt, len) where {T<:UTF32Strings}
     buf, out = _allocate(UInt32, len)
     unsafe_copyto!(out, beg, len)
     _upper!(out + (pnt - beg), out + (len<<2))
