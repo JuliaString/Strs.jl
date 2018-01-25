@@ -1,12 +1,11 @@
 test_string_length = 100
 
-#char_types = [ASCIIStr, LatinStr, UTF8Str, UCS2Str, UTF16Str, UTF32Str, UniStr]
-#char_types = [ASCIIStr, LatinStr, UTF8Str, UCS2Str, UTF16Str, UTF32Str]
-char_types = [ASCIIStr, LatinStr, UTF8Str]
+#string_types = [ASCIIStr, LatinStr, UTF8Str, UCS2Str, UTF16Str, UTF32Str, UniStr]
+string_types = [ASCIIStr, LatinStr, UTF8Str, UTF16Str, UTF32Str]
 
 ##  create type specific test strings
 test_strings_base = Dict{String, Any}()
-for T in char_types
+for T in string_types
     test_strings_base["$T"] = join([randchar(Strs.codepoint_type(T)) for i in 1:test_string_length])
 end
 
@@ -14,11 +13,13 @@ end
 test_strings_dict = Dict(
     "ASCIIStr" => [test_strings_base["ASCIIStr"]],
     "LatinStr" => [test_strings_base["ASCIIStr"], test_strings_base["LatinStr"]],
-    "UTF8Str" => [test_strings_base["ASCIIStr"], test_strings_base["LatinStr"], test_strings_base["UTF8Str"]]
+    "UTF8Str" => [test_strings_base["ASCIIStr"], test_strings_base["LatinStr"], test_strings_base["UTF8Str"]],
+    "UTF16Str" => [test_strings_base["ASCIIStr"], test_strings_base["LatinStr"], test_strings_base["UTF8Str"], test_strings_base["UTF16Str"]],
+    "UTF32Str" => [test_strings_base["ASCIIStr"], test_strings_base["LatinStr"], test_strings_base["UTF8Str"], test_strings_base["UTF16Str"], test_strings_base["UTF32Str"]]
 )
 
 @testset "constructors" begin
-    for T in char_types
+    for T in string_types
         #@test convert(T, [0x61,0x62,0x63,0x21]) == "abc!"
         @test convert(T, "abc!") == "abc!"
 
@@ -39,7 +40,7 @@ end
 
 @testset "{starts,ends}with" begin
     i = 1
-    for T in char_types
+    for T in string_types
         test_strings = test_strings_dict["$T"]
         for test_string in test_strings
             converted_string = convert(T, test_string)
