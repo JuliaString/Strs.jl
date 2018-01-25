@@ -67,6 +67,7 @@ function _lower(::Type{ASCIIStr}, dat, i, len)
 end
 
 function lowercase(str::ASCIIStr)
+    len = _len(str)
     @inbounds for i = 1:len
         _islower_a(str[i]) && return _upper(ASCIIStr, str, i, len)
     end
