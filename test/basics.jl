@@ -10,13 +10,8 @@ string_types = keys(compat_types)
 ##  create type specific test strings
 test_strings_base = Dict()
 for T in AllCharTypes
-    clist = String[]
-    for i in test_string_length
-        push!(clist, String([convert(Char, randchar(T)%UInt32) for j in 1:i]))
-    end
-    test_strings_base[T] = clist
+    test_strings_base[T] = [String([convert(Char, randchar(T)%UInt32) for i = 1:len]) for len in test_string_length]
 end
-
 
 @testset "constructors" begin
     for (ST, type_list) in compat_types, CT in type_list, test_string in test_strings_base[CT]
@@ -25,9 +20,8 @@ end
 end
 
 @testset "empty strings" begin
-    for (ST, type_list) in compat_types
-        emptystr = convert(ST, "")
-        @test isempty(emptystr)
+    for ST in keys(compat_types)
+        @test isempty(convert(ST, ""))
     end
 end
 
