@@ -94,14 +94,14 @@ convert(::Type{T}, v::Signed) where {T<:CodePoint} =
     (v >= 0 && isvalid(T, v%Unsigned)) ? convert(T, tobase(v)) : codepoint_error(T, v)
 convert(::Type{T}, v::Unsigned) where {T<:CodePoint} =
     isvalid(T, v) ? reinterpret(T, basetype(T)(v)) : codepoint_error(T, v)
+convert(::Type{Char}, v::T) where {T<:CodePoint} = convert(Char, x%basetype(T))
 
 rem(x::S, ::Type{T}) where {S<:CodePoint, T<:Number}    = rem(reinterpret(basetype(S), x), T)
 rem(x::S, ::Type{T}) where {S<:Number, T<:CodePoint}    = reinterpret(T, x%basetype(T))
 rem(x::S, ::Type{T}) where {S<:CodePoint, T<:CodePoint} = reinterpret(T, x%basetype(T))
+rem(x::S, ::Type{Char}) where {S<:CodePoint} = (x%basetype(T))%Char
 
-(::Type{UInt32})(v::T) where {T<:CodePoint} = Strs.tobase(v)%UInt32
-(::Type{Int})(v::T) where {T<:CodePoint}    = Strs.tobase(v)%Int
-(::Type{UInt})(v::T) where {T<:CodePoint}   = Strs.tobase(v)%UInt
+(::Type{S})(v::T) where {S<:Union{UInt32, Int, UInt, Char}, T<:CodePoint} = Strs.tobase(v)%S
 
 for nam in (:Text1, :Text2, :Text4, :ASCII, :Latin, :_Latin, :UCS2, :UTF32)
     sym = Symbol(string(nam, "Chr"))
