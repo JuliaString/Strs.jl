@@ -41,7 +41,18 @@ function string(c::UnicodeByteStrings...)
     LatinStr(buf)
 end
 
-reverse(s::T) where {T<:LatinStrings} = T(reverse(_data(s)))
+# Todo make generic version, with all CodeUnitSingle types
+function reverse(str::T) where {T<:Union{ASCIIStr,LatinStrings}}
+    (len = _len(str)) < 2 && return str
+    pnt = _pnt(str)
+    buf, beg = _allocate(UInt8, len)
+    out = beg + len
+    while out >= beg
+        set_codeunit!(out -= 1, get_codeunit(pnt))
+        pnt += 1
+    end
+    Str(cse(T), buf)
+end
 
 ## outputting Latin 1 strings ##
 

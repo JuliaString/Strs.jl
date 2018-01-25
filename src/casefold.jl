@@ -42,11 +42,11 @@ function lcfirst(str::ASCIIStr)
     Str(ASCIICSE, out)
 end
 
-function _upper(::Type{ASCIIStr}, beg::Ptr{UInt8}, pnt::Ptr{UInt8}, len)
+function _upper(::Type{ASCIIStr}, beg::Ptr{UInt8}, off, len)
     buf, out = _allocate(UInt8, len)
     fin = out + len
     unsafe_copyto!(out, beg, len)
-    out += (pnt - beg)
+    out += off
     while out < fin
         ch = get_codeunit(out)
         _islower_a(ch) && set_codeunit!(out, ch - 0x20)
@@ -55,11 +55,11 @@ function _upper(::Type{ASCIIStr}, beg::Ptr{UInt8}, pnt::Ptr{UInt8}, len)
     Str(ASCIICSE, buf)
 end
 
-function _lower(::Type{ASCIIStr}, dat, i, len)
+function _lower(::Type{ASCIIStr}, beg::Ptr{UInt8}, off, len)
     buf, out = _allocate(UInt8, len)
     fin = out + len
     unsafe_copyto!(out, beg, len)
-    out += (pnt - beg)
+    out += off
     while out < fin
         ch = get_codeunit(out)
         _isupper_a(ch) && set_codeunit!(out, ch + 0x20)
@@ -68,11 +68,11 @@ function _lower(::Type{ASCIIStr}, dat, i, len)
     Str(ASCIICSE, buf)
 end
 
-function _upper(::Type{LatinStr}, beg::Ptr{UInt8}, pnt::Ptr{UInt8}, len)
+function _upper(::Type{LatinStr}, beg::Ptr{UInt8}, off, len)
     buf, out = _allocate(UInt8, len)
     fin = out + len
     unsafe_copyto!(out, beg, len)
-    out += (pnt - beg)
+    out += off
     while out < fin
         ch = get_codeunit(out)
         _can_upper(ch) && set_codeunit!(out, ch - 0x20)
@@ -86,7 +86,7 @@ function uppercase(str::ASCIIStr)
     pnt = beg = _pnt(str)
     fin = beg + len
     while pnt < fin
-        _islower_a(get_codeunit(pnt)) && return _upper(ASCIIStr, beg, pnt, len)
+        _islower_a(get_codeunit(pnt)) && return _upper(ASCIIStr, beg, pnt-beg, len)
         pnt += 1
     end
     str
@@ -97,7 +97,7 @@ function lowercase(str::ASCIIStr)
     pnt = beg = _pnt(str)
     fin = beg + len
     while pnt < fin
-        _isupper_a(get_codeunit(pnt)) && return _lower(ASCIIStr, beg, pnt, len)
+        _isupper_a(get_codeunit(pnt)) && return _lower(ASCIIStr, beg, pnt-beg, len)
         pnt += 1
     end
     str
@@ -160,21 +160,22 @@ function uppercase(ch::_LatinChr)
 end
 titlecase(ch::LatinChars) = uppercase(ch)
 
-function _upper(::Type{_LatinStr}, beg, pnt, len)
+function _upper(::Type{_LatinStr}, beg::Ptr{UInt8}, off, len)
     fin = beg + len
-    cur = pnt
+    cur = beg + off
     # Need to scan the rest of the string to see if _widenupper needs to be called
     while cur < fin
-        ((ch = get_codeunit(cur)) == 0xb5) | (ch == 0xff) && return _widenupper(beg, cur, len)
+        ((ch = get_codeunit(cur)) == 0xb5) | (ch == 0xff) && return _widenupper(beg, off, len)
         cur += 1
     end
     buf, out = _allocate(UInt8, len)
     fin = out + len
     unsafe_copyto!(out, beg, len)
+    out += off
     while out < fin
-        ch = get_codeunit(pnt)
-        _can_upper(ch) && set_codeunit!(pnt, ch - 0x20)
-        pnt += 1
+        ch = get_codeunit(out)
+        _can_upper(ch) && set_codeunit!(out, ch - 0x20)
+        out += 1
     end
     Str(_LatinCSE, buf)
 end
@@ -188,10 +189,12 @@ function _widen!(dst::Ptr{T}, src::Ptr{S}, fin::Ptr{S}) where {T<:CodeUnitTypes,
     nothing
 end
 
-function _widenupper(beg::Ptr{UInt8}, cur::Ptr{UInt8}, len)
+function _widenupper(beg::Ptr{UInt8}, off, len)
     buf, out = _allocate(UInt16, len)
     fin = out + len
+    cur = beg + len
     _widen(out, beg, cur)
+    out += off
     while out < fin
         ch = get_codeunit(cur)
         if ch == 0xb5
@@ -212,7 +215,7 @@ function uppercase(str::LatinStr)
     pnt = beg = _pnt(str)
     fin = beg + len
     while pnt < fin
-        _can_upper(get_codeunit(pnt)) && return _upper(LatinStr, beg, pnt, len)
+        _can_upper(get_codeunit(pnt)) && return _upper(LatinStr, beg, pnt-beg, len)
         pnt += 1
     end
     str
@@ -225,21 +228,21 @@ function uppercase(str::_LatinStr)
     while pnt < fin
         ch = get_codeunit(pnt)
         ((ch == 0xb5) | (ch == 0xff)) && return _widenupper(beg, pnt, len)
-        _can_upper(ch) && return _upper(_LatinStr, beg, pnt, len)
+        _can_upper(ch) && return _upper(_LatinStr, beg, pnt-beg, len)
         pnt += 1
     end
     str
 end
 
-function _lower(::Type{T}, beg::Ptr{UInt8}, pnt::Ptr{UInt8}) where {T<:LatinStrings}
+function _lower(::Type{T}, beg::Ptr{UInt8}, off, len) where {T<:LatinStrings}
     buf, out = _allocate(UInt8, len)
     fin = out + len
     unsafe_copyto!(out, beg, len)
-    out += (pnt - beg)
+    out += off
     while out < fin
         ch = get_codeunit(out)
         _isupper_al(ch) && set_codeunit!(out, ch + 0x20)
-        pnt += 1
+        out += 1
     end
     Str(cse(T), buf)
 end
@@ -249,7 +252,7 @@ function lowercase(str::T) where {T<:LatinStrings}
     pnt = beg = _pnt(str)
     fin = beg + len
     while pnt < fin
-        _isupper_al(get_codeunit(pnt)) && return _lower(T, beg, pnt, len)
+        _isupper_al(get_codeunit(pnt)) && return _lower(T, beg, pnt-beg, len)
         pnt += 1
     end
     str
@@ -270,17 +273,17 @@ function _lower!(out::Ptr{T}, fin::Ptr{T}) where {T}
     end
 end
 
-function _lower(::Type{T}, beg, pnt, len) where {T<:UCS2Strings}
+function _lower(::Type{T}, beg, off, len) where {T<:UCS2Strings}
     buf, out = _allocate(UInt16, len)
     unsafe_copyto!(out, beg, len)
-    _lower!(out + (pnt - beg), out + (len<<1))
+    _lower!(out + off, out + (len<<1))
     Str(cse(T), buf)
 end
 
-function _lower(::Type{T}, beg, pnt, len) where {T<:UTF32Strings}
+function _lower(::Type{T}, beg, off, len) where {T<:UTF32Strings}
     buf, out = _allocate(UInt32, len)
     unsafe_copyto!(out, beg, len)
-    _lower!(out + (pnt - beg), out + (len<<2))
+    _lower!(out + off, out + (len<<2))
     Str(cse(T), buf)
 end
 
@@ -299,7 +302,7 @@ function lowercase(str::UCS2Str)
     while pnt < fin
         ch = get_codeunit(pnt)
         (islatin(ch) ? _isupper_al(ch) : isupper(ch)) &&
-            return _lower(UCS2Str, beg, pnt, _len(str))
+            return _lower(UCS2Str, beg, pnt-beg, _len(str))
         pnt += 2
     end
     str
@@ -323,17 +326,17 @@ function _upper!(out::Ptr{T}, fin::Ptr{T}) where {T}
     end
 end
 
-function _upper(::Type{T}, beg, pnt, len) where {T<:UCS2Strings}
+function _upper(::Type{T}, beg, off, len) where {T<:UCS2Strings}
     buf, out = _allocate(UInt16, len)
     unsafe_copyto!(out, beg, len)
-    _upper!(out + (pnt - beg), out + (len<<1))
+    _upper!(out + off, out + (len<<1))
     Str(cse(T), buf)
 end
 
-function _upper(::Type{T}, beg, pnt, len) where {T<:UTF32Strings}
+function _upper(::Type{T}, beg, off, len) where {T<:UTF32Strings}
     buf, out = _allocate(UInt32, len)
     unsafe_copyto!(out, beg, len)
-    _upper!(out + (pnt - beg), out + (len<<2))
+    _upper!(out + off, out + (len<<2))
     Str(cse(T), buf)
 end
 
@@ -343,7 +346,7 @@ function uppercase(str::UCS2Str)
     while pnt < fin
         ch = get_codeunit(pnt)
         (isascii(ch) ? _islower_a(ch) : (islatin(ch) ? _islower_l(ch) : _islower_u(ch))) &&
-            return _upper(UCS2Str, beg, pnt, _len(str))
+            return _upper(UCS2Str, beg, pnt-beg, _len(str))
         pnt += 2
     end
     str
@@ -353,7 +356,7 @@ function uppercase(str::T) where {T<:UTF32Strings}
     pnt = beg = _pnt(str)
     fin = beg + sizeof(str)
     while pnt < fin
-        _can_upper_ch(get_codeunit(pnt)) && return _upper(T, beg, pnt, _len(str))
+        _can_upper_ch(get_codeunit(pnt)) && return _upper(T, beg, pnt-beg, _len(str))
         pnt += 4
     end
     str
@@ -365,7 +368,7 @@ function lowercase(str::T) where {T<:UTF32Strings}
     while pnt < fin
         ch = get_codeunit(pnt)
         (islatin(ch) ? _isupper_al(ch) : _isupper_u(ch)) &&
-            return _lower(T, beg, pnt, _len(str))
+            return _lower(T, beg, pnt-beg, _len(str))
         pnt += 4
     end
     str
@@ -380,7 +383,7 @@ function lowercase(str::_UCS2Str)
         ch = get_codeunit(pnt)
         # Todo, return as _LatinStr if necessary
         (islatin(ch) ? (_isupper_a(ch) | _isupper_l(ch)) : _isupper_u(ch)) &&
-            return _lower(_UCS2Str, beg, pnt, _len(str))
+            return _lower(_UCS2Str, beg, pnt-beg, _len(str))
         pnt += 2
     end
     str
@@ -391,7 +394,7 @@ function uppercase(str::_UCS2Str)
     pnt = beg = _pnt(str)
     fin = beg + sizeof(str)
     while pnt < fin
-        _can_upper_ch(get_codeunit(pnt)) && return _upper(_UCS2Str, beg, pnt, _len(str))
+        _can_upper_ch(get_codeunit(pnt)) && return _upper(_UCS2Str, beg, pnt-beg, _len(str))
         pnt += 2
     end
     str
@@ -399,11 +402,11 @@ end
 
 # These are more complex, and maybe belong in a separate UTF16Str.jl package
 
-function _lower(::Type{UTF16Str}, beg, pnt, len)
+function _lower(::Type{UTF16Str}, beg, off, len)
     buf, out = _allocate(UInt16, len)
     unsafe_copyto!(out, beg, len)
     fin = out + (len<<1)
-    out += (pnt - beg)
+    out += off
     while out < fin
         ch = get_codeunit(out)
         if islatin(ch)
@@ -430,19 +433,19 @@ function lowercase(str::UTF16Str)
     while pnt < fin
         ch = get_codeunit(pnt)
         (ch > 0xd7ff # May be surrogate pair
-         ? _is_upper_u(ch > 0xdfff ? ch%UInt32 : get_supplementary(ch, get_codeunit(pnt += 2)))
+         ? _isupper_u(ch > 0xdfff ? ch%UInt32 : get_supplementary(ch, get_codeunit(pnt += 2)))
          : (isascii(ch) ? _isupper_a(ch) : (islatin(ch) ? _isupper_l(ch) : _isupper_u(ch)))) &&
-             return _lower(UTF16Str, beg, pnt, _len(str))
+             return _lower(UTF16Str, beg, pnt-beg, _len(str))
         pnt += 2
     end
     str
 end
 
-function _upper(::Type{UTF16Str}, beg, pnt, len)
+function _upper(::Type{UTF16Str}, beg, off, len)
     buf, out = _allocate(UInt16, len)
     unsafe_copyto!(out, beg, len)
     fin = out + (len<<1)
-    out += (pnt - beg)
+    out += off
     while out < fin
         ch = get_codeunit(out)
         if islatin(ch)
@@ -475,9 +478,9 @@ function uppercase(str::UTF16Str)
     while pnt < fin
         ch = get_codeunit(pnt)
         (ch > 0xd7ff # May be surrogate pair
-         ? _is_lower_u(ch > 0xdfff ? ch%UInt32 : get_supplementary(ch, get_codeunit(pnt += 2)))
+         ? _islower_u(ch > 0xdfff ? ch%UInt32 : get_supplementary(ch, get_codeunit(pnt += 2)))
          : _can_upper_ch(ch)) &&
-             return _upper(UTF16Str, beg, pnt, _len(str))
+             return _upper(UTF16Str, beg, pnt-beg, _len(str))
         pnt += 2
     end
     str

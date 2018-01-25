@@ -6,8 +6,6 @@ Licensed under MIT License, see LICENSE.md
 Based in part on code for UTF16String that used to be in Julia
 =#
 
-const _ascii_mask = 0xff80_ff80_ff80_ff80
-const _latin_mask = 0xff00_ff00_ff00_ff00
 const _trail_mask = 0xdc00_dc00_dc00_dc00
 const _hi_bit_16  = 0x8000_8000_8000_8000
 
@@ -27,24 +25,24 @@ end
 
 function isascii(str::T) where {T<:Union{Text2Str, UCS2Str, UTF16Str}}
     (siz = sizeof(str)) == 0 && return true
-    siz < CHUNKSZ && return ((unsafe_load(_pnt64(str)) & _mask_bytes(siz)) & _ascii_mask) == 0
-
+    siz < CHUNKSZ &&
+        return ((unsafe_load(_pnt64(str)) & _mask_bytes(siz)) & _ascii_mask(UInt16)) == 0
     pnt, fin = _calcpnt(str, siz)
     while (pnt += CHUNKSZ) <= fin
-        (unsafe_load(pnt) & _ascii_mask) == 0 || return false
+        (unsafe_load(pnt) & _ascii_mask(UInt16)) == 0 || return false
     end
-    pnt - CHUNKSZ == fin || ((unsafe_load(pnt) & _mask_bytes(siz)) & _ascii_mask) == 0
+    pnt - CHUNKSZ == fin || ((unsafe_load(pnt) & _mask_bytes(siz)) & _ascii_mask(UInt16)) == 0
 end
 
 function islatin(str::T) where {T<:Union{Text2Str, UCS2Str, UTF16Str}}
     (siz = sizeof(str)) == 0 && return true
-    siz < CHUNKSZ && return ((unsafe_load(_pnt64(str)) & _mask_bytes(siz)) & _latin_mask) == 0
-
+    siz < CHUNKSZ &&
+        return ((unsafe_load(_pnt64(str)) & _mask_bytes(siz)) & _latin_mask(UInt16)) == 0
     pnt, fin = _calcpnt(str, siz)
     while (pnt += CHUNKSZ) <= fin
         (unsafe_load(pnt) & _latin_mask) == 0 || return false
     end
-    pnt - CHUNKSZ == fin || ((unsafe_load(pnt) & _mask_bytes(siz)) & _latin_mask) == 0
+    pnt - CHUNKSZ == fin || ((unsafe_load(pnt) & _mask_bytes(siz)) & _latin_mask(UInt16)) == 0
 end
 
 # Check for any surrogate characters
@@ -205,7 +203,7 @@ function reverseind(str::UTF16Str, i::Integer)
 end
 
 function reverse(str::UTF16Str)
-    (len = _len(str)) == 0 && return str
+    (len = _len(str)) < 2 && return str
     pnt = _pnt(str)
     buf, beg = _allocate(UInt16, len)
     out = beg + (len<<1)
@@ -219,7 +217,7 @@ function reverse(str::UTF16Str)
 end
 
 function reverse(str::T) where {T<:UCS2Strings}
-    (len = _len(str)) == 0 && return str
+    (len = _len(str)) < 2 && return str
     pnt = _pnt(str)
     buf, beg = _allocate(UInt16, len)
     out = beg + (len<<1)

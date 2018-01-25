@@ -8,15 +8,11 @@ Based in part on code for UTF32String that used to be in Julia
 
 # UTF-32 basic functions
 
-const _ascii_mask_32 = 0xffffff80_ffffff80
-const _latin_mask_32 = 0xffffff00_ffffff00
-const _bmp_mask_32   = 0xffff0000_ffff0000
-
 function isascii(str::UTF32Str)
     (siz = sizeof(str)) == 0 && return true
     pnt, fin = _calcpnt(str, siz)
     while (pnt += CHUNKSZ) <= fin
-        (unsafe_load(pnt) & _ascii_mask_32) == 0 || return false
+        (unsafe_load(pnt) & _ascii_mask(UInt32)) == 0 || return false
     end
     pnt - CHUNKSZ == fin || unsafe_load(reinterpret(Ptr{UInt32}, pnt)) <= 0x7f
 end
@@ -25,11 +21,12 @@ function islatin(str::UTF32Str)
     (siz = sizeof(str)) == 0 && return true
     pnt, fin = _calcpnt(str, siz)
     while (pnt += CHUNKSZ) <= fin
-        (unsafe_load(pnt) & _latin_mask_32) == 0 || return false
+        (unsafe_load(pnt) & _latin_mask(UInt32)) == 0 || return false
     end
     pnt - CHUNKSZ == fin || unsafe_load(reinterpret(Ptr{UInt32}, pnt)) <= 0xff
 end
 
+const _bmp_mask_32   = 0xffff0000_ffff0000
 function isbmp(str::UTF32Str)
     (siz = sizeof(str)) == 0 && return true
     pnt, fin = _calcpnt(str, siz)

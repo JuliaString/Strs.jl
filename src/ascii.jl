@@ -37,8 +37,6 @@ end
 
 string(c::ASCIIStr...) = length(c) == 1 ? c[1] : Str(ASCIICSE, _string(c))
 
-reverse(s::ASCIIStr) = Str(ASCIICSE, reverse(_data(s)))
-
 ## outputting ASCII strings ##
 
 write(io::IO, s::ASCIIStr) = write(io, _data(s))
@@ -61,7 +59,7 @@ function convert(::Type{ASCIIStr}, str::AbstractString)
 end
 
 convert(::Type{ASCIIStr}, str::T) where {T<:Union{LatinStr,UTF8Str}} =
-    isascii(dat) ? _convert(ASCIIStr, _data(str)) : unierror(UTF_ERR_INVALID_ASCII)
+    isascii(str) ? _convert(ASCIIStr, _data(str)) : unierror(UTF_ERR_INVALID_ASCII)
 
 convert(::Type{ASCIIStr}, dat::Vector{UInt8}) =
     isascii(dat) ? _convert(ASCIIStr, dat) : unierror(UTF_ERR_INVALID_ASCII)
