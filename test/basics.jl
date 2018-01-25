@@ -21,7 +21,11 @@ end
 @testset "constructors" begin
     for (ST, type_list) in compat_types, CT in type_list, test_string in test_strings_base[CT]
         @test convert(ST, test_string) == test_string
+    end
+end
 
+@testset "empty strings" begin
+    for (ST, type_list) in compat_types
         emptystr = convert(ST, "")
         @test isempty(emptystr)
     end
