@@ -19,6 +19,8 @@ function rmpkg(pkg)
     Pkg.rm(pkg)
     p = joinpath(pkgdir, pkg)
     run(`rm -rf $p`)
+    j = joinpath(_rep(pkgdir, ver, joinpath("lib", ver)), string(pkg, ".ji"))
+    run(`rm -rf $j`)
 end
 
 function loadall(loc=git)
@@ -122,16 +124,9 @@ function testall()
 end
 
 """Load up a non-registered package"""
-function loadpkg(pkg, loc=git, branch=nothing)
-    try
-        Pkg.installed(pkg) == nothing || Pkg.free(pkg)
-    catch ex
-    end
-    p = joinpath(pkgdir, pkg)
-    run(`rm -rf $p`)
+function loadpkg(pkg; loc=git, branch=nothing)
+    rmpkg(pkg)
     Pkg.clone(joinpath(loc, string(pkg, ".jl")))
-    j = joinpath(_rep(pkgdir, ver, joinpath("lib", ver)), string(pkg, ".ji"))
-    run(`rm -rf $j`)
     branch == nothing || Pkg.checkout(pkg, branch)
     Pkg.build(pkg)
 end

@@ -127,6 +127,38 @@ function isascii(str::T) where {T<:Union{UTF8Str, LatinStr}}
     pnt - CHUNKSZ == fin || ((unsafe_load(pnt) & _mask_bytes(siz)) & hi_mask == 0)
 end
 
+_ascii_mask(::Type{UInt8})  = hi_mask
+_ascii_mask(::Type{UInt16}) = 0xff80_ff80_ff80_ff80
+_ascii_mask(::Type{UInt32}) = 0xffffff80_ffffff80
+
+_latin_mask(::Type{UInt16}) = 0xff00_ff00_ff00_ff00
+_latin_mask(::Type{UInt32}) = 0xffffff00_ffffff00
+
+function isascii(vec::Vector{T}) where {T<:CodeUnitTypes}
+    (siz = sizeof(vec)) == 0 && return true
+    pnt = pointer(vec)
+    fin = pnt + siz
+    # Check first code units
+    while (reinterpret(UInt, pnt) & 3) != 0
+        unsafe_load(pnt) > 0x7f && return false
+        (pnt += sizeof(T)) < fin || return true
+    end
+    if (fin -= CHUNKSZ) - pnt >= 0
+        qpnt = reinterpret(Ptr{UInt64}, pnt)
+        while true
+            (unsafe_load(qpnt) & _ascii_mask(T)) == 0 || return false
+            (qpnt += CHUNKSZ) <= fin || break
+        end
+        qpnt - CHUNKSZ == fin && return true
+        pnt = reinterpret(Ptr{T}, qpnt)
+    end
+    while pnt < fin
+        unsafe_load(pnt) > 0x7f && return false
+        pnt += sizeof(T)
+    end
+    true
+end
+
 # Todo! Here you need to see that 0b11yyyyxx at least 1 y must be set,
 # which indicates a non-Latin1 character
 all_latin(val) = ((val & (val<<1) & (val<<2 | (val<<3) | (val<<4) | (val<<5))) & hi_mask) == 0
@@ -280,37 +312,27 @@ const _ByteStr = Union{ASCIIStr, UTF8Str, String}
 string(c::_ByteStr...) = length(c) == 1 ? c[1]::UTF8Str : UTF8Str(_string(c))
     # ^^ at least one must be UTF-8 or the ASCII-only method would get called
 
-function reverse(s::UTF8Str)
-    (len = _len(s)) <= 1 && return s
-    buf = _allocate(len)
-    out = len
-    pos = 1
-    dat = _data(s)
-    @inbounds while out > 0
-        ch = dat[pos]
+function reverse(str::UTF8Str)
+    (len = _len(str)) < 2 && return str
+    buf, beg = _allocate(UInt8, len)
+    out = beg + len
+    pnt = _pnt(str)
+    while out >= beg
+        ch = get_codeunit(pnt)
         if ch > 0xdf
             if ch < 0xf0
-                # (out -= 3) < 0 && unierror(UTF_ERR_SHORT, pos, ch)
-                buf[out - 2], buf[out - 1], buf[out] = ch, dat[pos + 1], dat[pos + 2]
-                out -= 3
-                pos += 3
+                set_codeunit!(out -= 2, get_codeunit(pnt += 1))
+                set_codeunit!(out + 1, get_codeunit(pnt += 1))
             else
-                # (out -= 4) < 0 && unierror(UTF_ERR_SHORT, pos, ch)
-                buf[out - 3], buf[out - 2], buf[out - 1], buf[out] =
-                    ch, dat[pos+1], dat[pos+2], dat[pos+3]
-                out -= 4 # Assume valid for UTF8Str!
-                pos += 4
+                set_codeunit!(out -= 3, get_codeunit(pnt += 1))
+                set_codeunit!(out + 1,  get_codeunit(pnt += 1))
+                set_codeunit!(out + 2,  get_codeunit(pnt += 1))
             end
         elseif ch > 0x7f
-            # (out -= 2) < 0 && unierror(UTF_ERR_SHORT, pos, ch)
-            buf[out - 1], buf[out] = ch, dat[pos + 1]
-            out -= 2
-            pos += 2
-        else
-            buf[out] = ch
-            out -= 1
-            pos += 1
+            set_codeunit!(out -= 1, get_codeunit(pnt += 1))
         end
+        set_codeunit!(out -= 1, ch)
+        pnt += 1
     end
     Str(UTF8CSE, buf)
 end

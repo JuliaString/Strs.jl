@@ -565,6 +565,7 @@ function wrap(f, lines, io, cnts::LineCounts, t, msg, basetime=0%UInt)
         basetime != 0 && print_ratio(basetime/tim)
         pr"\(io)\n"
     catch ex
+        typeof(ex) == InterruptException && rethrow()
         push!(t, (msg, 0, 0%UInt))
         println(io, sprint(showerror, ex, catch_backtrace()))
     end
@@ -615,6 +616,7 @@ function testperf(lines::Vector{T}, io, cnts, docnam, basetime) where {T<:Abstra
         try
             tst(lines)
         catch ex
+            typeof(ex) == InterruptException && rethrow()
             str = f"Failed test \(nam): \(sprint(showerror, ex, catch_backtrace()))"
             println("File: ", docnam, ": ", str)
             return docnam, 0, t, str
@@ -736,12 +738,17 @@ function comparetestline(lines, results, list, displist)
     for (i, fun) in enumerate(list)
         fundiff = []
         funres = results[i]
-        for (j, text) in enumerate(lines)
-            res = fun(text)
-            res == funres[j] ||
-                push!(fundiff, typeof(res) == Bool ? (j, text) : (j, text, res, funres[j]))
+        try
+            for (j, text) in enumerate(lines)
+                res = fun(text)
+                res == funres[j] ||
+                    push!(fundiff, typeof(res) == Bool ? (j, text) : (j, text, res, funres[j]))
+            end
+            isempty(fundiff) || push!(diff, (i, fun, fundiff))
+        catch ex
+            typeof(ex) == InterruptException && rethrow()
+            pr"Failed test \(fun): \(sprint(showerror, ex, catch_backtrace()))"
         end
-        isempty(fundiff) || push!(diff, (i, fun, fundiff))
     end
     if isempty(diff)
         pwc(:green, "\r\u2714\n")
@@ -762,18 +769,19 @@ function comparetestchar(lines, results, list, displist)
         fundiff = []
         lineres = results[i]
         try
-        for (j, text) in enumerate(lines)
-            chrdiff = []
-            chrres = lineres[j]
-            for (k, ch) in enumerate(text)
-                res = fun(ch)
-                res == chrres[k] ||
-                    push!(chrdiff, typeof(res) == Bool ? (k, ch) : (k, ch, res, chrres[k]))
+            for (j, text) in enumerate(lines)
+                chrdiff = []
+                chrres = lineres[j]
+                for (k, ch) in enumerate(text)
+                    res = fun(ch)
+                    res == chrres[k] ||
+                        push!(chrdiff, typeof(res) == Bool ? (k, ch) : (k, ch, res, chrres[k]))
+                end
+                isempty(chrdiff) || push!(fundiff, (j, text, chrdiff))
             end
-            isempty(chrdiff) || push!(fundiff, (j, text, chrdiff))
-        end
             isempty(fundiff) || push!(diff, (i, fun, fundiff))
         catch ex
+            typeof(ex) == InterruptException && rethrow()
             pr"Failed test \(fun): \(sprint(showerror, ex, catch_backtrace()))"
         end
     end
@@ -795,17 +803,22 @@ function comparetestcu(lines, results, list, displist)
     for (i, fun) in enumerate(list)
         fundiff = []
         lineres = results[i]
-        for (j, text) in enumerate(lines)
-            chrdiff = []
-            chrres = lineres[j]
-            for (k, ch) in enumerate(codeunits(text))
-                res = fun(ch)
-                res == chrres[k] ||
-                    push!(chrdiff, typeof(res) == Bool ? (k, ch) : (k, ch, res, chrres[k]))
+        try
+            for (j, text) in enumerate(lines)
+                chrdiff = []
+                chrres = lineres[j]
+                for (k, ch) in enumerate(codeunits(text))
+                    res = fun(ch)
+                    res == chrres[k] ||
+                        push!(chrdiff, typeof(res) == Bool ? (k, ch) : (k, ch, res, chrres[k]))
+                end
+                isempty(chrdiff) || push!(fundiff, (j, text, chrdiff))
             end
-            isempty(chrdiff) || push!(fundiff, (j, text, chrdiff))
+            isempty(fundiff) || push!(diff, (i, fun, fundiff))
+        catch ex
+            typeof(ex) == InterruptException && rethrow()
+            pr"Failed test \(fun): \(sprint(showerror, ex, catch_backtrace()))"
         end
-        isempty(fundiff) || push!(diff, (i, fun, fundiff))
     end
     if isempty(diff)
         pwc(:green, "\r\u2714\n")
