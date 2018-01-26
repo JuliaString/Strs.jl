@@ -79,6 +79,7 @@ import Base: containsnul, convert, endof, getindex, length, map, pointer, collec
 @condimport ind2chr
 @condimport chr2ind
 @condimport thisind
+@condimport codeunits
 @condimport ncodeunits
 @condimport bytestring
 
@@ -86,9 +87,11 @@ isdefined(Base, :copyto!)        || (const copyto! = copy!)
 isdefined(Base, :unsafe_copyto!) || (const unsafe_copyto! = unsafe_copy!)
 isdefined(Base, :AbstractChar)   || (abstract type AbstractChar end ; export AbstractChar)
 isdefined(Base, :Nothing)        || (const Nothing = Void)
+isdefined(Base, :Cvoid)          || (const Cvoid = Void)
 
-uninit(T, len) = @static VERSION < v"0.7.0-DEV" ? T(len) : T(uninitialized, len)
+@static isdefined(Base, :codeunits) || include("codeunits.jl")
 
+uninit(T, len) = @static isdefined(Base, :uninitialized) ? T(uninitialized, len) : T(len)
 create_vector(T, len) = uninit(Vector{T}, len)
 
 include("types.jl")
@@ -97,7 +100,6 @@ include("access.jl")
 include("traits.jl")
 include("unicode.jl")
 include("casefold.jl")
-@static VERSION < v"v0.7.0-DEV" && include("codeunits.jl")
 include("iters.jl")
 include("core.jl")
 include("support.jl")

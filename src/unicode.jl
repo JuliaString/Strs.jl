@@ -239,20 +239,24 @@ _cat_mask(a) = a
 @inline _cat_mask(rng::UnitRange) = ((2 << rng.stop%UInt) - 1) & ~((1 << rng.start%UInt) - 1)
 
 @inline _check_mask(ch, mask) = ((1%UInt << _cat(ch)%UInt) & mask) != 0
-@inline _check_mask(ch, rng::UnitRange) = _check_mask(ch, _cat_mask(rng))
-@inline _check_mask(ch, a, b) = _check_mask(ch, _cat_mask(a, b))
 
 ## libc character class predicates ##
 
 # 0xb5, 0xdf, and 0xff cannot be uppercased in LatinStr, although they are lowercase
-@inline _can_upper(c) = _islower_a(c) | ((0xe0 <= c <= 0xfe) & (c != 0xf7))
+@inline _can_upper_l(c) = (0xe0 <= c <= 0xfe) & (c != 0xf7)
+@inline _can_upper(c) = _islower_a(c) | _can_upper_l(c)
 
 @inline _iscntrl(ch) = (ch <= 0x1f) | (0x7f <= ch <= 0x9f)
 @inline _isdigit(ch) = (ch - '0'%UInt8) <= 9
 @inline _isxdigit(ch) = _isdigit(ch) | (ch - 'A'%UInt8 < 6) | (ch - 'a'%UInt8 < 6)
 
+const _isupper_mask   = _cat_mask(Uni.LU, Uni.LT)
 const _isalpha_mask   = _cat_mask(Uni.LU : Uni.LO)
 const _isnumeric_mask = _cat_mask(Uni.ND : Uni.NO)
+const _ispunct_mask   = _cat_mask(Uni.PC : Uni.PO)
+const _isprint_mask   = _cat_mask(Uni.LU : Uni.ZS)
+const _isgraph_mask   = _cat_mask(Uni.LU : Uni.SO)
+const _isalnum_mask   = _isnumeric_mask | _isalpha_mask
 
 ############################################################################
 # Definitions for characters in the ASCII subset of Unicode
@@ -284,14 +288,14 @@ const _isnumeric_a = _isdigit
 # Definitions for any Unicode codepoint (requires call to utf8proc) (only used for non-Latin1)
 
 @inline _isnumeric_u(ch) = _check_mask(ch, _isnumeric_mask)
-@inline _ispunct_u(ch)   = _check_mask(ch, Uni.PC : Uni.PO)
+@inline _ispunct_u(ch)   = _check_mask(ch, _ispunct_mask)
 @inline _isspace_u(ch)   = _cat(ch) == Uni.ZS
 @inline _islower_u(ch)   = _cat(ch) == Uni.LL
-@inline _isupper_u(ch)   = _check_mask(ch, Uni.LU, Uni.LT)
+@inline _isupper_u(ch)   = _check_mask(ch, _isupper_mask)
 @inline _isalpha_u(ch)   = _check_mask(ch, _isalpha_mask)
-@inline _isalnum_u(ch)   = _check_mask(ch, _isnumeric_mask | _isalpha_mask)
-@inline _isprint_u(ch)   = _check_mask(ch, Uni.LU : Uni.ZS)
-@inline _isgraph_u(ch)   = _check_mask(ch, Uni.LU : Uni.SO)
+@inline _isalnum_u(ch)   = _check_mask(ch, _isalnum_mask)
+@inline _isprint_u(ch)   = _check_mask(ch, _isprint_mask)
+@inline _isgraph_u(ch)   = _check_mask(ch, _isgraph_mask)
 
 ############################################################################
 # Fallback definitions for all CodePoint types

@@ -161,6 +161,10 @@ for nam in BuiltInTypes
     @eval show(io::IO, ::Type{$sym}) = print(io, $(quotesym(sym)))
 end
 
+for nam in (:ASCII, :Latin, :_Latin, :UCS2, :UTF32, :Text1, :Text2, :Text4)
+    @eval codepoint_cse(::Type{$(Symbol("$(nam)Chr"))}) = $(Symbol("$(nam)CSE"))
+end
+
 """Union type for fast dispatching"""
 const UniStr = Union{ASCIIStr, _LatinStr, _UCS2Str, _UTF32Str}
 show(io::IO, ::Type{UniStr}) = print(io, :UniStr)

@@ -331,6 +331,15 @@ function checkstr(fun, lines::Vector{<:AbstractString})
     cnt
 end
 
+function checktext(fun, lines::Vector{<:AbstractString})
+    cnt = 0
+    for text in lines
+        isempty(text) || fun(text)
+        cnt += 1
+    end
+    cnt
+end
+
 function iteratenextind(text)
     cnt = 0
     len = ncodeunits(text)
@@ -518,12 +527,20 @@ function oldlength(s::UTF16Str)
     cnt
 end
 
-freverse(str) = sizeof(reverse(str))
+repeat1(str)  = repeat(str, 1)
+repeat10(str) = repeat(str, 10)
+repeat1c(str)  = repeat(str[1], 1)
+repeat10c(str) = repeat(str[1], 10)
 
 countsklength(l)  = checkstr(sklength, l)
 countoldlength(l) = checkstr(oldlength, l)
 
-checkreverse(l) = checkstr(freverse, l)
+checkrepeat1(l)   = checktext(repeat1, l)
+checkrepeat10(l)  = checktext(repeat10, l)
+checkrepeat1c(l)  = checktext(repeat1c, l)
+checkrepeat10c(l) = checktext(repeat10c, l)
+checkreverse(l)   = checktext(reverse, l)
+
 checknextind(l) = checkstr(iteratenextind, l)
 countchars(l)   = checkstr(iteratechars, l)
 countcps(l)     = checkstr(iteratecps, l)
@@ -579,7 +596,11 @@ const tests =
      (countsize,   "sizeof"),
      (countlength, "length"),
      (checknextind, "nextind\nchars"),
-     (checkreverse, "length\nreverse"),
+     (checkreverse, "reverse"),
+     (checkrepeat1,  "repeat 1\nstring"),
+     (checkrepeat10,  "repeat 10\nstring"),
+     (checkrepeat1c,  "repeat 1\nchar"),
+     (checkrepeat10c,  "repeat 10\nchar"),
 #    (countsklength,  "length\nSK"),
 #    (countoldlength, "length\nOld"),
      (countchars,   "iteration\nChar"),
@@ -835,7 +856,8 @@ end
 const testlist =
     (((length, ), "length"),
      ((isascii, isvalid), "isascii, isvalid"),
-     ((lowercase, uppercase, reverse), "lowercase, uppercase, reverse"),
+     #((lowercase, uppercase, reverse), "lowercase, uppercase, reverse"),
+     ((lowercase,), "lowercase,"),
      ((isascii, isvalid, iscntrl, islower, isupper, isalpha,
        isalnum, isspace, isprint, ispunct, isgraph, isdigit, isxdigit),
       "is(ascii|valid|cntrl|lower|upper|alpha|alnum|space|print|punct|graph|digit|xdigit)"),

@@ -75,6 +75,7 @@ const UTF_ERR_NORMALIZE         = " is not one of :NFC, :NFD, :NFKC, :NFKD"
 @noinline codepoint_error(T, v)  = unierror(string("Invalid CodePoint: ", T, " 0x", hex(v)))
 @noinline argerror(startpos, endpos) =
     unierror(string("End position ", endpos, " is less than start position (", startpos, ")"))
+@noinline repeaterr(cnt) = throw(ArgumentError("repeat count $cnt must be >= 0"))
 
 ## Functions to check validity of UTF-8, UTF-16, and UTF-32 encoded strings,
 #  and also to return information necessary to convert to other encodings
@@ -609,12 +610,46 @@ end
 # These should be optimized based on the traits, and return internal substrings, once
 # I've implemented those
 
-first(s::Str, n::Integer) = s[1:min(end, nextind(s, 0, n))]
-last(s::Str, n::Integer) = s[max(1, prevind(s, ncodeunits(s)+1, n)):end]
+first(str::Str, n::Integer) = str[1:min(end, nextind(str, 0, n))]
+last(str::Str, n::Integer) = str[max(1, prevind(str, ncodeunits(s)+1, n)):end]
 
 #reverseind(s::Str, i::Integer) = thisind(s, ncodeunits(s)-i+1)
-repeat(s::Str, r::Integer) = repeat(String(s), r)
-(^)(s::Union{Str,CodePoint}, r::Integer) = repeat(s, r)
+function repeat(str::T, cnt::Integer) where {T<:Str}
+    cnt < 2 && return cnt == 1 ? str : (cnt == 0 ? empty_str(T) : repeaterr(cnt))
+    siz = sizeof(str)
+    pnt = _pnt(str)
+    buf = _allocate(siz * cnt)
+    out = pointer(buf)
+    if sizeof(codeunit(T)) == 1 && siz == 1 # common case: repeating a single-byte string
+        ccall(:memset, Ptr{Cvoid}, (Ptr{UInt8}, Cint, Csize_t), out, get_codeunit(pnt), cnt)
+    else
+        while (cnt -= 1) >= 0
+            ccall(:memcpy, Ptr{Cvoid}, (Ptr{Cvoid}, Ptr{Cvoid}, UInt), out, pnt, siz)
+            out += siz
+        end
+    end
+    Str(cse(T), buf)
+end
+(^)(str::T, cnt::Integer) where {T<:Str} = repeat(str, cnt)
+
+function repeat(ch::CP, cnt::Integer) where {CP <: CodePoint}
+    T = codepoint_cse(CP)
+    cnt < 1 && return cnt == 0 ? empty_str(Str{T}) : repeaterr(cnt)
+    siz = codepoint_size(CP)
+    buf = _allocate(siz * cnt)
+    if siz == 1
+        ccall(:memset, Ptr{Cvoid}, (Ptr{UInt8}, Cint, Csize_t), pointer(buf), ch, cnt)
+    else
+        uintch = tobase(ch)
+        out = reinterpret(Ptr{basetype(CP)}, pointer(buf))
+        while (cnt -= 1) >= 0
+            set_codeunit!(out, uintch)
+            out += siz
+        end
+    end
+    Str(T, buf)
+end
+(^)(ch::CodePoint, cnt::Integer) = repeat(ch, cnt)
 
 # Definitions for C compatible strings, that don't allow embedded
 # '\0', and which are terminated by a '\0'
