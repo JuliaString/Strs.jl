@@ -220,8 +220,10 @@ const ByteStrings        = Union{Text1Str, BinaryStr, UnicodeByteStrings}
 const UnicodeStrings     = Union{String, UTF8Str, UTF16Str, UTF32Strings}
 
 ## Get the character set / encoding used by a string type
-cse(::T) where {T<:Str{C}} where {C<:CSE} = C
-cse(::Type{T}) where {T<:Str{C}} where {C<:CSE} = C
+cse(::T) where {C<:CSE,T<:Str{C}} = C
+cse(::Type{T}) where {C<:CSE,T<:Str{C}} = C
+cse(::String)       = UTF8CSE
+cse(::Type{String}) = UTF8CSE
 
 charset(::Type{<:AbstractString})  = UniPlusCharSet
 charset(::Type{T}) where {T<:Str{C}} where {C<:CSE{CS,E}} where {CS,E} = CS

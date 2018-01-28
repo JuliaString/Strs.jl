@@ -186,6 +186,19 @@ end
 
 isunicode(str::UTF8Str) = true
 
+function _nextcpfun(::CodeUnitMulti, ::Type{UTF8CSE}, pnt)
+    ch = get_codeunit(pnt)
+    if ch < 0x80
+        ch%UInt32, pnt + 1
+    elseif ch < 0xe0
+        get_utf8_2byte(pnt + 1, ch)%UInt32, pnt + 2
+    elseif ch < 0xf0
+        get_utf8_3byte(pnt + 2, ch)%UInt32, pnt + 3
+    else
+        get_utf8_4byte(pnt + 3, ch), pnt + 4
+    end
+end
+
 # Gets next codepoint
 @propagate_inbounds function _next(::CodeUnitMulti, T, str::UTF8Str, pos::Int)
     len = _len(str)

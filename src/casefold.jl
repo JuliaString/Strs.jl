@@ -373,6 +373,7 @@ end
 # that is the only expansion that occurs for upper or lower case
 
 function _lower(::Type{UTF8Str}, beg, off, len)
+    #print("_lower($beg, $off, $len)")
     # Note, the final length may be larger or smaller
     buf, out = _allocate(UInt8, len)
     unsafe_copyto!(out, beg, off)
@@ -387,13 +388,16 @@ function _lower(::Type{UTF8Str}, beg, off, len)
             out += 1
         elseif ch < 0xc4
             ch = (ch << 6) | (get_codeunit(pnt += 1) & 0x3f)
+            #println(" => $out, $ch, ", ch + (_isupper_l(ch) << 5))
             set_codeunit!(out, ch + (_isupper_l(ch) << 5))
             out += 1
         elseif ch < 0xe0
             # 2 byte
             c16 = get_utf8_2byte(pnt += 1, ch)
             if _isupper_u(c16)
+                #print(" => $out, $c16")
                 c16 = _lowercase_u(c16)
+                #println(", ", c16)
                 # Check if still 2 byte, could increase to 3 byte, decrease to 1 byte
                 if c16 < 0x80
                     set_codeunit!(out, c16%UInt8)
@@ -515,6 +519,7 @@ function lowercase(str::UTF8Str)
     fin = beg + sizeof(str)
     while pnt < fin
         ch = get_codeunit(pnt)
+        prv = pnt
         (ch < 0x80
          ? _isupper_a(ch)
          : (ch < 0xc4
@@ -524,7 +529,7 @@ function lowercase(str::UTF8Str)
                          : (ch < 0xe0
                             ? get_utf8_2byte(pnt += 1, ch)
                             : get_utf8_3byte(pnt += 2, ch))%UInt32))) &&
-            return _lower(UTF8Str, beg, pnt-beg, _len(str))
+            return _lower(UTF8Str, beg, prv-beg, _len(str))
         pnt += 1
     end
     str
@@ -535,6 +540,7 @@ function uppercase(str::UTF8Str)
     fin = beg + sizeof(str)
     while pnt < fin
         ch = get_codeunit(pnt)
+        prv = pnt
         (ch < 0x80
          ? _islower_a(ch)
          : (ch < 0xc4
@@ -544,7 +550,7 @@ function uppercase(str::UTF8Str)
                          : (ch < 0xe0
                             ? get_utf8_2byte(pnt += 1, ch)
                             : get_utf8_3byte(pnt += 2, ch))%UInt32))) &&
-            return _upper(UTF8Str, beg, pnt-beg, _len(str))
+            return _upper(UTF8Str, beg, prv-beg, _len(str))
         pnt += 1
     end
     str
@@ -584,10 +590,11 @@ function lowercase(str::UTF16Str)
     fin = beg + sizeof(str)
     while pnt < fin
         ch = get_codeunit(pnt)
+        prv = pnt
         (ch > 0xd7ff # May be surrogate pair
          ? _isupper_u(ch > 0xdfff ? ch%UInt32 : get_supplementary(ch, get_codeunit(pnt += 2)))
          : (isascii(ch) ? _isupper_a(ch) : (islatin(ch) ? _isupper_l(ch) : _isupper_u(ch)))) &&
-             return _lower(UTF16Str, beg, pnt-beg, _len(str))
+             return _lower(UTF16Str, beg, prv-beg, _len(str))
         pnt += 2
     end
     str
@@ -629,10 +636,11 @@ function uppercase(str::UTF16Str)
     fin = beg + sizeof(str)
     while pnt < fin
         ch = get_codeunit(pnt)
+        prv = pnt
         (ch > 0xd7ff # May be surrogate pair
          ? _islower_u(ch > 0xdfff ? ch%UInt32 : get_supplementary(ch, get_codeunit(pnt += 2)))
          : _can_upper_ch(ch)) &&
-             return _upper(UTF16Str, beg, pnt-beg, _len(str))
+             return _upper(UTF16Str, beg, prv-beg, _len(str))
         pnt += 2
     end
     str

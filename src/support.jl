@@ -554,48 +554,6 @@ end
 (*)(s1::Union{C1, S1}, ss::Union{C2, S2}...) where {C1<:CodePoint,C2<:CodePoint,S1<:Str,S2<:Str} =
     string(s1, ss...)
 
-function _cmp(a::Str, b::AbstractString)
-    a === b && return 0
-    i = start(a)
-    j = start(b)
-    while !done(a, i)
-        done(b, j) && return 1
-        c, i = next(a, i)
-        d, j = next(b, j)
-        c != d && return ifelse(c < d, -1, 1)
-    end
-    return ifelse(done(b, j), 0, -1)
-end
-_cmp(a::AbstractString, b::Str) = -_cmp(b, a)
-
-# Todo: handle comparisions of UTF16 specially, to compare first non-matching character
-# as if comparing Char to Char, to get ordering correct when dealing with > 0xffff non-BMP
-# characters
-
-# Fast version, compare bytes directly
-# (note, will have to handle things a bit differently when substrings are added to the Str type)
-#function _cmp(a::T, b::T) where {T<:Str}
-#end
-
-==(a::AbstractString, b::Str) = cmp(a, b) == 0
-==(a::Str, b::AbstractString) = cmp(a, b) == 0
-==(a::Str, b::Str)            = cmp(a, b) == 0
-
-# Handle cases where it's known by the types that can't be equal
-# (should do this better, it's a simple pattern)
-==(a::ASCIIStr, b::T)  where {T<:Union{_LatinStr,_UCS2Str,_UTF32Str}} = false
-==(a::T, b::ASCIIStr)  where {T<:Union{_LatinStr,_UCS2Str,_UTF32Str}} = false
-==(a::_LatinStr, b::T) where {T<:Union{ASCIIStr,_UCS2Str,_UTF32Str}}  = false
-==(a::T, b::_LatinStr) where {T<:Union{ASCIIStr,_UCS2Str,_UTF32Str}}  = false
-==(a::_UCS2Str, b::T)  where {T<:Union{ASCIIStr,_LatinStr,_UTF32Str}} = false
-==(a::T, b::_UCS2Str)  where {T<:Union{ASCIIStr,_LatinStr,_UTF32Str}} = false
-==(a::_UTF32Str, b::T) where {T<:Union{ASCIIStr,_LatinStr,UCS2Str}}   = false
-==(a::T, b::_UTF32Str) where {T<:Union{ASCIIStr,_LatinStr,UCS2Str}}   = false
-
-isless(a::AbstractString, b::Str) = cmp(a, b) < 0
-isless(a::Str, b::AbstractString) = cmp(a, b) < 0
-isless(a::Str, b::Str)            = cmp(a, b) < 0
-
 thisind(s::Str, i::Integer) = thisind(s, Int(i))
 
 function filter(f, s::T) where {T<:Str}

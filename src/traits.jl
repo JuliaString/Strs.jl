@@ -66,6 +66,9 @@ CodePointStyle(A::AbstractString) = CodePointStyle(typeof(A))
 CodePointStyle(::Type{<:AbstractString}) = CodeUnitSingle()
 CodePointStyle(::Type{T}) where {T<:Union{UTF8Str,UTF16Str,String}} = CodeUnitMulti()
 
+CodePointStyle(::Type{<:CSE}) = CodeUnitSingle()
+CodePointStyle(::Type{T}) where {T<:Union{UTF8CSE,UTF16CSE}} = CodeUnitMulti()
+
 # Type of character set
 
 """
@@ -115,6 +118,7 @@ CharSetStyle(::Type{_LatinStr}) = CharSetISOCompat()
 CharSetStyle(::Type{_UCS2Str})  = CharSetBMPCompat()
 
 CharSetStyle(A::AbstractChar)   = CharSetStyle(typeof(A))
+
 CharSetStyle(::Type{<:AbstractChar}) = CharSetUnicode()
 CharSetStyle(::Type{Char})      = CharSetUnicodePlus() # Encodes invalid characters also
 CharSetStyle(::Type{UInt8})     = CharSetBinary()
@@ -188,8 +192,100 @@ abstract type MutableStyle end
 struct ImmutableStr <: MutableStyle end
 struct MutableStr   <: MutableStyle end
 
+MutableStyle(A::AbstractString) = MutableStyle(typeof(A))
+
 MutableStyle(A::Str) = ImmutableStr()
 
 _isimmutable(::ImmutableStr, str::Type{T}) where {T<:Str} = true
 _isimmutable(::MutableStr, str::Type{T}) where {T<:Str} = false
 isimmutable(::Type{T}) where {T<:Str} = _isimmutable(MutableStyle(T))
+
+# Comparison traits
+
+"""
+    CompareStyle(Union{A, typeof(A)}, Union{B, typeof(B)})
+
+`CompareStyle` specifies how to compare two strings with character set encodings A and B
+
+    Strs.CompareStyle(::Type{<:MyString}, ::Type{String}) = ByteCompare()
+
+The default is `CodePointCompare`
+"""
+abstract type CompareStyle end
+
+struct ByteCompare      <: CompareStyle end # Compare bytewise
+struct ASCIICompare     <: CompareStyle end # Compare bytewise for ASCII subset, else codepoint
+struct WordCompare      <: CompareStyle end # Compare first not equal word with <
+struct UTF16Compare     <: CompareStyle end # Compare first not equal word adjusting > 0xd7ff
+struct WidenCompare     <: CompareStyle end # Narrower can be simply widened for comparisons
+struct CodePointCompare <: CompareStyle end # Compare CodePoints
+
+const WideCSE  = Union{UCS2CSE, _UCS2CSE, UTF32CSE, _UTF32CSE}
+
+const ASCIICmp = Str{ASCIICSE}
+const LatinCmp = Union{Str{LatinCSE}, Str{_LatinCSE}}
+const UTF8Cmp  = Union{String, Str{UTF8CSE}}
+const WideCmp  = T where {T<:Str{<:WideCSE}}
+const WideSet  = T where {T<:Str{<:Union{UCS2CSE, UTF32CSE}}}
+const WideSub  = T where {T<:Str{<:Union{_UCS2CSE, _UTF32CSE}}}
+
+CompareStyle(A::AbstractString, B::AbstractString) = CompareStyle(typeof(A), typeof(B))
+
+CompareStyle(A, B) = CodePointCompare()
+
+CompareStyle(A::S, B::T) where {C<:CSE,      S<:Str{C}, T<:Str{C}} = ByteCompare()
+CompareStyle(A::S, B::T) where {C<:UTF16CSE, S<:Str{C}, T<:Str{C}} = UTF16Compare()
+CompareStyle(A::S, B::T) where {C<:WideCSE,  S<:Str{C}, T<:Str{C}} = WordCompare()
+
+CompareStyle(A::S, B::T) where {S<:ASCIICmp, T<:UTF8Cmp}  = ByteCompare()
+CompareStyle(A::S, B::T) where {S<:ASCIICmp, T<:LatinCmp} = ByteCompare()
+CompareStyle(A::S, B::T) where {S<:ASCIICmp, T<:WideCmp}  = WidenCompare()
+
+CompareStyle(A::S, B::T) where {S<:LatinCmp, T<:LatinCmp} = ByteCompare()
+CompareStyle(A::S, B::T) where {S<:LatinCmp, T<:UTF8Cmp}  = ASCIICompare()
+CompareStyle(A::S, B::T) where {S<:LatinCmp, T<:WideCmp}  = WidenCompare()
+
+CompareStyle(A::S, B::T) where {S<:UTF8Cmp, T<:UTF8Cmp}   = ByteCompare()
+CompareStyle(A::S, B::T) where {S<:WideCmp, T<:WideCmp}   = WidenCompare()
+
+CompareStyle(A, B::S) where {S<:Union{ASCIICmp,LatinCmp,WideCmp}} = CompareStyle(B, A)
+
+"""
+    EqualsStyle(Union{A, typeof(A)}, Union{B, typeof(B)})
+
+`EqualsStyle` specifies how to compare two strings with character set encodings A and B
+
+    Strs.EqualsStyle(::Type{<:MyString}, ::Type{String}) = ByteEquals()
+
+The default is `CodePointEquals`
+"""
+abstract type EqualsStyle end
+
+struct NotEquals       <: EqualsStyle end # Cannot be equal
+struct ByteEquals      <: EqualsStyle end # Can be compared bytewise (for both < and ==)
+struct ASCIIEquals     <: EqualsStyle end # Can be compared bytewise for ASCII subset
+struct WidenEquals     <: EqualsStyle end # Narrower can be simply widened for comparisons
+struct CodePointEquals <: EqualsStyle end # Compare CodePoints
+
+EqualsStyle(A::AbstractString, B::AbstractString) = EqualsStyle(typeof(A), typeof(B))
+
+EqualsStyle(A, B) = CodePointEquals()
+
+EqualsStyle(A::S, B::T) where {C<:CSE, S<:Str{C}, T<:Str{C}} = ByteEquals()
+
+EqualsStyle(A::S, B::T) where {S<:ASCIICmp, T<:Union{UTF8Cmp,Str{LatinCSE}}} = ByteEquals()
+EqualsStyle(A::S, B::T) where {S<:ASCIICmp, T<:Union{WideSub,Str{_LatinCSE}}} = NotEquals()
+EqualsStyle(A::S, B::T) where {S<:ASCIICmp, T<:WideSet} = WidenEquals()
+
+EqualsStyle(A::S, B::T) where {S<:LatinCmp, T<:UTF8Cmp}  = ASCIIEquals()
+EqualsStyle(A::S, B::T) where {S<:LatinCmp, T<:LatinCmp} = ByteEquals()
+EqualsStyle(A::S, B::T) where {S<:LatinCmp, T<:WideSub}  = NotEquals()
+EqualsStyle(A::S, B::T) where {S<:LatinCmp, T<:WideSet}  = WidenEquals()
+
+EqualsStyle(A::S, B::T) where {S<:UTF8Cmp, T<:UTF8Cmp}   = ByteEquals()
+
+EqualsStyle(A::S, B::T) where {S<:Str{UCS2CSE}, T<:Str{_UCS2CSE}}   = ByteEquals()
+EqualsStyle(A::S, B::T) where {S<:Str{UCS2CSE}, T<:Str{_UTF32CSE}}  = NotEquals()
+EqualsStyle(A::S, B::T) where {S<:Str{UTF32CSE}, T<:Str{_UTF32CSE}} = ByteEquals()
+
+EqualsStyle(A, B::S) where {S<:Union{ASCIICmp,LatinCmp,WideCmp}} = EqualsStyle(B, A)
