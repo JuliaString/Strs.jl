@@ -593,13 +593,14 @@ end
 function repeat(ch::CP, cnt::Integer) where {CP <: CodePoint}
     T = codepoint_cse(CP)
     cnt < 1 && return cnt == 0 ? empty_str(Str{T}) : repeaterr(cnt)
-    siz = codepoint_size(CP)
+    siz = sizeof(CP)
     buf = _allocate(siz * cnt)
     if siz == 1
         ccall(:memset, Ptr{Cvoid}, (Ptr{UInt8}, Cint, Csize_t), pointer(buf), ch, cnt)
     else
         uintch = tobase(ch)
         out = reinterpret(Ptr{basetype(CP)}, pointer(buf))
+        # Note, this can be optimized by writing out chunks
         while (cnt -= 1) >= 0
             set_codeunit!(out, uintch)
             out += siz
@@ -607,7 +608,55 @@ function repeat(ch::CP, cnt::Integer) where {CP <: CodePoint}
     end
     Str(T, buf)
 end
-(^)(ch::CodePoint, cnt::Integer) = repeat(ch, cnt)
+(^)(ch::CP, cnt::Integer) where {CP <: CodePoint} = repeat(ch, cnt)
+
+@static if VERSION < v"0.7.0-DEV"
+    function repeat(ch::Char, cnt::Integer)
+        if cnt < 0
+            repeaterr(cnt)
+        elseif cnt == 0
+            empty_str(String)
+        elseif cnt == 1
+            string(ch)
+        else
+            uch = ch%UInt32
+            if ch <= 0x7f
+                buf = Base._string_n(cnt)
+                ccall(:memset, Ptr{Cvoid}, (Ptr{UInt8}, Cint, Csize_t), pointer(buf), ch, cnt)
+            elseif ch <= 0x7ff
+                buf = Base._string_n(cnt<<1)
+                pnt16 = reinterpret(Ptr{UInt16}, pointer(buf))
+                wrd = (uch >>> 6) | ((uch & 0x3f)%UInt16<<8) | 0x80c0
+                while (cnt -= 1) >= 0
+                    set_codeunit!(pnt16, wrd)
+                    pnt16 += 2
+                end
+            elseif ch <= 0xffff
+                buf = Base._string_n(cnt*3)
+                pnt = reinterpret(Ptr{UInt8}, pointer(buf))
+                b1, b2, b3 =
+                    0xe0 | ((uch >>> 12) & 0x3f), 0x80 | ((uch >>> 6) & 0x3f), 0x80 | (uch & 0x3f)
+                while (cnt -= 1) >= 0
+                    set_codeunit!(pnt, b1)
+                    set_codeunit!(pnt + 1, b2)
+                    set_codeunit!(pnt + 2, b3)
+                    pnt += 3
+                end
+            else
+                buf = Base._string_n(cnt<<2)
+                pnt32 = reinterpret(Ptr{UInt32}, pointer(buf))
+                dbl = (uch >>> 18) | ((uch & 0x3f)%UInt32<<8) | 0x808080f0
+                while (cnt -= 1) >= 0
+                    set_codeunit!(pnt32, dbl)
+                    pnt32 += 4
+                end
+            end
+            buf
+        end
+    end
+    (^)(ch::Char, cnt::Integer) = repeat(ch, cnt)
+end
+
 
 # Definitions for C compatible strings, that don't allow embedded
 # '\0', and which are terminated by a '\0'

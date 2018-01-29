@@ -213,7 +213,6 @@ function dispres(io, xres)
     println(io)
 end
 
-@static VERSION < v"0.7.0-DEV" && (Base.repeat(x::Char, cnt::Int) = x^cnt)
 const divline = string(repeat('#', 100),'\n','\f')
 
 function dispbench(io, totres)
@@ -776,7 +775,12 @@ function comparetestline(lines, results, list, displist)
     else
         pwc(:red, "\e[s\rX\e[u")
         io = IOBuffer()
-        print(io, " => ", diff)
+        try
+            print(io, " => ", diff)
+        catch ex
+            typeof(ex) == InterruptException && rethrow()
+            pr"Can't display diffs \(diff[end][2]): \(sprint(showerror, ex, catch_backtrace()))"
+        end
         str = String(take!(io))
         println(str[1:200])
     end
@@ -811,7 +815,12 @@ function comparetestchar(lines, results, list, displist)
     else
         pwc(:red, "\e[s\rX\e[u")
         io = IOBuffer()
-        print(io, " => ", diff)
+        try
+            print(io, " => ", diff)
+        catch ex
+            typeof(ex) == InterruptException && rethrow()
+            pr"Can't display diffs \(diff[end][2]): \(sprint(showerror, ex, catch_backtrace()))"
+        end
         str = String(take!(io))
         println(str[1:200])
     end
@@ -846,7 +855,12 @@ function comparetestcu(lines, results, list, displist)
     else
         pwc(:red, "\e[s\rX\e[u")
         io = IOBuffer()
-        print(io, " => ", diff)
+        try
+            print(io, " => ", diff)
+        catch ex
+            typeof(ex) == InterruptException && rethrow()
+            pr"Can't display diffs \(diff[end][2]): \(sprint(showerror, ex, catch_backtrace()))"
+        end
         str = String(take!(io))
         println(str[1:200])
     end
@@ -856,8 +870,7 @@ end
 const testlist =
     (((length, ), "length"),
      ((isascii, isvalid), "isascii, isvalid"),
-     #((lowercase, uppercase, reverse), "lowercase, uppercase, reverse"),
-     ((lowercase,), "lowercase,"),
+     ((lowercase, uppercase, reverse), "lowercase, uppercase, reverse"),
      ((isascii, isvalid, iscntrl, islower, isupper, isalpha,
        isalnum, isspace, isprint, ispunct, isgraph, isdigit, isxdigit),
       "is(ascii|valid|cntrl|lower|upper|alpha|alnum|space|print|punct|graph|digit|xdigit)"),

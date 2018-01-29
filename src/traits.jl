@@ -248,7 +248,7 @@ CompareStyle(A::S, B::T) where {S<:LatinCmp, T<:WideCmp}  = WidenCompare()
 CompareStyle(A::S, B::T) where {S<:UTF8Cmp, T<:UTF8Cmp}   = ByteCompare()
 CompareStyle(A::S, B::T) where {S<:WideCmp, T<:WideCmp}   = WidenCompare()
 
-CompareStyle(A, B::S) where {S<:Union{ASCIICmp,LatinCmp,WideCmp}} = CompareStyle(B, A)
+CompareStyle(A::S, B::T) where {S<:Str, T<:Union{ASCIICmp,LatinCmp,WideCmp}} = CompareStyle(B, A)
 
 """
     EqualsStyle(Union{A, typeof(A)}, Union{B, typeof(B)})
@@ -288,4 +288,4 @@ EqualsStyle(A::S, B::T) where {S<:Str{UCS2CSE}, T<:Str{_UCS2CSE}}   = ByteEquals
 EqualsStyle(A::S, B::T) where {S<:Str{UCS2CSE}, T<:Str{_UTF32CSE}}  = NotEquals()
 EqualsStyle(A::S, B::T) where {S<:Str{UTF32CSE}, T<:Str{_UTF32CSE}} = ByteEquals()
 
-EqualsStyle(A, B::S) where {S<:Union{ASCIICmp,LatinCmp,WideCmp}} = EqualsStyle(B, A)
+EqualsStyle(A::S, B::T) where {S<:Str, T<:Union{ASCIICmp,LatinCmp,WideCmp}} = EqualsStyle(B, A)

@@ -73,7 +73,7 @@ import Base: containsnul, convert, endof, getindex, length, map, pointer, collec
              reverse, rsearch, search, sizeof, string, unsafe_convert, unsafe_load, write,
              codeunit, start, next, done, nextind, prevind, reverseind,
              typemin, typemax, isvalid, rem, size, ndims, first, last, eltype, isempty, in,
-             hash, isless, ==, -, +, *, cmp, promote_rule, one, repeat, filter,
+             hash, isless, ==, -, +, *, ^, cmp, promote_rule, one, repeat, filter,
              print, show, isimmutable
     
 @condimport ind2chr
@@ -112,6 +112,8 @@ include("utf32.jl")
 include("encode.jl")
 include("stats.jl")
 include("legacy.jl")
+include("utf8case.jl")
+include("utf16case.jl")
 #include("util.jl")
 #include("substring.jl")
 #include("io.jl")

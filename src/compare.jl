@@ -1,17 +1,19 @@
 # Copyright 2018 Gandalf Software, Inc. (Scott Paul Jones)
 # Licensed under MIT License, see LICENSE.md
 
+_memcmp(a, b, s) = ccall(:memcmp, Int32, (Ptr{UInt8}, Ptr{UInt8}, UInt), _pnt(a), _pnt(b), s)
+
 function _cmp(::ByteCompare, a, b)
-    a === b && return 0
-    asiz, bsiz = sizeof(a), sizeof(b)
-    res = ccall(:memcmp, Int32, (Ptr{UInt8}, Ptr{UInt8}, UInt), a, b, min(asiz, bsiz))
+    asiz, apnt, bsiz, bpnt = sizeof(a), sizeof(b), _pnt(a), _pnt(b)
+    asiz == bsiz && apnt == bpnt && return 0
+    res = _memcmp(apnt, bpnt, min(asiz, bsiz))
     res < 0 ? -1 : res > 0 ? 1 : cmp(asiz, bsiz)
 end
 
 function _cmp(::UTF16Compare, a, b)
-    a === b && return 0
-    asiz, bsiz = sizeof(a), sizeof(b)
-    res = ccall(:memcmp, Int32, (Ptr{UInt8}, Ptr{UInt8}, UInt), a, b, min(asiz, bsiz))
+    asiz, apnt, bsiz, bpnt = sizeof(a), sizeof(b), _pnt(a), _pnt(b)
+    asiz == bsiz && apnt == bpnt && return 0
+    res = _memcmp(apnt, bpnt, min(asiz, bsiz))
     res < 0 ? -1 : res > 0 ? 1 : cmp(asiz, bsiz)
 end
 
@@ -54,9 +56,7 @@ cmp(a::Str, b::Str)            = _cmp(CompareStyle(a, b), a, b)
 # as if comparing Char to Char, to get ordering correct when dealing with > 0xffff non-BMP
 # characters
 
-_fasteq(a, b) =
-    (siz = sizeof(a)) == sizeof(b) &&
-    ccall(:memcmp, Int32, (Ptr{UInt8}, Ptr{UInt8}, UInt), a, b, siz) == 0
+_fasteq(a, b) = (siz = sizeof(a)) == sizeof(b) && _memcmp(a, b, siz) == 0
 
 function _cpeq(a::T, b) where {C<:CSE, T<:Str{C}}
     len, pnt = _lenpnt(a)
@@ -109,6 +109,7 @@ _iseq(::CodePointEquals, a, b) = _cpeq(a, b)
 
 ==(a::AbstractString, b::Str) = _iseq(EqualsStyle(a, b), a, b)
 ==(a::Str, b::AbstractString) = _iseq(EqualsStyle(a, b), a, b)
+==(a::Str, b::Str)            = _iseq(EqualsStyle(a, b), a, b)
 
 #=
 # Handle cases where it's known by the types that can't be equal
