@@ -27,6 +27,10 @@ _endof(::CodeUnitSingle, str) = (@_inline_meta(); _len(str))
     T(get_codeunit(str, pos)), pos + 1
 end
 
+_nextcpfun(::CodeUnitSingle, ::Type{S}, pnt::Ptr{T}) where {S,T<:CodeUnitTypes} =
+    get_codeunit(pnt), pnt + sizeof(T)
+_nextcp(::Type{T}, pnt) where {T} = _nextcpfun(CodePointStyle(T), T, pnt)
+
 @propagate_inbounds _getindex(::CodeUnitMulti, T, str, i::Int) =
     _next(CodeUnitMulti(), T, str, i)[1]
 

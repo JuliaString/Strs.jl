@@ -161,6 +161,10 @@ for nam in BuiltInTypes
     @eval show(io::IO, ::Type{$sym}) = print(io, $(quotesym(sym)))
 end
 
+for nam in (:ASCII, :Latin, :_Latin, :UCS2, :UTF32, :Text1, :Text2, :Text4)
+    @eval codepoint_cse(::Type{$(Symbol("$(nam)Chr"))}) = $(Symbol("$(nam)CSE"))
+end
+
 """Union type for fast dispatching"""
 const UniStr = Union{ASCIIStr, _LatinStr, _UCS2Str, _UTF32Str}
 show(io::IO, ::Type{UniStr}) = print(io, :UniStr)
@@ -216,8 +220,10 @@ const ByteStrings        = Union{Text1Str, BinaryStr, UnicodeByteStrings}
 const UnicodeStrings     = Union{String, UTF8Str, UTF16Str, UTF32Strings}
 
 ## Get the character set / encoding used by a string type
-cse(::T) where {T<:Str{C}} where {C<:CSE} = C
-cse(::Type{T}) where {T<:Str{C}} where {C<:CSE} = C
+cse(::T) where {C<:CSE,T<:Str{C}} = C
+cse(::Type{T}) where {C<:CSE,T<:Str{C}} = C
+cse(::String)       = UTF8CSE
+cse(::Type{String}) = UTF8CSE
 
 charset(::Type{<:AbstractString})  = UniPlusCharSet
 charset(::Type{T}) where {T<:Str{C}} where {C<:CSE{CS,E}} where {CS,E} = CS

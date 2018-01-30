@@ -213,7 +213,6 @@ function dispres(io, xres)
     println(io)
 end
 
-@static VERSION < v"0.7.0-DEV" && (Base.repeat(x::Char, cnt::Int) = x^cnt)
 const divline = string(repeat('#', 100),'\n','\f')
 
 function dispbench(io, totres)
@@ -327,6 +326,15 @@ function checkstr(fun, lines::Vector{<:AbstractString})
     cnt = 0
     for text in lines
         cnt += fun(text)
+    end
+    cnt
+end
+
+function checktext(fun, lines::Vector{<:AbstractString})
+    cnt = 0
+    for text in lines
+        isempty(text) || fun(text)
+        cnt += 1
     end
     cnt
 end
@@ -518,12 +526,20 @@ function oldlength(s::UTF16Str)
     cnt
 end
 
-freverse(str) = sizeof(reverse(str))
+repeat1(str)  = repeat(str, 1)
+repeat10(str) = repeat(str, 10)
+repeat1c(str)  = repeat(str[1], 1)
+repeat10c(str) = repeat(str[1], 10)
 
 countsklength(l)  = checkstr(sklength, l)
 countoldlength(l) = checkstr(oldlength, l)
 
-checkreverse(l) = checkstr(freverse, l)
+checkrepeat1(l)   = checktext(repeat1, l)
+checkrepeat10(l)  = checktext(repeat10, l)
+checkrepeat1c(l)  = checktext(repeat1c, l)
+checkrepeat10c(l) = checktext(repeat10c, l)
+checkreverse(l)   = checktext(reverse, l)
+
 checknextind(l) = checkstr(iteratenextind, l)
 countchars(l)   = checkstr(iteratechars, l)
 countcps(l)     = checkstr(iteratecps, l)
@@ -579,7 +595,11 @@ const tests =
      (countsize,   "sizeof"),
      (countlength, "length"),
      (checknextind, "nextind\nchars"),
-     (checkreverse, "length\nreverse"),
+     (checkreverse, "reverse"),
+     (checkrepeat1,  "repeat 1\nstring"),
+     (checkrepeat10,  "repeat 10\nstring"),
+     (checkrepeat1c,  "repeat 1\nchar"),
+     (checkrepeat10c,  "repeat 10\nchar"),
 #    (countsklength,  "length\nSK"),
 #    (countoldlength, "length\nOld"),
      (countchars,   "iteration\nChar"),
@@ -755,7 +775,12 @@ function comparetestline(lines, results, list, displist)
     else
         pwc(:red, "\e[s\rX\e[u")
         io = IOBuffer()
-        print(io, " => ", diff)
+        try
+            print(io, " => ", diff)
+        catch ex
+            typeof(ex) == InterruptException && rethrow()
+            pr"Can't display diffs \(diff[end][2]): \(sprint(showerror, ex, catch_backtrace()))"
+        end
         str = String(take!(io))
         println(str[1:200])
     end
@@ -790,7 +815,12 @@ function comparetestchar(lines, results, list, displist)
     else
         pwc(:red, "\e[s\rX\e[u")
         io = IOBuffer()
-        print(io, " => ", diff)
+        try
+            print(io, " => ", diff)
+        catch ex
+            typeof(ex) == InterruptException && rethrow()
+            pr"Can't display diffs \(diff[end][2]): \(sprint(showerror, ex, catch_backtrace()))"
+        end
         str = String(take!(io))
         println(str[1:200])
     end
@@ -825,7 +855,12 @@ function comparetestcu(lines, results, list, displist)
     else
         pwc(:red, "\e[s\rX\e[u")
         io = IOBuffer()
-        print(io, " => ", diff)
+        try
+            print(io, " => ", diff)
+        catch ex
+            typeof(ex) == InterruptException && rethrow()
+            pr"Can't display diffs \(diff[end][2]): \(sprint(showerror, ex, catch_backtrace()))"
+        end
         str = String(take!(io))
         println(str[1:200])
     end

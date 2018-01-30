@@ -8,6 +8,9 @@ It is used for CodeUnit support in pre v0.7 versions of Julia
 
 ## code unit access ##
 
+codeunit(str::AbstractString) = UInt8
+ncodeunits(str::AbstractString) = sizeof(str)
+
 """
     CodeUnits(s::AbstractString)
 

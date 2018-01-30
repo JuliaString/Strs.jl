@@ -76,12 +76,19 @@ end
 
 get_supplementary(lead::Unsigned, trail::Unsigned) = (UInt32(lead-0xd7f7)<<10 + trail)
 
+function _nextcpfun(::CodeUnitMulti, ::Type{UTF16CSE}, pnt)
+    ch = get_codeunit(pnt)
+    (is_surrogate_lead(ch)
+     ? (get_supplementary(ch, get_codeunit(pnt + 2)), pnt + 4)
+     : (ch%UInt32, pnt + 2))
+end
+
 function _next(::CodeUnitMulti, T, str::UTF16Str, pos::Int)
     @boundscheck pos <= _len(str) || boundserr(str, pos)
-    pnt = _pnt(str)
-    ch = get_codeunit(pnt, pos)
+    pnt = _pnt(str) + (pos<<1)
+    ch = get_codeunit(pnt - 2)
     (is_surrogate_lead(ch)
-     ? (T(get_supplementary(ch, get_codeunit(pnt, pos + 1))), pos + 2)
+     ? (T(get_supplementary(ch, get_codeunit(pnt))), pos + 2)
      : (T(ch), pos + 1))
 end
 

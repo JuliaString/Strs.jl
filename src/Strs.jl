@@ -73,12 +73,13 @@ import Base: containsnul, convert, endof, getindex, length, map, pointer, collec
              reverse, rsearch, search, sizeof, string, unsafe_convert, unsafe_load, write,
              codeunit, start, next, done, nextind, prevind, reverseind,
              typemin, typemax, isvalid, rem, size, ndims, first, last, eltype, isempty, in,
-             hash, isless, ==, -, +, *, cmp, promote_rule, one, repeat, filter,
+             hash, isless, ==, -, +, *, ^, cmp, promote_rule, one, repeat, filter,
              print, show, isimmutable
     
 @condimport ind2chr
 @condimport chr2ind
 @condimport thisind
+@condimport codeunits
 @condimport ncodeunits
 @condimport bytestring
 
@@ -86,9 +87,11 @@ isdefined(Base, :copyto!)        || (const copyto! = copy!)
 isdefined(Base, :unsafe_copyto!) || (const unsafe_copyto! = unsafe_copy!)
 isdefined(Base, :AbstractChar)   || (abstract type AbstractChar end ; export AbstractChar)
 isdefined(Base, :Nothing)        || (const Nothing = Void)
+isdefined(Base, :Cvoid)          || (const Cvoid = Void)
 
-uninit(T, len) = @static VERSION < v"0.7.0-DEV" ? T(len) : T(uninitialized, len)
+@static isdefined(Base, :codeunits) || include("codeunits.jl")
 
+uninit(T, len) = @static isdefined(Base, :uninitialized) ? T(uninitialized, len) : T(len)
 create_vector(T, len) = uninit(Vector{T}, len)
 
 include("types.jl")
@@ -97,10 +100,10 @@ include("access.jl")
 include("traits.jl")
 include("unicode.jl")
 include("casefold.jl")
-@static VERSION < v"v0.7.0-DEV" && include("codeunits.jl")
 include("iters.jl")
 include("core.jl")
 include("support.jl")
+include("compare.jl")
 include("ascii.jl")
 include("latin.jl")
 include("utf8.jl")
@@ -109,6 +112,8 @@ include("utf32.jl")
 include("encode.jl")
 include("stats.jl")
 include("legacy.jl")
+include("utf8case.jl")
+include("utf16case.jl")
 #include("util.jl")
 #include("substring.jl")
 #include("io.jl")

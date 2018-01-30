@@ -75,6 +75,7 @@ const UTF_ERR_NORMALIZE         = " is not one of :NFC, :NFD, :NFKC, :NFKD"
 @noinline codepoint_error(T, v)  = unierror(string("Invalid CodePoint: ", T, " 0x", hex(v)))
 @noinline argerror(startpos, endpos) =
     unierror(string("End position ", endpos, " is less than start position (", startpos, ")"))
+@noinline repeaterr(cnt) = throw(ArgumentError("repeat count $cnt must be >= 0"))
 
 ## Functions to check validity of UTF-8, UTF-16, and UTF-32 encoded strings,
 #  and also to return information necessary to convert to other encodings
@@ -553,48 +554,6 @@ end
 (*)(s1::Union{C1, S1}, ss::Union{C2, S2}...) where {C1<:CodePoint,C2<:CodePoint,S1<:Str,S2<:Str} =
     string(s1, ss...)
 
-function _cmp(a::Str, b::AbstractString)
-    a === b && return 0
-    i = start(a)
-    j = start(b)
-    while !done(a, i)
-        done(b, j) && return 1
-        c, i = next(a, i)
-        d, j = next(b, j)
-        c != d && return ifelse(c < d, -1, 1)
-    end
-    return ifelse(done(b, j), 0, -1)
-end
-_cmp(a::AbstractString, b::Str) = -_cmp(b, a)
-
-# Todo: handle comparisions of UTF16 specially, to compare first non-matching character
-# as if comparing Char to Char, to get ordering correct when dealing with > 0xffff non-BMP
-# characters
-
-# Fast version, compare bytes directly
-# (note, will have to handle things a bit differently when substrings are added to the Str type)
-#function _cmp(a::T, b::T) where {T<:Str}
-#end
-
-==(a::AbstractString, b::Str) = cmp(a, b) == 0
-==(a::Str, b::AbstractString) = cmp(a, b) == 0
-==(a::Str, b::Str)            = cmp(a, b) == 0
-
-# Handle cases where it's known by the types that can't be equal
-# (should do this better, it's a simple pattern)
-==(a::ASCIIStr, b::T)  where {T<:Union{_LatinStr,_UCS2Str,_UTF32Str}} = false
-==(a::T, b::ASCIIStr)  where {T<:Union{_LatinStr,_UCS2Str,_UTF32Str}} = false
-==(a::_LatinStr, b::T) where {T<:Union{ASCIIStr,_UCS2Str,_UTF32Str}}  = false
-==(a::T, b::_LatinStr) where {T<:Union{ASCIIStr,_UCS2Str,_UTF32Str}}  = false
-==(a::_UCS2Str, b::T)  where {T<:Union{ASCIIStr,_LatinStr,_UTF32Str}} = false
-==(a::T, b::_UCS2Str)  where {T<:Union{ASCIIStr,_LatinStr,_UTF32Str}} = false
-==(a::_UTF32Str, b::T) where {T<:Union{ASCIIStr,_LatinStr,UCS2Str}}   = false
-==(a::T, b::_UTF32Str) where {T<:Union{ASCIIStr,_LatinStr,UCS2Str}}   = false
-
-isless(a::AbstractString, b::Str) = cmp(a, b) < 0
-isless(a::Str, b::AbstractString) = cmp(a, b) < 0
-isless(a::Str, b::Str)            = cmp(a, b) < 0
-
 thisind(s::Str, i::Integer) = thisind(s, Int(i))
 
 function filter(f, s::T) where {T<:Str}
@@ -609,12 +568,95 @@ end
 # These should be optimized based on the traits, and return internal substrings, once
 # I've implemented those
 
-first(s::Str, n::Integer) = s[1:min(end, nextind(s, 0, n))]
-last(s::Str, n::Integer) = s[max(1, prevind(s, ncodeunits(s)+1, n)):end]
+first(str::Str, n::Integer) = str[1:min(end, nextind(str, 0, n))]
+last(str::Str, n::Integer) = str[max(1, prevind(str, ncodeunits(s)+1, n)):end]
 
 #reverseind(s::Str, i::Integer) = thisind(s, ncodeunits(s)-i+1)
-repeat(s::Str, r::Integer) = repeat(String(s), r)
-(^)(s::Union{Str,CodePoint}, r::Integer) = repeat(s, r)
+function repeat(str::T, cnt::Integer) where {T<:Str}
+    cnt < 2 && return cnt == 1 ? str : (cnt == 0 ? empty_str(T) : repeaterr(cnt))
+    siz = sizeof(str)
+    pnt = _pnt(str)
+    buf = _allocate(siz * cnt)
+    out = pointer(buf)
+    if sizeof(codeunit(T)) == 1 && siz == 1 # common case: repeating a single-byte string
+        ccall(:memset, Ptr{Cvoid}, (Ptr{UInt8}, Cint, Csize_t), out, get_codeunit(pnt), cnt)
+    else
+        while (cnt -= 1) >= 0
+            ccall(:memcpy, Ptr{Cvoid}, (Ptr{Cvoid}, Ptr{Cvoid}, UInt), out, pnt, siz)
+            out += siz
+        end
+    end
+    Str(cse(T), buf)
+end
+(^)(str::T, cnt::Integer) where {T<:Str} = repeat(str, cnt)
+
+function repeat(ch::CP, cnt::Integer) where {CP <: CodePoint}
+    T = codepoint_cse(CP)
+    cnt < 1 && return cnt == 0 ? empty_str(Str{T}) : repeaterr(cnt)
+    siz = sizeof(CP)
+    buf = _allocate(siz * cnt)
+    if siz == 1
+        ccall(:memset, Ptr{Cvoid}, (Ptr{UInt8}, Cint, Csize_t), pointer(buf), ch, cnt)
+    else
+        uintch = tobase(ch)
+        out = reinterpret(Ptr{basetype(CP)}, pointer(buf))
+        # Note, this can be optimized by writing out chunks
+        while (cnt -= 1) >= 0
+            set_codeunit!(out, uintch)
+            out += siz
+        end
+    end
+    Str(T, buf)
+end
+(^)(ch::CP, cnt::Integer) where {CP <: CodePoint} = repeat(ch, cnt)
+
+@static if VERSION < v"0.7.0-DEV"
+    function repeat(ch::Char, cnt::Integer)
+        if cnt < 0
+            repeaterr(cnt)
+        elseif cnt == 0
+            empty_str(String)
+        elseif cnt == 1
+            string(ch)
+        else
+            uch = ch%UInt32
+            if ch <= 0x7f
+                buf = Base._string_n(cnt)
+                ccall(:memset, Ptr{Cvoid}, (Ptr{UInt8}, Cint, Csize_t), pointer(buf), ch, cnt)
+            elseif ch <= 0x7ff
+                buf = Base._string_n(cnt<<1)
+                pnt16 = reinterpret(Ptr{UInt16}, pointer(buf))
+                wrd = (uch >>> 6) | ((uch & 0x3f)%UInt16<<8) | 0x80c0
+                while (cnt -= 1) >= 0
+                    set_codeunit!(pnt16, wrd)
+                    pnt16 += 2
+                end
+            elseif ch <= 0xffff
+                buf = Base._string_n(cnt*3)
+                pnt = reinterpret(Ptr{UInt8}, pointer(buf))
+                b1, b2, b3 =
+                    0xe0 | ((uch >>> 12) & 0x3f), 0x80 | ((uch >>> 6) & 0x3f), 0x80 | (uch & 0x3f)
+                while (cnt -= 1) >= 0
+                    set_codeunit!(pnt, b1)
+                    set_codeunit!(pnt + 1, b2)
+                    set_codeunit!(pnt + 2, b3)
+                    pnt += 3
+                end
+            else
+                buf = Base._string_n(cnt<<2)
+                pnt32 = reinterpret(Ptr{UInt32}, pointer(buf))
+                dbl = (uch >>> 18) | ((uch & 0x3f)%UInt32<<8) | 0x808080f0
+                while (cnt -= 1) >= 0
+                    set_codeunit!(pnt32, dbl)
+                    pnt32 += 4
+                end
+            end
+            buf
+        end
+    end
+    (^)(ch::Char, cnt::Integer) = repeat(ch, cnt)
+end
+
 
 # Definitions for C compatible strings, that don't allow embedded
 # '\0', and which are terminated by a '\0'
