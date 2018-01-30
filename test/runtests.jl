@@ -10,6 +10,7 @@ import Strs: ascii, checkstring, UTF_ERR_SHORT, UnicodeError, codepoint_adj, cod
 randchar(::Type{T}) where {T} = codepoint_adj(T, rand(codepoint_rng(T)))
 
 include("basics.jl")
+include("types.jl")
 
 @testset "Invalid sequences" begin include("invalid.jl") end
 @testset "Valid sequences"   begin include("valid.jl")   end
