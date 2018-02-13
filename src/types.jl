@@ -14,7 +14,7 @@ export BIG_ENDIAN, LITTLE_ENDIAN
 const BIG_ENDIAN    = (ENDIAN_BOM == 0x01020304)
 const LITTLE_ENDIAN = !BIG_ENDIAN
 
-const STR_DATA_VECTOR = true
+const STR_DATA_VECTOR = false
 
 struct CharSet{CS}   end
 struct Encoding{Enc} end
