@@ -145,11 +145,12 @@ retcheck(totalchar, flags, invalids, latin1byte, num2byte, num3byte, num4byte) =
      ifelse(invalids   == 0, 0, UTF_INVALID) | flags,
      num4byte, num3byte, num2byte, latin1byte, invalids)
 
-function unsafe_checkstring(dat::Union{AbstractVector{UInt8}, Ptr{UInt8}, String}, pos, endpos;
+function unsafe_checkstring(dat::T, pos, endpos;
                             accept_long_null  = false,
                             accept_surrogates = false,
                             accept_long_char  = false,
-                            accept_invalids   = false)
+                            accept_invalids   = false
+                            ) where {T<:Union{AbstractVector{UInt8}, Ptr{UInt8}, String}}
     flags = 0%UInt
     totalchar = latin1byte = num2byte = num3byte = num4byte = invalids = 0
     @inbounds while pos <= endpos
@@ -336,11 +337,11 @@ function unsafe_checkstring(dat::Union{AbstractVector{T}, Ptr{T}}, pos, endpos;
     retcheck(totalchar, flags, invalids, latin1byte, num2byte, num3byte, num4byte)
 end
 
-function unsafe_checkstring(str::AbstractString;
+function unsafe_checkstring(str::T;
                             accept_long_null  = false,
                             accept_surrogates = false,
                             accept_long_char  = false,
-                            accept_invalids   = false)
+                            accept_invalids   = false) where {T<:AbstractString}
     flags = 0%UInt
     totalchar = latin1byte = num2byte = num3byte = num4byte = invalids = 0
     pos = start(str)
@@ -468,7 +469,7 @@ Input Arguments:
 Optional Input Arguments:
 
 * `startpos` start position (defaults to 1)
-* `endpos`   end position   (defaults to `endof(dat)`)
+* `endpos`   end position   (defaults to `lastindex(dat)`)
 
 Keyword Arguments:
 
@@ -488,10 +489,10 @@ Throws:
 function checkstring end
 
 # No need to check bounds if using defaults
-checkstring(dat; kwargs...) = unsafe_checkstring(dat, 1, endof(dat); kwargs...)
+checkstring(dat; kwargs...) = unsafe_checkstring(dat, 1, lastindex(dat); kwargs...)
 
 # Make sure that beginning and end positions are bounds checked
-function checkstring(dat, startpos, endpos = endof(dat); kwargs...)
+function checkstring(dat, startpos, endpos = lastindex(dat); kwargs...)
     checkbounds(dat, startpos)
     checkbounds(dat, endpos)
     endpos < startpos && argerror(startpos, endpos)
@@ -516,11 +517,11 @@ function bytestring(s::AbstractString...)
     str = Base.print_to_string(s...)
     # handle zero length string quickly
     (siz = sizeof(str)) == 0 && return empty_ascii
-    dat = _data(str)
+    dat = _pnt(str)
     len, flags, num4byte, num3byte, num2byte, latin1, invalids =
         unsafe_checkstring(dat, 1, siz)
     if flags & ~UTF_INVALID == 0
-        Str(invalids == 0 ? ASCIICSE : Text1CSE, dat)
+        Str(invalids == 0 ? ASCIICSE : Text1CSE, _data(str))
     else
         # This takes care of long encodings, CESU-8 surrogate characters, etc.
         Str(UTF8CSE, _transcode_utf8(dat, len))
@@ -557,7 +558,7 @@ end
 thisind(s::Str, i::Integer) = thisind(s, Int(i))
 
 function filter(f, s::T) where {T<:Str}
-    out = IOBuffer(StringVector(endof(s)), true, true)
+    out = IOBuffer(StringVector(lastindex(s)), true, true)
     truncate(out, 0)
     for c in codepoints(s)
         f(c) && write(out, c)

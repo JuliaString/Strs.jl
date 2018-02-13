@@ -1,3 +1,5 @@
+@static VERSION < v"0.7.0-DEV" || (using Pkg, REPL)
+
 const ver = "v0.$(VERSION.minor)"
 const git = "https://github.com/JuliaString/"
 const pkgdir = Pkg.dir()
@@ -8,7 +10,6 @@ const pkglist =
 
 const mparse = @static VERSION < v"0.7.0-DEV" ? parse : Meta.parse
 _rep(str, a, b) = @static VERSION < v"0.7.0-DEV" ? replace(str, a, b) : replace(str, a => b)
-@static VERSION < v"0.7.0-DEV" || (using REPL)
 const RC = @static VERSION < v"0.7.0-DEV" ? Base.REPLCompletions : REPL.REPLCompletions
 
 function rmpkg(pkg)

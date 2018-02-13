@@ -10,7 +10,7 @@ ascii(pnt::Ptr{UInt8}, len::Integer) = begin
     pnt == C_NULL && nullerr()
     vec = ccall(:jl_pchar_to_array, Vector{UInt8}, (Ptr{UInt8}, Csize_t), pnt, len)
     isvalid(ASCIIStr, vec) || unierror(UTF_ERR_INVALID_ASCII)
-    ASCIIStr(vec)
+    Str(ASCIICSE, vec)
 end
 
 latin1(x) = convert(_LatinStr, x)

@@ -109,7 +109,7 @@ size(cp::CodePoint, dim) = convert(Int, dim) < 1 ? boundserr(cp, dim) : 1
 ndims(cp::CodePoint) = 0
 ndims(::Type{<:CodePoint}) = 0
 length(cp::CodePoint) = 1
-endof(cp::CodePoint) = 1
+lastindex(cp::CodePoint) = 1
 getindex(cp::CodePoint) = cp
 getindex(cp::CodePoint, i::Integer) = i == 1 ? cp : boundserr(cp, i)
 getindex(cp::CodePoint, I::Integer...) = all(x -> x == 1, I) ? cp : boundserr(cp, I)

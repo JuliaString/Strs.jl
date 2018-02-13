@@ -73,7 +73,7 @@ end
 
 ## required core functionality ##
 
-function endof(str::UTF8Str)
+function lastindex(str::Str{<:UTF8CSE})
     (len = _len(str)) == 0 && return len
     dat = _data(str)
     while is_valid_continuation(dat[len])
@@ -420,10 +420,14 @@ function convert(::Type{UTF8Str}, dat::Vector{UInt8})
     # get number of bytes to allocate
     len, flags, num4byte, num3byte, num2byte, latinbyte = unsafe_checkstring(dat, 1, _len(dat))
     # Copy, but eliminate over-long encodings and surrogate pairs
-    Str(UTF8CSE,
-        (flags & (UTF_LONG | UTF_SURROGATE)) == 0
-        ? copyto!(_allocate(sizeof(dat)), dat)
-        : _transcode_utf8(dat, len + latinbyte + num2byte + num3byte*2 + num4byte*3))
+    if flags & (UTF_LONG | UTF_SURROGATE) == 0
+        siz = sizeof(dat)
+        buf = _allocate(siz)
+        unsafe_copyto!(pointer(buf), pointer(dat), siz)
+        Str(UTF8CSE, buf)
+    else
+        Str(UTF8CSE, _transcode_utf8(dat, len + latinbyte + num2byte + num3byte*2 + num4byte*3))
+    end
 end
 
 function convert(::Type{UTF8Str}, str::String)
@@ -436,7 +440,7 @@ function convert(::Type{UTF8Str}, str::String)
     Str(UTF8CSE,
         ((flags & (UTF_LONG | UTF_SURROGATE)) == 0
          ? _data(str)
-         : _transcode_utf8(dat, len + latinbyte + num2byte + num3byte*2 + num4byte*3)))
+         : _transcode_utf8(_pnt(str), len + latinbyte + num2byte + num3byte*2 + num4byte*3)))
 end
 
 function convert(::Type{UTF8Str}, str::AbstractString)

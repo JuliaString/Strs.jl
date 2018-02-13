@@ -16,7 +16,7 @@ getindex(s::T, rge{Int}) where {T} = T(getindex(_data(s), r))
 getindex(s::T, indx::AbstractVector{Int}) where {T} = T(_data(s)[indx])
 =#
 
-_endof(::CodeUnitSingle, str) = (@_inline_meta(); _len(str))
+_lastindex(::CodeUnitSingle, str) = (@_inline_meta(); _len(str))
 
 @propagate_inbounds _getindex(::CodeUnitSingle, T, str, i::Int) =
     (@_inline_meta(); T(get_codeunit(_pnt(str), _ind2chr(CodeUnitSingle(), str, i))))
@@ -63,8 +63,8 @@ end
 end
 
 #  Call to specialized version via trait
-@propagate_inbounds endof(str::T) where {T<:Str} =
-    (@_inline_meta(); _endof(CodePointStyle(T), str))
+@propagate_inbounds lastindex(str::T) where {T<:Str} =
+    (@_inline_meta(); _lastindex(CodePointStyle(T), str))
 @propagate_inbounds getindex(str::T, i::Int) where {T<:Str} =
     (@_inline_meta(); _getindex(CodePointStyle(T), codepoint_type(T), str, i))
 @propagate_inbounds next(str::T, i::Int) where {T<:Str} =
@@ -91,9 +91,9 @@ end
 # Handle substrings of Str
 
 @propagate_inbounds length(str::S) where {S<:SubString{T}} where {T<:Str} =
-    _endof(CodePointStyle(T), str)
+    _lastindex(CodePointStyle(T), str)
 
-isvalid(str::SubString{<:Str}, i::Integer) = (start(str) <= i <= endof(str))
+isvalid(str::SubString{<:Str}, i::Integer) = (start(str) <= i <= lastindex(str))
 
 @propagate_inbounds ind2chr(str::S, i::Integer) where {S<:SubString{T}} where {T<:Str} =
     _ind2chr(CodePointStyle(T), str, i)

@@ -201,19 +201,32 @@ for (nam, low) in vcat(list, sublist)
 end
 for val in list ; @eval export $(symstr(val[1], "Str")) ; end
 
-@inline _convert(::Type{T}, a::Vector{UInt8}) where {T<:Str} =
-    Str(cse(T), copyto!(_allocate(sizeof(a)), a))
+@inline function _convert(::Type{T}, a::Vector{UInt8}) where {T<:Str}
+    if STR_DATA_VECTOR
+        Str(cse(T), copyto!(_allocate(sizeof(a)), a))
+    else
+        siz = sizeof(a)
+        buf = _allocate(siz)
+        unsafe_copyto!(pointer(buf), pointer(a), siz)
+        Str(cse(T), buf)
+    end
+end
 
+# These should be done via traits
 const ByteStr = Union{Text1Str, BinaryStr, ASCIIStr, LatinStr, _LatinStr, UTF8Str}
 const WordStr = Union{Text2Str, UCS2Str, _UCS2Str, UTF16Str} # 16-bit code units
 const QuadStr = Union{Text4Str, UTF32Str, _UTF32Str} # 32-bit code units
 const WideStr = Union{UCS2Str, UTF16Str, UTF32Str, _UCS2Str, _UTF32Str}
 
-# These should be done via traits
-const RawStrings   = Union{Text1Str, Text2Str, Text4Str}
-const LatinStrings = Union{LatinStr, _LatinStr}
-const UCS2Strings  = Union{UCS2Str,  _UCS2Str}
-const UTF32Strings = Union{UTF32Str, _UTF32Str}
+const RawCSEncodings   = Union{Text1CSE, Text2CSE, Text4CSE}
+const LatinCSEncodings = Union{LatinCSE, _LatinCSE}
+const UCS2CSEncodings  = Union{UCS2CSE,  _UCS2CSE}
+const UTF32CSEncodings = Union{UTF32CSE, _UTF32CSE}
+
+const RawStrings   = Str{<:RawCSEncodings}
+const LatinStrings = Str{<:LatinCSEncodings}
+const UCS2Strings  = Str{<:UCS2CSEncodings}
+const UTF32Strings = Str{<:UTF32CSEncodings}
 
 const UnicodeByteStrings = Union{ASCIIStr, LatinStrings}
 const ByteStrings        = Union{Text1Str, BinaryStr, UnicodeByteStrings}
@@ -254,7 +267,7 @@ promote_rule(::Type{LatinStr}, ::Type{_LatinStr}) = LatinStr
 promote_rule(::Type{UCS2Str}, ::Type{_UCS2Str})   = UCS2Str
 promote_rule(::Type{UTF32Str}, ::Type{_UTF32Str}) = UTF32Str
 
-sizeof(s::Str) = sizeof(s.data)
+sizeof(s::Str) = sizeof(s.data) + !STR_DATA_VECTOR
 
 """Codeunits of string as a Vector"""
 _data(s::Vector{UInt8}) = s
@@ -281,9 +294,9 @@ _pnt64(s::Str) = reinterpret(Ptr{UInt64}, pointer(s.data))
 
 """Length of string in codeunits"""
 _len(s) = sizeof(s)
-_len(s::ByteStr) = sizeof(s.data)
-_len(s::WordStr) = sizeof(s.data) >>> 1
-_len(s::QuadStr) = sizeof(s.data) >>> 2
+_len(s::ByteStr) = sizeof(s)
+_len(s::WordStr) = sizeof(s) >>> 1
+_len(s::QuadStr) = sizeof(s) >>> 2
 
 # For convenience
 @inline _lenpnt(s) = _len(s), _pnt(s)
@@ -291,3 +304,6 @@ _len(s::QuadStr) = sizeof(s.data) >>> 2
 @inline _calcpnt(str, siz) = (pnt = _pnt64(str) - CHUNKSZ;  (pnt, pnt + siz))
 
 @inline _mask_bytes(n) = (1%UInt << ((n & (CHUNKSZ - 1)) << 3)) - 0x1
+
+Base.need_full_hex(c::AbstractChar) = isxdigit(c)
+Base.escape_nul(c::AbstractChar) = ('0' <= c <= '7') ? "\\x00" : "\\0"

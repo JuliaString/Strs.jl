@@ -42,7 +42,7 @@ function _lower(::Type{UTF8Str}, beg, off, len)
                     if diff < 0
                         outend -= diff
                         resize!(buf, outend - out)
-                        println("diff=$diff, out=$out, _pnt(buf)=$(_pnt(buf))")
+                        #println("diff=$diff, out=$out, _pnt(buf)=$(_pnt(buf))")
                         out = _pnt(buf)
                         outend = out + sizeof(buf)
                     end
@@ -111,7 +111,7 @@ function _upper(::Type{UTF8Str}, beg, off, len)
                     if diff < 0
                         outend -= diff
                         resize!(buf, outend - out)
-                        println("diff=$diff, out=$out, _pnt(buf)=$(_pnt(buf))")
+                        #println("diff=$diff, out=$out, _pnt(buf)=$(_pnt(buf))")
                         out = _pnt(buf)
                         outend = out + sizeof(buf)
                     end

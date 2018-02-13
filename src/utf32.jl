@@ -8,7 +8,7 @@ Based in part on code for UTF32String that used to be in Julia
 
 # UTF-32 basic functions
 
-function isascii(str::UTF32Str)
+function isascii(str::Str{<:UTF32CSE})
     (siz = sizeof(str)) == 0 && return true
     pnt, fin = _calcpnt(str, siz)
     while (pnt += CHUNKSZ) <= fin
@@ -17,7 +17,7 @@ function isascii(str::UTF32Str)
     pnt - CHUNKSZ == fin || unsafe_load(reinterpret(Ptr{UInt32}, pnt)) <= 0x7f
 end
 
-function islatin(str::UTF32Str)
+function islatin(str::Str{<:UTF32CSE})
     (siz = sizeof(str)) == 0 && return true
     pnt, fin = _calcpnt(str, siz)
     while (pnt += CHUNKSZ) <= fin
@@ -27,7 +27,7 @@ function islatin(str::UTF32Str)
 end
 
 const _bmp_mask_32   = 0xffff0000_ffff0000
-function isbmp(str::UTF32Str)
+function isbmp(str::Str{<:UTF32CSE})
     (siz = sizeof(str)) == 0 && return true
     pnt, fin = _calcpnt(str, siz)
     while (pnt += CHUNKSZ) <= fin
@@ -36,12 +36,12 @@ function isbmp(str::UTF32Str)
     pnt- CHUNKSZ  == fin || unsafe_load(reinterpret(Ptr{UInt32}, pnt)) <= 0xffff
 end
 
-isunicode(str::UTF32Str)  = true
+isunicode(str::Str{<:UTF32CSE})  = true
 
-isascii(str::_UTF32Str)   = false
-islatin(str::_UTF32Str)   = false
-isbmp(str::_UTF32Str)     = false
-isunicode(str::_UTF32Str) = true
+isascii(str::Str{<:_UTF32CSE})   = false
+islatin(str::Str{<:_UTF32CSE})   = false
+isbmp(str::Str{<:_UTF32CSE})     = false
+isunicode(str::Str{<:_UTF32CSE}) = true
 
 
 # Speed this up by accessing 64 bits or more at a time
@@ -65,7 +65,7 @@ function search(str::UTF32Strings, ch::UInt32, pos::Integer)
     0
 end
 
-function rsearch(str::UTF32Strings, ch::UInt32, pos::Integer)
+function rsearch(str::Str{CSE_T}, ch::UInt32, pos::Integer) where {CSE_T<:Union{UTF32CSE,_UTF32CSE}}
     len, pnt = _lenpnt(str)
     pos == len + 1 && return 0
     1 <= pos <= len && boundserr(str, pos)
