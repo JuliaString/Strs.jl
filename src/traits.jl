@@ -220,14 +220,14 @@ struct UTF16Compare     <: CompareStyle end # Compare first not equal word adjus
 struct WidenCompare     <: CompareStyle end # Narrower can be simply widened for comparisons
 struct CodePointCompare <: CompareStyle end # Compare CodePoints
 
-const WideCSE  = Union{UCS2CSE, _UCS2CSE, UTF32CSE, _UTF32CSE}
+const FixUniCSE  = Union{UCS2CSE, _UCS2CSE, UTF32CSE, _UTF32CSE}
 
 const ASCIICmp = Str{ASCIICSE}
 const LatinCmp = Union{Str{LatinCSE}, Str{_LatinCSE}}
 const UTF8Cmp  = Union{String, Str{UTF8CSE}}
-const WideCmp  = T where {T<:Str{<:WideCSE}}
-const WideSet  = T where {T<:Str{<:Union{UCS2CSE, UTF32CSE}}}
-const WideSub  = T where {T<:Str{<:Union{_UCS2CSE, _UTF32CSE}}}
+const FixUniCmp  = T where {T<:Str{<:FixUniCSE}}
+const FixUniSet  = T where {T<:Str{<:Union{UCS2CSE, UTF32CSE}}}
+const FixUniSub  = T where {T<:Str{<:Union{_UCS2CSE, _UTF32CSE}}}
 
 CompareStyle(A::AbstractString, B::AbstractString) = CompareStyle(typeof(A), typeof(B))
 
@@ -235,20 +235,20 @@ CompareStyle(A, B) = CodePointCompare()
 
 CompareStyle(A::S, B::T) where {C<:CSE,      S<:Str{C}, T<:Str{C}} = ByteCompare()
 CompareStyle(A::S, B::T) where {C<:UTF16CSE, S<:Str{C}, T<:Str{C}} = UTF16Compare()
-CompareStyle(A::S, B::T) where {C<:WideCSE,  S<:Str{C}, T<:Str{C}} = WordCompare()
+CompareStyle(A::S, B::T) where {C<:FixUniCSE,  S<:Str{C}, T<:Str{C}} = WordCompare()
 
 CompareStyle(A::S, B::T) where {S<:ASCIICmp, T<:UTF8Cmp}  = ByteCompare()
 CompareStyle(A::S, B::T) where {S<:ASCIICmp, T<:LatinCmp} = ByteCompare()
-CompareStyle(A::S, B::T) where {S<:ASCIICmp, T<:WideCmp}  = WidenCompare()
+CompareStyle(A::S, B::T) where {S<:ASCIICmp, T<:FixUniCmp}  = WidenCompare()
 
 CompareStyle(A::S, B::T) where {S<:LatinCmp, T<:LatinCmp} = ByteCompare()
 CompareStyle(A::S, B::T) where {S<:LatinCmp, T<:UTF8Cmp}  = ASCIICompare()
-CompareStyle(A::S, B::T) where {S<:LatinCmp, T<:WideCmp}  = WidenCompare()
+CompareStyle(A::S, B::T) where {S<:LatinCmp, T<:FixUniCmp}  = WidenCompare()
 
 CompareStyle(A::S, B::T) where {S<:UTF8Cmp, T<:UTF8Cmp}   = ByteCompare()
-CompareStyle(A::S, B::T) where {S<:WideCmp, T<:WideCmp}   = WidenCompare()
+CompareStyle(A::S, B::T) where {S<:FixUniCmp, T<:FixUniCmp}   = WidenCompare()
 
-CompareStyle(A::S, B::T) where {S<:Str, T<:Union{ASCIICmp,LatinCmp,WideCmp}} = CompareStyle(B, A)
+CompareStyle(A::S, B::T) where {S<:Str, T<:Union{ASCIICmp,LatinCmp,FixUniCmp}} = CompareStyle(B, A)
 
 """
     EqualsStyle(Union{A, typeof(A)}, Union{B, typeof(B)})
@@ -274,13 +274,13 @@ EqualsStyle(A, B) = CodePointEquals()
 EqualsStyle(A::S, B::T) where {C<:CSE, S<:Str{C}, T<:Str{C}} = ByteEquals()
 
 EqualsStyle(A::S, B::T) where {S<:ASCIICmp, T<:Union{UTF8Cmp,Str{LatinCSE}}} = ByteEquals()
-EqualsStyle(A::S, B::T) where {S<:ASCIICmp, T<:Union{WideSub,Str{_LatinCSE}}} = NotEquals()
-EqualsStyle(A::S, B::T) where {S<:ASCIICmp, T<:WideSet} = WidenEquals()
+EqualsStyle(A::S, B::T) where {S<:ASCIICmp, T<:Union{FixUniSub,Str{_LatinCSE}}} = NotEquals()
+EqualsStyle(A::S, B::T) where {S<:ASCIICmp, T<:FixUniSet} = WidenEquals()
 
 EqualsStyle(A::S, B::T) where {S<:LatinCmp, T<:UTF8Cmp}  = ASCIIEquals()
 EqualsStyle(A::S, B::T) where {S<:LatinCmp, T<:LatinCmp} = ByteEquals()
-EqualsStyle(A::S, B::T) where {S<:LatinCmp, T<:WideSub}  = NotEquals()
-EqualsStyle(A::S, B::T) where {S<:LatinCmp, T<:WideSet}  = WidenEquals()
+EqualsStyle(A::S, B::T) where {S<:LatinCmp, T<:FixUniSub}  = NotEquals()
+EqualsStyle(A::S, B::T) where {S<:LatinCmp, T<:FixUniSet}  = WidenEquals()
 
 EqualsStyle(A::S, B::T) where {S<:UTF8Cmp, T<:UTF8Cmp}   = ByteEquals()
 
@@ -288,4 +288,4 @@ EqualsStyle(A::S, B::T) where {S<:Str{UCS2CSE}, T<:Str{_UCS2CSE}}   = ByteEquals
 EqualsStyle(A::S, B::T) where {S<:Str{UCS2CSE}, T<:Str{_UTF32CSE}}  = NotEquals()
 EqualsStyle(A::S, B::T) where {S<:Str{UTF32CSE}, T<:Str{_UTF32CSE}} = ByteEquals()
 
-EqualsStyle(A::S, B::T) where {S<:Str, T<:Union{ASCIICmp,LatinCmp,WideCmp}} = EqualsStyle(B, A)
+EqualsStyle(A::S, B::T) where {S<:Str, T<:Union{ASCIICmp,LatinCmp,FixUniCmp}} = EqualsStyle(B, A)

@@ -658,9 +658,9 @@ end
     (^)(ch::Char, cnt::Integer) = repeat(ch, cnt)
 end
 
-
 # Definitions for C compatible strings, that don't allow embedded
 # '\0', and which are terminated by a '\0'
+
 containsnul(str::ByteStr) = containsnul(unsafe_convert(Ptr{Cchar}, str), sizeof(str))
 
 # Check 4 characters at a time

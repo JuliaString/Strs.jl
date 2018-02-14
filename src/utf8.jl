@@ -239,8 +239,6 @@ end
 
 bytestring(str::Str{<:UTF8CSE}) = str
 
-lastidx(str::Str{<:UTF8CSE}) = sizeof(str)
-
 @inline _isvalid(::CodeUnitMulti, str::Str{<:UTF8CSE}, pos::Integer) =
     (1 <= pos <= _len(str)) && !is_valid_continuation(get_codeunit(_pnt(str), pos))
 
@@ -347,7 +345,7 @@ function rsearch(s::Str{<:UTF8CSE}, c::UInt32, i::Integer)
     end
 end
 
-const _ByteStr = Union{ASCIIStr, Str{<:UTF8CSE}, String}
+const _ByteStr = Union{Str{<:ASCIICSE}, Str{<:UTF8CSE}, String}
 
 string(c::_ByteStr...) = length(c) == 1 ? c[1]::UTF8Str : UTF8Str(_string(c))
     # ^^ at least one must be UTF-8 or the ASCII-only method would get called

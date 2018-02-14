@@ -220,10 +220,15 @@ for val in list ; @eval export $(symstr(val[1], "Str")) ; end
 end
 
 # These should be done via traits
-const ByteStr = Union{Text1Str, BinaryStr, ASCIIStr, LatinStr, _LatinStr, UTF8Str}
-const WordStr = Union{Text2Str, UCS2Str, _UCS2Str, UTF16Str} # 16-bit code units
-const QuadStr = Union{Text4Str, UTF32Str, _UTF32Str} # 32-bit code units
-const WideStr = Union{UCS2Str, UTF16Str, UTF32Str, _UCS2Str, _UTF32Str}
+const ByteCSE = Union{Text1CSE, BinaryCSE, ASCIICSE, LatinCSE, _LatinCSE, UTF8CSE}
+const WordCSE = Union{Text2CSE, UCS2CSE, _UCS2CSE, UTF16CSE} # 16-bit code units
+const QuadCSE = Union{Text4CSE, UTF32CSE, _UTF32CSE} # 32-bit code units
+const WideCSE = Union{UCS2CSE, UTF16CSE, UTF32CSE, _UCS2CSE, _UTF32CSE}
+
+const ByteStr = Str{<:ByteCSE}
+const WordStr = Str{<:WordCSE}
+const QuadStr = Str{<:QuadCSE}
+const WideStr = Str{<:WideCSE}
 
 const RawCSEncodings   = Union{Text1CSE, Text2CSE, Text4CSE}
 const LatinCSEncodings = Union{LatinCSE, _LatinCSE}
