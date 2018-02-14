@@ -15,6 +15,7 @@ const BIG_ENDIAN    = (ENDIAN_BOM == 0x01020304)
 const LITTLE_ENDIAN = !BIG_ENDIAN
 
 const STR_DATA_VECTOR = false
+const STR_KEEP_NUL    = true  # keep nul byte placed by String
 
 struct CharSet{CS}   end
 struct Encoding{Enc} end
@@ -109,6 +110,12 @@ struct Str{T,SubStr,Cache,Hash} <: AbstractString
 end
 #(::Type{STR})(v::STR_DATA_TYPE) where {STR<:Str{T,S,C,H}} where {T<:CSE,S,C,H} = Str(T, v)
 
+# Handle change from endof -> lastindex
+@static if !isdefined(Base, :lastindex)
+    Base.endof(str::Str) = lastindex(str)
+    lastindex(arr::AbstractArray) = Base.endof(arr)
+end
+
 # This needs to be redone, with character sets and the code unit as part of the type
 
 const CodeUnitTypes = Union{UInt8, UInt16, UInt32}
@@ -172,7 +179,7 @@ show(io::IO, ::Type{UniStr}) = print(io, :UniStr)
 if STR_DATA_VECTOR
     _allocate(len) = create_vector(UInt8, len)
 else
-    _allocate(len) = Base._string_n((len-1)%Csize_t)
+    _allocate(len) = Base._string_n((len+STR_KEEP_NUL-1)%Csize_t)
 end
 
 function _allocate(::Type{T}, len) where {T <: CodeUnitTypes}
@@ -267,7 +274,7 @@ promote_rule(::Type{LatinStr}, ::Type{_LatinStr}) = LatinStr
 promote_rule(::Type{UCS2Str}, ::Type{_UCS2Str})   = UCS2Str
 promote_rule(::Type{UTF32Str}, ::Type{_UTF32Str}) = UTF32Str
 
-sizeof(s::Str) = sizeof(s.data) + !STR_DATA_VECTOR
+sizeof(s::Str) = sizeof(s.data) + !STR_DATA_VECTOR - STR_KEEP_NUL
 
 """Codeunits of string as a Vector"""
 _data(s::Vector{UInt8}) = s
@@ -294,7 +301,6 @@ _pnt64(s::Str) = reinterpret(Ptr{UInt64}, pointer(s.data))
 
 """Length of string in codeunits"""
 _len(s) = sizeof(s)
-_len(s::ByteStr) = sizeof(s)
 _len(s::WordStr) = sizeof(s) >>> 1
 _len(s::QuadStr) = sizeof(s) >>> 2
 

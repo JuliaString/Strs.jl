@@ -2,11 +2,12 @@
 # Copyright 2017 Scott P. Jones and other contributors to the Julia language
 # Licensed under MIT License, see LICENSE.md
 
-ascii(str) = convert(ASCIIStr, str)
+# Renamed from ascii to to_ascii, to prevent issues
+to_ascii(str) = convert(ASCIIStr, str)
 
-ascii(pnt::Ptr{UInt8}) =
-    ascii(pnt, pnt == C_NULL ? Csize_t(0) : ccall(:strlen, Csize_t, (Ptr{UInt8},), pnt))
-ascii(pnt::Ptr{UInt8}, len::Integer) = begin
+to_ascii(pnt::Ptr{UInt8}) =
+    to_ascii(pnt, pnt == C_NULL ? Csize_t(0) : ccall(:strlen, Csize_t, (Ptr{UInt8},), pnt))
+to_ascii(pnt::Ptr{UInt8}, len::Integer) = begin
     pnt == C_NULL && nullerr()
     vec = ccall(:jl_pchar_to_array, Vector{UInt8}, (Ptr{UInt8}, Csize_t), pnt, len)
     isvalid(ASCIIStr, vec) || unierror(UTF_ERR_INVALID_ASCII)

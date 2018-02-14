@@ -46,7 +46,7 @@ Note: for good substring performance, some of the operations that are optimized 
 =#
 
 # Convenience functions
-export utf8, utf16, utf32
+export to_ascii, utf8, utf16, utf32
 
 export unsafe_str, codeunit, codeunits, codepoints, @str_str, @condimport
 
@@ -68,8 +68,6 @@ macro condimport(mod, sym)
 end
 
 using Base: @_inline_meta, @propagate_inbounds, @_propagate_inbounds_meta
-
-@static isdefined(Base, :lastindex) || (Base.endof(str) = lastindex(str))
 
 import Base: containsnul, convert, getindex, length, map, pointer, collect,
              reverse, rsearch, search, sizeof, string, unsafe_convert, unsafe_load, write,

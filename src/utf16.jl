@@ -62,7 +62,7 @@ islatin(str::_UCS2Str) = false
 isbmp(str::UCS2Strings) = true
 
 # Speed this up accessing 64 bits at a time
-function _cnt_non_bmp(len, pnt::Ptr{UInt16})
+@propagate_inbounds function _cnt_non_bmp(len, pnt::Ptr{UInt16})
     cnt = 0
     @inbounds for i = 1:len
         cnt += is_surrogate_lead(get_codeunit(pnt, i))
@@ -83,7 +83,7 @@ function _nextcpfun(::CodeUnitMulti, ::Type{UTF16CSE}, pnt)
      : (ch%UInt32, pnt + 2))
 end
 
-function _next(::CodeUnitMulti, T, str::Str{<:UTF16CSE}, pos::Int)
+@propagate_inbounds function _next(::CodeUnitMulti, T, str::Str{<:UTF16CSE}, pos::Int)
     @boundscheck pos <= _len(str) || boundserr(str, pos)
     pnt = _pnt(str) + (pos<<1)
     ch = get_codeunit(pnt - 2)
@@ -92,18 +92,18 @@ function _next(::CodeUnitMulti, T, str::Str{<:UTF16CSE}, pos::Int)
      : (T(ch), pos + 1))
 end
 
-@inline function _thisind(::CodeUnitMulti, str::Str{<:UTF16CSE}, pos::Int)
+@propagate_inbounds @inline function _thisind(::CodeUnitMulti, str::Str{<:UTF16CSE}, pos::Int)
     @boundscheck 1 <= pos <= _len(str) || boundserr(str, pos)
     pos - is_surrogate_trail(get_codeunit(_pnt(str), pos))
 end
 
-@inline function _nextind(::CodeUnitMulti, str::Str{<:UTF16CSE}, pos::Int)
+@propagate_inbounds @inline function _nextind(::CodeUnitMulti, str::Str{<:UTF16CSE}, pos::Int)
     pos == 0 && return 1
     @boundscheck 1 <= pos <= _len(str) || boundserr(str, pos)
     pos + 1 + is_surrogate_lead(get_codeunit(_pnt(str), pos))
 end
 
-@inline function _prevind(::CodeUnitMulti, str::Str{<:UTF16CSE}, pos::Int)
+@propagate_inbounds @inline function _prevind(::CodeUnitMulti, str::Str{<:UTF16CSE}, pos::Int)
     (pos -= 1) == 0 && return 0
     numcu = _len(str)
     @boundscheck 0 < pos <= numcu || boundserr(str, pos + 1)
@@ -111,7 +111,7 @@ end
 end
 
 # Todo: _prevind with nchar argument
-function _nextind(::CodeUnitMulti, str::Str{<:UTF16CSE}, pos::Int, cnt::Int)
+@propagate_inbounds function _nextind(::CodeUnitMulti, str::Str{<:UTF16CSE}, pos::Int, cnt::Int)
     cnt < 0 && neginderr(str, cnt)
     @boundscheck 0 <= pos <= _len(str) || boundserr(str, pos)
     cnt == 0 && return thisind(str, pos) == pos ? pos : unierror("Invalid position", str, pos)
@@ -235,7 +235,7 @@ function reverse(str::T) where {T<:UCS2Strings}
     Str(cse(T), buf)
 end
 
-@inline _isvalid(::CodeUnitMulti, str::Str{<:UTF16CSE}, i::Int) =
+@inline _isvalid(::CodeUnitMulti, str::Str{<:UTF16CSE}, i::Integer) =
     (1 <= i <= _len(str)) && !is_surrogate_trail(get_codeunit(_pnt(str), i))
 
 function isvalid(::Type{<:UCS2Strings}, data::AbstractArray{UInt16})
@@ -426,7 +426,7 @@ function convert(::Type{UTF16Str}, str::String)
     Str(UTF16CSE, flags == 0 ? _cvtsize(UInt16, str, len) : _encode_utf16(str, len + num4byte))
 end
 
-function convert(::Type{UTF16Str}, str::UTF8Str)
+function convert(::Type{UTF16Str}, str::Str{<:UTF8CSE})
     # handle zero length string quickly
     isempty(str) && return empty_utf16
     pnt = _pnt(str)

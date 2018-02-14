@@ -8,10 +8,10 @@ Based in part on code for ASCIIString that used to be in Julia
 
 ## overload methods for efficiency ##
 
-isascii(str::_LatinStr)      = false
-islatin(str::LatinStrings)   = true
-isbmp(str::LatinStrings)     = true
-isunicode(str::LatinStrings) = true
+isascii(str::Str{<:_LatinCSE}) = false
+islatin(str::LatinStrings)     = true
+isbmp(str::LatinStrings)       = true
+isunicode(str::LatinStrings)   = true
 
 bytestring(s::LatinStrings) = s
 
@@ -42,7 +42,7 @@ function string(c::UnicodeByteStrings...)
 end
 
 # Todo make generic version, with all CodeUnitSingle types
-function reverse(str::T) where {T<:Union{ASCIIStr,LatinStrings}}
+function reverse(str::T) where {T<:Union{Str{<:ASCIICSE},LatinStrings}}
     (len = _len(str)) < 2 && return str
     pnt = _pnt(str)
     buf, beg = _allocate(UInt8, len)

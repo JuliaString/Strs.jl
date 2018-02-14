@@ -1,5 +1,5 @@
 # Test pointer() functions
-let str = ascii("this ")
+let str = to_ascii("this ")
     u8  = utf8(str)
     u16 = utf16(str)
     u32 = utf32(str)
