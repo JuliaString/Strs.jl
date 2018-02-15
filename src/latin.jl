@@ -8,10 +8,10 @@ Based in part on code for ASCIIString that used to be in Julia
 
 ## overload methods for efficiency ##
 
-isascii(str::_LatinStr)      = false
-islatin(str::LatinStrings)   = true
-isbmp(str::LatinStrings)     = true
-isunicode(str::LatinStrings) = true
+isascii(str::Str{<:_LatinCSE}) = false
+islatin(str::LatinStrings)     = true
+isbmp(str::LatinStrings)       = true
+isunicode(str::LatinStrings)   = true
 
 bytestring(s::LatinStrings) = s
 
@@ -38,11 +38,11 @@ function string(c::UnicodeByteStrings...)
         unsafe_copyto!(buf, off, _data(str), 1, len)
         off += len
     end
-    LatinStr(buf)
+    Str(LatinCSE, buf)
 end
 
 # Todo make generic version, with all CodeUnitSingle types
-function reverse(str::T) where {T<:Union{ASCIIStr,LatinStrings}}
+function reverse(str::T) where {T<:Union{Str{<:ASCIICSE},LatinStrings}}
     (len = _len(str)) < 2 && return str
     pnt = _pnt(str)
     buf, beg = _allocate(UInt8, len)
@@ -92,7 +92,7 @@ function convert(::Type{T}, ch::UInt32) where {T<:LatinStrings}
     ch <= 0xff || unierror(UTF_ERR_INVALID_LATIN1, ch)
     buf = _allocate(1)
     buf[1] = ch%UInt8
-    T(buf)
+    Str(cse(T), buf)
 end
 
 function convert(::Type{ASCIIStr}, ch::UInt32)
@@ -109,16 +109,16 @@ convert(::Type{T}, s::S) where {T<:LatinStrings,S<:UnicodeByteStrings} = T(_data
 convert(::Type{T}, s::UTF8Str) where {T<:LatinStrings} = convert(T, _data(s))
 
 # Assumes that has already been checked for validity
-function _utf8_to_latin(dat::T, len) where {T<:Union{Ptr{UInt8}, Vector{UInt8}}}
-    buf, pnt = _allocate(UInt8, len)
-    pos = 0
-    fin = pnt + len
-    @inbounds while pnt < fin
-        ch = get_codeunit(dat, pos += 1)
+function _utf8_to_latin(pnt::Ptr{UInt8}, len)
+    buf, out = _allocate(UInt8, len)
+    fin = out + len
+    while out < fin
+        ch = get_codeunit(pnt)
         # Handle ASCII characters
-        ch > 0x7f && (ch = ((ch & 3) << 6) | (get_codeunit(dat, pos += 1) & 0x3f))
-        set_codeunit!(pnt, ch)
+        ch > 0x7f && (ch = ((ch & 3) << 6) | (get_codeunit(pnt += 1) & 0x3f))
         pnt += 1
+        set_codeunit!(out, ch)
+        out += 1
     end
     buf
 end
@@ -129,7 +129,7 @@ function convert(::Type{LatinStr}, str::String)
     # get number of bytes to allocate
     len, flags, num4byte, num3byte, num2byte, latinbyte = unsafe_checkstring(str, 1, sizeof(str))
     num4byte + num3byte + num2byte == 0 || unierror(UTF_ERR_INVALID_LATIN1)
-    LatinStr(flags == 0 ? _data(str) : _utf8_to_latin(_data(str), len))
+    Str(LatinCSE, flags == 0 ? _data(str) : _utf8_to_latin(_pnt(str), len))
 end
 
 function convert(::Type{_LatinStr}, str::String)
@@ -140,7 +140,7 @@ function convert(::Type{_LatinStr}, str::String)
         unsafe_checkstring(str, 1, sizeof(str))
     num4byte + num3byte + num2byte == 0 || unierror(UTF_ERR_INVALID_LATIN1)
     Str(latinbyte == 0 ? ASCIICSE : _LatinCSE,
-        flags == 0 ? _data(str) : _utf8_to_latin(_data(str), len))
+        flags == 0 ? _data(str) : _utf8_to_latin(_pnt(str), len))
 end
 
 convert(::Type{LatinStr}, a::Vector{UInt8}) = _convert(LatinStr, a)

@@ -163,22 +163,22 @@ end
 
 function Str(v::Vector{UInt8})
     siz = sizeof(v)
-    buf = _allocate(siz)
-    @inbounds copyto!(buf, v, siz)
+    buf, pnt = _allocate(UInt8, siz)
+    @inbounds unsafe_copyto!(pnt, pointer(v), siz)
     Str(Text1CSE, buf)
 end
 
 function Str(v::Vector{UInt16})
     len = length(v)
     buf, pnt = _allocate(UInt16, v)
-    @inbounds unsafe_copyto!(pnt, v, len)
+    @inbounds unsafe_copyto!(pnt, pointer(v), len)
     Str(Text2CSE, buf)
 end
 
 function Str(v::Vector{UInt32})
     len = length(v)
     buf, pnt = _allocate(UInt32, len)
-    @inbounds unsafe_copyto!(buf, v, len)
+    @inbounds unsafe_copyto!(buf, pointer(v), len)
     Str(Text4CSE, buf)
 end
 

@@ -9,7 +9,7 @@ Licensed under MIT License, see LICENSE.md
 # could expand to 3 byte sequences.  In the standard Unicode tables,
 # that is the only expansion that occurs for upper or lower case
 
-function _lower(::Type{UTF8Str}, beg, off, len)
+function _lower_utf8(beg, off, len)
     # Note, the final length may be larger or smaller
     buf, out = _allocate(UInt8, len)
     unsafe_copyto!(out, beg, off)
@@ -42,7 +42,7 @@ function _lower(::Type{UTF8Str}, beg, off, len)
                     if diff < 0
                         outend -= diff
                         resize!(buf, outend - out)
-                        println("diff=$diff, out=$out, _pnt(buf)=$(_pnt(buf))")
+                        #println("diff=$diff, out=$out, _pnt(buf)=$(_pnt(buf))")
                         out = _pnt(buf)
                         outend = out + sizeof(buf)
                     end
@@ -77,7 +77,7 @@ function _lower(::Type{UTF8Str}, beg, off, len)
     Str(UTF8CSE, buf)
 end
 
-function _upper(::Type{UTF8Str}, beg, off, len)
+function _upper_utf8(beg, off, len)
     # Note, the final length may be larger or smaller
     buf, out = _allocate(UInt8, len)
     unsafe_copyto!(out, beg, off)
@@ -111,7 +111,7 @@ function _upper(::Type{UTF8Str}, beg, off, len)
                     if diff < 0
                         outend -= diff
                         resize!(buf, outend - out)
-                        println("diff=$diff, out=$out, _pnt(buf)=$(_pnt(buf))")
+                        #println("diff=$diff, out=$out, _pnt(buf)=$(_pnt(buf))")
                         out = _pnt(buf)
                         outend = out + sizeof(buf)
                     end
@@ -146,7 +146,7 @@ function _upper(::Type{UTF8Str}, beg, off, len)
     Str(UTF8CSE, buf)
 end
 
-function lowercase(str::UTF8Str)
+function lowercase(str::T) where {T<:Str{CSE_T}} where {CSE_T<:UTF8CSE}
     pnt = beg = _pnt(str)
     fin = beg + sizeof(str)
     while pnt < fin
@@ -161,13 +161,13 @@ function lowercase(str::UTF8Str)
                          : (ch < 0xe0
                             ? get_utf8_2byte(pnt += 1, ch)
                             : get_utf8_3byte(pnt += 2, ch))%UInt32))) &&
-            return _lower(UTF8Str, beg, prv-beg, _len(str))
+            return _lower_utf8(beg, prv-beg, _len(str))
         pnt += 1
     end
     str
 end
 
-function uppercase(str::UTF8Str)
+function uppercase(str::T) where {T<:Str{CSE_T}} where {CSE_T<:UTF8CSE}
     pnt = beg = _pnt(str)
     fin = beg + sizeof(str)
     while pnt < fin
@@ -182,7 +182,7 @@ function uppercase(str::UTF8Str)
                          : (ch < 0xe0
                             ? get_utf8_2byte(pnt += 1, ch)
                             : get_utf8_3byte(pnt += 2, ch))%UInt32))) &&
-            return _upper(UTF8Str, beg, prv-beg, _len(str))
+            return _upper_utf8(beg, prv-beg, _len(str))
         pnt += 1
     end
     str

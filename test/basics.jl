@@ -28,8 +28,17 @@ end
 @testset "{starts,ends}with" begin
     for (ST, type_list) in compat_types, CT in type_list, test_string in test_strings_base[CT]
         converted_string = convert(ST, test_string)
+        try
         @test startswith(converted_string, test_string[1])
+        startswith(converted_string, test_string[1]) ||
+            println("startswith($converted_string, $(test_string[1])): $ST, $CT")
         @test endswith(converted_string, test_string[end])
+        endswith(converted_string, test_string[end]) ||
+            println("endswith($converted_string, $(test_string[end])): $ST, $CT")
+        catch ex
+            println("Error: $converted_string, $(test_string[end]): $ST, $CT")
+            println(sprint(showerror, ex, catch_backtrace()))
+        end
         ##   TODO needs test which would run in case the start and end chars are the same
         if test_string[1] != test_string[end]
             @test !startswith(converted_string, test_string[end])

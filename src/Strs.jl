@@ -46,7 +46,7 @@ Note: for good substring performance, some of the operations that are optimized 
 =#
 
 # Convenience functions
-export utf8, utf16, utf32
+export to_ascii, utf8, utf16, utf32
 
 export unsafe_str, codeunit, codeunits, codepoints, @str_str, @condimport
 
@@ -69,7 +69,7 @@ end
 
 using Base: @_inline_meta, @propagate_inbounds, @_propagate_inbounds_meta
 
-import Base: containsnul, convert, endof, getindex, length, map, pointer, collect,
+import Base: containsnul, convert, getindex, length, map, pointer, collect,
              reverse, rsearch, search, sizeof, string, unsafe_convert, unsafe_load, write,
              codeunit, start, next, done, nextind, prevind, reverseind,
              typemin, typemax, isvalid, rem, size, ndims, first, last, eltype, isempty, in,
@@ -82,6 +82,7 @@ import Base: containsnul, convert, endof, getindex, length, map, pointer, collec
 @condimport codeunits
 @condimport ncodeunits
 @condimport bytestring
+@condimport lastindex
 
 isdefined(Base, :copyto!)        || (const copyto! = copy!)
 isdefined(Base, :unsafe_copyto!) || (const unsafe_copyto! = unsafe_copy!)

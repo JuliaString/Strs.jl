@@ -8,7 +8,7 @@ Based in part on code for UTF32String that used to be in Julia
 
 # UTF-32 basic functions
 
-function isascii(str::UTF32Str)
+function isascii(str::Str{<:UTF32CSE})
     (siz = sizeof(str)) == 0 && return true
     pnt, fin = _calcpnt(str, siz)
     while (pnt += CHUNKSZ) <= fin
@@ -17,7 +17,7 @@ function isascii(str::UTF32Str)
     pnt - CHUNKSZ == fin || unsafe_load(reinterpret(Ptr{UInt32}, pnt)) <= 0x7f
 end
 
-function islatin(str::UTF32Str)
+function islatin(str::Str{<:UTF32CSE})
     (siz = sizeof(str)) == 0 && return true
     pnt, fin = _calcpnt(str, siz)
     while (pnt += CHUNKSZ) <= fin
@@ -27,7 +27,7 @@ function islatin(str::UTF32Str)
 end
 
 const _bmp_mask_32   = 0xffff0000_ffff0000
-function isbmp(str::UTF32Str)
+function isbmp(str::Str{<:UTF32CSE})
     (siz = sizeof(str)) == 0 && return true
     pnt, fin = _calcpnt(str, siz)
     while (pnt += CHUNKSZ) <= fin
@@ -36,12 +36,12 @@ function isbmp(str::UTF32Str)
     pnt- CHUNKSZ  == fin || unsafe_load(reinterpret(Ptr{UInt32}, pnt)) <= 0xffff
 end
 
-isunicode(str::UTF32Str)  = true
+isunicode(str::Str{<:UTF32CSE})  = true
 
-isascii(str::_UTF32Str)   = false
-islatin(str::_UTF32Str)   = false
-isbmp(str::_UTF32Str)     = false
-isunicode(str::_UTF32Str) = true
+isascii(str::Str{<:_UTF32CSE})   = false
+islatin(str::Str{<:_UTF32CSE})   = false
+isbmp(str::Str{<:_UTF32CSE})     = false
+isunicode(str::Str{<:_UTF32CSE}) = true
 
 
 # Speed this up by accessing 64 bits or more at a time
@@ -65,7 +65,7 @@ function search(str::UTF32Strings, ch::UInt32, pos::Integer)
     0
 end
 
-function rsearch(str::UTF32Strings, ch::UInt32, pos::Integer)
+function rsearch(str::Str{CSE_T}, ch::UInt32, pos::Integer) where {CSE_T<:Union{UTF32CSE,_UTF32CSE}}
     len, pnt = _lenpnt(str)
     pos == len + 1 && return 0
     1 <= pos <= len && boundserr(str, pos)
@@ -170,7 +170,7 @@ function _encode_utf32(pnt, len)
 end
 
 # transcode to vector of UInt32 from validated UTF8
-function _transcode_utf32(::Type{UTF8Str}, pnt, len)
+function _transcode_utf8_to_utf32(pnt, len)
     buf, out = _allocate(UInt32, len)
     fin = out + (len<<2)
     @inbounds while out < fin
@@ -195,7 +195,7 @@ function _transcode_utf32(::Type{UTF8Str}, pnt, len)
 end
 
 # transcode to vector of UInt32 from validated UTF16
-function _transcode_utf32(::Type{UTF16Str}, pnt, len)
+function _transcode_utf16_to_utf32(pnt, len)
     buf, out = _allocate(UInt32, len)
     fin = out + (len<<2)
     @inbounds while out < fin
@@ -209,19 +209,19 @@ function _transcode_utf32(::Type{UTF16Str}, pnt, len)
 end
 
 # This can rely on the fact that a UTF8Str is always valid
-function convert(::Type{UTF32Str}, str::UTF8Str)
+function convert(::Type{UTF32Str}, str::Str{<:UTF8CSE})
     # handle zero length string quickly
     (len = _len(str)) == 0 && return empty_utf32
     cnt = _length(CodeUnitMulti(), str)
     # Optimize case where no characters > 0x7f, otherwise has multi-byte UTF-8 sequences
     Str(UTF32CSE,
         (cnt == len
-         ? _cvtsize(UInt32, _data(str), cnt)
-         : _transcode_utf32(UTF8Str, _pnt(str), cnt)))
+         ? _cvtsize(UInt32, _pnt(str), cnt)
+         : _transcode_utf8_to_utf32(_pnt(str), cnt)))
 end
 
 _cvt_utf32(T, str) =
-    (siz = sizeof(str)) == 0 ? empty_str(T) : Str(cse(T), _cvtsize(UInt32, _data(str), siz))
+    (siz = sizeof(str)) == 0 ? empty_str(T) : Str(cse(T), _cvtsize(UInt32, _pnt(str), siz))
 
 const ShortStr = Union{UnicodeByteStrings,UCS2Strings}
 # This can rely on the fact that an ASCIIStr, LatinStr, UCS2Str is always valid
@@ -230,7 +230,7 @@ convert(::Type{UTF32Str}, str::ShortStr) = _cvt_utf32(UTF32Str, str)
 convert(::Type{_UTF32Str}, str::ShortStr) = _cvt_utf32(_UTF32Str, str)
 
 # This can rely on the fact that a UTF16Str is always valid
-function convert(::Type{UTF32Str}, str::UTF16Str)
+function convert(::Type{UTF32Str}, str::Str{<:UTF16CSE})
     # handle zero length string quickly
     (len = _len(str)) == 0 && return empty_utf32
     # Get number of characters to create
@@ -238,7 +238,7 @@ function convert(::Type{UTF32Str}, str::UTF16Str)
     # No surrogate pairs, do optimized copy
     Str(UTF32CSE, cnt == len
         ? _cvtsize(UInt32, _pnt(str), cnt)
-        : _transcode_utf32(UTF16Str, _pnt(str), cnt))
+        : _transcode_utf16_to_utf32(_pnt(str), cnt))
 end
 
 function convert(::Type{UTF16Str}, str::T) where {T<:UTF32Strings}
@@ -288,7 +288,7 @@ function convert(::Type{Vector{UInt32}}, str::QuadStr)
 end
 
 # I don't think this will work for Char anymore, broken by #24999
-unsafe_convert(::Type{Ptr{T}}, s::UTF32Str) where {T<:UniRawChar} = convert(Ptr{T}, _pnt(s))
+unsafe_convert(::Type{Ptr{T}}, s::Str{<:UTF32CSE}) where {T<:UniRawChar} = convert(Ptr{T}, _pnt(s))
 
 # Should check for 0xxxxxfeff and 0xfffexxxx as well, might be 16-bit encoded
 _convert(pnt::Ptr{T}, len, T1) where {T<:Union{UInt32,UInt32_U,UInt32_S,UInt32_US}} =

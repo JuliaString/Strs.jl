@@ -9,7 +9,7 @@ function tstcvt(strUTF8::UTF8Str, strUTF16::UTF16Str, strUTF32::UTF32Str)
 end
 
 # Create some ASCII, UTF8, UTF16, and UTF32 strings
-let strAscii = ascii("abcdefgh"),
+let strAscii = to_ascii("abcdefgh"),
     strA_UTF8 = utf8(("abcdefgh\uff")[1:8]),
     strL_UTF8 = utf8("abcdef\uff\uff"),
     str2_UTF8 = utf8("abcd\uff\uff\u7ff\u7ff"),
