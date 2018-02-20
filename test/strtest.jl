@@ -30,15 +30,11 @@ function loadall(loc=git)
         rmpkg(pkg)
     end
 
-
-    rmpkg("LightXML")
     rmpkg("JSON")
     Pkg.clone("https://github.com/ScottPJones/JSON.jl")
     Pkg.checkout("JSON", "spj/useptr")
     Pkg.build("JSON")
-    Pkg.clone("https://github.com/ScottPJones/LightXML.jl")
-    Pkg.checkout("LightXML", "spj/v7update")
-    Pkg.build("LightXML")
+    loadpkg("LightXML"; loc=loc)
 
     for pkg in pkglist
         Pkg.clone(joinpath(loc, string(pkg, ".jl")))
@@ -67,6 +63,25 @@ function testtable(m::Module, symtab, fun, f2)
     get_new(k) = lookupname(def, k)
     tab = collect(def.nam)
     juliatab = [fun(k) for k in keys(symtab)]
+    juliaval = Dict{String, Vector{String}}()
+    tabval   = Dict{String, Vector{String}}()
+    for k in keys(symtab)
+        val = symtab[k]
+        mykey = fun(k)
+        haskey(juliaval, val) ? push!(juliaval[val], mykey) : (juliaval[val] = [mykey])
+    end
+    for k in tab
+        val = lookupname(def, k)
+        haskey(tabval, val) ? push!(tabval[val], k) : (tabval[val] = [k])
+    end
+    prnt = false
+    for (val, keys) in juliaval
+        haskey(tabval, val) || continue
+        tabkeys = tabval[val]
+        keys == tabkeys && continue
+        prnt || (println("Names changed from old to new"); prnt = true)
+        println("\e[s", val, "\e[u\e[16C", "Old: ", rpad(keys, 20), "New: ", tabkeys)
+    end
     onlyjulia = setdiff(juliatab, tab)
     if !isempty(onlyjulia)
         tabjulia = [(key, str_chr(get_old(key))) for key in onlyjulia]
@@ -109,6 +124,63 @@ function testtable(m::Module, symtab, fun, f2)
         println()
     end
 end
+
+function showchanges(m::Module, symtab, fun)
+    def = m.default
+    tab = collect(def.nam)
+    juliaval = Dict{String, Set{String}}()
+    tabval   = Dict{String, Set{String}}()
+    for k in keys(symtab)
+        val = symtab[k]
+        haskey(juliaval, val) || (juliaval[val] = Set{String}())
+        push!(juliaval[val], fun(k))
+    end
+    for k in tab
+        contains(k, "{") && continue
+        val = lookupname(def, k)
+        haskey(tabval, val) || (tabval[val] = Set{String}())
+        push!(tabval[val], k)
+    end
+    prnt = false
+    preftab = Dict{String, Set{String}}()
+    for (val, keys) in juliaval
+        haskey(tabval, val) || continue
+        tabkeys = tabval[val]
+        keys == tabkeys && continue
+        prnt || (println("Names changed from old to new"); prnt = true)
+        # See if there is a common suffix
+        jkeys = collect(keys)
+        tkeys = collect(tabkeys)
+        onlyjulia = collect(setdiff(keys, tabkeys))
+        onlytable = collect(setdiff(tabkeys, keys))
+        bothtabs  = collect(intersect(keys, tabkeys))
+        if length(keys) == length(tabkeys) == 1
+            jk = jkeys[1]
+            tk = tkeys[1]
+            jlen = sizeof(jk)
+            tlen = sizeof(tk)
+            mlen = min(jlen, tlen)
+            lasteq = mlen
+            for i = 0:mlen-1
+                jk[end-i] == tk[end-i] || (lasteq = i ; break)
+            end
+            pref1 = tk[1:(end-lasteq)]
+            pref2 = jk[1:(end-lasteq)]
+            haskey(preftab, pref1) || (preftab[pref1] = Set{String}())
+            push!(preftab[pref1], pref2)
+            println("\e[s$pref1 -> $pref2\e[u\e[30C\e[s$val\e[u\e[3C$(rpad(jk,30))$(rpad(tk,30))")
+        elseif isempty(onlyjulia)
+            println("\e[s$bothtabs +\e[u\e[30C\e[s$val\e[u\e[3C$onlytable")
+        elseif isempty(onlytable)
+            println("\e[s$bothtabs -\e[u\e[30C\e[s$val\e[u\e[3C$onlyjulia")
+        else
+            println("\e[s$bothtabs\e[u\e[30C\e[s$val\e[u\e[3C$onlytable -> $onlyjulia")
+        end
+    end
+    preftab
+end
+
+showlatex() = showchanges(LaTeX_Entities, RC.latex_symbols, (x)->x[2:end])
 
 function testall()
     # Compare tables against what's currently in Base (for this version of Julia)
