@@ -31,9 +31,10 @@ function loadall(loc=git)
     end
 
     rmpkg("JSON")
-    Pkg.clone("https://github.com/ScottPJones/JSON.jl")
+    Pkg.clone(loc == git ? "https://github.com/ScottPJones/JSON.jl" : "/j/JSON.jl")
     Pkg.checkout("JSON", "spj/useptr")
     Pkg.build("JSON")
+    #loadpkg("LightXML"; loc = loc == git ? "https://github.com/JuliaIO/" : "/j/")
     loadpkg("LightXML"; loc="https://github.com/JuliaIO/")
 
     for pkg in pkglist

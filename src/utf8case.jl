@@ -146,7 +146,7 @@ function _upper_utf8(beg, off, len)
     Str(UTF8CSE, buf)
 end
 
-function lowercase(str::T) where {T<:Str{CSE_T}} where {CSE_T<:UTF8CSE}
+function lowercase(str::T) where {C<:UTF8CSE,T<:Str{C}}
     pnt = beg = _pnt(str)
     fin = beg + sizeof(str)
     while pnt < fin
@@ -167,7 +167,7 @@ function lowercase(str::T) where {T<:Str{CSE_T}} where {CSE_T<:UTF8CSE}
     str
 end
 
-function uppercase(str::T) where {T<:Str{CSE_T}} where {CSE_T<:UTF8CSE}
+function uppercase(str::T) where {C<:UTF8CSE,T<:Str{C}}
     pnt = beg = _pnt(str)
     fin = beg + sizeof(str)
     while pnt < fin
