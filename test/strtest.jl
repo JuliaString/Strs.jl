@@ -34,7 +34,7 @@ function loadall(loc=git)
     Pkg.clone("https://github.com/ScottPJones/JSON.jl")
     Pkg.checkout("JSON", "spj/useptr")
     Pkg.build("JSON")
-    loadpkg("LightXML"; loc=loc)
+    loadpkg("LightXML"; loc=git)
 
     for pkg in pkglist
         Pkg.clone(joinpath(loc, string(pkg, ".jl")))
