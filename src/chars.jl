@@ -72,7 +72,7 @@ isvalid(::Type{T}) where {T<:UnicodeChars} = true
 isvalid(::Type{ASCIIStr}, str::Vector{ASCIIChr}) = true
 isvalid(::Type{LatinStrings}, str::Vector{T}) where {T<:Union{ASCIIChr,LatinChars}} = true
 isvalid(::Type{UCS2Str}, str::Vector{T}) where {T<:Union{ASCIIChr,LatinChars,UCS2Chr}} = true
-isvalid(::Type{S}, str::Vector{T}) where {S<:UnicodeStrings} where {T<:UnicodeChars} = true
+isvalid(::Type{S}, str::Vector{T}) where {S<:UnicodeStrings,T<:UnicodeChars} = true
 
 isvalid(::Type{T}, v::Signed) where {T<:ByteChars} = typemin(T) <= v <= typemax(T)
 isvalid(::Type{T}, v::Unsigned) where {T<:ByteChars} = v <= typemax(T)

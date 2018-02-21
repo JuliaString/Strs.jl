@@ -23,7 +23,7 @@ function _length(::CodeUnitMulti, str::Str{<:UTF16CSE})
     pnt - CHUNKSZ == fin ? cnt : (cnt - count_ones(_get_masked(pnt) & _mask_bytes(siz)))
 end
 
-function isascii(str::T) where {T<:Str{CSE_T}} where {CSE_T<:Union{Text2CSE, UCS2CSE, UTF16CSE}}
+function isascii(str::T) where {C<:Union{Text2CSE, UCS2CSE, UTF16CSE},T<:Str{C}}
     (siz = sizeof(str)) == 0 && return true
     siz < CHUNKSZ &&
         return ((unsafe_load(_pnt64(str)) & _mask_bytes(siz)) & _ascii_mask(UInt16)) == 0
@@ -34,7 +34,7 @@ function isascii(str::T) where {T<:Str{CSE_T}} where {CSE_T<:Union{Text2CSE, UCS
     pnt - CHUNKSZ == fin || ((unsafe_load(pnt) & _mask_bytes(siz)) & _ascii_mask(UInt16)) == 0
 end
 
-function islatin(str::T) where {T<:Str{CSE_T}} where {CSE_T<:Union{Text2CSE, UCS2CSE, UTF16CSE}}
+function islatin(str::T) where {C<:Union{Text2CSE, UCS2CSE, UTF16CSE},T<:Str{C}}
     (siz = sizeof(str)) == 0 && return true
     siz < CHUNKSZ &&
         return ((unsafe_load(_pnt64(str)) & _mask_bytes(siz)) & _latin_mask(UInt16)) == 0
@@ -611,7 +611,7 @@ function _maprest(fun, str, len, pnt, fin, buf, out, uc)
     Str(UTF16CSE, totbuf)
 end
 
-function map(fun, str::T) where {T<:Str{CSE_T}} where {CSE_T<:Union{UCS2CSE, UTF16CSE}}
+function map(fun, str::T) where {C<:Union{UCS2CSE, UTF16CSE},T<:Str{C}}
     (len = _len(str)) == 0 && return empty_str(T)
     pnt = _pnt(str)
     buf, out = _allocate(UInt16, len)

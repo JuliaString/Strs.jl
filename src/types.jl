@@ -81,12 +81,12 @@ const _CSE{U} = Union{CharSet{U}, Encoding{U}} where {U}
 
 print(io::IO, ::S) where {S<:_CSE{U}} where {U} =
     print(io, U)
-print(io::IO, ::CSE{CS,E}) where {CS<:CharSet{S},E<:Encoding{U}} where {S,U} =
+print(io::IO, ::CSE{CS,E}) where {S,U,CS<:CharSet{S},E<:Encoding{U}} =
     print(io, "CSE{", string(S), ",", string(U), "}()")
 
 show(io::IO, ::Type{CharSet{S}}) where {S}   = print(io, "CharSet{", string(S), "}")
 show(io::IO, ::Type{Encoding{S}}) where {S}  = print(io, "Encoding{", string(S), "}")
-show(io::IO, ::Type{CSE{CS,E}}) where {CS<:CharSet{S},E<:Encoding{T}} where {S,T} =
+show(io::IO, ::Type{CSE{CS,E}}) where {S,T,CS<:CharSet{S},E<:Encoding{T}} =
     print(io, "CSE{", string(S), ", ", string(T), "}")
 
 # Note: this is still in transition to expressing character set, encoding
@@ -108,7 +108,7 @@ struct Str{T,SubStr,Cache,Hash} <: AbstractString
         where {CSE_T<:CSE} =
       new{CSE_T,Nothing,Nothing,Nothing}(v,nothing,nothing,nothing))
 end
-#(::Type{STR})(v::STR_DATA_TYPE) where {STR<:Str{T,S,C,H}} where {T<:CSE,S,C,H} = Str(T, v)
+#(::Type{STR})(v::STR_DATA_TYPE) where {T<:CSE,S,C,H,STR<:Str{T,S,C,H}} = Str(T, v)
 
 # Handle change from endof -> lastindex
 @static if !isdefined(Base, :lastindex)
@@ -251,10 +251,10 @@ cse(::String)       = UTF8CSE
 cse(::Type{String}) = UTF8CSE
 
 charset(::Type{<:AbstractString})  = UniPlusCharSet
-charset(::Type{T}) where {T<:Str{C}} where {C<:CSE{CS,E}} where {CS,E} = CS
+charset(::Type{T}) where {CS,E,C<:CSE{CS,E},T<:Str{C}} = CS
 
 encoding(::Type{<:AbstractString}) = UTF8Encoding # Julia likes to think of this as the default
-encoding(::Type{T}) where {T<:Str{C}} where {C<:CSE{CS,E}} where {CS,E} = E
+encoding(::Type{T}) where {CS,E,C<:CSE{CS,E},T<:Str{C}} = E
 
 promote_rule(::Type{T}, ::Type{T}) where {T<:CodePoint} = T
 promote_rule(::Type{Text2Chr}, ::Type{Text1Chr}) = Text2Chr
