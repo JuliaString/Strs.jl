@@ -147,7 +147,11 @@ function show(io::IO, v::Tuple{String,CharStat})
     pr"\(io)Lines with > 0:   \(s.lines)\n"
 end
 
-const pwc = print_with_color
+@static if VERSION < v"0.7.0-DEV"
+    const pwc = print_with_color
+else
+    pwc(c, io, str) = printstyled(io, str; color = c)
+end
 pwc(c, l) = pwc(c, STDOUT, l)
 
 pr_ul(io, l) = pwc(:underline, io, l)
