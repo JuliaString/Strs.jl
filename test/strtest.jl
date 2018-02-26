@@ -4,6 +4,15 @@ const ver = "v0.$(VERSION.minor)"
 const git = "https://github.com/JuliaString/"
 const pkgdir = Pkg.dir()
 
+@static if VERSION < v"0.7.0-DEV"
+    const pwc = print_with_color
+    pwc(c, l) = pwc(c, STDOUT, l)
+else
+    pwc(c, io, str) = printstyled(io, str; color = c)
+    pwc(c, l) = pwc(c, stdout, l)
+end
+pr_ul(l)     = pwc(:underline, l)
+
 const pkglist =
     ["StrTables", "LaTeX_Entities", "Emoji_Entities", "HTML_Entities", "Unicode_Entities",
      "Format", "StringLiterals", "Strs", "StrICU"]
@@ -46,8 +55,6 @@ function loadall(loc=git)
     end
 end
 
-print_chr(val) = isempty(val) || print("\e[s", val, "\e[u\e[2C")
-
 function str_chr(val)
     isempty(val) && return ("", 0, "")
     io = IOBuffer()
@@ -76,37 +83,64 @@ function testtable(m::Module, symtab, fun, f2)
         haskey(tabval, val) ? push!(tabval[val], k) : (tabval[val] = [k])
     end
     prnt = false
-    for (val, keys) in juliaval
+    srtjv = sort!(collect(keys(juliaval)))
+    outvec = Tuple{String, String, String, String}[]
+    cnt = 0
+    maxik = 0
+    maxjk = 0
+    maxkk = 0
+    for val in srtjv
+        keys = juliaval[val]
         haskey(tabval, val) || continue
         tabkeys = tabval[val]
         keys == tabkeys && continue
-        prnt || (println("Names changed from old to new"); prnt = true)
-        println("\e[s", val, "\e[u\e[16C", "Old: ", rpad(keys, 20), "New: ", tabkeys)
+        cnt += 1
+        ik = str_names(intersect(tabkeys, keys))
+        jk = str_names(setdiff(keys, tabkeys))
+        kk = str_names(setdiff(tabkeys, keys))
+        maxik = max(maxik, length(ik))
+        maxjk = max(maxjk, length(jk))
+        maxkk = max(maxkk, length(kk))
+        push!(outvec, (val, ik, jk, kk))
     end
-    onlyjulia = setdiff(juliatab, tab)
+    maxik += 1; maxjk += 1; maxkk += 1
+    println()
+    if !isempty(outvec)
+        println("Names changed from old to new: ", cnt)
+        str = """    $(rpad("Both", maxik))$(rpad("Removed", maxjk))$(rpad("Added", maxkk))"""
+        pr_ul(str)
+        println()
+        for (v, ik, jk, kk) in outvec
+            println("\e[s", v, "\e[u\e[4C", rpad(ik, maxik), rpad(jk, maxjk), kk)
+        end
+        println()
+    end
+    onlyjulia = sort!(collect(setdiff(juliatab, tab)))
     if !isempty(onlyjulia)
         tabjulia = [(key, str_chr(get_old(key))) for key in onlyjulia]
         maxjulia = mapreduce((v)->v[2][2], max, tabjulia)
-        println("Entities present in Julia table, not present in this table: ", length(onlyjulia))
-        for (key, v) in tabjulia
+        pr_ul("Entities present in Julia table, not present in this table: $(length(onlyjulia))\n")
+        for (key, v) in sort(tabjulia)
             (val, len, str) = v
-            println("\e[s", val, "\e[u\e[2C ", rpad(str, maxjulia), " ", key)
+            println("\e[s", val, "\e[u\e[4C ", haskey(tabval, val) ? "  " : "- ",
+                    rpad(str, maxjulia+1), key)
         end
         println()
     end
-    onlytable = setdiff(tab, juliatab)
+    onlytable = sort!(collect(setdiff(tab, juliatab)))
     if !isempty(onlytable)
         tabnew = [(key, str_chr(get_new(key))) for key in onlytable]
         maxnew = mapreduce((v)->v[2][2], max, tabnew)
-        println("Entities present in this table, not present in Julia table: ", length(onlytable))
+        pr_ul("Entities present in this table, not present in Julia table: $(length(onlytable))\n")
         for (key, v) in tabnew
             (val, len, str) = v
-            println("\e[s", val, "\e[u\e[2C ", rpad(str, maxnew), " ", key)
+            println("\e[s", val, "\e[u\e[4C ", haskey(juliaval, val) ? "  " : "+ ",
+                    rpad(str, maxnew+1), key)
         end
         println()
     end
-    bothtab = intersect(juliatab, tab)
-    tabdiff = []
+    bothtab = sort!(collect(intersect(juliatab, tab)))
+    tabdiff = Tuple{String, Tuple{String, Int, String}, Tuple{String, Int, String}}[]
     for key in bothtab
         vold = get_old(key)
         vnew = get_new(key)
@@ -115,12 +149,12 @@ function testtable(m::Module, symtab, fun, f2)
     if !isempty(tabdiff)
         maxdiff1 = mapreduce((v)->v[2][2], max, tabdiff)
         maxdiff2 = mapreduce((v)->v[3][2], max, tabdiff)
-        println("Entities present in both tables, with different values: ", length(tabdiff))
+        pr_ul("Entities present in both tables, with different values: $(length(tabdiff))\n")
         for (key, v1, v2) in tabdiff
             (val, len, str) = v1
-            print("\e[s", val, "\e[u\e[2C ", rpad(str, maxdiff1), "   ")
+            print("\e[s", val, "\e[u\e[4C ", rpad(str, maxdiff1+3))
             (val, len, str) = v2
-            println("\e[s", val, "\e[u\e[2C ", rpad(str, maxdiff2), "   ", key)
+            println("\e[s", val, "\e[u\e[4C ", rpad(str, maxdiff2+3), key)
         end
         println()
     end
@@ -152,9 +186,9 @@ function showchanges(m::Module, symtab, fun)
         # See if there is a common suffix
         jkeys = collect(keys)
         tkeys = collect(tabkeys)
-        onlyjulia = collect(setdiff(keys, tabkeys))
-        onlytable = collect(setdiff(tabkeys, keys))
-        bothtabs  = collect(intersect(keys, tabkeys))
+        onlyjulia = sort!(collect(setdiff(keys, tabkeys)))
+        onlytable = sort!(collect(setdiff(tabkeys, keys)))
+        bothtabs  = sort!(collect(intersect(keys, tabkeys)))
         if length(keys) == length(tabkeys) == 1
             jk = jkeys[1]
             tk = tkeys[1]
@@ -183,10 +217,80 @@ end
 
 showlatex() = showchanges(LaTeX_Entities, RC.latex_symbols, (x)->x[2:end])
 
+const StrSet = Set{String}
+const TPSet = NTuple{6, StrSet}
+
+function add_values!(tab::Dict, ind, symtab::Dict, fun)
+    for (nam, val) in symtab
+        haskey(tab, val) ||
+            (tab[val] = (StrSet(), StrSet(), StrSet(), StrSet(), StrSet(), StrSet()))
+        n = fun(nam)
+        push!(tab[val][ind], n)
+    end
+end
+
+function add_values!(tab::Dict, ind, m::Module)
+    def = m.default
+    for i = 1:length(def)
+        nam = def[i]
+        val = lookupname(def, nam)
+        haskey(tab, val) ||
+            (tab[val] = (StrSet(), StrSet(), StrSet(), StrSet(), StrSet(), StrSet()))
+        push!(tab[val][ind], nam)
+    end
+end
+
+function build_tables()
+    tab = Dict{String, TPSet}()
+    add_values!(tab, 1, RC.latex_symbols, (x)->x[2:end])
+    add_values!(tab, 2, RC.emoji_symbols, (x)->x[3:end-1])
+    add_values!(tab, 3, LaTeX_Entities)
+    add_values!(tab, 4, Emoji_Entities)
+    add_values!(tab, 5, HTML_Entities)
+    #add_values!(tab, 6, Unicode_Entities)
+    tab
+end
+
+function max_lengths(tab)
+    lens = [0,0,0,0,0]
+    for (val, nams) in tab, i = 1:length(lens)
+        l = 0
+        for n in nams[i]
+            l += length(n) + 1
+        end
+        lens[i] = max(lens[i], l)
+    end
+    lens
+end
+
+function str_names(nameset)
+    io = IOBuffer()
+    allnames = sort!(collect(nameset))
+    for n in allnames
+        print(io, n, " ")
+    end
+    String(take!(io))
+end
+
+function display_table(tab)
+    lens = max_lengths(tab)
+    vt = collect(keys(tab))
+    nt = collect(values(tab))
+    srt = sortperm(vt)
+    for loc in srt
+        val, names = vt[loc], nt[loc]
+        print("\e[s$val\e[u\e[4C\e[s$(str_chr(val)[3])\e[u\e[12C")
+        for i=1:length(lens)
+            print(rpad(str_names(names[i]), lens[i]))
+        end
+        println()
+    end
+end
+
 function testall()
     # Compare tables against what's currently in Base (for this version of Julia)
-    testtable(LaTeX_Entities, RC.latex_symbols, (x)->x[2:end], (x)->"\\$x")
-    testtable(Emoji_Entities, RC.emoji_symbols, (x)->x[3:end-1], (x)->"\\:$x:")
+    testtable(LaTeX_Entities, RC.latex_symbols, (x)->x[2:end],   (x)->string("\\", x))
+    testtable(Emoji_Entities, RC.emoji_symbols, (x)->x[3:end-1], (x)->string("\\:", x, ':'))
     for pkg in pkglist
         try
             Pkg.test(pkg)
