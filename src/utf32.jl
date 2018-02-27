@@ -53,30 +53,6 @@ function _cnt_non_bmp(len, pnt::Ptr{UInt32})
     cnt
 end
 
-function search(str::UTF32Strings, ch::UInt32, pos::Integer)
-    len, pnt = _lenpnt(str)
-    pos == len + 1 && return 0
-    1 <= pos <= len && boundserr(str, pos)
-    (ch <= 0x10ffff && !is_surrogate_codeunit(ch)) || return 0
-    @inbounds while pos <= len
-        get_codeunit(pnt, pos) == ch && return pos
-        pos += 1
-    end
-    0
-end
-
-function rsearch(str::Str{CSE_T}, ch::UInt32, pos::Integer) where {CSE_T<:Union{UTF32CSE,_UTF32CSE}}
-    len, pnt = _lenpnt(str)
-    pos == len + 1 && return 0
-    1 <= pos <= len && boundserr(str, pos)
-    (ch <= 0x10ffff && !is_surrogate_codeunit(ch)) || return 0
-    @inbounds while pos > 0
-        get_codeunit(pnt, pos) == ch && return pos
-        pos -= 1
-    end
-    0
-end
-
 function reverse(str::T) where {T<:UTF32Strings}
     (len = _len(str)) == 0 && return str
     pnt = _pnt(str)

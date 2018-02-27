@@ -295,56 +295,6 @@ end
     SubString(str, beg, lst)
 end
 
-@propagate_inbounds function search(str::Str{<:UTF8CSE}, ch::UInt32, pos::Integer)
-    len = _len(str)
-    @boundscheck if 1 <= pos <= len
-        pos == len + 1 && return 0
-        boundserr(str, pos)
-    end
-    pnt = _pnt(str)
-    cu = get_codeunit(pnt, pos)
-    is_valid_continuation(cu) && unierror(UTF_ERR_INVALID_INDEX, pos, cu)
-    dat = str.data
-    ch < 0x80 && return search(dat, ch%UInt8, pos)
-    if ch <= 0x7ff
-        b1 = 0xc0 | (ch >>> 6)
-        b2 = 0x80 | (ch & 0x3f)
-        while (pos = search(dat, b1, pos)) != 0
-            get_codeunit(pnt, pos + 1) == b2 && break
-            pos += 2
-        end
-    elseif ch <= 0xffff
-        b1 = 0xe0 | (ch >>> 12)
-        b2 = 0x80 | ((ch >>> 6) & 0x3f)
-        b3 = 0x80 | (ch & 0x3f)
-        while (pos = search(dat, b1, pos)) != 0
-            get_codeunit(pnt, pos + 1) == b2 && get_codeunit(pnt, pos + 2) == b3 && break
-            pos += 3
-        end
-    else
-        b1 = 0xf0 | (ch >>>  18)
-        b2 = 0x80 | ((ch >>> 12) & 0x3f)
-        b3 = 0x80 | ((ch >>>  6) & 0x3f)
-        b4 = 0x80 | (ch & 0x3f)
-        while (pos = search(dat, b1, pos)) != 0
-            get_codeunit(pnt, pos + 1) == b2 && get_codeunit(pnt, pos + 2) == b3 &&
-                get_codeunit(pnt, pos + 3) == b4 && break
-            pos += 4
-        end
-    end
-    pos
-end
-function rsearch(s::Str{<:UTF8CSE}, c::UInt32, i::Integer)
-    dat = _data(s)
-    c < 0x80 && return rsearch(dat, c%UInt8, i)
-    b = first_utf8_byte(c)
-    while true
-        i = rsearch(dat, b, i)
-        (i==0 || s[i] == c) && return i
-        i = prevind(s, i)
-    end
-end
-
 const _ByteStr = Union{Str{<:ASCIICSE}, Str{<:UTF8CSE}, String}
 
 string(c::_ByteStr...) = length(c) == 1 ? c[1]::UTF8Str : UTF8Str(_string(c))
