@@ -183,7 +183,7 @@ else
 end
 
 function _allocate(::Type{T}, len) where {T <: CodeUnitTypes}
-    buf = _allocate(len * sizeof(T))
+    buf = _allocate((len+STR_KEEP_NULL-1) * sizeof(T))
     buf, reinterpret(Ptr{T}, pointer(buf))
 end
 
