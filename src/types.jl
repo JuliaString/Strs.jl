@@ -112,8 +112,15 @@ end
 
 # Handle change from endof -> lastindex
 @static if !isdefined(Base, :lastindex)
+    export lastindex
     Base.endof(str::Str) = lastindex(str)
     lastindex(arr::AbstractArray) = Base.endof(arr)
+end
+@static if !isdefined(Base, :firstindex)
+    export firstindex
+    firstindex(str::AbstractString) = 1
+    # AbstractVector might be an OffsetArray
+    firstindex(str::Vector) = 1
 end
 
 # This needs to be redone, with character sets and the code unit as part of the type
@@ -183,7 +190,7 @@ else
 end
 
 function _allocate(::Type{T}, len) where {T <: CodeUnitTypes}
-    buf = _allocate((len+STR_KEEP_NULL-1) * sizeof(T))
+    buf = _allocate((len+STR_KEEP_NUL-1) * sizeof(T))
     buf, reinterpret(Ptr{T}, pointer(buf))
 end
 
@@ -234,15 +241,15 @@ const RawCSEncodings   = Union{Text1CSE, Text2CSE, Text4CSE}
 const LatinCSEncodings = Union{LatinCSE, _LatinCSE}
 const UCS2CSEncodings  = Union{UCS2CSE,  _UCS2CSE}
 const UTF32CSEncodings = Union{UTF32CSE, _UTF32CSE}
+const UnicodeEncodings = Union{UTF8CSE, UTF16CSE, UTF32CSEncodings}
 
 const RawStrings   = Str{<:RawCSEncodings}
 const LatinStrings = Str{<:LatinCSEncodings}
 const UCS2Strings  = Str{<:UCS2CSEncodings}
 const UTF32Strings = Str{<:UTF32CSEncodings}
 
-const UnicodeByteStrings = Union{ASCIIStr, LatinStrings}
-const ByteStrings        = Union{Text1Str, BinaryStr, UnicodeByteStrings}
-const UnicodeStrings     = Union{String, UTF8Str, UTF16Str, UTF32Strings}
+const UnicodeByteStrings = Union{Str{<:ASCIICSE}, LatinStrings}
+const UnicodeStrings     = Union{String, Str{<:UnicodeEncodings}}
 
 ## Get the character set / encoding used by a string type
 cse(::T) where {C<:CSE,T<:Str{C}} = C

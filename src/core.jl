@@ -145,6 +145,4 @@ end
     _collectstr(CodePointStyle(T), S, str)
 
 # Extra functions
-search(str::Str, ch::Char, i::Integer) = search(str, UInt32(ch), i)
-rsearch(str::Str, ch::Char, i::Integer) = rsearch(str, UInt32(ch), i)
 convert(str::Str, ch::Char) = convert(str, UInt32(ch))

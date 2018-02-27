@@ -95,9 +95,10 @@ convert(::Type{Char}, v::T) where {T<:CodePoint} = convert(Char, x%basetype(T))
 rem(x::S, ::Type{T}) where {S<:CodePoint, T<:Number}    = rem(reinterpret(basetype(S), x), T)
 rem(x::S, ::Type{T}) where {S<:Number, T<:CodePoint}    = reinterpret(T, x%basetype(T))
 rem(x::S, ::Type{T}) where {S<:CodePoint, T<:CodePoint} = reinterpret(T, x%basetype(T))
-rem(x::S, ::Type{Char}) where {S<:CodePoint} = (x%basetype(T))%Char
+rem(x::S, ::Type{Char}) where {S<:CodePoint} = Char(x%basetype(S))
 
-(::Type{S})(v::T) where {S<:Union{UInt32, Int, UInt, Char}, T<:CodePoint} = Strs.tobase(v)%S
+(::Type{S})(v::T) where {S<:Union{UInt32, Int, UInt}, T<:CodePoint} = Strs.tobase(v)%S
+(::Type{Char})(v::CodePoint) = Char(Strs.tobase(v))
 
 for nam in (:Text1, :Text2, :Text4, :ASCII, :Latin, :_Latin, :UCS2, :UTF32)
     sym = Symbol(string(nam, "Chr"))

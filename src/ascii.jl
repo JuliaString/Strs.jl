@@ -8,17 +8,7 @@ Based in part on code for ASCIIString that used to be in Julia
 
 ## overload methods for efficiency ##
 
-bytestring(s::Str{<:ASCIIStr}) = s
-
-function search(s::Str{<:ASCIIStr}, c::UInt32, i::Integer)
-    len = _len(s)
-    i == len + 1 && return 0
-    1 <= i <= len || boundserr(s, i)
-    c < 0x80 ? search(_data(s), c%UInt8, i) : 0
-end
-
-rsearch(s::Str{<:ASCIIStr}, c::UInt32, i::Integer) =
-    c < 0x80 ? rsearch(_data(s), c%UInt8, i) : 0
+bytestring(s::Str{<:ASCIICSE}) = s
 
 function _string(c)
     n = 0
@@ -35,11 +25,11 @@ function _string(c)
     v
 end
 
-string(c::Str{<:ASCIIStr}...) = length(c) == 1 ? c[1] : Str(ASCIICSE, _string(c))
+string(c::Str{<:ASCIICSE}...) = length(c) == 1 ? c[1] : Str(ASCIICSE, _string(c))
 
 ## outputting ASCII strings ##
 
-write(io::IO, s::Str{<:ASCIIStr}) = write(io, _data(s))
+write(io::IO, s::Str{<:ASCIICSE}) = write(io, _data(s))
 
 write(io::IO, ch::ASCIIChr) = write(io, tobase(ch))
 
@@ -112,7 +102,7 @@ end
 convert(::Type{ASCIIStr}, a::Vector{UInt8}, invalids_as::String) =
     _convert_ascii(a, sizeof(invalids_as), _data(ascii(invalids_as)))
 
-convert(::Type{ASCIIStr}, a::Vector{UInt8}, invalids_as::Str{<:ASCIIStr}) =
+convert(::Type{ASCIIStr}, a::Vector{UInt8}, invalids_as::Str{<:ASCIICSE}) =
     _convert_ascii(a, sizeof(invalids_as), _data(invalids_as))
 
 convert(::Type{ASCIIStr}, a::Vector{UInt8}, invalids_as::AbstractString) =
