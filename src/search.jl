@@ -95,12 +95,15 @@ julia> find_first("Julia", "JuliaLang")
 """
 function find_last  end
 
+find_next(pat::Regex, str, pos::Integer) = findnext(pat, str, pos)
+find_prev(pat::Regex, str, pos::Integer) = findprev(pat, str, pos)
+find_first(pat::Regex, str) = findfirst(pat, str)
+find_last(pat::Regex, str)  = findlast(pat, str)
+
 found(::Type{<:AbstractString}, v) = v != 0
 find_result(::Type{<:AbstractString}, v) = v
 
 @static if VERSION < v"0.7.0-DEV"
-const base_fwd_substr_search = Base.search
-const base_rev_substr_search = Base.rsearch
 const base_fwd_search = Base.searchindex
 const base_rev_search = Base.rsearchindex
 
@@ -145,8 +148,6 @@ specialized methods by using e.g. `f::Base.OccursIn` in a method signature.
 const occursin = OccursIn
 else
 
-const base_fwd_substr_search = Base._substr_search
-const base_rev_substr_search = Base._rsearch
 const base_fwd_search = Base._searchindex
 const base_rev_search = Base._rsearchindex
 
@@ -166,10 +167,8 @@ const ByteVec = Vector{<:Bytes}
 const AbsChars = Union{Char, AbstractChar}
 const StrOrByteVec = Union{ByteStr, ByteVec}
 
-_fwd_substr_search(str::String, t, pos::Integer) = base_fwd_substr_search(str, t, pos)
-_rev_substr_search(str::String, t, pos::Integer) = base_rev_substr_search(str, t, pos)
-_fwd_search(str::String, t, pos::Integer) = base_fwd_search(str, t, pos)
-_rev_search(str::String, t, pos::Integer) = base_rev_search(str, t, pos)
+_fwd_search(str::String, t::String, pos::Integer) = base_fwd_search(str, t, pos)
+_rev_search(str::String, t::String, pos::Integer) = base_rev_search(str, t, pos)
 
 find_next(pred::EqualTo{<:AbstractChar}, str::AbstractString, pos::Integer) =
     _fwd_search(str, pred.x, pos)
@@ -205,9 +204,8 @@ function find_prev(pred::EqualTo{<:AbsChars}, str::Str, pos::Integer)
     pos
 end
 
-# Returns index or range
-find_first(pred, str::AbstractString) = find_next(pred, str, 1)
-find_last(pred,  str::AbstractString) = find_prev(pred, str, lastindex(str))
+find_first(a, b) = find_next(a, b, 1)
+find_last(a,  b) = find_prev(a, b, lastindex(b))
 
 # Returns index
 find_first(pred::EqualTo{<:Bytes}, a::StrOrByteVec)            = _fwd_search(a, pred.x)
@@ -233,11 +231,14 @@ function find_next(testf::Function, str::AbstractString, pos::Integer)
     0
 end
 
-find_next(t::AbstractString, str::AbstractString, pos::Integer) = _fwd_substr_search(str, t, pos)
-find_prev(t::AbstractString, str::AbstractString, pos::Integer) = _rev_substr_search(str, t, pos)
-
-find_first(t::AbstractString, str::AbstractString) = _fwd_substr_search(str, t, 1)
-find_last(t::AbstractString, str::AbstractString) = _rev_substr_search(str, t, lastindex(str))
+function find_next(t::AbstractString, str::AbstractString, pos::Integer)
+    idx = _fwd_search(str, t, pos)
+    idx:(idx - 1 + ((!isempty(t) && idx > 0) ? lastindex(t) : 0))
+end
+function find_prev(t::AbstractString, str::AbstractString, pos::Integer)
+    idx = _rev_search(str, t, pos)
+    idx:(idx - 1 + ((!isempty(t) && idx > 0) ? lastindex(t) : 0))
+end
 
 _fwd_search(str::UnicodeByteStrings, ch::CodeUnitTypes, pos::Integer) =
     ch <= typemax(codepoint_type(str)) ? _fwd_search(_data(str), ch%UInt8, pos) : 0
@@ -260,6 +261,7 @@ function _fwd_search(str::ByteStr, b::Bytes, pos::Integer=1)
     q == C_NULL ? 0 : Int(q - p + 1)
 end
 
+#=
 _fwd_search(a::StrOrByteVec, b::AbsChars, pos::Integer = 1) =
     (isascii(b)
      ? _fwd_search(a, b%UInt8, pos)
@@ -269,6 +271,7 @@ _fwd_search(a::String, b::AbsChars, pos::Integer = 1) =
     (isascii(b)
      ? base_fwd_search(a, b%UInt8, pos)
      : base_fwd_search(a, unsafe_wrap(Vector{UInt8}, string(b)), pos))
+=#
 
 function _rev_search(a::StrOrByteVec, b::Bytes, pos::Integer = sizeof(a))
     if pos < 1
@@ -285,6 +288,7 @@ function _rev_search(a::StrOrByteVec, b::Bytes, pos::Integer = sizeof(a))
     q == C_NULL ? 0 : Int(q - p + 1)
 end
 
+#=
 _rev_search(a::StrOrByteVec, ch::AbsChars, pos::Integer = length(a)) =
     (isascii(b)
      ? _rev_search(a, ch%UInt8, pos)
@@ -294,6 +298,7 @@ _rev_search(a::String, ch::AbsChars, pos::Integer = length(a)) =
     (isascii(b)
      ? base_rev_search(a, ch%UInt8, pos)
      : base_rev_search(a, unsafe_wrap(Vector{UInt8}, string(ch)), pos))
+=#
 
 _fwd_search(a::StrOrByteVec, ch::ByteChars, pos::Integer = 1) =
     _fwd_search(a, ch%UInt8, pos)
@@ -333,9 +338,9 @@ end
 
 _search_bloom_mask(c) = UInt64(1) << (c & 63)
 
-const UTF8Strings = Union{String, Str{<:ASCIICSE}, Str{<:UTF8CSE}}
+const UTF8Strings = Union{Str{<:ASCIICSE}, Str{<:UTF8CSE}}
 
-function _fwd_substr_search(str::UTF8Strings, t::UTF8Strings, pos::Integer)
+function _fwd_search(str::UTF8Strings, t::UTF8Strings, pos::Integer)
     # Check for fast case of a single byte (check for single character also)
     lastindex(t) == 1 && return _fwd_search(str, get_codeunit(t), pos)
     _fwd_search(unsafe_wrap(Vector{UInt8}, str), unsafe_wrap(Vector{UInt8}, t), pos)
@@ -386,12 +391,8 @@ function _fwd_search(s::ByteVec, m, t::ByteVec, n, i::Integer)
     0
 end
 
-_fwd_search(s::ByteVec, t::ByteVec, i::Integer) = _fwd_search(s, sizeof(s), t, sizeof(t), i)
-
-function _fwd_substr_search(str, t, pos::Integer)
-    idx = _fwd_search(str, t, pos)
-    idx:(idx - 1 + ((!isempty(t) && idx > 0) ? lastindex(t) : 0))
-end
+_fwd_search(s::ByteVec, t::ByteVec, i::Integer) =
+    _fwd_search(s, sizeof(s), t, sizeof(t), i)
 
 # AbstractString implementation of the generic find_prev interface
 function find_prev(testf::Function, str::AbstractString, pos::Integer)
@@ -479,12 +480,8 @@ function _rev_search(s::ByteVec, m, t::ByteVec, n, k::Integer)
     0
 end
 
-_rev_search(s::ByteVec, t::ByteVec, k::Integer) = _rev_search(s, sizeof(s), t, sizeof(t), k)
-
-function _rev_substr_search(str, t, pos::Integer)
-    idx = _rev_search(str, t, pos)
-    idx:(idx - 1 + ((!isempty(t) && idx > 0) ? lastindex(t) : 0))
-end
+_rev_search(s::ByteVec, t::ByteVec, k::Integer) =
+    _rev_search(s, sizeof(s), t, sizeof(t), k)
 
 """
     contains(haystack::AbstractString, needle::Union{AbstractString,Regex,Char})

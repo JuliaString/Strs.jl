@@ -113,8 +113,9 @@ end
 # Handle change from endof -> lastindex
 @static if !isdefined(Base, :lastindex)
     export lastindex
-    Base.endof(str::Str) = lastindex(str)
+    lastindex(str::AbstractString) = Base.endof(str)
     lastindex(arr::AbstractArray) = Base.endof(arr)
+    Base.endof(str::Str) = lastindex(str)
 end
 @static if !isdefined(Base, :firstindex)
     export firstindex
