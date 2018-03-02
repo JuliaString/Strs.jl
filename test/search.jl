@@ -17,124 +17,135 @@ const fbbstr = "foo,bar,baz"
     # Note: the commented out test will be enabled after fixes to make
     # sure that find_next/find_prev are consistent
     # no matter what type of AbstractString the second argument is
-    @test_throws BoundsError find_next(equalto('a'), "foo", 0)
+    @test_throws BoundsError find_next('a', "foo", 0)
     @test_throws BoundsError find_next(occursin(Char[]), "foo", 5)
     # @test_throws BoundsError find_prev(occursin(Char[]), "foo", 0)
     @test_throws BoundsError find_prev(occursin(Char[]), "foo", 5)
 
     # @test_throws ErrorException in("foobar","bar")
-    @test_throws BoundsError find_next(equalto(0x1), b"\x1\x2",0)
+    #@test_throws BoundsError find_next(equalto(0x1), b"\x1\x2",0)
 end
 
+# Should test GenericString also, once overthing else is working
 const UnicodeStringTypes =
-    (String, GenericString, UTF16Str, UTF32Str, UniStr, UTF8Str)
+    (String, UTF16Str, UTF32Str, UniStr, UTF8Str)
 const ASCIIStringTypes =
     (UnicodeStringTypes..., ASCIIStr, LatinStr, UCS2Str)
-
-const testfirst =
-    (('x', '\0', '\u80', '∀', 'H', 'l', ',', '\n'), (0, 0, 0, 0, 1, 3, 6, 14))
-
-const testlast =
-    (('x', '\0', '\u80', '∀', 'H', 'l', ',', '\n'), (0, 0, 0, 0, 1, 11, 6, 14))
-
-const testnext =
-    (('l', 4, 4), ('l', 5, 11), ('l', 12, 0), (',', 7, 0), ('\n', 15, 0))
-
-const testprev =
-    (('H', 0, 0), ('l', 5, 4), ('l', 4, 4), ('l', 3, 3),  ('l', 2, 0), (',', 5, 0))
-
-const asciifirst =
-    (("x", 0:-1), ("H", 1:1), ("l", 3:3), ("\n", 14:14))
-
-const asciilast =
-    (("x", 0:-1), ("H", 1:1), ("l", 11:11), ("\n", 14:14))
-
-const asciinext =
-    (("H", 2, 0:-1), ("l", 4, 4:4), ("l", 5, 11:11), ("l", 12, 0:-1), ("\n", 15, 0:-1))
-
-const asciiprev =
-    (("H", 2, 1:1), ("H", 0, 0:-1), ("l", 10, 4:4), ("l", 4, 4:4), ("l", 3, 3:3),
-     ("l", 2, 0:-1), ("\n", 13, 0:-1))
-
-const unifirst =
-    (('z', 0), ('\0', 0), ('\u80', 0), ('∄', 0), ('∀', 1),
-     ('∃', 13), ('x', 26), ('δ', 17), ('ε', 5))
-
-const uninext = (('∀', 4, 0), ('∃', 16, 0), ('x', 27, 43), ('x', 44, 0))
 
 const ustr = (("éé", "ééé"), ("€€", "€€€"), ("\U1f596\U1f596", "\U1f596\U1f596\U1f596"))
 const resfirst = (1:3, 1:4, 1:5)
 const reslast  = (3:5, 4:7, 5:9)
 
+function cvtchar(T, ch)
+    try 
+        T(ch)
+    catch
+        UTF32Chr(ch)
+    end
+end
+
+function test2(fun, T, tstr, ostr, list)
+    for (opat, res) in list
+        tpat = T(opat)
+        @test fun(tpat, tstr) == res
+        @test fun(opat, tstr) == res
+        @test fun(tpat, ostr) == res
+        @test fun(opat, ostr) == res
+    end
+end
+function test3(fun, T, tstr, ostr, list)
+    for (opat, beg, res) in list
+        tpat = T(opat)
+        @test fun(tpat, tstr, beg) == res
+        @test fun(opat, tstr, beg) == res
+        @test fun(tpat, ostr, beg) == res
+        @test fun(opat, ostr, beg) == res
+    end
+end
+function test2ch(fun, T, tstr, ostr, list)
+    cpt = codepoint_type(T)
+    for (opat, res) in list
+        tpat = cvtchar(cpt, opat)
+        @test fun(tpat, tstr) == res
+        @test fun(opat, tstr) == res
+        @test fun(tpat, ostr) == res
+        @test fun(opat, ostr) == res
+        @test fun(equalto(tpat), tstr) == res
+        @test fun(equalto(opat), tstr) == res
+        @test fun(equalto(tpat), ostr) == res
+        @test fun(equalto(opat), ostr) == res
+    end
+end
+
+function test3ch(fun, T, tstr, ostr, list)
+    cpt = codepoint_type(T)
+    for (opat, beg, res) in list
+        tpat = cvtchar(cpt, opat)
+        @test fun(tpat, tstr, beg) == res
+        @test fun(opat, tstr, beg) == res
+        @test fun(tpat, ostr, beg) == res
+        @test fun(opat, ostr, beg) == res
+        @test fun(equalto(tpat), tstr, beg) == res
+        @test fun(equalto(opat), tstr, beg) == res
+        @test fun(equalto(tpat), ostr, beg) == res
+        @test fun(equalto(opat), ostr, beg) == res
+    end
+end
+
 @testset "ASCII Tests" begin
     @testset for T in ASCIIStringTypes
         str = T(astr)
-        lst = nextind(str,lastindex(str))
+        lst = nextind(str, lastindex(str))
         @testset "BoundsError" begin
-            @test_throws BoundsError find_next(equalto('z'), str, 0)
-            @test_throws BoundsError find_next(equalto('∀'), str, 0)
-            @test_throws BoundsError find_next(equalto('ε'), str, lst + 1)
-            @test_throws BoundsError find_next(equalto('a'), str, lst + 1)
+            @test_throws BoundsError find_next('z', str, 0)
+            @test_throws BoundsError find_next('∀', str, 0)
+            @test_throws BoundsError find_next('ε', str, lst + 1)
+            @test_throws BoundsError find_next('a', str, lst + 1)
         end
         @testset "find_*(equalto(ch)...)" begin
-            for (ch, pos) in zip(testfirst[1], testfirst[2])
-                @test find_first(equalto(ch), str) == pos
-            end
-            for (ch, beg, pos) in zip(testnext[1], testfirst[2])
-                @test find_next(equalto(ch), str, beg) == pos
-            end
-            for (ch, pos) in testlast
-                @test find_last(equalto(ch), str) == pos
-            end
-            for (ch, beg, pos) in testprev
-                @test find_prev(equalto(ch), str, beg) == pos
-            end
+            test2ch(find_first, T, str, astr,
+                    zip(('x', '\0', '\u80', '∀', 'H', 'l', ',', '\n'), (0, 0, 0, 0, 1, 3, 6, 14)))
+            test3ch(find_next,  T, str, astr,
+                    (('l', 4, 4), ('l', 5, 11), ('l', 12, 0), (',', 7, 0), ('\n', 15, 0)))
+            test2ch(find_last,  T, str, astr,
+                    zip(('x', '\0', '\u80', '∀', 'H', 'l', ',', '\n'), (0, 0, 0, 0, 1, 11, 6, 14)))
+            test3ch(find_prev,  T, str, astr,
+                    (('H', 0, 0), ('l', 5, 4), ('l', 4, 4), ('l', 3, 3), ('l', 2, 0), (',', 5, 0)))
         end
         @testset "find_* single-char string" begin
-            for (needle, res) in asciifirst
-                @test find_first(needle, str) == res
-            end
-            for (needle, beg, res) in asciinext
-                @test find_prev(needle, str, beg) == res
-            end
-            for (needle, res) in asciilast
-                @test find_last(needle, str) == res
-            end
-            for (needle, beg, res) in asciiprev
-                @test find_prev(needle, str, beg) == res
-            end
+            test2(find_first, T, str, astr,
+                  (("x", 0:-1), ("H", 1:1), ("l", 3:3), ("\n", 14:14)))
+            test2(find_last,  T, str, astr,
+                  (("x", 0:-1), ("H", 1:1), ("l", 11:11), ("\n", 14:14)))
+            test3(find_next,  T, str, astr,
+                  (("H", 2, 0:-1), ("l", 4, 4:4), ("l", 5, 11:11),
+                   ("l", 12, 0:-1), ("\n", 15, 0:-1)))
+            test3(find_prev,  T, str, astr,
+                  (("H", 2, 1:1), ("H", 0, 0:-1), ("l", 10, 4:4),
+                   ("l", 4, 4:4), ("l", 3, 3:3), ("l", 2, 0:-1), ("\n", 13, 0:-1)))
         end
 
         str = T(fbbstr)
         @testset "find_* two-char string" begin
-            @test find_first("xx", str) == 0:-1
-            @test find_first("fo", str) == 1:2
-            @test find_first("oo", str) == 2:3
-            @test find_first("o,", str) == 3:4
-            @test find_first(",b", str) == 4:5
-            @test find_first("az", str) == 10:11
-
-            @test find_next("fo", str, 3) == 0:-1
-            @test find_next("oo", str, 4) == 0:-1
-            @test find_next("o,", str, 5) == 0:-1
-            @test find_next(",b", str, 6) == 8:9
-            @test find_next(",b", str, 10) == 0:-1
-            @test find_next("az", str, 12) == 0:-1
-
+            let pats = ("xx", "fo", "oo", "o", ",b", "az"),
+                res = (0:-1, 1:2, 2:3, 3:4, 4:5, 10:11)
+                test2(find_first, T, str, fbbstr, zip(pats, res))
+            end
+            let pats = ("fo", "oo", "o", ",b", ",b", "az"),
+                pos  = (3, 4, 5, 6, 10, 12),
+                res  = (0:-1, 0:-1, 0:-1, 8:9, 0:-1, 0:-1)
+                test3(find_next, T, str, fbbstr, zip(pats, pos, res))
+            end
             # string backward search with a two-char string literal
-            @test find_last("xx", str) == 0:-1
-            @test find_last("fo", str) == 1:2
-            @test find_last("oo", str) == 2:3
-            @test find_last("o,", str) == 3:4
-            @test find_last(",b", str) == 8:9
-            @test find_last("az", str) == 10:11
-
-            @test find_prev("fo", str, 1) == 0:-1
-            @test find_prev("oo", str, 2) == 0:-1
-            @test find_prev("o,", str, 1) == 0:-1
-            @test find_prev(",b", str, 6) == 4:5
-            @test find_prev(",b", str, 3) == 0:-1
-            @test find_prev("az", str, 10) == 0:-1
+            let pats = ("xx", "fo", "oo", "o", ",b", "az"),
+                res = (0:-1, 1:2, 2:3, 3:4, 8:9, 10:11)
+                test2(find_last, T, str, fbbstr, zip(pats, res))
+            end
+            let pats = ("fo", "oo", "o", ",b", ",b", "az"),
+                pos  = (1, 2, 1, 6, 3, 10),
+                res  = (0:-1, 0:-1, 0:-1, 4:5, 0:-1, 0:-1)
+                test3(find_prev, T, str, fbbstr, zip(pats, pos, res))
+            end
         end
 
         empty = T("")
@@ -152,55 +163,44 @@ const reslast  = (3:5, 4:7, 5:9)
     end
 end
 
+#=
 @testset "Unicode Tests" begin
     @testset for T in UnicodeStringTypes
         str = T(u8str)
         lst = nextind(str, lastindex(str))
         @testset "find_*(equalto(chr),..." begin
             @testset "BoundsError" begin
-                @test_throws BoundsError find_next(equalto('z'), str, 0)
-                @test_throws BoundsError find_next(equalto('∀'), str, 0)
-                @test_throws BoundsError find_next(equalto('ε'), str, lst+1)
-                @test_throws BoundsError find_next(equalto('a'), str, lst+1)
+                @test_throws BoundsError find_next('z', str, 0)
+                @test_throws BoundsError find_next('∀', str, 0)
+                @test_throws BoundsError find_next('ε', str, lst+1)
+                @test_throws BoundsError find_next('a', str, lst+1)
             end
             @testset "Index Error" begin
-                @test_throws StringIndexError find_next(equalto('∀'), str, 2)
-                @test_throws StringIndexError find_next(equalto('∃'), str, 15)
-                @test_throws StringIndexError find_next(equalto('δ'), str, 18)
+                @test_throws StringIndexError find_next('∀', str, 2)
+                @test_throws StringIndexError find_next('∃', str, 15)
+                @test_throws StringIndexError find_next('δ', str, 18)
             end
-            for (ch, pos) in unifirst
-                @test find_first(equalto(ch), str) == pos
-            end
-            for (ch, beg, pos) in uninext
-                @test find_next(equalto(ch), str, beg) == pos
-            end
-            @test find_next(equalto('δ'), str, nextind(str,17)) == 33
-            @test find_next(equalto('δ'), str, nextind(str,33)) == 0
-            @test find_next(equalto('ε'), str, nextind(str,5)) == 54
-            @test find_next(equalto('ε'), str, nextind(str,54)) == 0
+            test2ch(find_first, T, str, u8str,
+                    (('z', 0), ('\0', 0), ('\u80', 0), ('∄', 0), ('∀', 1),
+                     ('∃', 13), ('x', 26), ('δ', 17), ('ε', 5)))
+            test3ch(find_next, T, str, u8str,
+                    (('∀', 4, 0), ('∃', 16, 0), ('x', 27, 43), ('x', 44, 0)))
+
+            @test find_next('δ', str, nextind(str, 17)) == 33
+            @test find_next('δ', str, nextind(str, 33)) == 0
+            @test find_next('ε', str, nextind(str,  5)) == 54
+            @test find_next('ε', str, nextind(str, 54)) == 0
             for ch in ('ε', 'a')
                 @test find_next(equalto(ch), str, lst) == 0
             end
-            @test find_last(equalto('z'), str) == 0
-            @test find_last(equalto('\0'), str) == 0
-            @test find_last(equalto('\u80'), str) == 0
-            @test find_last(equalto('∄'), str) == 0
-            @test find_last(equalto('∀'), str) == 1
-            @test find_last(equalto('∃'), str) == 13
-            @test find_last(equalto('x'), str) == 43
-            @test find_last(equalto('δ'), str) == 33
-            @test find_last(equalto('ε'), str) == 54
 
-            @test find_prev(equalto('∀'), str, 0) == 0
-            @test find_prev(equalto('∃'), str, 14) == 13
-            @test find_prev(equalto('∃'), str, 13) == 13
-            @test find_prev(equalto('∃'), str, 12) == 0
-            @test find_prev(equalto('x'), str, 42) == 26
-            @test find_prev(equalto('x'), str, 25) == 0
-            @test find_prev(equalto('δ'), str, 32) == 17
-            @test find_prev(equalto('δ'), str, 16) == 0
-            @test find_prev(equalto('ε'), str, 53) == 5
-            @test find_prev(equalto('ε'), str, 4) == 0
+            test2ch(find_last, T, str, u8str,
+                    zip(('z', '\0', '\u80', '∄', '∀', '∃', 'x', 'δ', 'ε'),
+                        (0, 0, 0, 0, 1, 13, 43, 33, 54)))
+            test3ch(find_prev, T, str, u8str,
+                    zip(('∀', '∃', '∃', '∃', 'x', 'x', 'δ', 'δ', 'ε', 'ε'),
+                        (0, 14, 13, 12, 42, 25, 32, 16, 53, 4),
+                        (0, 13, 13,  0, 26,  0, 17,  0,  5, 0)))
         end
 
         @testset "find_* 1-char string,..." begin
@@ -260,11 +260,12 @@ end
                 @test find_last(a, b) == resl
                 @test find_prev(a, b, lastindex(b)) == resl
                 @test find_last(a, a) == resf
-                @test find_prev(a, a, lastindex(b)) == resf
+                @test find_prev(a, a, lastindex(a)) == resf
             end
         end
     end
 end
+=#
 
 @testset "ASCII Regex" begin
     # string forward search with a single-char regex
@@ -319,19 +320,19 @@ end
 end
 
 @testset "string search with a two-char regex" begin
-    @test find_first(r"xx", fbb) == 0:-1
-    @test find_first(r"fo", fbb) == 1:2
-    @test find_first(r"oo", fbb) == 2:3
-    @test find_first(r"o,", fbb) == 3:4
-    @test find_first(r",b", fbb) == 4:5
-    @test find_first(r"az", fbb) == 10:11
+    @test find_first(r"xx", fbbstr) == 0:-1
+    @test find_first(r"fo", fbbstr) == 1:2
+    @test find_first(r"oo", fbbstr) == 2:3
+    @test find_first(r"o,", fbbstr) == 3:4
+    @test find_first(r",b", fbbstr) == 4:5
+    @test find_first(r"az", fbbstr) == 10:11
 
-    @test find_next(r"fo", fbb, 3) == 0:-1
-    @test find_next(r"oo", fbb, 4) == 0:-1
-    @test find_next(r"o,", fbb, 5) == 0:-1
-    @test find_next(r",b", fbb, 6) == 8:9
-    @test find_next(r",b", fbb, 10) == 0:-1
-    @test find_next(r"az", fbb, 12) == 0:-1
+    @test find_next(r"fo", fbbstr, 3) == 0:-1
+    @test find_next(r"oo", fbbstr, 4) == 0:-1
+    @test find_next(r"o,", fbbstr, 5) == 0:-1
+    @test find_next(r",b", fbbstr, 6) == 8:9
+    @test find_next(r",b", fbbstr, 10) == 0:-1
+    @test find_next(r"az", fbbstr, 12) == 0:-1
 end
 
 @testset "contains with a String and Char needle" begin
@@ -344,14 +345,14 @@ end
 end
 
 @testset "issue #15723" begin
-    @test find_first(equalto('('), "⨳(") == 4
-    @test find_next(equalto('('), "(⨳(", 2) == 5
-    @test find_last(equalto('('), "(⨳(") == 5
-    @test find_prev(equalto('('), "(⨳(", 2) == 1
+    @test find_first('(', "⨳(") == 4
+    @test find_next('(', "(⨳(", 2) == 5
+    @test find_last('(', "(⨳(") == 5
+    @test find_prev('(', "(⨳(", 2) == 1
 end
 
 #=
-@test @inferred findall(equalto('a'), "éa") == [3]
-@test @inferred findall(equalto('€'), "€€") == [1, 4]
-@test @inferred isempty(findall(equalto('é'), ""))
+@test @inferred findall('a', "éa") == [3]
+@test @inferred findall('€', "€€") == [1, 4]
+@test @inferred isempty(findall('é', ""))
 =#

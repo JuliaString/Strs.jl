@@ -55,7 +55,7 @@ struct UnicodeError <: Exception
 end
 
 _repmsg(msg, pos, chr) =
-    replace(replace(msg, "<<1>>" => string(pos)), "<<2>>" =>  hex(chr))
+    replace(replace(msg, "<<1>>" => string(pos)), "<<2>>" =>  outhex(chr))
 show(io::IO, exc::UnicodeError) =
     print(io, "UnicodeError: ", _repmsg(exc.errmsg, exc.errpos, exc.errchr))
 end
@@ -72,7 +72,7 @@ const UTF_ERR_NORMALIZE         = " is not one of :NFC, :NFD, :NFKC, :NFKD"
 @noinline nulerr()               = unierror("cannot convert NULL to string")
 @noinline ncharerr(n)            = unierror(string("nchar (", n, ") must be greater than 0"))
 @noinline neginderr(s, n)        = unierror("Index ($n) must be non negative")
-@noinline codepoint_error(T, v)  = unierror(string("Invalid CodePoint: ", T, " 0x", hex(v)))
+@noinline codepoint_error(T, v)  = unierror(string("Invalid CodePoint: ", T, " 0x", outhex(v)))
 @noinline argerror(startpos, endpos) =
     unierror(string("End position ", endpos, " is less than start position (", startpos, ")"))
 @noinline repeaterr(cnt) = throw(ArgumentError("repeat count $cnt must be >= 0"))

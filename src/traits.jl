@@ -174,7 +174,9 @@ _isvalid(::T, ::Type{UTF32CharSet}, ::Type{<:CharSet}, str) where {T<:ValidatedS
      _isvalid(ValidatedStyle(T), CS, str)
 
 isvalid(::Type{S}, chr::T) where {S<:CodePoint, T<:CodePoint} =
-     _isvalid(ValidatedStyle(T), S, T, chr)
+     _isvalid(ValidatedStyle(T), charset(S), charset(T), chr)
+
+isvalid(::Type{T}, chr::Char) where {T<:CodePoint} = isvalid(T, chr%UInt32)
 
 # For now, there is only support for immutable `Str`s, when mutable `Str`s are added.
 

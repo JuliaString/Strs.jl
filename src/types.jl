@@ -35,21 +35,21 @@ macro cse(cs, e)
     :(CSE{CharSet{$(quotesym(cs)), $(quotesym(e))}()})
 end
 
-const charsets =
-    (:Binary,  # really, no character set at all, not text
+const charsets = (
      :ASCII,   # (7-bit subset of Unicode)
      :Latin,   # ISO-8859-1 (8-bit subset of Unicode)
      :UCS2,    # BMP (16-bit subset of Unicode)
      :UTF32,   # corresponding to codepoints (0-0xd7ff, 0xe000-0x10fff)
-     :UniPlus, # valid Unicode, plus unknown characters (for String)
      :Text1,   # Unknown character set, 1 byte
      :Text2,   # Unknown character set, 2 byte
      :Text4)   # Unknown character set, 4 byte
 
-const BinaryCharSet  = CharSet{:Binary}  # really, no character set at all, not text
 for nam in charsets
     @eval const $(symstr(nam, "CharSet")) = CharSet{$(quotesym(nam))}
 end
+
+const BinaryCharSet  = CharSet{:Binary}  # really, no character set at all, not text
+const UniPlusCharSet = CharSet{:UniPlus} # valid Unicode, plus unknown characters (for String)
 
 # These are to indicate string types that must have at least one character of the type,
 # for the internal types to make up the UniStr union type
@@ -108,7 +108,6 @@ struct Str{T,SubStr,Cache,Hash} <: AbstractString
         where {CSE_T<:CSE} =
       new{CSE_T,Nothing,Nothing,Nothing}(v,nothing,nothing,nothing))
 end
-#(::Type{STR})(v::STR_DATA_TYPE) where {T<:CSE,S,C,H,STR<:Str{T,S,C,H}} = Str(T, v)
 
 # Handle change from endof -> lastindex
 @static if !isdefined(Base, :lastindex)
@@ -142,6 +141,11 @@ for (names, siz) in ((_cpname1, 8), (_cpname2, 16), (_cpname4, 32)), nam in name
     @eval export $chrnam
 end
 primitive type _LatinChr <: CodePoint 8 end
+
+for nam in charsets
+    @eval charset(::Type{$(symstr(nam, "Chr"))}) = $(symstr(nam, "CharSet"))
+end
+charset(::Type{Char}) = UniPlusCharSet
 
 const CodePointTypes = Union{CodeUnitTypes, CodePoint}
 
@@ -324,5 +328,5 @@ _len(s::QuadStr) = sizeof(s) >>> 2
 
 @inline _mask_bytes(n) = (1%UInt << ((n & (CHUNKSZ - 1)) << 3)) - 0x1
 
-Base.need_full_hex(c::AbstractChar) = isxdigit(c)
-Base.escape_nul(c::AbstractChar) = ('0' <= c <= '7') ? "\\x00" : "\\0"
+Base.need_full_hex(c::CodePoint) = isxdigit(c)
+Base.escape_nul(c::CodePoint) = ('0' <= c <= '7') ? "\\x00" : "\\0"

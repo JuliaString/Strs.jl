@@ -59,7 +59,7 @@ function str_chr(val)
     isempty(val) && return ("", 0, "")
     io = IOBuffer()
     for ch in val
-        print(io, hex(ch%UInt32,4), ':')
+        print(io, Strs.outhex(ch%UInt32,4), ':')
     end
     str = String(take!(io))[1:end-1]
     val, length(str), str

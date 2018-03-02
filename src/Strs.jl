@@ -48,7 +48,7 @@ Note: for good substring performance, some of the operations that are optimized 
 # Convenience functions
 export to_ascii, utf8, utf16, utf32
 
-export unsafe_str, codeunit, codeunits, codepoints, @str_str, @condimport
+export unsafe_str, codeunit, codeunits, codepoints, @str_str, @condimport, codepoint_type
 
 symstr(s...) = Symbol(string(s...))
 quotesym(s...) = Expr(:quote, symstr(s...))
@@ -82,8 +82,10 @@ import Base: containsnul, convert, getindex, length, map, pointer, collect, in,
 @condimport codeunits
 @condimport ncodeunits
 @condimport bytestring
+@condimport firstindex
 @condimport lastindex
 @condimport contains
+@condimport isfound
 
 isdefined(Base, :copyto!)        || (const copyto! = copy!)
 isdefined(Base, :unsafe_copyto!) || (const unsafe_copyto! = unsafe_copy!)
@@ -95,6 +97,12 @@ isdefined(Base, :Cvoid)          || (const Cvoid = Void)
 
 uninit(T, len) = @static isdefined(Base, :uninitialized) ? T(uninitialized, len) : T(len)
 create_vector(T, len) = uninit(Vector{T}, len)
+
+@static if VERSION < v"0.7.0-DEV"
+    const outhex = hex
+else
+    outhex(v, p=1) = string(v, base=16, pad=p)
+end
 
 include("types.jl")
 include("chars.jl")

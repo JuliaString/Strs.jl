@@ -24,10 +24,14 @@ basetype(::Type{Text2Chr})    = UInt16
 basetype(::Type{UTF32Chr})    = UInt32
 basetype(::Type{Text4Chr})    = UInt32
 
+basetype(::Type{Char})        = UInt32
+
 basetype(::Type{T}) where {T<:CodeUnitTypes} = T
 
 tobase(v::T) where {T<:CodePoint} = reinterpret(basetype(T), v)
 tobase(v::T) where {T<:CodeUnitTypes} = v
+
+tobase(v::Char) = v%UInt32
 
 typemin(::Type{T}) where {T<:CodePoint} = reinterpret(T, typemin(basetype(T)))
 typemax(::Type{T}) where {T<:CodePoint} = reinterpret(T, typemax(basetype(T)))
@@ -35,17 +39,19 @@ typemax(::Type{T}) where {T<:CodePoint} = reinterpret(T, typemax(basetype(T)))
 typemax(::Type{ASCIIChr}) = reinterpret(ASCIIChr, 0x7f)
 typemax(::Type{UTF32Chr}) = reinterpret(UTF32Chr, 0x10ffff)
 
-codepoint_type(::Type{<:Text1Str})       = Text1Chr
-codepoint_type(::Type{<:Text2Str})       = Text2Chr
-codepoint_type(::Type{<:Text4Str})       = Text4Chr
-codepoint_type(::Type{<:BinaryStr})      = UInt8
+codepoint_type(::Type{<:AbstractString})   = Char
 
-codepoint_type(::Type{<:ASCIIStr})       = ASCIIChr
-codepoint_type(::Type{<:LatinStr})       = LatinChr
-codepoint_type(::Type{<:_LatinStr})      = _LatinChr
-codepoint_type(::Type{<:UCS2Str})        = UCS2Chr
-codepoint_type(::Type{<:_UCS2Str})       = UCS2Chr
-codepoint_type(::Type{<:UnicodeStrings}) = UTF32Chr
+codepoint_type(::Type{<:Str{<:Text1CSE}})  = Text1Chr
+codepoint_type(::Type{<:Str{<:Text2CSE}})  = Text2Chr
+codepoint_type(::Type{<:Str{<:Text4CSE}})  = Text4Chr
+codepoint_type(::Type{<:Str{<:BinaryCSE}}) = UInt8
+
+codepoint_type(::Type{<:Str{<:ASCIICSE}})  = ASCIIChr
+codepoint_type(::Type{<:Str{<:LatinCSE}})  = LatinChr
+codepoint_type(::Type{<:Str{<:_LatinCSE}}) = _LatinChr
+codepoint_type(::Type{<:Str{<:UCS2CSE}})   = UCS2Chr
+codepoint_type(::Type{<:Str{<:_UCS2CSE}})  = UCS2Chr
+codepoint_type(::Type{<:Str{<:UnicodeEncodings}}) = UTF32Chr
 
 codepoint_size(::Type{T}) where {T<:Union{String,Str}} = sizeof(codepoint_type(T))
 
@@ -69,9 +75,9 @@ set_codeunit!(dat::String, ch) = set_codeunit!(dat, 1, ch)
 
 isvalid(::Type{T}) where {T<:UnicodeChars} = true
 
-isvalid(::Type{ASCIIStr}, str::Vector{ASCIIChr}) = true
-isvalid(::Type{LatinStrings}, str::Vector{T}) where {T<:Union{ASCIIChr,LatinChars}} = true
-isvalid(::Type{UCS2Str}, str::Vector{T}) where {T<:Union{ASCIIChr,LatinChars,UCS2Chr}} = true
+isvalid(::Type{Str{<:ASCIICSE}}, str::Vector{ASCIIChr}) = true
+isvalid(::Type{<:LatinStrings}, str::Vector{T}) where {T<:Union{ASCIIChr,LatinChars}} = true
+isvalid(::Type{<:UCS2Strings}, str::Vector{T}) where {T<:Union{ASCIIChr,LatinChars,UCS2Chr}} = true
 isvalid(::Type{S}, str::Vector{T}) where {S<:UnicodeStrings,T<:UnicodeChars} = true
 
 isvalid(::Type{T}, v::Signed) where {T<:ByteChars} = typemin(T) <= v <= typemax(T)
@@ -91,14 +97,17 @@ convert(::Type{T}, v::Signed) where {T<:CodePoint} =
 convert(::Type{T}, v::Unsigned) where {T<:CodePoint} =
     isvalid(T, v) ? reinterpret(T, basetype(T)(v)) : codepoint_error(T, v)
 convert(::Type{Char}, v::T) where {T<:CodePoint} = convert(Char, x%basetype(T))
+convert(::Type{T}, v::Char) where {T<:CodePoint} = convert(T, v%UInt32)
 
 rem(x::S, ::Type{T}) where {S<:CodePoint, T<:Number}    = rem(reinterpret(basetype(S), x), T)
 rem(x::S, ::Type{T}) where {S<:Number, T<:CodePoint}    = reinterpret(T, x%basetype(T))
 rem(x::S, ::Type{T}) where {S<:CodePoint, T<:CodePoint} = reinterpret(T, x%basetype(T))
 rem(x::S, ::Type{Char}) where {S<:CodePoint} = Char(x%basetype(S))
+rem(x::Char, ::Type{T}) where {T<:CodePoint} = x%UInt32%T
 
 (::Type{S})(v::T) where {S<:Union{UInt32, Int, UInt}, T<:CodePoint} = Strs.tobase(v)%S
 (::Type{Char})(v::CodePoint) = Char(Strs.tobase(v))
+(::Type{T})(v::Char) where {T<:CodePoint} = T(v%UInt32)
 
 for nam in (:Text1, :Text2, :Text4, :ASCII, :Latin, :_Latin, :UCS2, :UTF32)
     sym = Symbol(string(nam, "Chr"))

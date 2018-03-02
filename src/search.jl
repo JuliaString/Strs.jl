@@ -33,10 +33,10 @@ function find_next end
 
 """
     find_first(pattern::AbstractString, string::AbstractString)
-    find_first(pattern::Regex, string::String)
+    find_first(pattern::Regex, string::AbstractString)
 
 Find the first occurrence of `pattern` in `string`. Equivalent to
-[`find_next(pattern, string, firstindex(s))`](@ref).
+[`find_next(pattern, string, 1)`](@ref).
 
 # Examples
 ```jldoctest
@@ -104,8 +104,10 @@ found(::Type{<:AbstractString}, v) = v != 0
 find_result(::Type{<:AbstractString}, v) = v
 
 @static if VERSION < v"0.7.0-DEV"
-const base_fwd_search = Base.searchindex
-const base_rev_search = Base.rsearchindex
+const base_fwd_srch_chr = Base.searchindex
+const base_fwd_srch_str = Base.searchindex
+const base_rev_srch_chr = Base.rsearchindex
+const base_rev_srch_str = Base.rsearchindex
 
 export EqualTo, equalto, OccursIn, occursin
 
@@ -148,8 +150,10 @@ specialized methods by using e.g. `f::Base.OccursIn` in a method signature.
 const occursin = OccursIn
 else
 
-const base_fwd_search = Base._searchindex
-const base_rev_search = Base._rsearchindex
+const base_fwd_srch_chr = Base._searchindex
+const base_fwd_srch_str = Base._searchindex
+const base_rev_srch_chr = Base._rsearchindex
+const base_rev_srch_str = Base._rsearchindex
 
     import Base: EqualTo, equalto, OccursIn, occursin
 
@@ -162,56 +166,21 @@ const base_rev_search = Base._rsearchindex
 =#
 end
 
-const Bytes = Union{UInt8, Int8}
-const ByteVec = Vector{<:Bytes}
-const AbsChars = Union{Char, AbstractChar}
-const StrOrByteVec = Union{ByteStr, ByteVec}
+const AbsChar = Union{Char, CodePoint} # replace with AbstractChar when in base
+const ByteStrings     = Union{String, ByteStr}
 
-_fwd_search(str::String, t::String, pos::Integer) = base_fwd_search(str, t, pos)
-_rev_search(str::String, t::String, pos::Integer) = base_rev_search(str, t, pos)
+find_next(pred::EqualTo{<:AbsChar}, str::AbstractString, pos::Integer) =
+    _fwd_srch_chr(str, pred.x, pos)
+find_prev(pred::EqualTo{<:AbsChar}, str::AbstractString, pos::Integer) =
+    _rev_srch_chr(str, pred.x, pos)
 
-find_next(pred::EqualTo{<:AbstractChar}, str::AbstractString, pos::Integer) =
-    _fwd_search(str, pred.x, pos)
-find_prev(pred::EqualTo{<:AbstractChar}, str::AbstractString, pos::Integer) =
-    _rev_search(str, pred.x, pos)
-
-# Returns index
-function find_next(pred::EqualTo{<:AbsChars}, str::Str, pos::Integer)
-    if pos < 1
-        @boundscheck pos < 0 && boundserr(str, pos)
-        return 0
-    elseif pos > (siz = sizeof(str))
-        @boundscheck pos > siz + 1 && boundserr(str, pos)
-        return 0
-    end
-    @inbounds isvalid(str, pos) || unierror(UTF_ERR_INVALID_INDEX, str, pos)
-    ch = pred.x
-    isascii(ch) && return _fwd_search(str, ch % UInt8, pos)
-    while (pos = _fwd_search(str, first_utf8_byte(ch), pos)) != 0 && str[pos] != ch
-        pos = nextind(str, pos)
-    end
-    pos
-end
-
-# Returns index
-function find_prev(pred::EqualTo{<:AbsChars}, str::Str, pos::Integer)
-    ch = pred.x
-    isascii(ch) && return _rev_search(str, ch % UInt8, pos)
-    byt = first_utf8_byte(ch)
-    while (pos = _rev_search(str, byt, pos)) != 0 && str[pos] != ch
-        pos = prevind(str, pos)
-    end
-    pos
-end
+find_next(ch::AbsChar, str::AbstractString, pos::Integer) = _fwd_srch_chr(str, ch, pos)
+find_prev(ch::AbsChar, str::AbstractString, pos::Integer) = _rev_srch_chr(str, ch, pos)
 
 find_first(a, b) = find_next(a, b, 1)
 find_last(a,  b) = find_prev(a, b, lastindex(b))
 
-# Returns index
-find_first(pred::EqualTo{<:Bytes}, a::StrOrByteVec)            = _fwd_search(a, pred.x)
-find_next(pred::EqualTo{<:Bytes}, a::StrOrByteVec, i::Integer) = _fwd_search(a, pred.x, i)
-find_last(pred::EqualTo{<:Bytes}, a::StrOrByteVec)             = _rev_search(a, pred.x)
-find_prev(pred::EqualTo{<:Bytes}, a::StrOrByteVec, i::Integer) = _rev_search(a, pred.x, i)
+const index_error = Base.string_index_err
 
 # AbstractString implementation of the generic find_next interface
 function find_next(testf::Function, str::AbstractString, pos::Integer)
@@ -219,180 +188,17 @@ function find_next(testf::Function, str::AbstractString, pos::Integer)
         @boundscheck pos < 0 && boundserr(str, pos)
         return 0
     end
-    n = ncodeunits(str)
-    if pos > n
-        @boundscheck pos > n + 1 && boundserr(str, pos)
+    len = ncodeunits(str)
+    if pos > len
+        @boundscheck pos > len + 1 && boundserr(str, pos)
         return 0
     end
-    isvalid(str, pos) || unierror(UTF_ERR_INVALID_INDEX, str, pos)
+    isvalid(str, pos) || index_error(str, pos)
     for (j, d) in pairs(SubString(str, pos))
         testf(d) && return pos + j - 1
     end
     0
 end
-
-function find_next(t::AbstractString, str::AbstractString, pos::Integer)
-    idx = _fwd_search(str, t, pos)
-    idx:(idx - 1 + ((!isempty(t) && idx > 0) ? lastindex(t) : 0))
-end
-function find_prev(t::AbstractString, str::AbstractString, pos::Integer)
-    idx = _rev_search(str, t, pos)
-    idx:(idx - 1 + ((!isempty(t) && idx > 0) ? lastindex(t) : 0))
-end
-
-_fwd_search(str::UnicodeByteStrings, ch::CodeUnitTypes, pos::Integer) =
-    ch <= typemax(codepoint_type(str)) ? _fwd_search(_data(str), ch%UInt8, pos) : 0
-
-_rev_search(str::UnicodeByteStrings, ch::CodeUnitTypes, pos::Integer) =
-    ch <= typemax(codepoint_type(str)) ? _rev_search(_data(str), ch%UInt8, pos) : 0
-
-function _fwd_search(str::ByteStr, b::Bytes, pos::Integer=1)
-    if pos < 1
-        @boundscheck boundserr(a, pos)
-        return 0
-    end
-    n = sizeof(a)
-    if pos > n
-        @boundscheck pos > n + 1 && boundserr(a, pos)
-        return 0
-    end
-    p = pointer(a)
-    q = ccall(:memchr, Ptr{UInt8}, (Ptr{UInt8}, Int32, Csize_t), p + pos - 1, b, n - pos + 1)
-    q == C_NULL ? 0 : Int(q - p + 1)
-end
-
-#=
-_fwd_search(a::StrOrByteVec, b::AbsChars, pos::Integer = 1) =
-    (isascii(b)
-     ? _fwd_search(a, b%UInt8, pos)
-     : _fwd_search(a, unsafe_wrap(Vector{UInt8}, string(b)), pos))
-
-_fwd_search(a::String, b::AbsChars, pos::Integer = 1) =
-    (isascii(b)
-     ? base_fwd_search(a, b%UInt8, pos)
-     : base_fwd_search(a, unsafe_wrap(Vector{UInt8}, string(b)), pos))
-=#
-
-function _rev_search(a::StrOrByteVec, b::Bytes, pos::Integer = sizeof(a))
-    if pos < 1
-        @boundscheck pos < 0 && boundserr(a, pos)
-        return 0
-    end
-    n = sizeof(a)
-    if pos > n
-        @boundscheck pos > n + 1 && boundserr(a, pos)
-        return 0
-    end
-    p = pointer(a)
-    q = ccall(:memrchr, Ptr{UInt8}, (Ptr{UInt8}, Int32, Csize_t), p, b, pos)
-    q == C_NULL ? 0 : Int(q - p + 1)
-end
-
-#=
-_rev_search(a::StrOrByteVec, ch::AbsChars, pos::Integer = length(a)) =
-    (isascii(b)
-     ? _rev_search(a, ch%UInt8, pos)
-     : _rev_search(a, unsafe_wrap(Vector{UInt8}, string(ch)), pos))
-
-_rev_search(a::String, ch::AbsChars, pos::Integer = length(a)) =
-    (isascii(b)
-     ? base_rev_search(a, ch%UInt8, pos)
-     : base_rev_search(a, unsafe_wrap(Vector{UInt8}, string(ch)), pos))
-=#
-
-_fwd_search(a::StrOrByteVec, ch::ByteChars, pos::Integer = 1) =
-    _fwd_search(a, ch%UInt8, pos)
-_rev_search(a::StrOrByteVec, ch::ByteChars, pos::Integer = length(a)) =
-    _rev_search(a, ch%UInt8, pos)
-
-function _fwd_search(str::StrOrByteVec, t::AbstractString, pos::Integer)
-    isempty(t) &&
-        return 1 <= pos <= nextind(str, lastindex(str)) ? pos : boundserr(str, pos)
-    t1, trest = Iterators.peel(t)
-    while (pos = _fwd_search(str, t1, pos)) != 0
-        ii = nextind(str, pos)
-        a = Iterators.Stateful(trest)
-        matched = all(splat(==), zip(SubString(str, ii), a))
-        isempty(a) && matched && break
-        pos = ii
-    end
-    pos
-end
-
-function _fwd_search(str::AbstractString, ch::AbsChars, pos::Integer)
-    isascii(ch) && return _fwd_search(str, ch % UInt8, pos)
-    if pos < 1
-        @boundscheck pos < 0 && boundserr(a, pos)
-        return 0
-    elseif pos > (lst = lastindex(str))
-        @boundscheck pos > lst + 1 && boundserr(str, pos)
-        return 0
-    end
-    @inbounds isvalid(str, pos) || unierror(UTF_ERR_INVALID_INDEX, str, pos)
-    b1 = first_utf8_byte(ch)
-    while (pos = _fwd_search(str, b1, pos)) != 0 && str[pos] != ch
-        pos = nextind(str, pos)
-    end
-    pos
-end
-
-_search_bloom_mask(c) = UInt64(1) << (c & 63)
-
-const UTF8Strings = Union{Str{<:ASCIICSE}, Str{<:UTF8CSE}}
-
-function _fwd_search(str::UTF8Strings, t::UTF8Strings, pos::Integer)
-    # Check for fast case of a single byte (check for single character also)
-    lastindex(t) == 1 && return _fwd_search(str, get_codeunit(t), pos)
-    _fwd_search(unsafe_wrap(Vector{UInt8}, str), unsafe_wrap(Vector{UInt8}, t), pos)
-end
-
-function _fwd_search(s::ByteVec, m, t::ByteVec, n, i::Integer)
-    n == 0 && return 1 <= i <= m+1 ? max(1, i) : 0
-    m == 0 && return 0
-    n == 1 && return _fwd_search(s, get_codeunit(t), p)
-    w = m - n
-    m < n  && return 0
-    i - 1 > w && return 0
-
-    bloom_mask = UInt64(0)
-    skip = n - 1
-    tlast = get_codeunit(t, n)
-    for j in 1:n
-        bloom_mask |= _search_bloom_mask(get_codeunit(t, j))
-        if get_codeunit(t,j) == tlast && j < n
-            skip = n - j - 1
-        end
-    end
-
-    i -= 1
-    while i <= w
-        if get_codeunit(s, i + n) == tlast
-            # check candidate
-            j = 0
-            while j < n - 1 && get_codeunit(s, i + j + 1) == get_codeunit(t, j + 1)
-                j += 1
-            end
-
-            # match found
-            j == n - 1 && return i+1
-
-            # no match, try to rule out the next character
-            if i < w && (bloom_mask & _search_bloom_mask(get_codeunit(s, i + n + 1))) == 0
-                i += n
-            else
-                i += skip
-            end
-        elseif i < w && (bloom_mask & _search_bloom_mask(get_codeunit(s, i + n + 1))) == 0
-            i += n
-        end
-        i += 1
-    end
-
-    0
-end
-
-_fwd_search(s::ByteVec, t::ByteVec, i::Integer) =
-    _fwd_search(s, sizeof(s), t, sizeof(t), i)
 
 # AbstractString implementation of the generic find_prev interface
 function find_prev(testf::Function, str::AbstractString, pos::Integer)
@@ -400,121 +206,275 @@ function find_prev(testf::Function, str::AbstractString, pos::Integer)
         @boundscheck pos < 0 && boundserr(str, pos)
         return 0
     end
-    n = ncodeunits(str)
-    if pos > n
-        @boundscheck pos > n + 1 && boundserr(str, pos)
+    len = ncodeunits(str)
+    if pos > len
+        @boundscheck pos > len + 1 && boundserr(str, pos)
         return 0
     end
-    r = reverse(str)
-    j = find_next(testf, r, reverseind(r, pos))
-    j == 0 ? 0 : reverseind(str, j)
+    isvalid(str, pos) || index_error(str, pos)
+    while pos > 0
+        @inbounds ch = str[pos]
+        testf(ch) && break
+        pos = prevind(str, pos)
+    end
+    pos
 end
 
-function _rev_search(str::AbstractString, t::AbstractString, pos::Integer)
-    isempty(t) &&
+_fwd_srch_codeunit(ptr::Ptr{UInt8}, cu::UInt8, fin::Ptr{UInt8}) =
+    _fwd_srch_codeunit(ptr, cu, fin-pnt)
+_rev_srch_codeunit(ptr::Ptr{UInt8}, cu::UInt8, fin::Ptr{UInt8}) =
+    _rev_srch_codeunit(ptr, cu, fin-pnt)
+
+@inline function _fwd_srch_codeunit(pnt::Ptr{UInt8}, cu::UInt8, pos, len)
+    res = _fwd_memchr(pnt + pos - 1, cu, len - pos + 1)
+    res == C_NULL ? 0 : Int(res - pnt + 1)
+end
+
+@inline function _rev_srch_codeunit(pnt::Ptr{UInt8}, cu::UInt8, pos)
+    res = _rev_memchr(pnt, cu, pos)
+    res == C_NULL ? 0 : Int(res - pnt + 1)
+end
+
+_fwd_srch_codeunit(str::ByteStr, cu::UInt8, pos) =
+    _fwd_srch_codeunit(_pnt(str), cu, pos, _len(str))
+_rev_srch_codeunit(str::ByteStr, cu::UInt8, pos) =
+    _rev_srch_codeunit(_pnt(str), cu, pos)
+
+_fwd_srch_codeunit(str::QuadStr, cu::UInt32, pos) =
+    _fwd_srch_codeunit(_pnt(str), cu%UInt32, pos, _len(str))
+_rev_srch_codeunit(str::QuadStr, cu::UInt32, pos) =
+    _rev_srch_codeunit(_pnt(str), cu%UInt32, pos)
+
+function _fwd_srch_chr(str, ch, pos::Integer)
+    if pos < 1
+        @boundscheck boundserr(str, pos)
+        return 0
+    end
+    len = ncodeunits(str)
+    if pos > len
+        @boundscheck pos > len + 1 && boundserr(str, pos)
+        return 0
+    end
+    isvalid(str, pos) || index_error(str, pos)
+    # Check here if ch is valid for the type of string
+    cpt = codepoint_type(typeof(str))
+    isvalid(cpt, ch) ? _fwd_srch_codeunit(str, tobase(ch%cpt), pos) : 0
+end
+
+function _rev_srch_chr(str, ch, pos::Integer)
+    if pos < 1
+        @boundscheck pos < 0 && boundserr(str, pos)
+        return 0
+    end
+    len = ncodeunits(str)
+    if pos > len
+        @boundscheck pos > len + 1 && boundserr(str, pos)
+        return 0
+    end
+    isvalid(str, pos) || index_error(str, pos)
+    # Check first if ch is valid for the type of string
+    cpt = codepoint_type(typeof(str))
+    isvalid(cpt, ch) ? _rev_srch_codeunit(str, tobase(ch%cpt), pos) : 0
+end
+
+_fwd_srch_chr(str::AbstractString, ch::Char, pos::Integer) =
+    base_fwd_srch_chr(str, ch, pos)
+_rev_srch_chr(str::AbstractString, ch::Char, pos::Integer) =
+    base_rev_srch_chr(str, ch, pos)
+_fwd_srch_chr(str::String, ch::CodePoint, pos::Integer) =
+    base_fwd_srch_chr(str, ch%Char, pos)
+_rev_srch_chr(str::String, ch::CodePoint, pos::Integer) =
+    base_rev_srch_chr(str, ch%Char, pos)
+_fwd_srch_chr(str::Str, ch::Char, pos::Integer) =
+    _fwd_srch_chr(str, ch%UInt32, pos)
+_rev_srch_chr(str::Str, ch::Char, pos::Integer) =
+    _rev_srch_chr(str, ch%UInt32, pos)
+
+# Substring searching
+
+# Note: these definitions, from Base, are incorrect, because the indexing of the needle
+# doesn't necessarily match that of the string being searched
+
+function find_next(needle::AbstractString, str::AbstractString, pos::Integer)
+    idx = _fwd_srch_str(str, needle, pos)
+    idx:(idx - 1 + ((!isempty(needle) && idx > 0) ? lastindex(needle) : 0))
+end
+function find_prev(needle::AbstractString, str::AbstractString, pos::Integer)
+    idx = _rev_srch_str(str, needle, pos)
+    idx:(idx - 1 + ((!isempty(needle) && idx > 0) ? lastindex(needle) : 0))
+end
+
+_fwd_srch_str(str::String, needle::String, pos::Integer) = base_fwd_srch_str(str, needle, pos)
+_rev_srch_str(str::String, needle::String, pos::Integer) = base_rev_srch_str(str, needle, pos)
+
+_fwd_srch_cp(::CodeUnitSingle, str, cp, pos) = _fwd_srch_codeunit(str, cp, pos)
+_rev_srch_cp(::CodeUnitSingle, str, cp, pos) = _rev_srch_codeunit(str, cp, pos)
+
+function _fwd_srch_cp(::CodeUnitMulti, str, cp, pos)
+    len = _len(str)
+    @inbounds while pos <= len
+        tobase(str[pos]) == cp && return pos
+        pos = nextind(str, pos)
+    end
+    0
+end
+
+function _rev_srch_cp(::CodeUnitMulti, str, cp, pos)
+    @inbounds while pos > 0
+        tobase(str[pos]) == cp && return pos
+        pos = prevind(str, pos)
+    end
+    0
+end
+
+function _fwd_srch_str(str::AbstractString, needle::AbstractString, pos::Integer)
+    isempty(needle) &&
         return 1 <= pos <= nextind(str, lastindex(str)) ? pos : boundserr(str, pos)
-    t1, trest = Iterators.peel(Iterators.reverse(t))
-    while (pos = _rev_search(str, t1, pos)) != 0
-        ii = prevind(str, pos)
+    ch, trest = Iterators.peel(needle)
+    # Check first if ch is valid for the type of string
+    str_cp_typ = codepoint_type(typeof(str))
+    isvalid(str_cp_typ, ch) || return 0
+    cbase = tobase(ch)%basetype(str_cp_typ)
+    cstyle = CodePointStyle(str)
+    # We want to search the abstract string for a *codepoint*
+    while (pos = _fwd_srch_cp(cstyle, str, cbase, pos)) != 0
+        ii = nextind(str, pos)
         a = Iterators.Stateful(trest)
-        b = Iterators.Stateful(Iterators.reverse(pairs(SubString(str, 1, ii))))
-        matched = all(splat(==), zip(a, (x[2] for x in b)))
-        if matched && isempty(a)
-            isempty(b) && return firstindex(str)
-            return nextind(str, popfirst!(b)[1])
-        end
+        matched = all(Base.splat(==), zip(SubString(str, ii), a))
+        isempty(a) && matched && break
         pos = ii
     end
     pos
 end
 
-function _rev_search(str::UTF8Strings, t::UTF8Strings, pos::Integer)
-    # Check for fast case of a single byte
-    siz = sizeof(t)
-    siz == 1 && return _rev_search(str, get_codeunit(str), pos)
-    if lastindex(t) != 0
-        j = str <= (ncodeunits(str) ? nextind(str, pos)-1 : pos)
-        return _rev_search(unsafe_wrap(Vector{UInt8}, str), unsafe_wrap(Vector{UInt8}, t), j)
-    end
-    pos > sizeof(str) ? 0 : (pos == 0 ? 1 : pos)
-end
+_search_bloom_mask(ch) = UInt64(1) << (ch & 63)
+_check_bloom_mask(mask, pnt, off) = (mask & _search_bloom_mask(get_codeunit(pnt, off))) == 0
 
-function _rev_search(s::ByteVec, m, t::ByteVec, n, k::Integer)
-    n == 0 && return 0 <= k <= m ? max(k, 1) : 0
-    m == 0 && return 0
-    n == 1 && return _rev_search(s, get_codeunit(t, 1), k)
-    m < n  && return 0
-    k <= 0 && return 0
+const UTF8Strings = Union{Str{<:ASCIICSE}, Str{<:UTF8CSE}}
+
+function _fwd_srch_str(str::UTF8Strings, needle::UTF8Strings, pos::Integer)
+    # Check for fast case of a single codeunit (should check for single character also)
+    tlen = ncodeunits(needle)
+    tlen == 1 &&
+        return _fwd_srch_chr(str, get_codeunit(needle), pos)
+    slen = ncodeunits(str)
+    tlen == 0 && return 1 <= pos <= slen+1 ? pos : 0
+    slen == 0 && return 0
+    diff = slen - tlen
+    slen < tlen && return 0
+    slen == tlen && pos == 1 && return (_memcmp(str, needle, slen) == 0 ? 1 : 0)
+    (pos -= 1) <= diff || return 0
+
+    spnt = _pnt(str)
+    npnt = _pnt(needle)
+
+    tlast = get_codeunit(npnt, tlen)
 
     bloom_mask = UInt64(0)
-    skip = n - 1
-    tfirst = get_codeunit(t,1)
-    for j in n:-1:1
-        bloom_mask |= _search_bloom_mask(get_codeunit(t,j))
-        get_codeunit(t,j) == tfirst && j > 1 && (skip = j - 2)
+    skip = tlen - 1
+    for j in 1:tlen
+        bloom_mask |= _search_bloom_mask(get_codeunit(npnt, j))
+        get_codeunit(npnt, j) == tlast && j < tlen && (skip = tlen - j - 1)
     end
+    
+    while pos <= diff
+        if get_codeunit(spnt, pos + tlen) == tlast
+            pos += 1
 
-    i = min(k - n + 1, m - n + 1)
-    while i > 0
-        if get_codeunit(s,i) == tfirst
             # check candidate
             j = 0
-            while (j += 1) < n && get_codeunit(s, i+j) == get_codeunit(t,j+1) ; end
+            while j < tlen - 1 && get_codeunit(spnt, pos + j) == get_codeunit(npnt, j + 1)
+                j += 1
+            end
 
             # match found
-            j == n && return i
+            j == tlen - 1 && return pos
 
             # no match, try to rule out the next character
-            if i > 1 && bloom_mask & _search_bloom_mask(get_codeunit(s,i-1)) == 0
-                i -= n
+            if pos <= diff && _check_bloom_mask(bloom_mask, spnt, pos + tlen)
+                pos += tlen
             else
-                i -= skip
+                pos += skip
             end
-        elseif i > 1
-            if bloom_mask & _search_bloom_mask(get_codeunit(s, i-1)) == 0
-                i -= n
-            end
+        elseif (pos += 1) <= diff && _check_bloom_mask(bloom_mask, spnt, pos + tlen)
+            pos += tlen
         end
-        i -= 1
+    end
+
+    0
+end
+
+function _rev_srch_str(str::AbstractString, needle::AbstractString, pos::Integer)
+    isempty(needle) &&
+        return 1 <= pos <= nextind(str, lastindex(str)) ? pos : boundserr(str, pos)
+    ch, trest = Iterators.peel(Iterators.reverse(needle))
+    # Check first if ch is valid for the type of string
+    str_cp_typ = codepoint_type(typeof(str))
+    isvalid(str_cp_typ, ch) || return 0
+    cbase = tobase(ch)%basetype(str_cp_typ)
+    cstyle = CodePointStyle(str)
+    while (pos = _rev_srch_cp(cstyle, str, cbase, pos)) != 0
+        ii = prevind(str, pos)
+        a = Iterators.Stateful(trest)
+        b = Iterators.Stateful(Iterators.reverse(pairs(SubString(str, 1, ii))))
+        all(Base.splat(==), zip(a, (x[2] for x in b))) && isempty(a) &&
+            return isempty(b) ? 1 : nextind(str, popfirst!(b)[1])
+        pos = ii
+    end
+    pos
+end
+
+function _rev_srch_str(str::UTF8Strings, needle::UTF8Strings, pos::Integer)
+    # Check for fast case of a single codeunit
+    tlen = ncodeunits(needle)
+    tlen == 1 && return _rev_srch_chr(str, get_codeunit(needle), pos)
+    slen = ncodeunits(str)
+    tlen == 0 && return pos > slen ? 0 : (pos == 0 ? 1 : pos)
+    slen == 0 && return 0
+    slen < tlen && return 0
+    pos <= 0 && return 0
+    slen == tlen && pos == 1 && return (_memcmp(str, needle, slen) == 0 ? 1 : 0)
+    pos = min(pos, slen) - tlen + 1
+
+    spnt = _pnt(str)
+    npnt = _pnt(needle)
+
+    bloom_mask = UInt64(0)
+    skip = tlen - 1
+    tfirst = get_codeunit(npnt)
+    for j in tlen:-1:1
+        bloom_mask |= _search_bloom_mask(get_codeunit(npnt, j))
+        get_codeunit(npnt, j) == tfirst && j > 1 && (skip = j - 2)
+    end
+
+    while pos > 0
+        if get_codeunit(spnt, pos) == tfirst
+            # check candidate
+            j = 0
+            while (j += 1) < tlen && get_codeunit(spnt, pos + j) == get_codeunit(npnt, j + 1) ; end
+
+            # match found
+            j == tlen && return pos
+
+            # no match, try to rule out the next character
+            pos -= ((pos > 1 && _check_bloom_mask(bloom_mask, spnt, pos - 1)) ? tlen : skip) + 1
+        elseif pos > 1 && _check_bloom_mask(bloom_mask, spnt, pos -= 1)
+            pos -= 1
+        else
+            pos -= 1
+        end
     end
     0
 end
 
-_rev_search(s::ByteVec, t::ByteVec, k::Integer) =
-    _rev_search(s, sizeof(s), t, sizeof(t), k)
+contains(haystack::Str, needle::AbsChar)        = _fwd_srch_chr(haystack, needle, 1) != 0
+contains(haystack::Str, needle::AbstractString) = _fwd_srch_str(haystack, needle, 1) != 0
+contains(haystack::AbstractString, needle::CodePoint) = _fwd_srch_chr(haystack, needle, 1) != 0
+contains(haystack::AbstractString, needle::Str) = _fwd_srch_str(haystack, needle, 1) != 0
 
-"""
-    contains(haystack::AbstractString, needle::Union{AbstractString,Regex,Char})
+in(ch::AbsChar, str::AbstractString) = base_fwd_srch_chr(str, ch%Char, 1) != 0
+in(ch::AbsChar, str::Str) = _fwd_srch_chr(str, ch, 1) != 0
 
-Determine whether the second argument is a substring of the first. If `needle`
-is a regular expression, checks whether `haystack` contains a match.
-
-# Examples
-```jldoctest
-julia> contains("JuliaLang is pretty cool!", "Julia")
-true
-
-julia> contains("JuliaLang is pretty cool!", 'a')
-true
-
-julia> contains("aba", r"a.a")
-true
-
-julia> contains("abba", r"a.a")
-false
-```
-"""
-function contains end
-
-contains(haystack::Str, needle::Union{AbstractString, AbsChars, CodeUnitTypes, Int8}) =
-    _fwd_search(haystack, needle, firstindex(haystack)) != 0
-contains(haystack::AbstractString, needle::Union{Str, AbstractChar}) =
-    _fwd_search(haystack, needle, firstindex(haystack)) != 0
-
-in(ch::AbstractChar, str::AbstractString) = base_fwd_search(str, ch%Char, 1) != 0
-in(ch::AbstractChar, str::Str)            = _fwd_search(str, ch, 1) != 0
-in(ch::Char, str::Str)                    = _fwd_search(str, ch%UInt32%Text4Chr, 1) != 0
-
-in(a::Str, b::Str) = contains(b, a)
 in(a::Str, b::AbstractString) = contains(b, a)
 in(a::AbstractString, b::Str) = contains(b, a)
+in(a::Str, b::Str)            = contains(b, a)
