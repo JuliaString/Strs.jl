@@ -57,10 +57,10 @@ function reverse(str::T) where {T<:UTF32Strings}
     (len = _len(str)) == 0 && return str
     pnt = _pnt(str)
     buf, beg = _allocate(UInt32, len)
-    out = beg + (len<<2)
+    out = bytoff(beg, len)
     while out >= beg
-        set_codeunit!(out -= 4, get_codeunit(pnt))
-        pnt += 4
+        set_codeunit!(out -= sizeof(UInt32), get_codeunit(pnt))
+        pnt += sizeof(UInt32)
     end
     Str(cse(T), buf)
 end
@@ -136,11 +136,11 @@ end
 function _encode_utf32(pnt, len)
     buf, out = _allocate(UInt32, len)
     # has multi-byte UTF-8 sequences
-    fin = out + (len<<2)
+    fin = bytoff(out, len)
     @inbounds while out < fin
         ch, pnt = get_cp(pnt)
         set_codeunit!(out, ch)
-        out += 4
+        out += sizeof(UInt32)
     end
     buf
 end
@@ -148,7 +148,7 @@ end
 # transcode to vector of UInt32 from validated UTF8
 function _transcode_utf8_to_utf32(pnt, len)
     buf, out = _allocate(UInt32, len)
-    fin = out + (len<<2)
+    fin = bytoff(out, len)
     @inbounds while out < fin
         ch = get_codeunit(pnt)%UInt32
         # Handle ASCII characters
@@ -165,7 +165,7 @@ function _transcode_utf8_to_utf32(pnt, len)
             set_codeunit!(out, get_utf8_4byte(pnt += 3, ch))
         end
         pnt += 1
-        out += 4
+        out += sizeof(UInt32)
     end
     buf
 end
@@ -173,13 +173,13 @@ end
 # transcode to vector of UInt32 from validated UTF16
 function _transcode_utf16_to_utf32(pnt, len)
     buf, out = _allocate(UInt32, len)
-    fin = out + (len<<2)
+    fin = bytoff(out, len)
     @inbounds while out < fin
         ch = get_codeunit(pnt)
-        is_surrogate_lead(ch) && (ch = get_supplementary(ch, get_codeunit(pnt += 2)))
+        is_surrogate_lead(ch) && (ch = get_supplementary(ch, get_codeunit(pnt += sizeof(UInt16))))
         set_codeunit!(out, ch)
-        pnt += 2
-        out += 4
+        pnt += sizeof(UInt16)
+        out += sizeof(UInt32)
     end
     buf
 end
@@ -242,12 +242,12 @@ const UniRawChar = Union{UInt32, Int32, Text4Chr, Char}
 function convert(::Type{T}, dat::AbstractVector{<:UniRawChar}) where {T<:UTF32Strings}
     (len = length(dat)) == 0 && empty_str(T)
     buf, pnt = _allocate(UInt32, len)
-    fin = pnt + (len<<2)
+    fin = bytoff(pnt, len)
     pos = 0
     @inbounds while pnt < fin
         ch = dat[pos += 1]%UInt32
         set_codeunit!(pnt, check_valid(ch, pos))
-        pnt += 4
+        pnt += sizeof(UInt32)
     end
     Str(cse(T), buf)
 end

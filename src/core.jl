@@ -35,7 +35,6 @@ _nextcp(::Type{T}, pnt) where {T} = _nextcpfun(CodePointStyle(T), T, pnt)
     _next(CodeUnitMulti(), T, str, i)[1]
 
 _length(::CodeUnitSingle, str) = (@_inline_meta(); _len(str))
-_isvalid(::CodeUnitSingle, str, i) = (@_inline_meta(); 1 <= i <= _len(str))
 
 _thisind(::CodeUnitSingle, str, i) = Int(i)
 
@@ -71,8 +70,6 @@ end
     (@_inline_meta(); _next(CodePointStyle(T), codepoint_type(T), str, i))
 @propagate_inbounds length(str::T) where {T<:Str} =
     (@_inline_meta(); _length(CodePointStyle(T), str))
-@propagate_inbounds isvalid(str::T, i::Integer) where {T<:Str} =
-    (@_inline_meta(); _isvalid(CodePointStyle(T), str, i))
 @propagate_inbounds thisind(str::T, i::Int) where {T<:Str} =
     (@_inline_meta(); _thisind(CodePointStyle(T), str, i))
 @propagate_inbounds prevind(str::T, i::Int) where {T<:Str} =
@@ -87,6 +84,14 @@ end
     _ind2chr(CodePointStyle(T), str, i)
 @propagate_inbounds chr2ind(str::T, i::Int) where {T<:Str} =
     _chr2ind(CodePointStyle(T), str, i)
+
+@propagate_inbounds function isvalid(str::T, i::Integer) where {T<:Str}
+    @_inline_meta()
+    @boundscheck 1 <= i <= _len(str) || return false
+    _isvalid_char_pos(CodePointStyle(T), str, i)
+end
+
+_isvalid_char_pos(::CodeUnitSingle, str, i) = true
 
 #=
 # Handle substrings of Str

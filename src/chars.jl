@@ -17,6 +17,17 @@ codeunit(::Type{UniStr})    = UInt32 # Note, the real type could be UInt8, UInt1
 
 codeunit(::S) where {S<:Str} = codeunit(S)
 
+bytoff(::Type{UInt8},  off) = off
+bytoff(::Type{UInt16}, off) = off << 1
+bytoff(::Type{UInt32}, off) = off << 2
+chroff(::Type{UInt8},  off) = off
+chroff(::Type{UInt16}, off) = off >>> 1
+chroff(::Type{UInt32}, off) = off >>> 2
+
+chrdiff(pnt::Ptr{T}, beg::Ptr{T}) where {T<:CodeUnitTypes} = Int(chroff(T, pnt - beg))
+
+bytoff(pnt::Ptr{T}, off) where {T<:CodeUnitTypes} = pnt + bytoff(T, off)
+
 """Default value for CodePoint types"""
 basetype(::Type{<:CodePoint}) = UInt8
 basetype(::Type{UCS2Chr})     = UInt16
@@ -72,24 +83,6 @@ set_codeunit!(dat::String, pos, ch) = unsafe_store!(pointer(dat), pos, ch)
 set_codeunit!(pnt::Ptr{<:CodeUnitTypes}, ch) = unsafe_store!(pnt, ch)
 set_codeunit!(dat::AbstractVector{<:CodeUnitTypes}, ch) = (dat[1] = ch)
 set_codeunit!(dat::String, ch) = set_codeunit!(dat, 1, ch)
-
-isvalid(::Type{T}) where {T<:UnicodeChars} = true
-
-isvalid(::Type{Str{<:ASCIICSE}}, str::Vector{ASCIIChr}) = true
-isvalid(::Type{<:LatinStrings}, str::Vector{T}) where {T<:Union{ASCIIChr,LatinChars}} = true
-isvalid(::Type{<:UCS2Strings}, str::Vector{T}) where {T<:Union{ASCIIChr,LatinChars,UCS2Chr}} = true
-isvalid(::Type{S}, str::Vector{T}) where {S<:UnicodeStrings,T<:UnicodeChars} = true
-
-isvalid(::Type{T}, v::Signed) where {T<:ByteChars} = typemin(T) <= v <= typemax(T)
-isvalid(::Type{T}, v::Unsigned) where {T<:ByteChars} = v <= typemax(T)
-isvalid(::Type{T}, v::Signed) where {T<:WideChars} = v >= 0 && isvalid(T, Unsigned(v))
-isvalid(::Type{T}, v::Unsigned) where {T<:WideChars} =
-    (v <= typemax(T)) & !is_surrogate_codeunit(v)
-
-isvalid(::Type{Char}, ch::T) where {T<:UnicodeChars} = true
-isvalid(::Type{Char}, ch::Text1Chr) = true
-isvalid(::Type{Char}, ch::Text2Chr) = !is_surrogate_codeunit(tobase(ch))
-isvalid(::Type{Char}, ch::Text4Chr) = isvalid(UTF32Chr, tobase(ch))
 
 convert(::Type{T}, v::S) where {T<:Integer, S<:CodePoint} = convert(T, tobase(v))
 convert(::Type{T}, v::Signed) where {T<:CodePoint} =

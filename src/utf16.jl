@@ -12,10 +12,12 @@ const _hi_bit_16  = 0x8000_8000_8000_8000
 @inline _mask_surr(v)  = xor((v | v<<1 | v<<2 | v<<3 | v<<4 | v<<5) & _hi_bit_16, _hi_bit_16)
 @inline _get_masked(qpnt) = _mask_surr(xor(unsafe_load(qpnt), _trail_mask))
 
+@inline get_utf16(ch) = (0xd7c0 + (ch >> 10))%UInt16, (0xdc00 + (ch & 0x3ff))%UInt16
+
 function _length(::CodeUnitMulti, str::Str{<:UTF16CSE})
     (siz = sizeof(str)) == 0 && return 0
     siz == 2 && return 1
-    cnt = siz>>>1
+    cnt = chroff(UInt16, siz)
     pnt, fin = _calcpnt(str, siz)
     while (pnt += CHUNKSZ) <= fin
         cnt -= count_ones(_get_masked(pnt))
@@ -150,8 +152,8 @@ function reverse(str::T) where {T<:UCS2Strings}
     Str(cse(T), buf)
 end
 
-@inline _isvalid(::CodeUnitMulti, str::Str{<:UTF16CSE}, i::Integer) =
-    (1 <= i <= _len(str)) && !is_surrogate_trail(get_codeunit(_pnt(str), i))
+@inline _isvalid_char_pos(::CodeUnitMulti, str::Str{<:UTF16CSE}, pos::Integer) =
+    !is_surrogate_trail(get_codeunit(_pnt(str), pos))
 
 function isvalid(::Type{<:UCS2Strings}, data::AbstractArray{UInt16})
     @inbounds for ch in data

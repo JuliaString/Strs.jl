@@ -10,20 +10,20 @@ Based in part on code for UTF8String that used to be in Julia
 
 # Get rest of character ch from 2-byte UTF-8 sequence at pnt - 1
 @inline get_utf8_2byte(pnt, ch) =
-    @inbounds return (((ch & 0x3f)%UInt16 << 6) | (get_codeunit(pnt) & 0x3f))
+    (((ch & 0x3f)%UInt16 << 6) | (get_codeunit(pnt) & 0x3f))
 
 # Get rest of character ch from 3-byte UTF-8 sequence at pnt - 2
 @inline get_utf8_3byte(pnt, ch) =
-    @inbounds return (((ch & 0xf)%UInt16 << 12)
-                      | ((get_codeunit(pnt - 1)%UInt16 & 0x3f) << 6)
-                      | (get_codeunit(pnt) & 0x3f))
+    (((ch & 0xf)%UInt16 << 12)
+     | ((get_codeunit(pnt - 1)%UInt16 & 0x3f) << 6)
+     | (get_codeunit(pnt) & 0x3f))
 
 # Get rest of character ch from 4-byte UTF-8 sequence at pnt - 3
 @inline get_utf8_4byte(pnt, ch) =
-    @inbounds return (((ch & 0x7)%UInt32 << 18)
-                      | ((get_codeunit(pnt - 2)%UInt32 & 0x3f) << 12)
-                      | ((get_codeunit(pnt - 1)%UInt32 & 0x3f) << 6)
-                      | (get_codeunit(pnt) & 0x3f))
+    (((ch & 0x7)%UInt32 << 18)
+     | ((get_codeunit(pnt - 2)%UInt32 & 0x3f) << 12)
+     | ((get_codeunit(pnt - 1)%UInt32 & 0x3f) << 6)
+     | (get_codeunit(pnt) & 0x3f))
 
 # Output a character as a 2-byte UTF-8 sequence
 @inline function output_utf8_2byte!(pnt, ch)
@@ -252,8 +252,8 @@ end
 
 bytestring(str::Str{<:UTF8CSE}) = str
 
-@inline _isvalid(::CodeUnitMulti, str::Str{<:UTF8CSE}, pos::Integer) =
-    (1 <= pos <= _len(str)) && !is_valid_continuation(get_codeunit(_pnt(str), pos))
+@inline _isvalid_char_pos(::CodeUnitMulti, str::Str{<:UTF8CSE}, pos::Integer) =
+    !is_valid_continuation(get_codeunit(_pnt(str), pos))
 
 @propagate_inbounds function _thisind(::CodeUnitMulti, str::Str{<:UTF8CSE}, pos::Integer)
     @boundscheck 0 < pos <= _len(str) || boundserr(str, pos)

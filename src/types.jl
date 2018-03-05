@@ -256,6 +256,9 @@ const UTF32Strings = Str{<:UTF32CSEncodings}
 const UnicodeByteStrings = Union{Str{<:ASCIICSE}, LatinStrings}
 const UnicodeStrings     = Union{String, Str{<:UnicodeEncodings}}
 
+const AbsChar      = Union{Char, CodePoint} # replace with AbstractChar when in base
+const ByteStrings  = Union{String, ByteStr}
+
 ## Get the character set / encoding used by a string type
 cse(::T) where {C<:CSE,T<:Str{C}} = C
 cse(::Type{T}) where {C<:CSE,T<:Str{C}} = C

@@ -1,15 +1,22 @@
 # Copyright 2018 Gandalf Software, Inc. (Scott Paul Jones)
 # Licensed under MIT License, see LICENSE.md
 
-_fwd_memchr(ptr::Ptr{UInt8}, byt::UInt8, len::Integer) =
-    ccall(:memchr, Ptr{UInt8}, (Ptr{UInt8}, Int32, Csize_t), ptr, byt, len)
-_rev_memchr(ptr::Ptr{UInt8}, byt::UInt8, len::Integer) =
-    ccall(:memrchr, Ptr{UInt8}, (Ptr{UInt8}, Int32, Csize_t), ptr, byt, len)
-
 const (WidChr,OthChr) = @static sizeof(Cwchar_t) == 4 ? (UInt32,UInt16) : (UInt16,UInt32)
 
+_fwd_memchr(ptr::Ptr{UInt8}, byt::UInt8, len::Integer) =
+    ccall(:memchr, Ptr{UInt8}, (Ptr{UInt8}, Int32, Csize_t), ptr, byt, len)
+
 _fwd_memchr(ptr::Ptr{WidChr}, wchr::WidChr, len::Integer) =
-    ccall(:wmemchr, Ptr{Cvoid}, (Ptr{Cvoid}, Int32, Csize_t), ptr, wchr, len)
+    ccall(:wmemchr, Ptr{WidChr}, (Ptr{WidChr}, Int32, Csize_t), ptr, wchr, len)
+
+_fwd_memchr(beg::Ptr{OthChr}, wchr::OthChr, len::Integer) =
+    _fwd_memchr(beg, ch, bytoff(beg, len))
+
+_fwd_memchr(ptr::Ptr{UInt8}, byt::UInt8, fin::Ptr{UInt8}) = _fwd_memchr(ptr, byt, fin - ptr)
+_rev_memchr(ptr::Ptr{UInt8}, byt::UInt8, fin::Ptr{UInt8}) = _rev_memchr(ptr, byt, fin - ptr)
+
+_fwd_memchr(ptr::Ptr{WidChr}, wchr::WidChr, fin::Ptr{WidChr}) =
+    _fwd_memchr(ptr, wchr, chroff(fin - ptr))
 
 function _fwd_memchr(pnt::Ptr{T}, wchr::T, fin::Ptr{T}) where {T<:OthChr}
     while pnt < fin
@@ -19,23 +26,25 @@ function _fwd_memchr(pnt::Ptr{T}, wchr::T, fin::Ptr{T}) where {T<:OthChr}
     C_NULL
 end
 
+_rev_memchr(ptr::Ptr{UInt8}, byt::UInt8, len::Integer) =
+    ccall(:memrchr, Ptr{UInt8}, (Ptr{UInt8}, Int32, Csize_t), ptr, byt, len)
+
 function _rev_memchr(beg::Ptr{T}, ch::T, pnt::Ptr{T}) where {T<:Union{UInt16,UInt32}}
     while (pnt -= sizeof(T)) >= beg
         get_codeunit(pnt) == ch && return pnt
     end
     C_NULL
 end
-_fwd_memchr(pnt::Ptr{T}, wchr::T, len::Integer) where {T<:OthChr} =
-    _fwd_memchr(beg, ch, beg + pos * sizeof(T))
+
 _rev_memchr(beg::Ptr{T}, ch::T, pos::Integer) where {T<:Union{UInt16,UInt32}} =
-    _rev_memchr(beg, ch, beg + pos * sizeof(T))
+    _rev_memchr(beg, ch, bytoff(beg, pos))
 
 _memcmp(a::Ptr{UInt8}, b::Ptr{UInt8}, len) =
     ccall(:memcmp, Int32, (Ptr{UInt8}, Ptr{UInt8}, UInt), a, b, len)
 _memcmp(a::Ptr{OthChr}, b::Ptr{OthChr}, len) =
-    ccall(:memcmp, Int32, (Ptr{Cvoid}, Ptr{Cvoid}, UInt), a, b, len)
+    ccall(:memcmp, Int32, (Ptr{OthChr}, Ptr{OthChr}, UInt), a, b, len)
 _memcmp(a::Ptr{WidChr}, b::Ptr{WidChr}, len) =
-    ccall(:wmemcmp, Int32, (Ptr{Cvoid}, Ptr{Cvoid}, UInt), a, b, len>>2)
+    ccall(:wmemcmp, Int32, (Ptr{WidChr}, Ptr{WidChr}, UInt), a, b, chroff(WidChr, len))
 
 _memcmp(a::Union{String, ByteStr}, b::Union{String, ByteStr}, siz) = _memcmp(_pnt(a), _pnt(b), siz)
 _memcmp(a::WordStr, b::WordStr, siz) = _memcmp(_pnt(a), _pnt(b), siz)
@@ -137,6 +146,8 @@ function _cpeq(a::T, b) where {C<:CSE, T<:Str{C}}
     end
     true
 end
+
+_cpeq(a, b::T) where {C<:CSE, T<:Str{C}} = _cpeq(b, a)
 
 function _cpeq(a::S, b::T) where {CSE1<:CSE, CSE2<:CSE, S<:Str{CSE1}, T<:Str{CSE2}}
     len1, pnt1 = _lenpnt(a)

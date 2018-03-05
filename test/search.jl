@@ -6,31 +6,12 @@ const astr = "Hello, world.\n"
 const u8str = "∀ ε > 0, ∃ δ > 0: |x-y| < δ ⇒ |f(x)-f(y)| < ε"
 const fbbstr = "foo,bar,baz"
 
-@testset "BoundsError" begin
-    # I think these should give error on 4 also, and "" is not treated
-    # consistently with SubString("",1,1), nor with Char[]
-    for ind in (0, 5)
-        @test_throws BoundsError find_next(SubString("",1,1), "foo", ind)
-        @test_throws BoundsError find_prev(SubString("",1,1), "foo", ind)
-    end
-
-    # Note: the commented out test will be enabled after fixes to make
-    # sure that find_next/find_prev are consistent
-    # no matter what type of AbstractString the second argument is
-    @test_throws BoundsError find_next('a', "foo", 0)
-    @test_throws BoundsError find_next(occursin(Char[]), "foo", 5)
-    # @test_throws BoundsError find_prev(occursin(Char[]), "foo", 0)
-    @test_throws BoundsError find_prev(occursin(Char[]), "foo", 5)
-
-    # @test_throws ErrorException in("foobar","bar")
-    #@test_throws BoundsError find_next(equalto(0x1), b"\x1\x2",0)
-end
-
 # Should test GenericString also, once overthing else is working
 const UnicodeStringTypes =
     (String, UTF16Str, UTF32Str, UniStr, UTF8Str)
 const ASCIIStringTypes =
-    (UnicodeStringTypes..., ASCIIStr, LatinStr, UCS2Str)
+    (String, UTF8Str, ASCIIStr, LatinStr)
+    #    (UnicodeStringTypes..., ASCIIStr, LatinStr, UCS2Str)
 
 const ustr = (("éé", "ééé"), ("€€", "€€€"), ("\U1f596\U1f596", "\U1f596\U1f596\U1f596"))
 const resfirst = (1:3, 1:4, 1:5)
@@ -40,126 +21,139 @@ function cvtchar(T, ch)
     try 
         T(ch)
     catch
-        UTF32Chr(ch)
+        Text4Chr(ch)
     end
 end
 
-function test2(fun, T, tstr, ostr, list)
-    for (opat, res) in list
-        tpat = T(opat)
-        @test fun(tpat, tstr) == res
-        @test fun(opat, tstr) == res
-        @test fun(tpat, ostr) == res
-        @test fun(opat, ostr) == res
-    end
-end
-function test3(fun, T, tstr, ostr, list)
-    for (opat, beg, res) in list
-        tpat = T(opat)
-        @test fun(tpat, tstr, beg) == res
-        @test fun(opat, tstr, beg) == res
-        @test fun(tpat, ostr, beg) == res
-        @test fun(opat, ostr, beg) == res
-    end
-end
-function test2ch(fun, T, tstr, ostr, list)
-    cpt = codepoint_type(T)
-    for (opat, res) in list
-        tpat = cvtchar(cpt, opat)
-        @test fun(tpat, tstr) == res
-        @test fun(opat, tstr) == res
-        @test fun(tpat, ostr) == res
-        @test fun(opat, ostr) == res
-        @test fun(equalto(tpat), tstr) == res
-        @test fun(equalto(opat), tstr) == res
-        @test fun(equalto(tpat), ostr) == res
-        @test fun(equalto(opat), ostr) == res
+function test2(fun, P, str, list)
+    for (pat, res) in list
+        p = P(pat)
+        (r = fun(pat, str)) == res ||
+            println("$(fun)($(typeof(pat)):\"$pat\", $(typeof(str)):\"$str\") => $r != $res")
+        @test fun(pat, str) == res
     end
 end
 
-function test3ch(fun, T, tstr, ostr, list)
-    cpt = codepoint_type(T)
-    for (opat, beg, res) in list
-        tpat = cvtchar(cpt, opat)
-        @test fun(tpat, tstr, beg) == res
-        @test fun(opat, tstr, beg) == res
-        @test fun(tpat, ostr, beg) == res
-        @test fun(opat, ostr, beg) == res
-        @test fun(equalto(tpat), tstr, beg) == res
-        @test fun(equalto(opat), tstr, beg) == res
-        @test fun(equalto(tpat), ostr, beg) == res
-        @test fun(equalto(opat), ostr, beg) == res
+function test3(fun, P, str, list)
+    for (pat, beg, res) in list
+        p = P(pat)
+        (r = fun(pat, str, beg)) == res ||
+            println("$(fun)($(typeof(pat)):\"$pat\", $(typeof(str)):\"$str\", $beg) => $r != $res")
+        @test fun(pat, str, beg) == res
     end
 end
 
-@testset "ASCII Tests" begin
-    @testset for T in ASCIIStringTypes
-        str = T(astr)
-        lst = nextind(str, lastindex(str))
-        @testset "BoundsError" begin
-            @test_throws BoundsError find_next('z', str, 0)
-            @test_throws BoundsError find_next('∀', str, 0)
-            @test_throws BoundsError find_next('ε', str, lst + 1)
-            @test_throws BoundsError find_next('a', str, lst + 1)
-        end
-        @testset "find_*(equalto(ch)...)" begin
-            test2ch(find_first, T, str, astr,
-                    zip(('x', '\0', '\u80', '∀', 'H', 'l', ',', '\n'), (0, 0, 0, 0, 1, 3, 6, 14)))
-            test3ch(find_next,  T, str, astr,
-                    (('l', 4, 4), ('l', 5, 11), ('l', 12, 0), (',', 7, 0), ('\n', 15, 0)))
-            test2ch(find_last,  T, str, astr,
-                    zip(('x', '\0', '\u80', '∀', 'H', 'l', ',', '\n'), (0, 0, 0, 0, 1, 11, 6, 14)))
-            test3ch(find_prev,  T, str, astr,
-                    (('H', 0, 0), ('l', 5, 4), ('l', 4, 4), ('l', 3, 3), ('l', 2, 0), (',', 5, 0)))
-        end
-        @testset "find_* single-char string" begin
-            test2(find_first, T, str, astr,
-                  (("x", 0:-1), ("H", 1:1), ("l", 3:3), ("\n", 14:14)))
-            test2(find_last,  T, str, astr,
-                  (("x", 0:-1), ("H", 1:1), ("l", 11:11), ("\n", 14:14)))
-            test3(find_next,  T, str, astr,
-                  (("H", 2, 0:-1), ("l", 4, 4:4), ("l", 5, 11:11),
-                   ("l", 12, 0:-1), ("\n", 15, 0:-1)))
-            test3(find_prev,  T, str, astr,
-                  (("H", 2, 1:1), ("H", 0, 0:-1), ("l", 10, 4:4),
-                   ("l", 4, 4:4), ("l", 3, 3:3), ("l", 2, 0:-1), ("\n", 13, 0:-1)))
-        end
+function test2ch(fun, C, str, list)
+    for (p, res) in list
+        pat = cvtchar(C, p)
+        (r = fun(pat, str)) == res ||
+            println("$(fun)($(typeof(pat)):\"$pat\"), $(typeof(str)):\"$str\") => $r != $res")
+        (r = fun(equalto(pat), str)) == res ||
+            println("$(fun)(equalto($(typeof(pat)):\"$pat\"), $(typeof(str)):\"$str\") => $r != $res")
+        @test fun(pat, str) == res
+        @test fun(equalto(pat), str) == res
+    end
+end
 
-        str = T(fbbstr)
-        @testset "find_* two-char string" begin
-            let pats = ("xx", "fo", "oo", "o", ",b", "az"),
-                res = (0:-1, 1:2, 2:3, 3:4, 4:5, 10:11)
-                test2(find_first, T, str, fbbstr, zip(pats, res))
-            end
-            let pats = ("fo", "oo", "o", ",b", ",b", "az"),
-                pos  = (3, 4, 5, 6, 10, 12),
-                res  = (0:-1, 0:-1, 0:-1, 8:9, 0:-1, 0:-1)
-                test3(find_next, T, str, fbbstr, zip(pats, pos, res))
-            end
-            # string backward search with a two-char string literal
-            let pats = ("xx", "fo", "oo", "o", ",b", "az"),
-                res = (0:-1, 1:2, 2:3, 3:4, 8:9, 10:11)
-                test2(find_last, T, str, fbbstr, zip(pats, res))
-            end
-            let pats = ("fo", "oo", "o", ",b", ",b", "az"),
-                pos  = (1, 2, 1, 6, 3, 10),
-                res  = (0:-1, 0:-1, 0:-1, 4:5, 0:-1, 0:-1)
-                test3(find_prev, T, str, fbbstr, zip(pats, pos, res))
-            end
-        end
+function test3ch(fun, C, str, list)
+    for (p, beg, res) in list
+        pat = cvtchar(C, p)
+        (r = fun(pat, str, beg)) == res ||
+            println("$(fun)($(typeof(pat)):'$pat', $(typeof(str)):\"$str\", $beg) => $r != $res")
+        (r = fun(equalto(pat), str, beg)) == res ||
+            println("$fun(equalto($(typeof(pat)):'$pat'), $(typeof(str)):\"$str\", $beg) => $r != $res")
+        @test fun(pat, str, beg) == res
+        @test fun(equalto(pat), str, beg) == res
+    end
+end
 
-        empty = T("")
-        @testset "find_* empty string,..." begin
-            for i = 1:lastindex(str)
-                @test find_next(empty, str, i) == i:i-1
+@testset "ASCII Strings" begin
+    for T in ASCIIStringTypes, P in ASCIIStringTypes
+        @testset "pattern: $P, str: $T" begin
+            str = T(astr)
+            C = codepoint_type(P)
+            lst = nextind(str, lastindex(str))
+            empty_pred = occursin(C[])
+            @testset "BoundsError" begin
+                for ind in (0, lst, lst+1), fun in (find_next, find_prev)
+                    @test_throws BoundsError fun(SubString(P(""),1,1), str, ind)
+                    @test_throws BoundsError fun(equalto(cvtchar(C,'a')), str, ind)
+                    @test_throws BoundsError fun(equalto(cvtchar(C,'∀')), str, ind)
+                    @test_throws BoundsError fun(equalto(cvtchar(C,'ε')), str, ind)
+                    @test_throws BoundsError fun(empty_pred, str, ind)
+                end
             end
-            for i = 1:lastindex(str)
-                @test find_prev(empty, str, i) == i:i-1
+            @testset "find_*(equalto(ch)...)" begin
+                let pats = ('x', '\0', '\u80', '∀', 'H', 'l', ',', '\n'),
+                    res  = (0,   0,    0,      0,   1,   3,   6,   14)
+                    test2ch(find_first, C, str, zip(pats, res))
+                end
+                let pats = ('l', 'l', 'l', ',', '.'),
+                    pos  = (  4,   5,  12,  7,   14),
+                    res  = (  4,  11,   0,  0,    0)
+                    test3ch(find_next,  C, str, zip(pats, pos, res))
+                end
+                let pats = ('x', '\0', '\u80', '∀', 'H', 'l', ',', '\n'),
+                    res  = (0, 0, 0, 0, 1, 11, 6, 14)
+                    test2ch(find_last,  C, str, zip(pats, res))
+                end
+                let pats = ('H', 'l', 'l', 'l', 'l', ','),
+                    pos  = (1, 5, 4, 3, 2, 5),
+                    res  = (1, 4, 4, 3, 0, 0)
+                    test3ch(find_prev,  C, str, zip(pats, pos, res))
+                end
             end
-        end
+            @testset "find_* single-char string" begin
+                test2(find_first, P, str,
+                      (("x", 0:-1), ("H", 1:1), ("l", 3:3), ("\n", 14:14)))
+                test2(find_last,  P, str,
+                      (("x", 0:-1), ("H", 1:1), ("l", 11:11), ("\n", 14:14)))
+                test3(find_next,  P, str,
+                      (("H", 2, 0:-1), ("l", 4, 4:4), ("l", 5, 11:11),
+                       ("l", 12, 0:-1), (".", 14, 0:-1), ("\n", 14, 14:14)))
+                test3(find_prev,  P, str,
+                      (("H", 2, 1:1), ("H", 1, 1:1), ("l", 10, 4:4),
+                       ("l", 4, 4:4), ("l", 3, 3:3), ("l", 2, 0:-1), ("\n", 13, 0:-1)))
+            end
 
-        @test find_first(empty, empty) == 1:0
-        @test find_last(empty, empty) == 1:0
+            str = T(fbbstr)
+            @testset "find_* two-char string" begin
+                let pats = ("xx", "fo", "oo", "o,", ",b", "az"),
+                    res  = (0:-1, 1:2,  2:3,  3:4,  4:5,  10:11)
+                    test2(find_first, P, str, zip(pats, res))
+                end
+                let pats = ("fo", "oo", "o,", ",b", ",b", "az"),
+                    pos  = (3,    4,    5,    6,    10,   11), # was 12, that gives boundserror
+                    res  = (0:-1, 0:-1, 0:-1, 8:9,  0:-1, 0:-1)
+                    test3(find_next, P, str, zip(pats, pos, res))
+                end
+                # string backward search with a two-char string literal
+                let pats = ("xx", "fo", "oo", "o,", ",b", "az"),
+                    res  = (0:-1, 1:2,  2:3,  3:4,  8:9,  10:11)
+                    test2(find_last, P, str, zip(pats, res))
+                end
+                let pats = ("fo", "oo", "o,", ",b", ",b", "az"),
+                    pos  = (1,    2,    1,    6,    3,    10),
+                    res  = (0:-1, 0:-1, 0:-1, 4:5,  0:-1, 0:-1)
+                    test3(find_prev, P, str, zip(pats, pos, res))
+                end
+            end
+
+            emptyT = T("")
+            emptyP = P("")
+
+            @testset "find_* empty string,..." begin
+                for i = 1:lastindex(str)
+                    @test find_next(emptyP, str, i) == i:i-1
+                end
+                for i = 1:lastindex(str)
+                    @test find_prev(emptyP, str, i) == i:i-1
+                end
+            end
+
+            @test find_first(emptyP, emptyT) == 1:0
+            @test find_last(emptyP, emptyT) == 1:0
+        end
     end
 end
 
