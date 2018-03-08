@@ -51,11 +51,8 @@ function find_first end
 
 """
     find_prev(pattern::AbstractString, string::AbstractString, start::Integer)
-    find_prev(pattern::Regex, string::String, start::Integer)
 
 Find the previous occurrence of `pattern` in `string` starting at position `start`.
-`pattern` can be either a string, or a regular expression, in which case `string`
-must be of type `String`.
 
 The return value is a range of indexes where the matching sequence is found, such that
 `s[find_prev(x, s, i)] == x`:
@@ -101,15 +98,12 @@ struct Rev <: Dir end
 
 const _not_found = 0:-1
 
-find_next(pat::Regex, str, pos::Integer) = coalesce(findnext(pat, str, pos), _not_found)
-find_prev(pat::Regex, str, pos::Integer) = coalesce(findprev(pat, str, pos), _not_found)
-find_first(pat::Regex, str) = coalesce(findfirst(pat, str), _not_found)
-find_last(pat::Regex, str)  = coalesce(findlast(pat, str), _not_found)
-
 found(::Type{<:AbstractString}, v) = v != 0
 find_result(::Type{<:AbstractString}, v) = v
 
 @static if VERSION < v"0.7.0-DEV"
+
+find_next(pat::Regex, str, pos::Integer) = search(str, pat, pos)
 
 export EqualTo, equalto, OccursIn, occursin
 
@@ -154,6 +148,8 @@ const occursin = OccursIn
 else
 
 import Base: EqualTo, equalto, OccursIn, occursin
+
+find_next(pat::Regex, str, pos::Integer) = coalesce(findnext(pat, str, pos), _not_found)
 
 #=
     nothing_sentinel(i) = i == 0 ? nothing : i
@@ -313,6 +309,7 @@ end
 
 function _srch_strings(::Rev, str::AbstractString, needle::AbstractString,
                        ch, nxtsub, pos, slen, tlen)
+    println("_srch_strings(::Rev, \"$str\", \"$needle\", '$ch', $nxtsub, $pos, $slen, $tlen)")
     while (pos = _srch_cp(Rev(), str, ch, pos, slen)) != 0
         res = _cmp_str(str, nextind(str, pos), needle, nxtsub)
         res == 0 || return pos:res
@@ -443,8 +440,7 @@ contains(hay::AbstractString, chr::CodePoint) = _srch_chr(Fwd(), hay, chr, 1) !=
 contains(hay::Str, str::AbstractString)       = _srch_str(Fwd(), hay, str, 1) != 0
 contains(hay::AbstractString, str::Str)       = _srch_str(Fwd(), hay, str, 1) != 0
 
-in(ch::AbsChar, str::AbstractString) = _srch_chr(Fwd(), str, ch, 1) != 0
-
-in(a::Str, b::AbstractString) = contains(b, a)
-in(a::AbstractString, b::Str) = contains(b, a)
-in(a::Str, b::Str)            = contains(b, a)
+in(chr::CodePoint, str::AbstractString) = contains(str, chr)
+in(chr::AbsChar,   str::Str)            = contains(str, chr)
+in(pat::Str, str::AbstractString)       = contains(str, pat)
+in(pat::AbstractString, str::Str)       = contains(str, pat)

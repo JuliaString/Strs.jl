@@ -311,11 +311,11 @@ const _isnumeric_a = _isdigit
 @inline islatin(ch::Unsigned)    = ch <= 0xff
 @inline islatin(ch::CodePoint)   = islatin(tobase(ch))
 
-@inline isbmp(ch::Unsigned)      = ch <= typemax(UCS2Chr) && !is_surrogate_codeunit(ch)
+@inline isbmp(ch::Unsigned)      = ch <= 0xffff && !is_surrogate_codeunit(ch)
 @inline isbmp(ch::UInt8)         = true
 @inline isbmp(ch::CodePoint)     = isbmp(tobase(ch))
 
-@inline isunicode(ch::Unsigned)  = ch <= typemax(UTF32Chr) && !is_surrogate_codeunit(ch)
+@inline isunicode(ch::Unsigned)  = ch <= 0x10ffff && !is_surrogate_codeunit(ch)
 @inline isunicode(ch::UInt8)     = true
 @inline isunicode(ch::CodePoint) = isunicode(tobase(ch))
 

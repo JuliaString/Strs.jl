@@ -65,9 +65,9 @@ end
 @propagate_inbounds lastindex(str::T) where {T<:Str} =
     (@_inline_meta(); _lastindex(CodePointStyle(T), str))
 @propagate_inbounds getindex(str::T, i::Int) where {T<:Str} =
-    (@_inline_meta(); _getindex(CodePointStyle(T), codepoint_type(T), str, i))
+    (@_inline_meta(); R = codepoint_type(T) ; _getindex(CodePointStyle(T), R, str, i)::R)
 @propagate_inbounds next(str::T, i::Int) where {T<:Str} =
-    (@_inline_meta(); _next(CodePointStyle(T), codepoint_type(T), str, i))
+    (@_inline_meta(); R = codepoint_type(T) ; _next(CodePointStyle(T), R, str, i)::Tuple{R,Int})
 @propagate_inbounds length(str::T) where {T<:Str} =
     (@_inline_meta(); _length(CodePointStyle(T), str))
 @propagate_inbounds thisind(str::T, i::Int) where {T<:Str} =

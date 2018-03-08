@@ -256,7 +256,7 @@ const UTF32Strings = Str{<:UTF32CSEncodings}
 const UnicodeByteStrings = Union{Str{<:ASCIICSE}, LatinStrings}
 const UnicodeStrings     = Union{String, Str{<:UnicodeEncodings}}
 
-const AbsChar      = Union{Char, CodePoint} # replace with AbstractChar when in base
+const AbsChar = @static isdefined(Base, :AbstractChar) ? AbstractChar : Union{Char, CodePoint}
 const ByteStrings  = Union{String, ByteStr}
 
 ## Get the character set / encoding used by a string type

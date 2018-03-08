@@ -44,6 +44,8 @@ tobase(v::T) where {T<:CodeUnitTypes} = v
 
 tobase(v::Char) = v%UInt32
 
+codepoint(v::T) where {T<:CodePoint} = tobase(v)
+
 typemin(::Type{T}) where {T<:CodePoint} = reinterpret(T, typemin(basetype(T)))
 typemax(::Type{T}) where {T<:CodePoint} = reinterpret(T, typemax(basetype(T)))
 
@@ -84,13 +86,13 @@ set_codeunit!(pnt::Ptr{<:CodeUnitTypes}, ch) = unsafe_store!(pnt, ch)
 set_codeunit!(dat::AbstractVector{<:CodeUnitTypes}, ch) = (dat[1] = ch)
 set_codeunit!(dat::String, ch) = set_codeunit!(dat, 1, ch)
 
-convert(::Type{T}, v::S) where {T<:Integer, S<:CodePoint} = convert(T, tobase(v))
+convert(::Type{T}, v::S) where {T<:Integer, S<:CodePoint} = convert(T, tobase(v))::T
 convert(::Type{T}, v::Signed) where {T<:CodePoint} =
     (v >= 0 && isvalid(T, v%Unsigned)) ? convert(T, tobase(v)) : codepoint_error(T, v)
 convert(::Type{T}, v::Unsigned) where {T<:CodePoint} =
     isvalid(T, v) ? reinterpret(T, basetype(T)(v)) : codepoint_error(T, v)
-convert(::Type{Char}, v::T) where {T<:CodePoint} = convert(Char, x%basetype(T))
-convert(::Type{T}, v::Char) where {T<:CodePoint} = convert(T, v%UInt32)
+convert(::Type{Char}, v::T) where {T<:CodePoint} = convert(Char, tobase(v))
+convert(::Type{T}, v::Char) where {T<:CodePoint} = convert(T, tobase(v))::T
 
 rem(x::S, ::Type{T}) where {S<:CodePoint, T<:Number}    = rem(reinterpret(basetype(S), x), T)
 rem(x::S, ::Type{T}) where {S<:Number, T<:CodePoint}    = reinterpret(T, x%basetype(T))
@@ -98,27 +100,39 @@ rem(x::S, ::Type{T}) where {S<:CodePoint, T<:CodePoint} = reinterpret(T, x%baset
 rem(x::S, ::Type{Char}) where {S<:CodePoint} = Char(x%basetype(S))
 rem(x::Char, ::Type{T}) where {T<:CodePoint} = x%UInt32%T
 
-(::Type{S})(v::T) where {S<:Union{UInt32, Int, UInt}, T<:CodePoint} = Strs.tobase(v)%S
-(::Type{Char})(v::CodePoint) = Char(Strs.tobase(v))
-(::Type{T})(v::Char) where {T<:CodePoint} = T(v%UInt32)
+(::Type{S})(v::T) where {S<:Union{UInt32, Int, UInt}, T<:CodePoint} = tobase(v)%S
+(::Type{Char})(v::CodePoint) = Char(tobase(v))
+(::Type{T})(v::Char) where {T<:CodePoint} = T(tobase(v))
 
 for nam in (:Text1, :Text2, :Text4, :ASCII, :Latin, :_Latin, :UCS2, :UTF32)
     sym = Symbol(string(nam, "Chr"))
-    @eval $sym(v) = convert($sym, v)
+    @eval $sym(v::Number) = convert($sym, v)
 end
 
-size(cp::CodePoint) = ()
 size(cp::CodePoint, dim) = convert(Int, dim) < 1 ? boundserr(cp, dim) : 1
-ndims(cp::CodePoint) = 0
-ndims(::Type{<:CodePoint}) = 0
-length(cp::CodePoint) = 1
-lastindex(cp::CodePoint) = 1
-getindex(cp::CodePoint) = cp
 getindex(cp::CodePoint, i::Integer) = i == 1 ? cp : boundserr(cp, i)
 getindex(cp::CodePoint, I::Integer...) = all(x -> x == 1, I) ? cp : boundserr(cp, I)
-first(cp::CodePoint) = cp
-last(cp::CodePoint) = cp
-eltype(::Type{CodePoint}) = CodePoint
+
+@static if !isdefined(Base, :AbstractChar)
+    size(cp::CodePoint) = ()
+    ndims(cp::CodePoint) = 0
+    ndims(::Type{<:CodePoint}) = 0
+    length(cp::CodePoint) = 1
+    lastindex(cp::CodePoint) = 1
+    getindex(cp::CodePoint) = cp
+    first(cp::CodePoint) = cp
+    last(cp::CodePoint) = cp
+    eltype(::Type{CodePoint}) = CodePoint
+    start(cp::CodePoint) = false
+    next(cp::CodePoint, state) = (cp, true)
+    done(cp::CodePoint, state) = state
+    isempty(cp::CodePoint) = false
+    in(x::CodePoint, y::CodePoint) = x == y
+    -(x::CodePoint, y::CodePoint) = Int(x) - Int(y)
+    -(x::CodePoint, y::Integer) = CodePoint((Int32(x) - Int32(y))%UInt32)
+    +(x::CodePoint, y::Integer) = CodePoint((Int32(x) + Int32(y))%UInt32)
+    +(x::Integer, y::CodePoint) = y + x
+end
 
 _uni_rng(m) = 0x00000:ifelse(m < 0xd800, m, m-0x800)
 codepoint_rng(::Type{T}) where {T<:CodePoint} = _uni_rng(typemax(T)%UInt32)
@@ -129,29 +143,15 @@ codepoint_rng(::Type{Text4Chr}) = 0%UInt32:typemax(UInt32)
 codepoint_adj(::Type{T}, ch) where {T} = ifelse(ch < 0xd800, ch, ch+0x800)%T
 codepoint_adj(::Type{T}, ch) where {T<:Union{Text2Chr,Text4Chr}} = ch%T
 
-start(cp::CodePoint) = false
-next(cp::CodePoint, state) = (cp, true)
-done(cp::CodePoint, state) = state
-isempty(cp::CodePoint) = false
-in(x::CodePoint, y::CodePoint) = x == y
+==(x::CodePoint, y::AbsChar) = tobase(x) == tobase(y)
+==(x::AbsChar, y::CodePoint) = tobase(x) == tobase(y)
 
-==(x::CodePointTypes, y::CodePoint) = tobase(x) == tobase(y)
-==(x::CodePoint, y::CodeUnitTypes) = tobase(x) == tobase(y)
-==(x::CodePoint, y::Char) = tobase(x) == y%UInt32
-==(x::Char, y::CodePoint) = y == x
+isless(x::CodePoint, y::AbsChar)   = tobase(x) < tobase(y)
+isless(x::AbsChar,   y::CodePoint) = tobase(x) < tobase(y)
 
-isless(x::CodePointTypes, y::CodePoint) = tobase(x) < tobase(y)
-isless(x::CodePoint, y::CodeUnitTypes)  = tobase(x) < tobase(y)
-isless(x::CodePointTypes, y::Char) = tobase(x) < y%UInt32
-isless(x::Char, y::CodePointTypes) = x%UInt32 < tobase(y)
-
+# Note: this is not the same as the Base definition, which may be a problem
 hash(x::CodePoint, h::UInt) =
     hash_uint64(xor((UInt32(x) + 0x0d4d64234) << 32), UInt64(h))
-
--(x::CodePointTypes, y::CodePoint) = Int(x) - Int(y)
--(x::CodePoint, y::Integer) = CodePoint((Int32(x) - Int32(y))%UInt32)
-+(x::CodePoint, y::Integer) = CodePoint((Int32(x) + Int32(y))%UInt32)
-+(x::Integer, y::CodePoint) = y + x
 
 show(io::IO, cp::CodePoint)  = print(io, Char(tobase(cp)))
 print(io::IO, cp::CodePoint) = print(io, Char(tobase(cp)))

@@ -25,7 +25,7 @@ struct AlwaysValid     <: ValidatedStyle end
 struct UnknownValidity <: ValidatedStyle end
 
 ValidatedStyle(::Type{<:AbstractChar}) = UnknownValidity()
-ValidatedStyle(::Type{Char}) = UnknownValidity() # Only until Char becomes <: AbstractChar
+@static isdefined(Base, :AbstractChar) || (ValidatedStyle(::Type{Char}) = UnknownValidity())
 ValidatedStyle(::Type{<:CodePoint}) = AlwaysValid()
 
 ValidatedStyle(::Type{<:AbstractString}) = UnknownValidity()
@@ -53,12 +53,13 @@ abstract type CodePointStyle end
 struct CodeUnitSingle <: CodePointStyle end
 struct CodeUnitMulti  <: CodePointStyle end
 
-CodePointStyle(A::AbstractString) = CodePointStyle(typeof(A))
-CodePointStyle(::Type{<:AbstractString}) = CodeUnitSingle()
-CodePointStyle(::Type{T}) where {T<:Union{UTF8Str,UTF16Str,String}} = CodeUnitMulti()
-
 CodePointStyle(::Type{<:CSE}) = CodeUnitSingle()
-CodePointStyle(::Type{T}) where {T<:Union{UTF8CSE,UTF16CSE}} = CodeUnitMulti()
+CodePointStyle(::Type{<:Union{UTF8CSE,UTF16CSE}}) = CodeUnitMulti()
+
+CodePointStyle(::Type{T}) where {T<:AbstractString} = CodePointStyle(cse(T))
+
+CodePointStyle(::Type{<:SubString{T}}) where {T<:AbstractString} = CodePointStyle(T)
+CodePointStyle(v::AbstractString) = CodePointStyle(typeof(v))
 
 ismulti(str::AbstractString) = CodePointStyle(str) === CodeUnitMulti()
 
@@ -121,8 +122,6 @@ CharSetStyle(::Type{UInt32})    = CharSetUnknown()
 # must check range if CS1 is smaller than CS2, even if CS2 is valid for it's range
 _isvalid(::ValidatedStyle, ::Type{ASCIICharSet}, ::Type{T}, val) where {T<:CharSet} = isascii(val)
 
-# Union{Text1CharSet, Text2CharSet, LatinCharSet, UCS2CharSet, UTF32CharSet}}
-
 (_isvalid(::ValidatedStyle, ::Type{LatinCharSet}, ::Type{T}, val)
  where {T<:Union{Text2CharSet, Text4CharSet, UCS2CharSet, UTF32CharSet}}) =
      islatin(val)
@@ -130,6 +129,7 @@ _isvalid(::ValidatedStyle, ::Type{ASCIICharSet}, ::Type{T}, val) where {T<:CharS
 (_isvalid(::ValidatedStyle, ::Type{UCS2CharSet}, ::Type{T}, val)
  where {T<:Union{Text2CharSet, Text4CharSet, UTF32CharSet}}) =
      isbmp(val)
+
 _isvalid(::ValidatedStyle, ::Type{UTF32CharSet}, ::Type{<:CharSet}, val) =
     isunicode(val)
 

@@ -86,12 +86,13 @@ import Base: containsnul, convert, getindex, length, map, pointer, collect, in,
 @condimport lastindex
 @condimport contains
 @condimport isfound
+@condimport codepoint
 
 isdefined(Base, :copyto!)        || (const copyto! = copy!)
 isdefined(Base, :unsafe_copyto!) || (const unsafe_copyto! = unsafe_copy!)
-isdefined(Base, :AbstractChar)   || (abstract type AbstractChar end ; export AbstractChar)
 isdefined(Base, :Nothing)        || (const Nothing = Void)
 isdefined(Base, :Cvoid)          || (const Cvoid = Void)
+isdefined(Base, :AbstractChar)   || (abstract type AbstractChar end ; export AbstractChar)
 
 @static isdefined(Base, :codeunits) || include("codeunits.jl")
 
