@@ -52,21 +52,18 @@ typemax(::Type{T}) where {T<:CodePoint} = reinterpret(T, typemax(basetype(T)))
 typemax(::Type{ASCIIChr}) = reinterpret(ASCIIChr, 0x7f)
 typemax(::Type{UTF32Chr}) = reinterpret(UTF32Chr, 0x10ffff)
 
-codepoint_type(::Type{<:AbstractString})   = Char
+eltype(::Type{<:Str{BinaryCSE}}) = UInt8
 
-codepoint_type(::Type{<:Str{<:Text1CSE}})  = Text1Chr
-codepoint_type(::Type{<:Str{<:Text2CSE}})  = Text2Chr
-codepoint_type(::Type{<:Str{<:Text4CSE}})  = Text4Chr
-codepoint_type(::Type{<:Str{<:BinaryCSE}}) = UInt8
+eltype(::Type{<:Str{Text1CSE}})     = Text1Chr
+eltype(::Type{<:Str{Text2CSE}})     = Text2Chr
+eltype(::Type{<:Str{Text4CSE}})     = Text4Chr
+eltype(::Type{<:Str{ASCIICSE}})     = ASCIIChr
+eltype(::Type{<:Str{LatinCSE}})     = LatinChr
+eltype(::Type{<:Str{_LatinCSE}})    = _LatinChr
+eltype(::Type{<:Str{<:UCS2_CSEs}})    = UCS2Chr
+eltype(::Type{<:Str{<:Unicode_CSEs}}) = UTF32Chr
 
-codepoint_type(::Type{<:Str{<:ASCIICSE}})  = ASCIIChr
-codepoint_type(::Type{<:Str{<:LatinCSE}})  = LatinChr
-codepoint_type(::Type{<:Str{<:_LatinCSE}}) = _LatinChr
-codepoint_type(::Type{<:Str{<:UCS2CSE}})   = UCS2Chr
-codepoint_type(::Type{<:Str{<:_UCS2CSE}})  = UCS2Chr
-codepoint_type(::Type{<:Str{<:UnicodeEncodings}}) = UTF32Chr
-
-codepoint_size(::Type{T}) where {T<:Union{String,Str}} = sizeof(codepoint_type(T))
+codepoint_size(::Type{T}) where {T<:Union{String,Str}} = sizeof(eltype(T))
 
 get_codeunit(dat, pos) = codeunit(dat, pos)
 get_codeunit(pnt::Ptr{<:CodeUnitTypes}, pos) = unsafe_load(pnt, pos)
@@ -109,6 +106,7 @@ for nam in (:Text1, :Text2, :Text4, :ASCII, :Latin, :_Latin, :UCS2, :UTF32)
     @eval $sym(v::Number) = convert($sym, v)
 end
 
+eltype(::Type{<:CodePoint}) = CodePoint
 size(cp::CodePoint, dim) = convert(Int, dim) < 1 ? boundserr(cp, dim) : 1
 getindex(cp::CodePoint, i::Integer) = i == 1 ? cp : boundserr(cp, i)
 getindex(cp::CodePoint, I::Integer...) = all(x -> x == 1, I) ? cp : boundserr(cp, I)
@@ -122,7 +120,6 @@ getindex(cp::CodePoint, I::Integer...) = all(x -> x == 1, I) ? cp : boundserr(cp
     getindex(cp::CodePoint) = cp
     first(cp::CodePoint) = cp
     last(cp::CodePoint) = cp
-    eltype(::Type{CodePoint}) = CodePoint
     start(cp::CodePoint) = false
     next(cp::CodePoint, state) = (cp, true)
     done(cp::CodePoint, state) = state
@@ -132,6 +129,8 @@ getindex(cp::CodePoint, I::Integer...) = all(x -> x == 1, I) ? cp : boundserr(cp
     -(x::CodePoint, y::Integer) = CodePoint((Int32(x) - Int32(y))%UInt32)
     +(x::CodePoint, y::Integer) = CodePoint((Int32(x) + Int32(y))%UInt32)
     +(x::Integer, y::CodePoint) = y + x
+    show(io::IO, cp::CodePoint)  = show(io, Char(cp))
+    print(io::IO, cp::CodePoint) = print(io, Char(cp))
 end
 
 _uni_rng(m) = 0x00000:ifelse(m < 0xd800, m, m-0x800)
@@ -149,9 +148,11 @@ codepoint_adj(::Type{T}, ch) where {T<:Union{Text2Chr,Text4Chr}} = ch%T
 isless(x::CodePoint, y::AbsChar)   = tobase(x) < tobase(y)
 isless(x::AbsChar,   y::CodePoint) = tobase(x) < tobase(y)
 
-# Note: this is not the same as the Base definition, which may be a problem
-hash(x::CodePoint, h::UInt) =
-    hash_uint64(xor((UInt32(x) + 0x0d4d64234) << 32), UInt64(h))
+# This is so that the hash is compatible with isless, but it's very inefficient
+Base.hash(x::CodePoint, h::UInt) = hash(Char(x), h)
 
-show(io::IO, cp::CodePoint)  = print(io, Char(tobase(cp)))
-print(io::IO, cp::CodePoint) = print(io, Char(tobase(cp)))
+# Note: this is not the same as the Base definition, which may be a problem
+# (it is the same as the pre-v0.7 definition, i.e. hashing the Unicode codepoint)
+#Base.hash(x::CodePoint, h::UInt) =
+#    Base.hash_uint64(xor((UInt32(x) + 0x0d4d64234) << 32), UInt64(h))
+

@@ -48,7 +48,7 @@ Note: for good substring performance, some of the operations that are optimized 
 # Convenience functions
 export to_ascii, utf8, utf16, utf32
 
-export unsafe_str, codeunit, codeunits, codepoints, @str_str, @condimport, codepoint_type
+export unsafe_str, codeunit, codeunits, codepoints, @str_str, @condimport
 
 symstr(s...) = Symbol(string(s...))
 quotesym(s...) = Expr(:quote, symstr(s...))
@@ -73,7 +73,7 @@ import Base: containsnul, convert, getindex, length, map, pointer, collect, in,
              reverse, rsearch, search, sizeof, string, unsafe_convert, unsafe_load, write,
              codeunit, start, next, done, nextind, prevind, reverseind,
              typemin, typemax, isvalid, rem, size, ndims, first, last, eltype, isempty, in,
-             hash, isless, ==, -, +, *, ^, cmp, promote_rule, one, repeat, filter,
+             isless, ==, -, +, *, ^, cmp, promote_rule, one, repeat, filter,
              print, show, isimmutable
     
 @condimport ind2chr

@@ -19,7 +19,9 @@ function _srch_utf8_fwd(beg, ch, pnt, fin)
     else
         b1, b2, b3, b4 = get_utf8_4(ch)
         pnt += 2
-        while (pnt = _fwd_memchr(pnt + 1, b4, fin)) != 0
+        println("beg=$beg, pnt=$pnt, fin=$fin, ch=$ch, $b1,$b2,$b3,$b4")
+        while (pnt = _fwd_memchr(pnt + 1, b4, fin)) != C_NULL
+            println(" => $pnt")
             eq_bytes(pnt - 3, b1, b2, b3) && return Int(pnt - beg) - 2
         end
     end

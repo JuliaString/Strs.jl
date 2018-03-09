@@ -71,7 +71,7 @@ end
     for T in ASCIIStringTypes, P in ASCIIStringTypes
         @testset "pattern: $P, str: $T" begin
             str = T(astr)
-            C = codepoint_type(P)
+            C = eltype(P)
             lst = nextind(str, lastindex(str))
             empty_pred = occursin(C[])
             @testset "BoundsError" begin

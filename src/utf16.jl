@@ -411,9 +411,9 @@ function _cvt_utf8(::Type{T}, str::S) where {T<:Union{String, UTF8Str}, S}
 end
 
 # Split this way to avoid ambiguity errors
-convert(::Type{String}, str::T) where {T<:Union{UCS2Strings, Str{<:UTF16CSE}, UTF32Strings}} =
+convert(::Type{String}, str::T) where {T<:Union{UCS2Strings, Str{UTF16CSE}, UTF32Strings}} =
     _cvt_utf8(String, str)
-convert(::Type{UTF8Str}, str::T) where {T<:Union{UCS2Strings, Str{<:UTF16CSE}, UTF32Strings}} =
+convert(::Type{UTF8Str}, str::T) where {T<:Union{UCS2Strings, Str{UTF16CSE}, UTF32Strings}} =
     _cvt_utf8(UTF8Str, str)
 
 """

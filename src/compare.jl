@@ -12,11 +12,13 @@ _fwd_memchr(ptr::Ptr{WidChr}, wchr::WidChr, len::Integer) =
 _fwd_memchr(beg::Ptr{OthChr}, wchr::OthChr, len::Integer) =
     _fwd_memchr(beg, ch, bytoff(beg, len))
 
-_fwd_memchr(ptr::Ptr{UInt8}, byt::UInt8, fin::Ptr{UInt8}) = _fwd_memchr(ptr, byt, fin - ptr)
-_rev_memchr(ptr::Ptr{UInt8}, byt::UInt8, fin::Ptr{UInt8}) = _rev_memchr(ptr, byt, fin - ptr)
+_fwd_memchr(ptr::Ptr{UInt8}, byt::UInt8, fin::Ptr{UInt8}) =
+    ptr < fin ? _fwd_memchr(ptr, byt, fin - ptr) : C_NULL
+_rev_memchr(ptr::Ptr{UInt8}, byt::UInt8, fin::Ptr{UInt8}) =
+    ptr < fin ? _rev_memchr(ptr, byt, fin - ptr) : C_NULL
 
 _fwd_memchr(ptr::Ptr{WidChr}, wchr::WidChr, fin::Ptr{WidChr}) =
-    _fwd_memchr(ptr, wchr, chroff(fin - ptr))
+    ptr < fin ? _fwd_memchr(ptr, wchr, chroff(fin - ptr)) : C_NULL
 
 function _fwd_memchr(pnt::Ptr{T}, wchr::T, fin::Ptr{T}) where {T<:OthChr}
     while pnt < fin
@@ -141,8 +143,7 @@ function _cpeq(a::T, b) where {C<:CSE, T<:Str{C}}
         done(b, pos) && return false
         c1, pnt = _nextcp(C, pnt)
         ch, pos = next(b, pos)
-        c2 = ch%UInt32
-        c1 == c2 || return false
+        c1 == tobase(ch) || return false
     end
     true
 end
@@ -178,28 +179,17 @@ function _wideneq(a::S, b::T) where {S<:Str,T<:Str}
     true
 end
 
-_iseq(::NotEquals,       a, b) = false
-_iseq(::ByteEquals,      a, b) = _fasteq(a, b)
-_iseq(::ASCIIEquals,     a, b) = _cpeq(a, b)
-_iseq(::WidenEquals,     a, b) = _wideneq(a, b)
-_iseq(::CodePointEquals, a, b) = _cpeq(a, b)
+_iseq(::NoCompare,        a, b) = false
+_iseq(::ByteCompare,      a, b) = _fasteq(a, b)
+_iseq(::WordCompare,      a, b) = _fasteq(a, b)
+_iseq(::UTF16Compare,     a, b) = _fasteq(a, b)
+_iseq(::WidenCompare,     a, b) = _wideneq(a, b)
+_iseq(::ASCIICompare,     a, b) = _cpeq(a, b) # This can be optimized later
+_iseq(::CodePointCompare, a, b) = _cpeq(a, b)
 
 ==(a::AbstractString, b::Str) = _iseq(EqualsStyle(a, b), a, b)
 ==(a::Str, b::AbstractString) = _iseq(EqualsStyle(a, b), a, b)
 ==(a::Str, b::Str)            = _iseq(EqualsStyle(a, b), a, b)
-
-#=
-# Handle cases where it's known by the types that can't be equal
-# (should do this better, it's a simple pattern)
-==(a::ASCIIStr, b::T)  where {T<:Union{_LatinStr,_UCS2Str,_UTF32Str}} = false
-==(a::T, b::ASCIIStr)  where {T<:Union{_LatinStr,_UCS2Str,_UTF32Str}} = false
-==(a::_LatinStr, b::T) where {T<:Union{ASCIIStr,_UCS2Str,_UTF32Str}}  = false
-==(a::T, b::_LatinStr) where {T<:Union{ASCIIStr,_UCS2Str,_UTF32Str}}  = false
-==(a::_UCS2Str, b::T)  where {T<:Union{ASCIIStr,_LatinStr,_UTF32Str}} = false
-==(a::T, b::_UCS2Str)  where {T<:Union{ASCIIStr,_LatinStr,_UTF32Str}} = false
-==(a::_UTF32Str, b::T) where {T<:Union{ASCIIStr,_LatinStr,UCS2Str}}   = false
-==(a::T, b::_UTF32Str) where {T<:Union{ASCIIStr,_LatinStr,UCS2Str}}   = false
-=#
 
 isless(a::AbstractString, b::Str) = cmp(a, b) < 0
 isless(a::Str, b::AbstractString) = cmp(a, b) < 0
