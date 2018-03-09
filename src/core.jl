@@ -35,7 +35,6 @@ _nextcp(::Type{T}, pnt) where {T} = _nextcpfun(CodePointStyle(T), T, pnt)
     _next(CodeUnitMulti(), T, str, i)[1]
 
 _length(::CodeUnitSingle, str) = (@_inline_meta(); _len(str))
-_isvalid(::CodeUnitSingle, str, i) = (@_inline_meta(); 1 <= i <= _len(str))
 
 _thisind(::CodeUnitSingle, str, i) = Int(i)
 
@@ -66,13 +65,11 @@ end
 @propagate_inbounds lastindex(str::T) where {T<:Str} =
     (@_inline_meta(); _lastindex(CodePointStyle(T), str))
 @propagate_inbounds getindex(str::T, i::Int) where {T<:Str} =
-    (@_inline_meta(); _getindex(CodePointStyle(T), codepoint_type(T), str, i))
+    (@_inline_meta(); R = eltype(T) ; _getindex(CodePointStyle(T), R, str, i)::R)
 @propagate_inbounds next(str::T, i::Int) where {T<:Str} =
-    (@_inline_meta(); _next(CodePointStyle(T), codepoint_type(T), str, i))
+    (@_inline_meta(); R = eltype(T) ; _next(CodePointStyle(T), R, str, i)::Tuple{R,Int})
 @propagate_inbounds length(str::T) where {T<:Str} =
     (@_inline_meta(); _length(CodePointStyle(T), str))
-@propagate_inbounds isvalid(str::T, i::Integer) where {T<:Str} =
-    (@_inline_meta(); _isvalid(CodePointStyle(T), str, i))
 @propagate_inbounds thisind(str::T, i::Int) where {T<:Str} =
     (@_inline_meta(); _thisind(CodePointStyle(T), str, i))
 @propagate_inbounds prevind(str::T, i::Int) where {T<:Str} =
@@ -87,6 +84,14 @@ end
     _ind2chr(CodePointStyle(T), str, i)
 @propagate_inbounds chr2ind(str::T, i::Int) where {T<:Str} =
     _chr2ind(CodePointStyle(T), str, i)
+
+@propagate_inbounds function isvalid(str::T, i::Integer) where {T<:Str}
+    @_inline_meta()
+    @boundscheck 1 <= i <= _len(str) || return false
+    _isvalid_char_pos(CodePointStyle(T), str, i)
+end
+
+_isvalid_char_pos(::CodeUnitSingle, str, i) = true
 
 #=
 # Handle substrings of Str
@@ -123,7 +128,7 @@ end
 @propagate_inbounds function _collectstr(::CodeUnitSingle, ::Type{S}, str::T) where {S,T<:Str}
     len, pnt = _lenpnt(str)
     vec = create_vector(S, len)
-    cpt = codepoint_type(T)
+    cpt = eltype(T)
     if S == cpt
         @inbounds unsafe_copyto!(reinterpret(Ptr{basetype(cpt)}, pointer(vec)), pnt, len)
     else
@@ -135,7 +140,7 @@ end
 end
 
 @propagate_inbounds collect(str::T) where {T<:Str} =
-    _collectstr(CodePointStyle(T), codepoint_type(T), str)
+    _collectstr(CodePointStyle(T), eltype(T), str)
 
 # An optimization here would be to check just if they are the same type, but
 # rather if they are the same size with a compatible encoding, i.e. like
@@ -145,6 +150,4 @@ end
     _collectstr(CodePointStyle(T), S, str)
 
 # Extra functions
-search(str::Str, ch::Char, i::Integer) = search(str, UInt32(ch), i)
-rsearch(str::Str, ch::Char, i::Integer) = rsearch(str, UInt32(ch), i)
 convert(str::Str, ch::Char) = convert(str, UInt32(ch))

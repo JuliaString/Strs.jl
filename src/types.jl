@@ -35,21 +35,21 @@ macro cse(cs, e)
     :(CSE{CharSet{$(quotesym(cs)), $(quotesym(e))}()})
 end
 
-const charsets =
-    (:Binary,  # really, no character set at all, not text
+const charsets = (
      :ASCII,   # (7-bit subset of Unicode)
      :Latin,   # ISO-8859-1 (8-bit subset of Unicode)
      :UCS2,    # BMP (16-bit subset of Unicode)
      :UTF32,   # corresponding to codepoints (0-0xd7ff, 0xe000-0x10fff)
-     :UniPlus, # valid Unicode, plus unknown characters (for String)
      :Text1,   # Unknown character set, 1 byte
      :Text2,   # Unknown character set, 2 byte
      :Text4)   # Unknown character set, 4 byte
 
-const BinaryCharSet  = CharSet{:Binary}  # really, no character set at all, not text
 for nam in charsets
     @eval const $(symstr(nam, "CharSet")) = CharSet{$(quotesym(nam))}
 end
+
+const BinaryCharSet  = CharSet{:Binary}  # really, no character set at all, not text
+const UniPlusCharSet = CharSet{:UniPlus} # valid Unicode, plus unknown characters (for String)
 
 # These are to indicate string types that must have at least one character of the type,
 # for the internal types to make up the UniStr union type
@@ -108,12 +108,19 @@ struct Str{T,SubStr,Cache,Hash} <: AbstractString
         where {CSE_T<:CSE} =
       new{CSE_T,Nothing,Nothing,Nothing}(v,nothing,nothing,nothing))
 end
-#(::Type{STR})(v::STR_DATA_TYPE) where {T<:CSE,S,C,H,STR<:Str{T,S,C,H}} = Str(T, v)
 
 # Handle change from endof -> lastindex
 @static if !isdefined(Base, :lastindex)
-    Base.endof(str::Str) = lastindex(str)
+    export lastindex
+    lastindex(str::AbstractString) = Base.endof(str)
     lastindex(arr::AbstractArray) = Base.endof(arr)
+    Base.endof(str::Str) = lastindex(str)
+end
+@static if !isdefined(Base, :firstindex)
+    export firstindex
+    firstindex(str::AbstractString) = 1
+    # AbstractVector might be an OffsetArray
+    firstindex(str::Vector) = 1
 end
 
 # This needs to be redone, with character sets and the code unit as part of the type
@@ -134,6 +141,11 @@ for (names, siz) in ((_cpname1, 8), (_cpname2, 16), (_cpname4, 32)), nam in name
     @eval export $chrnam
 end
 primitive type _LatinChr <: CodePoint 8 end
+
+for nam in charsets
+    @eval charset(::Type{$(symstr(nam, "Chr"))}) = $(symstr(nam, "CharSet"))
+end
+charset(::Type{Char}) = UniPlusCharSet
 
 const CodePointTypes = Union{CodeUnitTypes, CodePoint}
 
@@ -166,7 +178,9 @@ for nam in BuiltInTypes
     cse = Symbol("$(nam)CSE")
     @eval const $sym = Str{$cse, Nothing, Nothing, Nothing}
     @eval show(io::IO, ::Type{$sym}) = print(io, $(quotesym(sym)))
+    @eval show(io::IO, ::Type{$cse}) = print(io, $(quotesym(cse)))
 end
+show(io::IO, ::Type{BinaryCSE}) = print(io, "BinaryCSE")
 
 for nam in (:ASCII, :Latin, :_Latin, :UCS2, :UTF32, :Text1, :Text2, :Text4)
     @eval codepoint_cse(::Type{$(Symbol("$(nam)Chr"))}) = $(Symbol("$(nam)CSE"))
@@ -183,7 +197,7 @@ else
 end
 
 function _allocate(::Type{T}, len) where {T <: CodeUnitTypes}
-    buf = _allocate(len * sizeof(T))
+    buf = _allocate((len+STR_KEEP_NUL-1) * sizeof(T))
     buf, reinterpret(Ptr{T}, pointer(buf))
 end
 
@@ -219,42 +233,53 @@ for val in list ; @eval export $(symstr(val[1], "Str")) ; end
     end
 end
 
+# Various useful groups of character set types
+
 # These should be done via traits
-const ByteCSE = Union{Text1CSE, BinaryCSE, ASCIICSE, LatinCSE, _LatinCSE, UTF8CSE}
-const WordCSE = Union{Text2CSE, UCS2CSE, _UCS2CSE, UTF16CSE} # 16-bit code units
-const QuadCSE = Union{Text4CSE, UTF32CSE, _UTF32CSE} # 32-bit code units
-const WideCSE = Union{UCS2CSE, UTF16CSE, UTF32CSE, _UCS2CSE, _UTF32CSE}
+const Binary_CSEs   = Union{Text1CSE, BinaryCSE}
+const Raw_CSEs      = Union{Text1CSE, Text2CSE, Text4CSE}
+const Latin_CSEs    = Union{LatinCSE, _LatinCSE}
+const UCS2_CSEs     = Union{UCS2CSE,  _UCS2CSE}
+const UTF32_CSEs    = Union{UTF32CSE, _UTF32CSE}
+const Unicode_CSEs  = Union{UTF8CSE, UTF16CSE, UTF32_CSEs}
+const SubSet_CSEs   = Union{_LatinCSE, _UCS2CSE, _UTF32CSE}
 
-const ByteStr = Str{<:ByteCSE}
-const WordStr = Str{<:WordCSE}
-const QuadStr = Str{<:QuadCSE}
-const WideStr = Str{<:WideCSE}
+const Byte_CSEs     = Union{ASCIICSE, Binary_CSEs, Latin_CSEs, UTF8CSE}
+const Word_CSEs     = Union{Text2CSE, UCS2_CSEs, UTF16CSE} # 16-bit characters
+const Quad_CSEs     = Union{Text4CSE, UTF32_CSEs}          # 32-bit code units
+const Wide_CSEs     = Union{UTF16CSE, UCS2_CSEs, UTF32_CSEs}
+const WordQuad_CSEs = Union{Text2CSE,Text4CSE,UCS2CSE,UTF16CSE,UTF32CSE}
 
-const RawCSEncodings   = Union{Text1CSE, Text2CSE, Text4CSE}
-const LatinCSEncodings = Union{LatinCSE, _LatinCSE}
-const UCS2CSEncodings  = Union{UCS2CSE,  _UCS2CSE}
-const UTF32CSEncodings = Union{UTF32CSE, _UTF32CSE}
+const BinaryStrings = Str{BinaryCSE}
+const ASCIIStrings = Str{ASCIICSE}
+const RawStrings   = Str{<:Raw_CSEs}
+const LatinStrings = Str{<:Latin_CSEs}
+const UCS2Strings  = Str{<:UCS2_CSEs}
+const UTF32Strings = Str{<:UTF32_CSEs}
 
-const RawStrings   = Str{<:RawCSEncodings}
-const LatinStrings = Str{<:LatinCSEncodings}
-const UCS2Strings  = Str{<:UCS2CSEncodings}
-const UTF32Strings = Str{<:UTF32CSEncodings}
+const ByteStr = Str{<:Byte_CSEs}
+const WordStr = Str{<:Word_CSEs}
+const QuadStr = Str{<:Quad_CSEs}
+const WideStr = Str{<:Wide_CSEs}
 
-const UnicodeByteStrings = Union{ASCIIStr, LatinStrings}
-const ByteStrings        = Union{Text1Str, BinaryStr, UnicodeByteStrings}
-const UnicodeStrings     = Union{String, UTF8Str, UTF16Str, UTF32Strings}
+const UnicodeByteStrings = Union{Str{ASCIICSE}, LatinStrings}
+const UnicodeStrings     = Union{String, Str{<:Unicode_CSEs}}
+
+const AbsChar = @static isdefined(Base, :AbstractChar) ? AbstractChar : Union{Char, CodePoint}
+const ByteStrings  = Union{String, ByteStr}
 
 ## Get the character set / encoding used by a string type
-cse(::T) where {C<:CSE,T<:Str{C}} = C
-cse(::Type{T}) where {C<:CSE,T<:Str{C}} = C
-cse(::String)       = UTF8CSE
-cse(::Type{String}) = UTF8CSE
+cse(::Type{<:AbstractString}) = UTF8CSE # Default unless overridden
+cse(::Type{<:Str{C}}) where {C<:CSE} = C
+cse(str::AbstractString) = cse(typeof(str))
 
-charset(::Type{<:AbstractString})  = UniPlusCharSet
-charset(::Type{T}) where {CS,E,C<:CSE{CS,E},T<:Str{C}} = CS
+charset(::Type{<:AbstractString}) = UniPlusCharSet # Default unless overridden
+charset(::Type{<:Str{CSE{CS}}}) where {CS} = CS
+charset(str::AbstractString) = charset(typeof(str))
 
 encoding(::Type{<:AbstractString}) = UTF8Encoding # Julia likes to think of this as the default
-encoding(::Type{T}) where {CS,E,C<:CSE{CS,E},T<:Str{C}} = E
+encoding(::Type{<:Str{CSE{CS,E}}}) where {CS,E} = E
+encoding(str::AbstractString) = encoding(typeof(str))
 
 promote_rule(::Type{T}, ::Type{T}) where {T<:CodePoint} = T
 promote_rule(::Type{Text2Chr}, ::Type{Text1Chr}) = Text2Chr
@@ -264,20 +289,20 @@ promote_rule(::Type{Text4Chr}, ::Type{Text2Chr}) = Text4Chr
 promote_rule(::Type{T}, ::Type{ASCIIChr}) where {T} = T
 promote_rule(::Type{LatinChr}, ::Type{_LatinChr}) = LatinChr
 promote_rule(::Type{UTF32Chr}, ::Type{UCS2Chr}) = UTF32Chr
-promote_rule(::Type{T}, ::Type{S}) where {T<:WideChars,S<:ByteChars} = T
+promote_rule(::Type{T}, ::Type{<:ByteChars}) where {T<:WideChars} = T
 
 promote_rule(::Type{T}, ::Type{T}) where {T<:Str} = T
-promote_rule(::Type{Text2Str}, ::Type{Text1Str}) = Text2Str
-promote_rule(::Type{Text4Str}, ::Type{Text1Str}) = Text4Str
-promote_rule(::Type{Text4Str}, ::Type{Text2Str}) = Text4Str
+promote_rule(::Type{T}, ::Type{<:Str{Text1CSE}}) where {T<:Str{Text2CSE}} = T
+promote_rule(::Type{T}, ::Type{<:Str{Text1CSE}}) where {T<:Str{Text4CSE}} = T
+promote_rule(::Type{T}, ::Type{<:Str{Text2CSE}}) where {T<:Str{Text4CSE}} = T
 
-promote_rule(::Type{T}, ::Type{ASCIIStr}) where {T<:Union{LatinStrings,UnicodeStrings,WideStr}} = T
-promote_rule(::Type{T}, ::Type{LatinStrings}) where {T<:Union{UnicodeStrings,WideStr}} = T
-promote_rule(::Type{T}, ::Type{UCS2Strings}) where {T<:Union{UTF32Strings}} = T
+promote_rule(::Type{T}, ::Type{<:Str{ASCIICSE}}) where {T<:Union{LatinStrings,UnicodeStrings,WideStr}} = T
+promote_rule(::Type{T}, ::Type{<:LatinStrings}) where {T<:Union{UnicodeStrings,WideStr}} = T
+promote_rule(::Type{T}, ::Type{<:UCS2Strings})  where {T<:Union{UTF32Strings}} = T
 
-promote_rule(::Type{LatinStr}, ::Type{_LatinStr}) = LatinStr
-promote_rule(::Type{UCS2Str}, ::Type{_UCS2Str})   = UCS2Str
-promote_rule(::Type{UTF32Str}, ::Type{_UTF32Str}) = UTF32Str
+promote_rule(::Type{T}, ::Type{<:Str{_LatinCSE}}) where {T<:Str{LatinCSE}} = T
+promote_rule(::Type{T}, ::Type{<:Str{_UCS2CSE}})  where {T<:Str{UCS2CSE}} = T
+promote_rule(::Type{T}, ::Type{<:Str{_UTF32CSE}}) where {T<:Str{UTF32CSE}} = T
 
 sizeof(s::Str) = sizeof(s.data) + !STR_DATA_VECTOR - STR_KEEP_NUL
 
@@ -316,5 +341,5 @@ _len(s::QuadStr) = sizeof(s) >>> 2
 
 @inline _mask_bytes(n) = (1%UInt << ((n & (CHUNKSZ - 1)) << 3)) - 0x1
 
-Base.need_full_hex(c::AbstractChar) = isxdigit(c)
-Base.escape_nul(c::AbstractChar) = ('0' <= c <= '7') ? "\\x00" : "\\0"
+Base.need_full_hex(c::CodePoint) = isxdigit(c)
+Base.escape_nul(c::CodePoint) = ('0' <= c <= '7') ? "\\x00" : "\\0"

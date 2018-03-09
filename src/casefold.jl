@@ -104,28 +104,26 @@ function lowercase(str::ASCIIStr)
 end
 
 function ucfirst(str::LatinStr)
-    dat = _data(str)
-    isempty(dat) && return str
-    ch = get_codeunit(dat)
-    if _can_upper(ch)
-        out = copy(dat)
-        out[1] = ch - 0x20
-        Str(LatinCSE, out)
-    else
-        str
-    end
+    (len = _len(str)) == 0 && return str
+    pnt = _pnt(str)
+    ch = get_codeunit(pnt)
+    _can_upper(ch) || return str
+    buf, out = _allocate(UInt8, len)
+    set_codeunit!(out, ch - 0x20)
+    len > 1 && unsafe_copyto!(out, pnt+1, len-1)
+    Str(LatinCSE, buf)
 end
 
 # Special handling for characters that can't map into Latin1
 function ucfirst(str::_LatinStr)
     (len = _len(str)) == 0 && return str
     pnt = _pnt(str)
-    @inbounds ch = tobase(get_codeunit(pnt))
+    ch = get_codeunit(pnt)
     if _can_upper(ch)
-        out8 = _allocate(len)
-        unsafe_copyto!(pointer(out8), pnt, len)
+        buf, out8 = _allocate(UInt8, len)
         set_codeunit!(out8, ch - 0x20)
-        Str(_LatinStr, out8)
+        len > 1 && unsafe_copyto!(out8, pnt+1, len-1)
+        Str(_LatinCSE, buf)
     elseif (ch == 0xb5) | (ch == 0xff)
         buf, out = _allocate(UInt16, len)
         set_codeunit!(out, ifelse(ch == 0xb5, 0x39c, 0x178))
@@ -140,11 +138,14 @@ function ucfirst(str::_LatinStr)
 end
 
 function lcfirst(str::T) where {T<:LatinStrings}
-    dat = _data(str)
-    (isempty(dat) || !isupper(get_codeunit(dat))) && return str
-    @inbounds out = copy(dat)
-    @inbounds out[1] += 0x20
-    Str(cse(T), out)
+    (len = _len(str)) == 0 && return str
+    pnt = _pnt(str)
+    ch = get_codeunit(pnt)
+    _isupper(ch) || return str
+    buf, out = _allocate(UInt8, len)
+    set_codeunit!(out, ch + 0x20)
+    len > 1 && unsafe_copyto!(out, pnt+1, len-1)
+    Str(cse(T), buf)
 end
 
 lowercase(ch::T) where {T<:LatinChars} = T(_lowercase_l(tobase(ch)))

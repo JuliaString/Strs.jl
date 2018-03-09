@@ -15,16 +15,6 @@ isunicode(str::LatinStrings)   = true
 
 bytestring(s::LatinStrings) = s
 
-function search(str::LatinStrings, ch::UInt32, pos::Integer)
-    len = _len(str)
-    pos == len + 1 && return 0
-    1 <= pos <= len && boundserr(str, pos)
-    ch <= 0xff ? search(_data(str), ch%UInt8, pos) : 0
-end
-
-rsearch(str::LatinStrings, ch::UInt32, pos::Integer) =
-    ch <= 0xff ? rsearch(_data(str), ch%UInt8, pos) : 0
-
 function string(c::UnicodeByteStrings...)
     length(c) == 1 && return c[1]
     n = 0

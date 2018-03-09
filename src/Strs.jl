@@ -69,11 +69,11 @@ end
 
 using Base: @_inline_meta, @propagate_inbounds, @_propagate_inbounds_meta
 
-import Base: containsnul, convert, getindex, length, map, pointer, collect,
+import Base: containsnul, convert, getindex, length, map, pointer, collect, in,
              reverse, rsearch, search, sizeof, string, unsafe_convert, unsafe_load, write,
              codeunit, start, next, done, nextind, prevind, reverseind,
              typemin, typemax, isvalid, rem, size, ndims, first, last, eltype, isempty, in,
-             hash, isless, ==, -, +, *, ^, cmp, promote_rule, one, repeat, filter,
+             isless, ==, -, +, *, ^, cmp, promote_rule, one, repeat, filter,
              print, show, isimmutable
     
 @condimport ind2chr
@@ -82,18 +82,28 @@ import Base: containsnul, convert, getindex, length, map, pointer, collect,
 @condimport codeunits
 @condimport ncodeunits
 @condimport bytestring
+@condimport firstindex
 @condimport lastindex
+@condimport contains
+@condimport isfound
+@condimport codepoint
 
 isdefined(Base, :copyto!)        || (const copyto! = copy!)
 isdefined(Base, :unsafe_copyto!) || (const unsafe_copyto! = unsafe_copy!)
-isdefined(Base, :AbstractChar)   || (abstract type AbstractChar end ; export AbstractChar)
 isdefined(Base, :Nothing)        || (const Nothing = Void)
 isdefined(Base, :Cvoid)          || (const Cvoid = Void)
+isdefined(Base, :AbstractChar)   || (abstract type AbstractChar end ; export AbstractChar)
 
 @static isdefined(Base, :codeunits) || include("codeunits.jl")
 
 uninit(T, len) = @static isdefined(Base, :uninitialized) ? T(uninitialized, len) : T(len)
 create_vector(T, len) = uninit(Vector{T}, len)
+
+@static if VERSION < v"0.7.0-DEV"
+    const outhex = hex
+else
+    outhex(v, p=1) = string(v, base=16, pad=p)
+end
 
 include("types.jl")
 include("chars.jl")
@@ -110,6 +120,9 @@ include("latin.jl")
 include("utf8.jl")
 include("utf16.jl")
 include("utf32.jl")
+include("search.jl")
+include("utf8search.jl")
+include("utf16search.jl")
 include("encode.jl")
 include("stats.jl")
 include("legacy.jl")

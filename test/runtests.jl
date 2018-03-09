@@ -19,6 +19,7 @@ include("types.jl")
 @testset "UTF-32 tests"      begin include("utf32.jl")   end
 @testset "Conversion errors" begin include("convert.jl") end
 @testset "Pointer functions" begin include("pointer.jl") end
+@testset "Search functions"  begin include("search.jl")  end
 
 @testset "Unicode Strings" begin
 # Unicode errors

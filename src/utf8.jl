@@ -8,22 +8,22 @@ Based in part on code for UTF8String that used to be in Julia
 
 # UTF-8 support functions
 
-# Get rest of character ch from 2-byte UTF-8 sequence in dat
+# Get rest of character ch from 2-byte UTF-8 sequence at pnt - 1
 @inline get_utf8_2byte(pnt, ch) =
-    @inbounds return (((ch & 0x3f)%UInt16 << 6) | (get_codeunit(pnt) & 0x3f))
+    (((ch & 0x3f)%UInt16 << 6) | (get_codeunit(pnt) & 0x3f))
 
-# Get rest of character ch from 3-byte UTF-8 sequence in dat
+# Get rest of character ch from 3-byte UTF-8 sequence at pnt - 2
 @inline get_utf8_3byte(pnt, ch) =
-    @inbounds return (((ch & 0xf)%UInt16 << 12)
-                      | ((get_codeunit(pnt - 1)%UInt16 & 0x3f) << 6)
-                      | (get_codeunit(pnt) & 0x3f))
+    (((ch & 0xf)%UInt16 << 12)
+     | ((get_codeunit(pnt - 1)%UInt16 & 0x3f) << 6)
+     | (get_codeunit(pnt) & 0x3f))
 
-# Get rest of character ch from 4-byte UTF-8 sequence in dat
+# Get rest of character ch from 4-byte UTF-8 sequence at pnt - 3
 @inline get_utf8_4byte(pnt, ch) =
-    @inbounds return (((ch & 0x7)%UInt32 << 18)
-                      | ((get_codeunit(pnt - 2)%UInt32 & 0x3f) << 12)
-                      | ((get_codeunit(pnt - 1)%UInt32 & 0x3f) << 6)
-                      | (get_codeunit(pnt) & 0x3f))
+    (((ch & 0x7)%UInt32 << 18)
+     | ((get_codeunit(pnt - 2)%UInt32 & 0x3f) << 12)
+     | ((get_codeunit(pnt - 1)%UInt32 & 0x3f) << 6)
+     | (get_codeunit(pnt) & 0x3f))
 
 # Output a character as a 2-byte UTF-8 sequence
 @inline function output_utf8_2byte!(pnt, ch)
@@ -48,6 +48,18 @@ end
     set_codeunit!(pnt + 3, 0x80 | (ch & 0x3f))
     pnt + 4
 end
+
+@inline get_utf8_2(ch) =
+    0xc0 | (ch >>> 6)%UInt8, 0x80 | (ch & 0x3f)%UInt8
+@inline get_utf8_3(ch) =
+    (0xe0 | (ch >>> 12)%UInt8, 0x80 | ((ch >>> 6) & 0x3f)%UInt8, 0x80 | (ch & 0x3f)%UInt8)
+@inline get_utf8_4(ch) =
+    (0xf0 | (ch >>>  18)%UInt8, 0x80 | ((ch >>> 12) & 0x3f)%UInt8,
+     0x80 | ((ch >>>  6) & 0x3f)%UInt8, 0x80 | (ch & 0x3f)%UInt8)
+
+@inline eq_bytes(pnt, b1)         = get_codeunit(pnt) == b1
+@inline eq_bytes(pnt, b1, b2)     = get_codeunit(pnt+1) == b2 && eq_bytes(pnt, b1)
+@inline eq_bytes(pnt, b1, b2, b3) = get_codeunit(pnt+2) == b3 && eq_bytes(pnt, b1, b2)
 
 @inline _write_utf_2(io, ch) =
     write(io, 0xc0 | (ch >>> 6)%UInt8, 0x80 | (ch & 0x3f)%UInt8)
@@ -198,7 +210,7 @@ function _nextcpfun(::CodeUnitMulti, ::Type{UTF8CSE}, pnt)
 end
 
 # Gets next codepoint
-@propagate_inbounds function _next(::CodeUnitMulti, T, str::Str{<:UTF8CSE}, pos::Int)
+@propagate_inbounds function _next(::CodeUnitMulti, T, str::Str{<:UTF8CSE}, pos::Integer)
     len = _len(str)
     @boundscheck 0 < pos <= len || boundserr(str, pos)
     pnt = _pnt(str) + pos - 1
@@ -229,28 +241,27 @@ end
      ? (ch > 0x7ff ? (ch > 0xffff ? ((ch>>18) | 0xf0) : ((ch>>12) | 0xe0)) : ((ch>>6) | 0xc0))
      : ch)%UInt8
 
-function _reverseind(::CodeUnitMulti, str::Str{<:UTF8CSE}, pos::Int)
-    pnt = _pnt(s) + _len(str) + 1 - pos
-    pos - (is_valid_continuation(pnt)
-           ? (is_valid_continuation(pnt - 1) ? (is_valid_continuation(pnt - 2) ? 3 : 2) : 1) : 0)
+@inline checkcont(pnt) = is_valid_continuation(get_codeunit(pnt))
+
+function _reverseind(::CodeUnitMulti, str::Str{<:UTF8CSE}, pos::Integer)
+    pnt = _pnt(str) + _len(str) + 1 - pos
+    pos - (checkcont(pnt) ? (checkcont(pnt - 1) ? (checkcont(pnt - 2) ? 3 : 2) : 1) : 0)
 end
 
 ## overload methods for efficiency ##
 
 bytestring(str::Str{<:UTF8CSE}) = str
 
-@inline _isvalid(::CodeUnitMulti, str::Str{<:UTF8CSE}, pos::Integer) =
-    (1 <= pos <= _len(str)) && !is_valid_continuation(get_codeunit(_pnt(str), pos))
+@inline _isvalid_char_pos(::CodeUnitMulti, str::Str{<:UTF8CSE}, pos::Integer) =
+    !is_valid_continuation(get_codeunit(_pnt(str), pos))
 
-@inline checkcont(pnt) = is_valid_continuation(get_codeunit(pnt))
-
-@propagate_inbounds function _thisind(::CodeUnitMulti, str::Str{<:UTF8CSE}, pos::Int)
+@propagate_inbounds function _thisind(::CodeUnitMulti, str::Str{<:UTF8CSE}, pos::Integer)
     @boundscheck 0 < pos <= _len(str) || boundserr(str, pos)
     pnt = _pnt(str) + pos - 1
     pos - (checkcont(pnt) ? (checkcont(pnt - 1) ? (checkcont(pnt - 2) ? 3 : 2) : 1) : 0)
 end
 
-@propagate_inbounds function _nextind(T::CodeUnitMulti, str::Str{<:UTF8CSE}, pos::Int)
+@propagate_inbounds function _nextind(T::CodeUnitMulti, str::Str{<:UTF8CSE}, pos::Integer)
     pos == 0 && return 1
     numcu = _len(str)
     @boundscheck 1 <= pos <= numcu || boundserr(str, pos)
@@ -263,7 +274,7 @@ end
               : ifelse(cu < 0xe0, 2, ifelse(cu < 0xf0, 3, 4))))
 end
 
-@propagate_inbounds function _prevind(T::CodeUnitMulti, str::Str{<:UTF8CSE}, pos::Int)
+@propagate_inbounds function _prevind(T::CodeUnitMulti, str::Str{<:UTF8CSE}, pos::Integer)
     pos == 1 && return 0
     numcu = _len(str)
     pos == numcu + 1 && @inbounds return _thisind(T, str, numcu)
@@ -293,56 +304,6 @@ end
         is_valid_continuation(ch) && unierror(UTF_ERR_INVALID_INDEX, lst, ch)
     end
     SubString(str, beg, lst)
-end
-
-@propagate_inbounds function search(str::Str{<:UTF8CSE}, ch::UInt32, pos::Integer)
-    len = _len(str)
-    @boundscheck if 1 <= pos <= len
-        pos == len + 1 && return 0
-        boundserr(str, pos)
-    end
-    pnt = _pnt(str)
-    cu = get_codeunit(pnt, pos)
-    is_valid_continuation(cu) && unierror(UTF_ERR_INVALID_INDEX, pos, cu)
-    dat = str.data
-    ch < 0x80 && return search(dat, ch%UInt8, pos)
-    if ch <= 0x7ff
-        b1 = 0xc0 | (ch >>> 6)
-        b2 = 0x80 | (ch & 0x3f)
-        while (pos = search(dat, b1, pos)) != 0
-            get_codeunit(pnt, pos + 1) == b2 && break
-            pos += 2
-        end
-    elseif ch <= 0xffff
-        b1 = 0xe0 | (ch >>> 12)
-        b2 = 0x80 | ((ch >>> 6) & 0x3f)
-        b3 = 0x80 | (ch & 0x3f)
-        while (pos = search(dat, b1, pos)) != 0
-            get_codeunit(pnt, pos + 1) == b2 && get_codeunit(pnt, pos + 2) == b3 && break
-            pos += 3
-        end
-    else
-        b1 = 0xf0 | (ch >>>  18)
-        b2 = 0x80 | ((ch >>> 12) & 0x3f)
-        b3 = 0x80 | ((ch >>>  6) & 0x3f)
-        b4 = 0x80 | (ch & 0x3f)
-        while (pos = search(dat, b1, pos)) != 0
-            get_codeunit(pnt, pos + 1) == b2 && get_codeunit(pnt, pos + 2) == b3 &&
-                get_codeunit(pnt, pos + 3) == b4 && break
-            pos += 4
-        end
-    end
-    pos
-end
-function rsearch(s::Str{<:UTF8CSE}, c::UInt32, i::Integer)
-    dat = _data(s)
-    c < 0x80 && return rsearch(dat, c%UInt8, i)
-    b = first_utf8_byte(c)
-    while true
-        i = rsearch(dat, b, i)
-        (i==0 || s[i] == c) && return i
-        i = prevind(s, i)
-    end
 end
 
 const _ByteStr = Union{Str{<:ASCIICSE}, Str{<:UTF8CSE}, String}
@@ -377,7 +338,7 @@ end
 
 ## outputting UTF-8 strings ##
 
-write(io::IO, s::Str{<:UTF8CSE}) = write(io, _data(s))
+write(io::IO, str::Str{<:UTF8CSE}) = write(io, _data(str))
 
 @inline get_ch(dat, pos, off) = (get_codeunit(dat, pos + off) & 0x3f)%UInt32
 

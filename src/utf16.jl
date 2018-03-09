@@ -12,10 +12,12 @@ const _hi_bit_16  = 0x8000_8000_8000_8000
 @inline _mask_surr(v)  = xor((v | v<<1 | v<<2 | v<<3 | v<<4 | v<<5) & _hi_bit_16, _hi_bit_16)
 @inline _get_masked(qpnt) = _mask_surr(xor(unsafe_load(qpnt), _trail_mask))
 
+@inline get_utf16(ch) = (0xd7c0 + (ch >> 10))%UInt16, (0xdc00 + (ch & 0x3ff))%UInt16
+
 function _length(::CodeUnitMulti, str::Str{<:UTF16CSE})
     (siz = sizeof(str)) == 0 && return 0
     siz == 2 && return 1
-    cnt = siz>>>1
+    cnt = chroff(UInt16, siz)
     pnt, fin = _calcpnt(str, siz)
     while (pnt += CHUNKSZ) <= fin
         cnt -= count_ones(_get_masked(pnt))
@@ -118,91 +120,6 @@ end
     pos + cnt + is_surrogate_lead(get_codeunit(_pnt(str), pos + cnt))
 end
 
-function search(str::UCS2Strings, ch::UInt32, pos::Integer)
-    pos == (len = _len(str)) + 1 && return 0
-    pos <= pos <= len && boundserr(str, pos)
-    # Check for invalid characters, which could not be in a UCS2Str
-    ch <= 0x0ffff || return 0
-    wrd = ch%UInt16
-    is_surrogate_codeunit(wrd) && return 0
-    beg = _pnt(str) - 2
-    pnt = beg + (pos << 1)
-    fin = beg + (len << 1)
-    @inbounds while pnt <= fin
-        get_codeunit(pnt) == wrd && return (pnt - beg)>>1
-        pnt += 2
-    end
-    0
-end
-
-function rsearch(str::UCS2Strings, ch::UInt32, pos::Integer)
-    len, pnt = _lenpnt(str)
-    pos == len + 1 && return 0
-    1 <= pos <= len && boundserr(str, pos)
-    # Check for invalid characters, which could not be in a UCS2Str
-    ch <= 0x0ffff || return 0
-    wrd = ch%UInt16
-    is_surrogate_codeunit(wrd) && return 0
-    @inbounds while pos > 0
-        get_codeunit(pnt, pos) == wrd && return pos
-        pos -= 1
-    end
-    0
-end
-
-function search(str::Str{<:UTF16CSE}, ch::UInt32, pos::Integer)
-    len, pnt = _lenpnt(str)
-    pos == len + 1 && return 0
-    1 <= pos <= len && boundserr(str, pos)
-    # Check for invalid characters, which could not be in a Str{<:UTF16CSE}
-    ch <= 0x010ffff || return 0
-    is_surrogate_codeunit(ch) && return 0
-    # Check for fast case, character in BMP
-    if ch <= 0x0ffff
-        wrd = ch%UInt16
-        @inbounds while pos <= len
-            get_codeunit(pnt, pos) == wrd && return pos
-            pos += 1
-        end
-    else
-        wrd  = (0xd7c0 + (ch >> 10))%UInt16
-        surr = (0xdc00 + (ch & 0x3ff))%UInt16
-        @inbounds while pos < len
-            if get_codeunit(pnt, pos) == wrd
-                get_codeunit(pnt, pos + 1) == surr && return pos
-                pos += 1
-            end
-            pos += 1
-        end
-    end
-    0
-end
-
-function rsearch(str::Str{<:UTF16CSE}, ch::UInt32, pos::Integer)
-    len, pnt = _lenpnt(str)
-    pos == len + 1 && return 0
-    1 <= pos <= len && boundserr(str, pos)
-    # Check for invalid characters, which could not be in a UCS2Str
-    ch <= 0x10ffff || return 0
-    is_surrogate_codeunit(ch) && return 0
-    # Check for fast case, character in BMP
-    if ch <= 0x0ffff
-        wrd = ch%UInt16
-        @inbounds while pos > 0
-            get_codeunit(pnt, pos) == wrd && return pos
-            pos -= 1
-        end
-    else
-        wrd  = (0xd7c0 + (ch >> 10))%UInt16
-        surr = (0xdc00 + (ch & 0x3ff))%UInt16
-        @inbounds while pos > 1
-            get_codeunit(pnt, pos) == surr && get_codeunit(pnt, pos -= 1) == wrd && return pos
-            pos -= 1
-        end
-    end
-    0
-end
-
 function reverseind(str::Str{<:UTF16CSE}, i::Integer)
     len, pnt = _lenpnt(str)
     j = len - i
@@ -235,8 +152,8 @@ function reverse(str::T) where {T<:UCS2Strings}
     Str(cse(T), buf)
 end
 
-@inline _isvalid(::CodeUnitMulti, str::Str{<:UTF16CSE}, i::Integer) =
-    (1 <= i <= _len(str)) && !is_surrogate_trail(get_codeunit(_pnt(str), i))
+@inline _isvalid_char_pos(::CodeUnitMulti, str::Str{<:UTF16CSE}, pos::Integer) =
+    !is_surrogate_trail(get_codeunit(_pnt(str), pos))
 
 function isvalid(::Type{<:UCS2Strings}, data::AbstractArray{UInt16})
     @inbounds for ch in data
@@ -494,9 +411,9 @@ function _cvt_utf8(::Type{T}, str::S) where {T<:Union{String, UTF8Str}, S}
 end
 
 # Split this way to avoid ambiguity errors
-convert(::Type{String}, str::T) where {T<:Union{UCS2Strings, Str{<:UTF16CSE}, UTF32Strings}} =
+convert(::Type{String}, str::T) where {T<:Union{UCS2Strings, Str{UTF16CSE}, UTF32Strings}} =
     _cvt_utf8(String, str)
-convert(::Type{UTF8Str}, str::T) where {T<:Union{UCS2Strings, Str{<:UTF16CSE}, UTF32Strings}} =
+convert(::Type{UTF8Str}, str::T) where {T<:Union{UCS2Strings, Str{UTF16CSE}, UTF32Strings}} =
     _cvt_utf8(UTF8Str, str)
 
 """

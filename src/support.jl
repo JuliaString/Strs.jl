@@ -40,9 +40,9 @@ const UTF_ERR_INVALID_16 =
 const UTF_ERR_INVALID_UCS2 =
   "invalid UCS-2 character (surrogate present)"
 const UTF_ERR_INVALID_INDEX =
-  "invalid character index"
+  "invalid character index <<1>>"
 
-if isdefined(Base, :UnicodeError)
+@static if isdefined(Base, :UnicodeError)
     Base.UnicodeError(msg) = UnicodeError(msg, 0%Int32, 0%UInt32)
 else
 
@@ -55,7 +55,7 @@ struct UnicodeError <: Exception
 end
 
 _repmsg(msg, pos, chr) =
-    replace(replace(msg, "<<1>>" => string(pos)), "<<2>>" =>  hex(chr))
+    replace(replace(msg, "<<1>>" => string(pos)), "<<2>>" =>  outhex(chr))
 show(io::IO, exc::UnicodeError) =
     print(io, "UnicodeError: ", _repmsg(exc.errmsg, exc.errpos, exc.errchr))
 end
@@ -70,12 +70,23 @@ const UTF_ERR_NORMALIZE         = " is not one of :NFC, :NFD, :NFKC, :NFKD"
 @noinline unierror(err, pos, ch) = throw(UnicodeError(err, pos, ch))
 @noinline unierror(err, v)       = unierror(string(":", v, err))
 @noinline nulerr()               = unierror("cannot convert NULL to string")
-@noinline ncharerr(n)            = unierror(string("nchar (", n, ") must be greater than 0"))
 @noinline neginderr(s, n)        = unierror("Index ($n) must be non negative")
-@noinline codepoint_error(T, v)  = unierror(string("Invalid CodePoint: ", T, " 0x", hex(v)))
+@noinline ncharerr(n)            = unierror(string("nchar (", n, ") must be greater than 0"))
+@noinline codepoint_error(T, v)  = unierror(string("Invalid CodePoint: ", T, " 0x", outhex(v)))
 @noinline argerror(startpos, endpos) =
     unierror(string("End position ", endpos, " is less than start position (", startpos, ")"))
 @noinline repeaterr(cnt) = throw(ArgumentError("repeat count $cnt must be >= 0"))
+
+@static if VERSION < v"0.7.0-DEV"
+    struct StringIndexError <: Exception
+        string::AbstractString
+        index::Integer
+    end
+    @noinline index_error(s::AbstractString, i::Integer) =
+        throw(StringIndexError(s, Int(i)))
+else
+    const index_error = Base.string_index_err
+end
 
 ## Functions to check validity of UTF-8, UTF-16, and UTF-32 encoded strings,
 #  and also to return information necessary to convert to other encodings
