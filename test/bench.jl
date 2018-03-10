@@ -32,7 +32,8 @@ using Strs
 import Strs: LineCounts, CharTypes, CharStat, calcstats
 import Strs: _LatinStr, _UCS2Str, _UTF32Str, _LatinChr
 
-create_vector(T, len)  = @static VERSION < v"0.7.0-DEV" ? Vector{T}(len) : Vector{T}(undef, len)
+uninit(T, len) = @static VERSION < v"0.7.0-DEV" ? T(len) : T(undef, len)
+create_vector(T, len)  = uninit(Vector{T}, len)
 
 import Base: show
 
