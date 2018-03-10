@@ -53,7 +53,8 @@ function calcstats(lines)
         minlen = min(minlen, len)
         maxlen = max(maxlen, len)
         flags = 0
-        for ch in l
+        for chr in l
+            ch = chr%UInt32
             t = ch <= 0x7f ? 1 :
                 ch <= 0xff ? 2 :
                 ch <= 0x7ff ? 3 :

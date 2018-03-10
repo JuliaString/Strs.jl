@@ -7,7 +7,7 @@ Licensed under MIT License, see LICENSE.md
 
 # These are more complex, and maybe belong in a separate UTF16Str.jl package
 
-function _lower(::Type{UTF16Str}, beg, off, len)
+function _lower(::Type{<:Str{UTF16CSE}}, beg, off, len)
     buf, out = _allocate(UInt16, len)
     unsafe_copyto!(out, beg, len)
     fin = out + (len<<1)
@@ -34,7 +34,7 @@ function _lower(::Type{UTF16Str}, beg, off, len)
     Str(UTF16CSE, buf)
 end
 
-function lowercase(str::UTF16Str)
+function lowercase(str::Str{UTF16CSE})
     pnt = beg = _pnt(str)
     fin = beg + sizeof(str)
     while pnt < fin
@@ -49,15 +49,17 @@ function lowercase(str::UTF16Str)
     str
 end
 
-function _upper(::Type{UTF16Str}, beg, off, len)
+function _upper(::Type{<:Str{UTF16CSE}}, beg, off, len)
     buf, out = _allocate(UInt16, len)
     unsafe_copyto!(out, beg, len)
     fin = out + (len<<1)
     out += off
     while out < fin
         ch = get_codeunit(out)
-        if islatin(ch)
-            if _islower_al(ch)
+        if isascii(ch)
+            _islower_a(ch) && set_codeunit!(out, ch -= 0x20)
+        elseif islatin(ch)
+            if _can_upper_l(ch)
                 set_codeunit!(out, ch -= 0x20)
             elseif ch == 0xb5
                 set_codeunit!(out, 0x39c)

@@ -264,7 +264,7 @@ _can_upper_latin(ch) = _can_upper(ch) | (ch == 0xb5) | (ch == 0xff)
 _can_upper_only_latin(ch) = _can_upper_l(ch) | (ch == 0xb5) | (ch == 0xff)
 
 @inline _can_upper_ch(ch) =
-    ch <= 0x7f ? _islower_a(ch) : (ch <= 0xff ? _can_upper_latin(ch) : _islower_u(ch))
+    ch <= 0x7f ? _islower_a(ch) : (ch <= 0xff ? _can_upper_only_latin(ch) : _islower_u(ch))
 @inline _can_lower_ch(ch) =
     ch <= 0x7f ? _isupper_a(ch) : (ch <= 0xff ? _isupper_l(ch) : _isupper_u(ch))
 

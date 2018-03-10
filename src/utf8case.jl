@@ -92,7 +92,7 @@ function _upper_utf8(beg, off, len)
             out += 1
         elseif ch < 0xc4
             ch = (ch << 6) | (get_codeunit(pnt += 1) & 0x3f)
-            c16 = ch == 0xb5 ? 0x39c : (ch == 0xff ? 0x178 : (ch + _can_upper_l(ch)<<5)%UInt16)
+            c16 = ch == 0xb5 ? 0x39c : (ch == 0xff ? 0x178 : (ch - _can_upper_l(ch)<<5)%UInt16)
             out = output_utf8_2byte!(out, c16)
         elseif ch < 0xe0
             # 2 byte
@@ -146,7 +146,7 @@ function _upper_utf8(beg, off, len)
     Str(UTF8CSE, buf)
 end
 
-function lowercase(str::Str{<:UTF8CSE})
+function lowercase(str::Str{UTF8CSE})
     pnt = beg = _pnt(str)
     fin = beg + sizeof(str)
     while pnt < fin
@@ -167,7 +167,7 @@ function lowercase(str::Str{<:UTF8CSE})
     str
 end
 
-function uppercase(str::Str{<:UTF8CSE})
+function uppercase(str::Str{UTF8CSE})
     pnt = beg = _pnt(str)
     fin = beg + sizeof(str)
     while pnt < fin
