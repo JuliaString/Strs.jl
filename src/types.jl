@@ -14,7 +14,6 @@ export BIG_ENDIAN, LITTLE_ENDIAN
 const BIG_ENDIAN    = (ENDIAN_BOM == 0x01020304)
 const LITTLE_ENDIAN = !BIG_ENDIAN
 
-const STR_DATA_VECTOR = false
 const STR_KEEP_NUL    = true  # keep nul byte placed by String
 
 struct CharSet{CS}   end
@@ -93,18 +92,16 @@ show(io::IO, ::Type{CSE{CS,E}}) where {S,T,CS<:CharSet{S},E<:Encoding{T}} =
 # and optional cached info for hashes, UTF-8/UTF-16 encodings, subsets, etc.
 # via more type parameters
 
-const STR_DATA_TYPE = STR_DATA_VECTOR ? Vector{UInt8} : String
-
 struct Str{T,SubStr,Cache,Hash} <: AbstractString
-    data::STR_DATA_TYPE
+    data::String
     substr::SubStr
     cache::Cache
     hash::Hash
 
-    ((::Type{Str})(::CSE_T, v::STR_DATA_TYPE)
+    ((::Type{Str})(::CSE_T, v::String)
         where {CSE_T<:CSE} =
       new{CSE_T,Nothing,Nothing,Nothing}(v,nothing,nothing,nothing))
-    ((::Type{Str})(::Type{CSE_T}, v::STR_DATA_TYPE)
+    ((::Type{Str})(::Type{CSE_T}, v::String)
         where {CSE_T<:CSE} =
       new{CSE_T,Nothing,Nothing,Nothing}(v,nothing,nothing,nothing))
 end
@@ -145,7 +142,9 @@ primitive type _LatinChr <: CodePoint 8 end
 for nam in charsets
     @eval charset(::Type{$(symstr(nam, "Chr"))}) = $(symstr(nam, "CharSet"))
 end
-charset(::Type{Char}) = UniPlusCharSet
+charset(::Type{UInt8})     = BinaryCharSet
+charset(::Type{Char})      = UniPlusCharSet
+charset(::Type{_LatinChr}) = LatinSubSet
 
 const CodePointTypes = Union{CodeUnitTypes, CodePoint}
 
@@ -190,11 +189,7 @@ end
 const UniStr = Union{ASCIIStr, _LatinStr, _UCS2Str, _UTF32Str}
 show(io::IO, ::Type{UniStr}) = print(io, :UniStr)
 
-if STR_DATA_VECTOR
-    _allocate(len) = create_vector(UInt8, len)
-else
-    _allocate(len) = Base._string_n((len+STR_KEEP_NUL-1)%Csize_t)
-end
+_allocate(len) = Base._string_n((len+STR_KEEP_NUL-1)%Csize_t)
 
 function _allocate(::Type{T}, len) where {T <: CodeUnitTypes}
     buf = _allocate((len+STR_KEEP_NUL-1) * sizeof(T))
@@ -206,11 +201,8 @@ const list = [(:ASCII, :ascii), (:Latin, :latin), (:UCS2,  :ucs2), (:UTF32, :utf
 const sublist = [(:_Latin, :_latin), (:_UCS2, :_ucs2), (:_UTF32, :_utf32)]
 
 const empty_string = ""
-if STR_DATA_VECTOR
-    const empty_strvec = _allocate(0)
-else
-    const empty_strvec = empty_string
-end
+const empty_strvec = empty_string
+
 empty_str(::Type{String}) = empty_string
 
 for (nam, low) in vcat(list, sublist)
@@ -223,14 +215,10 @@ end
 for val in list ; @eval export $(symstr(val[1], "Str")) ; end
 
 @inline function _convert(::Type{T}, a::Vector{UInt8}) where {T<:Str}
-    if STR_DATA_VECTOR
-        Str(cse(T), copyto!(_allocate(sizeof(a)), a))
-    else
-        siz = sizeof(a)
-        buf = _allocate(siz)
-        unsafe_copyto!(pointer(buf), pointer(a), siz)
-        Str(cse(T), buf)
-    end
+    siz = sizeof(a)
+    buf = _allocate(siz)
+    unsafe_copyto!(pointer(buf), pointer(a), siz)
+    Str(cse(T), buf)
 end
 
 # Various useful groups of character set types
@@ -251,18 +239,18 @@ const Wide_CSEs     = Union{UTF16CSE, UCS2_CSEs, UTF32_CSEs}
 const WordQuad_CSEs = Union{Text2CSE,Text4CSE,UCS2CSE,UTF16CSE,UTF32CSE}
 
 const BinaryStrings = Str{BinaryCSE}
-const ASCIIStrings = Str{ASCIICSE}
-const RawStrings   = Str{<:Raw_CSEs}
-const LatinStrings = Str{<:Latin_CSEs}
-const UCS2Strings  = Str{<:UCS2_CSEs}
-const UTF32Strings = Str{<:UTF32_CSEs}
+const ASCIIStrings  = Str{ASCIICSE}
+const RawStrings    = Str{<:Raw_CSEs}
+const LatinStrings  = Str{<:Latin_CSEs}
+const UCS2Strings   = Str{<:UCS2_CSEs}
+const UTF32Strings  = Str{<:UTF32_CSEs}
 
 const ByteStr = Str{<:Byte_CSEs}
 const WordStr = Str{<:Word_CSEs}
 const QuadStr = Str{<:Quad_CSEs}
 const WideStr = Str{<:Wide_CSEs}
 
-const UnicodeByteStrings = Union{Str{ASCIICSE}, LatinStrings}
+const UnicodeByteStrings = Str{<:Union{ASCIICSE, Latin_CSEs}}
 const UnicodeStrings     = Union{String, Str{<:Unicode_CSEs}}
 
 const AbsChar = @static isdefined(Base, :AbstractChar) ? AbstractChar : Union{Char, CodePoint}
@@ -304,19 +292,13 @@ promote_rule(::Type{T}, ::Type{<:Str{_LatinCSE}}) where {T<:Str{LatinCSE}} = T
 promote_rule(::Type{T}, ::Type{<:Str{_UCS2CSE}})  where {T<:Str{UCS2CSE}} = T
 promote_rule(::Type{T}, ::Type{<:Str{_UTF32CSE}}) where {T<:Str{UTF32CSE}} = T
 
-sizeof(s::Str) = sizeof(s.data) + !STR_DATA_VECTOR - STR_KEEP_NUL
+sizeof(s::Str) = sizeof(s.data) + 1 - STR_KEEP_NUL
 
 """Codeunits of string as a Vector"""
 _data(s::Vector{UInt8}) = s
-if STR_DATA_VECTOR
-    _data(s::String)  =
-        @static VERSION < v"0.7.0-DEV" ? Vector{UInt8}(s) : unsafe_wrap(Vector{UInt8}, s)
-    _data(s::ByteStr) = s.data
-else
-    _data(s::String)  = s
-    _data(s::ByteStr) =
-        @static VERSION < v"0.7.0-DEV" ? Vector{UInt8}(s.data) : unsafe_wrap(Vector{UInt8}, s.data)
-end
+_data(s::String)  = s
+_data(s::ByteStr) =
+    @static VERSION < v"0.7.0-DEV" ? Vector{UInt8}(s.data) : unsafe_wrap(Vector{UInt8}, s.data)
 
 """Pointer to codeunits of string"""
 _pnt(s::Union{String,Vector{UInt8}}) = pointer(s)
