@@ -37,12 +37,11 @@ create_vector(T, len)  = uninit(Vector{T}, len)
 
 import Base: show
 
-const userdir = "/Users/scott/"
+const default_dir = "/Users/scott/"
 
-const dpath   = joinpath(userdir, "textsamples")
-const gutpath = joinpath(userdir, "gutenberg")
-const outpath = joinpath(userdir, "samples")
-const defsampledir = outpath
+const inppath = "textsamples"
+const gutpath = "gutenberg"
+const smppath = "samples"
 
 const gutenbergbooks =
     (("files/2600/2600-0",        "English"), # War & Peace, some other languages in quotes
@@ -65,12 +64,12 @@ const downloadedbooks =
 
 #Load books from Project Gutenberg site, removing lines added at beginning and end that
 # are not part of the book, as much as possible
-function load_gutenberg!(books, list, dict)
+function load_gutenberg!(books, list, dict; dir = default_dir)
     for (nam, lang) in list
         cnt = get(dict, lang, 0)
         dict[lang] = cnt + 1
         outnam = cnt == 0 ? "$lang.txt" : "$lang-$cnt.txt"
-        lname = joinpath(gutpath, outnam)
+        lname = joinpath(dir, gutpath, outnam)
         download(joinpath("http://www.gutenberg.org/", nam * ".txt"), lname)
         println("Saved to: ", lname)
         lines = readlines(lname)
@@ -94,14 +93,14 @@ function load_gutenberg!(books, list, dict)
     books
 end
 
-function load_books()
+function load_books(; dir=default_dir)
     dict = Dict{String,Int}()
     books = Vector{Tuple{String, Vector{String}}}()
     for (nam, lang) in downloadedbooks
         cnt = get(dict, lang, 0)
         dict[lang] = cnt + 1
         outnam = cnt == 0 ? "$lang.txt" : "$lang-$cnt.txt"
-        lines = readlines(joinpath(dpath, nam))
+        lines = readlines(joinpath(dir, inppath, nam))
         # Eliminate empty lines
         pos = 0
         len = length(lines)
@@ -115,9 +114,9 @@ function load_books()
     load_gutenberg!(books, gutenbergbooks, dict)
 end
 
-function save_books(books)
+function save_books(books; dir=default_dir)
     for (nam, book) in books
-        outnam = joinpath(outpath, nam)
+        outnam = joinpath(dir, smppath, nam)
         open(outnam, "w") do io
             for lin in book
                 println(io, lin)
@@ -617,8 +616,8 @@ const tests =
      (checkgraph,   "isgraph\nchars"),
      (checkdigit,   "isdigit\nchars"),
      (checkxdigit,  "isxdigit\nchars"),
-     =#
      (dolowercase,  "lowercase\nstring"),
+     =#
      (douppercase,  "uppercase\nstring"),
 #    (dotitlecase,  "titlecase\nstring"),
     )
@@ -867,8 +866,7 @@ end
 const testlist =
     (((length, ), "length"),
      ((isascii, isvalid), "isascii, isvalid"),
-     #((lowercase, uppercase, reverse), "lowercase, uppercase, reverse"),
-     ((lowercase, uppercase), "lowercase, uppercase"),
+     ((lowercase, uppercase, reverse), "lowercase, uppercase, reverse"),
      ((isascii, isvalid, iscntrl, islower, isupper, isalpha,
        is_alnum, isspace, isprint, ispunct, is_graph, isdigit, isxdigit),
       "is(ascii|valid|cntrl|lower|upper|alpha|_alnum|space|print|punct|_graph|digit|xdigit)"),
@@ -888,15 +886,16 @@ function compareall(io, lines, res)
      eltype(lines) == UTF8Str ? comparetestline(lines, res[6], testlist[6]...) : [])
 end
 
-function checktests(io = _stdout(), sampledir = defsampledir)
+function checktests(io = _stdout(); dir=default_dir)
     totres = []
     totcmp = []
+    sampledir = joinpath(dir, smppath)
     for fname in readdir(sampledir)
         lines = readlines(joinpath(sampledir, fname))
         stats = calcstats(lines)
         list = [String, UTF8Str, UTF16Str, UTF32Str, UniStr]
         MT = enctyp(stats.maxtyp)
-        push!(list, MT)
+        MT != UTF32Str && push!(list, MT)
         isdefined(Main, :UTF8String) && push!(list, UTF8String, UTF16String, UTF32String)
         enc = encode_lines(list, lines)
         res = (runcheckline(Int, lines, testlist[1][1]),
@@ -917,11 +916,12 @@ function checktests(io = _stdout(), sampledir = defsampledir)
     totres, totcmp
 end
 
-function benchdir(io = _stdout(), sampledir = defsampledir)
+function benchdir(io = _stdout(); dir=default_dir)
     totres = []
     totlines = []
     totnames = []
     totsizes = []
+    sampledir = joinpath(dir, smppath)
     for fname in readdir(sampledir)
         lines = readlines(joinpath(sampledir, fname))
         stats = calcstats(lines)

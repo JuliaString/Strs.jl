@@ -25,7 +25,7 @@ function _length(::CodeUnitMulti, str::Str{<:UTF16CSE})
     pnt - CHUNKSZ == fin ? cnt : (cnt - count_ones(_get_masked(pnt) & _mask_bytes(siz)))
 end
 
-function isascii(str::T) where {C<:Union{Text2CSE, UCS2CSE, UTF16CSE},T<:Str{C}}
+function isascii(str::Str{C}) where {C<:Union{Text2CSE, UCS2CSE, UTF16CSE}}
     (siz = sizeof(str)) == 0 && return true
     siz < CHUNKSZ &&
         return ((unsafe_load(_pnt64(str)) & _mask_bytes(siz)) & _ascii_mask(UInt16)) == 0
@@ -36,7 +36,7 @@ function isascii(str::T) where {C<:Union{Text2CSE, UCS2CSE, UTF16CSE},T<:Str{C}}
     pnt - CHUNKSZ == fin || ((unsafe_load(pnt) & _mask_bytes(siz)) & _ascii_mask(UInt16)) == 0
 end
 
-function islatin(str::T) where {C<:Union{Text2CSE, UCS2CSE, UTF16CSE},T<:Str{C}}
+function islatin(str::Str{C}) where {C<:Union{Text2CSE, UCS2CSE, UTF16CSE}}
     (siz = sizeof(str)) == 0 && return true
     siz < CHUNKSZ &&
         return ((unsafe_load(_pnt64(str)) & _mask_bytes(siz)) & _latin_mask(UInt16)) == 0
@@ -59,8 +59,8 @@ function isbmp(str::Str{<:UTF16CSE})
     pnt - CHUNKSZ == fin || (_get_masked(pnt) & _mask_bytes(siz)) == 0
 end
 
-isascii(str::_UCS2Str) = false
-islatin(str::_UCS2Str) = false
+isascii(str::Str{_UCS2CSE}) = false
+islatin(str::Str{_UCS2CSE}) = false
 isbmp(str::UCS2Strings) = true
 
 # Speed this up accessing 64 bits at a time
@@ -130,8 +130,8 @@ function reverse(str::Str{<:UTF16CSE})
     (len = _len(str)) < 2 && return str
     pnt = _pnt(str)
     buf, beg = _allocate(UInt16, len)
-    out = beg + (len<<1)
-    while out >= beg
+    out = bytoff(beg, len)
+    while out > beg
         ch = get_codeunit(pnt)
         is_surrogate_lead(ch) && set_codeunit!(out -= 2, get_codeunit(pnt += 2))
         set_codeunit!(out -= 2, ch)
@@ -140,16 +140,17 @@ function reverse(str::Str{<:UTF16CSE})
     Str(UTF16CSE, buf)
 end
 
-function reverse(str::T) where {T<:UCS2Strings}
+function reverse(str::Str{C}) where {C<:Union{Text2CSE,Text4CSE,UCS2_CSEs,UTF32_CSEs}}
     (len = _len(str)) < 2 && return str
     pnt = _pnt(str)
-    buf, beg = _allocate(UInt16, len)
-    out = beg + (len<<1)
-    while out >= beg
-        set_codeunit!(out -= 2, get_codeunit(pnt))
-        pnt += 2
+    T = codeunit(str)
+    buf, beg = _allocate(T, len)
+    out = bytoff(beg, len)
+    while out > beg
+        set_codeunit!(out -= sizeof(T), get_codeunit(pnt))
+        pnt += sizeof(T)
     end
-    Str(cse(T), buf)
+    Str(C, buf)
 end
 
 @inline _isvalid_char_pos(::CodeUnitMulti, str::Str{<:UTF16CSE}, pos::Integer) =
@@ -175,6 +176,8 @@ end
     ch <= 0x10ffff || unierror(UTF_ERR_INVALID, pos, ch)
     ch
 end
+
+# These need to change to output directly, not converted to UTF-8
 
 ## outputting UCS2 strings ##
 
@@ -287,7 +290,7 @@ function convert(::Type{T}, str::Str{<:UTF16CSE}) where {T<:UCS2Strings}
     Str(cse(T), _cvtsize(UInt16, _pnt(str), len))
 end
 
-function isvalid(::Type{UTF16Str}, data::AbstractArray{UInt16})
+function isvalid(::Type{<:Str{UTF16CSE}}, data::AbstractArray{UInt16})
     pos = 0
     len = length(data)
     @inbounds while (pos += 1) < len # check for unpaired surrogates
@@ -301,7 +304,7 @@ end
 
 # This can be sped up, to check 4 words at a time, only checking for unpaired
 # or out of order surrogates when one is found in the UInt64
-function isvalid(::Type{UTF16Str}, data::Ptr{UInt16}, len)
+function isvalid(::Type{<:Str{UTF16CSE}}, data::Ptr{UInt16}, len)
     i = 1
     @inbounds while i < len # check for unpaired surrogates
         ch = get_codeunit(data, i)
@@ -316,7 +319,7 @@ function isvalid(::Type{UTF16Str}, data::Ptr{UInt16}, len)
     i > len || !is_surrogate_codeunit(get_codeunit(data, i))
 end
 
-function convert(::Type{UTF16Str}, str::AbstractString)
+function convert(::Type{<:Str{UTF16CSE}}, str::AbstractString)
     isempty(str) && return empty_utf16
     len, flags, num4byte = unsafe_checkstring(str)
     buf, pnt = _allocate(UInt16, len + num4byte)
@@ -334,7 +337,7 @@ function convert(::Type{UTF16Str}, str::AbstractString)
     Str(UTF16CSE, buf)
 end
 
-function convert(::Type{UTF16Str}, str::String)
+function convert(::Type{<:Str{UTF16CSE}}, str::String)
     # handle zero length string quickly
     isempty(str) && return empty_utf16
     # Check that is correct UTF-8 encoding and get number of words needed
@@ -343,7 +346,7 @@ function convert(::Type{UTF16Str}, str::String)
     Str(UTF16CSE, flags == 0 ? _cvtsize(UInt16, str, len) : _encode_utf16(str, len + num4byte))
 end
 
-function convert(::Type{UTF16Str}, str::Str{<:UTF8CSE})
+function convert(::Type{<:Str{UTF16CSE}}, str::Str{<:UTF8CSE})
     # handle zero length string quickly
     isempty(str) && return empty_utf16
     pnt = _pnt(str)
@@ -395,11 +398,11 @@ end
 _encode_utf16(dat::Vector{UInt8}, len) = _encode_utf16(pointer(dat), len)
 _encode_utf16(str::String, len)        = _encode_utf16(_pnt(str), len)
 
-@inline _cvt_16_to_utf8(::Type{UTF16Str}, pnt, len)       = _transcode_utf8(pnt, len)
-@inline _cvt_16_to_utf8(::Type{<:UCS2Strings}, pnt, len)  = _encode_utf8(pnt, len)
-@inline _cvt_16_to_utf8(::Type{<:UTF32Strings}, pnt, len) = _encode_utf8(pnt, len)
+@inline _cvt_16_to_utf8(::Type{<:Str{UTF16CSE}}, pnt, len) = _transcode_utf8(pnt, len)
+@inline _cvt_16_to_utf8(::Type{<:UCS2Strings}, pnt, len)   = _encode_utf8(pnt, len)
+@inline _cvt_16_to_utf8(::Type{<:UTF32Strings}, pnt, len)  = _encode_utf8(pnt, len)
 
-function _cvt_utf8(::Type{T}, str::S) where {T<:Union{String, UTF8Str}, S}
+function _cvt_utf8(::Type{T}, str::S) where {T<:Union{String, Str{UTF8CSE}}, S}
     # handle zero length string quickly
     (len = _len(str)) == 0 && return empty_str(T)
     # get number of bytes to allocate (use faster count for validated strings)

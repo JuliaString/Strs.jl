@@ -27,14 +27,14 @@ function _srch_utf16_rev(beg, ch, pnt)
     0
 end
 
-function _srch_cp(::Fwd, str::Str{<:UTF16CSE}, cp::AbsChar, pos, len)
+function _srch_cp(::Fwd, str::Str{UTF16CSE}, cp::AbsChar, pos, len)
     beg = _pnt(str)
     ((ch = tobase(cp)) <= 0x0ffff
      ? _srch_codeunit(Fwd(), beg, ch%UInt16, pos, len)
      : _srch_utf16_fwd(beg, ch, bytoff(beg, pos), bytoff(beg, len)))
 end
 
-function _srch_cp(::Rev, str::Str{<:UTF16CSE}, cp::AbsChar, pos, len)
+function _srch_cp(::Rev, str::Str{UTF16CSE}, cp::AbsChar, pos, len)
     beg = _pnt(str)
     ((ch = tobase(cp)) <= 0x0ffff
      ? _srch_codeunit(Rev(), beg, ch%UInt16, pos)

@@ -28,7 +28,7 @@ function _srch_utf8_fwd(beg, ch, pnt, fin)
     0
 end
 
-function _srch_cp(::Fwd, str::Str{<:UTF8CSE}, cp::AbsChar, pos, len)
+function _srch_cp(::Fwd, str::Str{UTF8CSE}, cp::AbsChar, pos, len)
     beg = _pnt(str)
     is_valid_continuation(get_codeunit(beg, pos)) && index_error(str, pos)
     ((ch = tobase(cp)) < 0x80
@@ -62,7 +62,7 @@ function _srch_utf8_rev(beg, ch, pnt)
     0
 end
 
-function _srch_cp(::Rev, str::Str{<:UTF8CSE}, cp::AbsChar, pos, len)
+function _srch_cp(::Rev, str::Str{UTF8CSE}, cp::AbsChar, pos, len)
     beg = _pnt(str)
     is_valid_continuation(get_codeunit(beg + pos - 1)) && index_error(str, pos)
     ((ch = tobase(cp)) < 0x80
