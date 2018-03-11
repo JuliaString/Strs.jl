@@ -249,8 +249,9 @@ function convert(::Type{<:Str{C}}, str::AbstractString) where {C<:UCS2_CSEs}
     len, flags, num4byte = unsafe_checkstring(str)
     num4byte == 0 || unierror(UTF_ERR_INVALID_UCS2)
     buf, pnt = _allocate(UInt16, len)
-    @inbounds for (i, ch) in enumerate(str)
-        set_codeunit!(pnt, i, ch%UInt16)
+    @inbounds for ch in str
+        set_codeunit!(pnt, ch%UInt16)
+        pnt += 2
     end
     Str(C, buf)
 end
@@ -267,7 +268,7 @@ function convert(::Type{<:Str{C}}, str::String) where {C<:UCS2_CSEs}
 end
 
 # handle zero length string quickly, just widen these
-convert(::Type{<:Str{C}}, str::UnicodeByteStrings) where {C<:UCS2_CSEs} =
+convert(::Type{<:Str{C}}, str::Str{<:Union{ASCIICSE, Latin_CSEs}}) where {C<:UCS2_CSEs} =
     (siz = sizeof(str)) == 0 ? empty_str(C) : Str(C, _cvtsize(UInt16, _pnt(str), siz))
 
 function convert(::Type{<:Str{C}}, str::Str{UTF16CSE}) where {C<:UCS2_CSEs}

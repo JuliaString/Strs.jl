@@ -61,7 +61,7 @@ convert(::Type{<:Str{_UTF32CSE}}, ch::Unsigned) =
         : unierror(UTF_ERR_INVALID, 0, ch))
      : _convert(_LatinCSE, ch%UInt8))
 
-function convert(::Type{UTF32Str}, str::AbstractString)
+function convert(::Type{<:Str{UTF32CSE}}, str::AbstractString)
     isempty(str) && return empty_utf32
     len, flags = unsafe_checkstring(str)
     buf, pnt = _allocate(UInt32, len)
@@ -74,18 +74,14 @@ end
 convert(::Type{_UTF32Str}, str::AbstractString) = Str(str)
 
 # This needs to handle the fact that the String type can contain invalid data!
-function _convert_string_utf32(::Type{T}, str::String) where {T<:UTF32Strings}
+function convert(::Type{<:Str{UTF32CSE}}, str::String)
     # handle zero length string quickly
-    (len = _len(str)) == 0 && return empty_str(T)
+    (len = _len(str)) == 0 && return empty_str(UTF32CSE)
     # Validate UTF-8 encoding, and get number of words to create
     len, flags = unsafe_checkstring(str, 1, len)
     # Optimize case where no characters > 0x7f, no invalid
-    Str(cse(T), flags == 0 ? _cvtsize(UInt32, str, len) : _encode_utf32(_pnt(str), len))
+    Str(UTF32CSE, flags == 0 ? _cvtsize(UInt32, str, len) : _encode_utf32(_pnt(str), len))
 end
-
-# Avert problems with ambiguous method
-convert(::Type{UTF32Str}, str::String)  = _convert_string_utf32(UTF32Str, str)
-convert(::Type{_UTF32Str}, str::String) = _convert_string_utf32(_UTF32Str, str)
 
 @inline function get_cp(pnt)
     ch = get_codeunit(pnt)%UInt32
@@ -158,9 +154,9 @@ function _transcode_utf16_to_utf32(pnt, len)
 end
 
 # This can rely on the fact that a UTF8Str is always valid
-function convert(::Type{UTF32Str}, str::Str{UTF8CSE})
+function convert(::Type{<:Str{UTF32CSE}}, str::Str{UTF8CSE})
     # handle zero length string quickly
-    (len = _len(str)) == 0 && return empty_utf32
+    (len = _len(str)) == 0 && return empty_str(UTF32CSE)
     cnt = _length(CodeUnitMulti(), str)
     # Optimize case where no characters > 0x7f, otherwise has multi-byte UTF-8 sequences
     Str(UTF32CSE,
@@ -169,17 +165,14 @@ function convert(::Type{UTF32Str}, str::Str{UTF8CSE})
          : _transcode_utf8_to_utf32(_pnt(str), cnt)))
 end
 
-_cvt_utf32(T, str) =
-    (siz = sizeof(str)) == 0 ? empty_str(T) : Str(cse(T), _cvtsize(UInt32, _pnt(str), siz))
-
-const ShortStr = Union{UnicodeByteStrings,UCS2Strings}
 # This can rely on the fact that an ASCIIStr, LatinStr, UCS2Str is always valid
-convert(::Type{Text4Str}, str::ShortStr) = _cvt_utf32(Text4Str, str)
-convert(::Type{UTF32Str}, str::ShortStr) = _cvt_utf32(UTF32Str, str)
-convert(::Type{_UTF32Str}, str::ShortStr) = _cvt_utf32(_UTF32Str, str)
+convert(::Type{<:Str{UTF32CSE}}, str::Str{<:Union{ASCIICSE,Latin_CSEs,UCS2_CSEs}}) =
+    ((siz = sizeof(str)) == 0
+     ? empty_str(UTF32CSE)
+     : Str(UTF32CSE, _cvtsize(UInt32, _pnt(str), siz)))
 
 # This can rely on the fact that a UTF16Str is always valid
-function convert(::Type{UTF32Str}, str::Str{UTF16CSE})
+function convert(::Type{<:Str{UTF32CSE}}, str::Str{UTF16CSE})
     # handle zero length string quickly
     (len = _len(str)) == 0 && return empty_utf32
     # Get number of characters to create
@@ -190,7 +183,7 @@ function convert(::Type{UTF32Str}, str::Str{UTF16CSE})
         : _transcode_utf16_to_utf32(_pnt(str), cnt))
 end
 
-function convert(::Type{UTF16Str}, str::Str{<:UTF32_CSEs})
+function convert(::Type{<:Str{UTF16CSE}}, str::Str{<:UTF32_CSEs})
     # handle zero length string quickly
     (len = _len(str)) == 0 && return empty_utf16
     # get number of words to allocate
@@ -201,13 +194,13 @@ function convert(::Type{UTF16Str}, str::Str{<:UTF32_CSEs})
     Str(UTF16CSE, nonbmp == 0 ? _cvtsize(UInt16, pnt, len) : _encode_utf16(pnt, len + nonbmp))
 end
 
-function convert(::Type{S}, str::T) where {S<:UCS2Strings,T<:UTF32Strings}
+function convert(::Type{<:Str{C}}, str::Str{<:UTF32_CSEs}) where {C<:UCS2_CSEs}
     # Might want to have an invalids_as argument
     # handle zero length string quickly
-    (len = _len(str)) == 0 && return empty_str(S)
+    (len = _len(str)) == 0 && return empty_str(UCS2CSE)
     # Check if conversion is valid
     isbmp(str) || unierror(UTF_ERR_INVALID_UCS2)
-    Str(cse(S), _cvtsize(UInt16, _pnt(str), len))
+    Str(UCS2CSE, _cvtsize(UInt16, _pnt(str), len))
 end
 
 const UniRawChar = Union{UInt32, Int32, Text4Chr, Char}
@@ -217,8 +210,8 @@ function convert(::Type{T}, dat::AbstractVector{<:UniRawChar}) where {T<:UTF32St
     buf, pnt = _allocate(UInt32, len)
     fin = bytoff(pnt, len)
     pos = 0
-    @inbounds while pnt < fin
-        ch = dat[pos += 1]%UInt32
+    while pnt < fin
+        @inbounds ch = dat[pos += 1]%UInt32
         set_codeunit!(pnt, check_valid(ch, pos))
         pnt += sizeof(UInt32)
     end
@@ -229,10 +222,11 @@ end
 convert(::Type{T}, v::AbstractVector{<:UniRawChar}) where {T<:AbstractString} =
     convert(T, convert(UTF32Str, v))
 
+# To do, make this more generic, add a function that can create a vector & fill it from an Str
 function convert(::Type{Vector{UInt32}}, str::QuadStr)
     len = _len(str)
     vec = create_vector(UInt32, len)
-    @inbounds unsafe_copyto!(pointer(vec), _pnt(str), len)
+    _memcpy(pointer(vec), _pnt(str), len)
     vec
 end
 
@@ -275,11 +269,30 @@ end
 
 isvalid(str::Vector{Char}) = isvalid(UTF32Str, str)
 
-function map(fun, str::T) where {T<:UTF32Strings}
+function map(fun, str::Str{UTF32CSE})
     len = _len(str)
+    fin = bytoff(pnt, len)
     buf, pnt = _allocate(UInt32, len)
-    @inbounds for i = 1:len
-        set_codeunit!(pnt, i, check_valid(UInt32(fun(dat[i]))))
+    while pnt < fin
+        set_codeunit!(out, check_valid(fun(get_codeunit(pnt))))
+        pnt += sizeof(UInt32)
+        out += sizeof(UInt32)
     end
-    Str(cse(T), buf)
+    Str(UTF32CSE, buf)
+end
+
+# Make sure the result actually still has at least one character > 0xffff
+function map(fun, str::Str{_UTF32CSE})
+    len, pnt = _lenpnt(str)
+    fin = bytoff(pnt, len)
+    buf, out = _allocate(UInt32, len)
+    msk = 0%UInt32
+    while pnt < fin
+        ch = check_valid(fun(get_codeunit(pnt)))
+        msk |= ch
+        set_codeunit!(out, ch)
+        pnt += sizeof(UInt32)
+        out += sizeof(UInt32)
+    end
+    Str(ifelse(msk < 0xffff, UTF32CSE, _UTF32CSE), buf)
 end

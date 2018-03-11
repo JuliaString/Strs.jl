@@ -9,13 +9,15 @@ Based in part on code for ASCIIString that used to be in Julia
 ## overload methods for efficiency ##
 
 isascii(str::Str{_LatinCSE}) = false
-islatin(str::LatinStrings)     = true
-isbmp(str::LatinStrings)       = true
-isunicode(str::LatinStrings)   = true
+islatin(str::LatinStrings)   = true
+isbmp(str::LatinStrings)     = true
+isunicode(str::LatinStrings) = true
 
 bytestring(s::LatinStrings) = s
 
-function string(collection::UnicodeByteStrings...)
+const _UBS = Str{<:Union{ASCIICSE, Latin_CSEs}}
+
+function string(collection::_UBS...)
     length(c) == 1 && return collection[1]
     len = 0
     for str in collection
@@ -33,7 +35,7 @@ end
 # Todo make generic version, with all CodeUnitSingle types
 function reverse(str::Str{C}) where {C<:Union{ASCIICSE, Latin_CSEs, Text1CSE, BinaryCSE}}
     (len = _len(str)) < 2 && return str
-    GC.@preserve str begin
+    #GC.@preserve str begin
         pnt = _pnt(str)
         buf, beg = _allocate(UInt8, len)
         out = beg + len
@@ -42,13 +44,13 @@ function reverse(str::Str{C}) where {C<:Union{ASCIICSE, Latin_CSEs, Text1CSE, Bi
             pnt += 1
         end
         Str(C, buf)
-    end
+    #end
 end
 
 ## outputting Latin 1 strings ##
 
 function print(io::IO, str::LatinStrings)
-    GC.@preserve str begin
+    #GC.@preserve str begin
         pnt = _pnt(str)
         fin = pnt + sizeof(str)
         # Skip and write out ASCII sequences together
@@ -66,7 +68,7 @@ function print(io::IO, str::LatinStrings)
             write_utf8_2(io, ch)
             pnt += 1
         end
-    end
+    #end
     nothing
 end
 
@@ -78,8 +80,8 @@ write(io::IO, ch::LatinChars) = write(io, tobase(ch))
 ## transcoding to Latin1 ##
 
 convert(::Type{T}, s::T) where {T<:LatinStrings} = s
-convert(::Type{T}, s::S) where {T<:LatinStrings,S<:UnicodeByteStrings} = T(s.data)
-convert(::Type{T}, s::UTF8Str) where {T<:LatinStrings} = convert(T, s.data)
+convert(::Type{T}, s::Str{<:_UBS}) where {T<:LatinStrings} = T(s.data)
+convert(::Type{T}, s::Str{UTF8CSE}) where {T<:LatinStrings} = convert(T, s.data)
 
 # Assumes that has already been checked for validity
 function _utf8_to_latin(pnt::Ptr{UInt8}, len)
@@ -127,10 +129,10 @@ function convert(::Type{T}, str::AbstractString) where {T<:LatinStrings}
     # Might want to have invalids_as here
     len, flags = unsafe_checkstring(str)
     (flags & ~(UTF_LONG | UTF_LATIN1)) == 0 || unierror(UTF_ERR_INVALID_LATIN1)
-    buf = _allocate(len)
-    out = 0
+    buf, pnt = _allocate(UInt8, len)
     @inbounds for ch in str
-        buf[out += 1] = ch%UInt8
+        set_codeunit!(pnt, ch%UInt8)
+        pnt += 1
     end
     Str(T, buf)
 end

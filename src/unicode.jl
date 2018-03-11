@@ -140,6 +140,8 @@ else
     import Base: graphemes
 end
 
+@static isdefined(Base, :textwidth) || (textwidth(str::String) = strwidth(str))
+
 export is_alnum, is_graph
 
 # Recommended by deprecate
@@ -218,9 +220,10 @@ normalize(str::Str, nf::Symbol) =
 
 ## character column width function ##
 
-textwidth(ch::CodePointTypes) = Int(ccall(:utf8proc_charwidth, Cint, (UInt32,), ch))
+textwidth(ch::CodeUnitTypes) = Int(ccall(:utf8proc_charwidth, Cint, (UInt32,), ch))
 textwidth(ch::ASCIIChr) = 1
 textwidth(ch::LatinChars) = 1
+textwidth(ch::CodePoint) = textwidth(tobase(ch))
 
 textwidth(str::Str) = mapreduce(textwidth, +, 0, str)
 textwidth(str::ASCIIStr) = length(str)

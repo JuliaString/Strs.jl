@@ -1,7 +1,7 @@
 #=
 Benchmarking routines for characters and strings
 
-Copyright 2017 Gandalf Software, Inc., Scott P. Jones
+Copyright 2017-2018 Gandalf Software, Inc., Scott P. Jones
 Licensed under MIT License, see LICENSE.md
 
 THIS IS STILL VERY WIP AND HARDCODED!
@@ -25,7 +25,9 @@ using BenchmarkTools
 
 const test_legacy = false
 
-@static test_legacy && (using LegacyStrings)
+@static if test_legacy
+    using LegacyStrings
+end
 
 using StringLiterals
 using Strs
@@ -37,8 +39,6 @@ create_vector(T, len)  = uninit(Vector{T}, len)
 
 import Base: show
 
-const default_dir = "/Users/scott/"
-
 const inppath = "textsamples"
 const gutpath = "gutenberg"
 const smppath = "samples"
@@ -47,6 +47,7 @@ const gutenbergbooks =
     (("files/2600/2600-0",        "English"), # War & Peace, some other languages in quotes
      ("files/1400/1400-0",        "English"), # Great Expectations, uses Unicode quotes
      ("files/42286/42286-0",      "Hungarian"),
+     ("files/8119/8119-0",        "Polish"),
      ("files/32941/32941-0",      "Japanese"),
      ("files/24264/24264-0",      "Chinese"),
      ("files/40687/40687-0",      "Telugu"), # Third most spoken in India, official
@@ -62,14 +63,18 @@ const downloadedbooks =
     (("LYSAIa GORA DIeVICh'Ia - SIeRGIeI GOLOVAChIoV.txt", "Russian"),
      )
 
-#Load books from Project Gutenberg site, removing lines added at beginning and end that
-# are not part of the book, as much as possible
-function load_gutenberg!(books, list, dict; dir = default_dir)
+getdefdir(dir)::String = dir === nothing ? homedir() : dir
+
+"""
+Load books from Project Gutenberg site, removing lines added at beginning and end that
+are not part of the book, as much as possible
+"""
+function load_gutenberg!(books, list, dict, gutenbergdir)
     for (nam, lang) in list
         cnt = get(dict, lang, 0)
         dict[lang] = cnt + 1
         outnam = cnt == 0 ? "$lang.txt" : "$lang-$cnt.txt"
-        lname = joinpath(dir, gutpath, outnam)
+        lname = joinpath(gutenbergdir, outnam)
         download(joinpath("http://www.gutenberg.org/", nam * ".txt"), lname)
         println("Saved to: ", lname)
         lines = readlines(lname)
@@ -93,14 +98,22 @@ function load_gutenberg!(books, list, dict; dir = default_dir)
     books
 end
 
-function load_books(; dir=default_dir)
+"""
+load_books(; dir=nothing)
+
+Loads a set of books from a local directory, and downloads a set of books from Project Gutenberg
+Returns them as a dictionary with names -> vectors of strings
+"""
+function load_books(; dir::Any=nothing)
+    defdir = getdefdir(dir)
+    inputdir = joinpath(defdir, inppath)
     dict = Dict{String,Int}()
     books = Vector{Tuple{String, Vector{String}}}()
     for (nam, lang) in downloadedbooks
         cnt = get(dict, lang, 0)
         dict[lang] = cnt + 1
         outnam = cnt == 0 ? "$lang.txt" : "$lang-$cnt.txt"
-        lines = readlines(joinpath(dir, inppath, nam))
+        lines = readlines(joinpath(inputdir, nam))
         # Eliminate empty lines
         pos = 0
         len = length(lines)
@@ -111,12 +124,19 @@ function load_books(; dir=default_dir)
         end
         push!(books, (outnam, out))
     end
-    load_gutenberg!(books, gutenbergbooks, dict)
+    load_gutenberg!(books, gutenbergbooks, dict, joinpath(defdir, gutpath))
 end
 
-function save_books(books; dir=default_dir)
+"""
+save_books(books; dir=nothing)
+
+Saves the collection of downloaded books into the given directory, in a "samples" subdirectory.
+If the directory is not set, it will default to the user's home directory
+"""
+function save_books(books; dir::Any=nothing)
+    sampledir = joinpath(getdefdir(dir), smppath)
     for (nam, book) in books
-        outnam = joinpath(dir, smppath, nam)
+        outnam = joinpath(sampledir, nam)
         open(outnam, "w") do io
             for lin in book
                 println(io, lin)
@@ -238,18 +258,16 @@ end
 
 function dolowercase(lines::Vector{<:AbstractString})
     cnt = 0
-    for (i, text) in enumerate(lines)
-        val = lowercase(text)
-        cnt += (val !== text)
+    for text in lines
+        cnt += lowercase(text) !== text
     end
     cnt
 end
 
 function douppercase(lines::Vector{<:AbstractString})
     cnt = 0
-    for (i, text) in enumerate(lines)
-        val = uppercase(text)
-        cnt += (val !== text)
+    for text in lines
+        cnt += uppercase(text) !== text
     end
     cnt
 end
@@ -470,7 +488,6 @@ searchstr(lines::Vector{String})      = searchlines(lines, "thy")
 searchstr(lines::Vector{T}) where {T} = searchlines(lines, T("thy"))
 
 # normalize
-# textwidth
 # isassigned
 
 sklength(str) = length(str)
@@ -529,6 +546,7 @@ repeat10c(str) = repeat(str[1], 10)
 
 countsklength(l)  = checkstr(sklength, l)
 countoldlength(l) = checkstr(oldlength, l)
+checktextwidth(l) = checkstr(textwidth, l)
 
 checkrepeat1(l)   = checktext(repeat1, l)
 checkrepeat10(l)  = checktext(repeat10, l)
@@ -619,6 +637,7 @@ const tests =
      (dolowercase,  "lowercase\nstring"),
      =#
      (douppercase,  "uppercase\nstring"),
+     (checktextwidth, "textwidth\nstring"),
 #    (dotitlecase,  "titlecase\nstring"),
     )
 
@@ -864,7 +883,7 @@ function comparetestcu(lines, results, list, displist)
 end
 
 const testlist =
-    (((length, ), "length"),
+    (((length, textwidth), "length, textwidth"),
      ((isascii, isvalid), "isascii, isvalid"),
      ((lowercase, uppercase, reverse), "lowercase, uppercase, reverse"),
      ((isascii, isvalid, iscntrl, islower, isupper, isalpha,
@@ -886,10 +905,10 @@ function compareall(io, lines, res)
      eltype(lines) == UTF8Str ? comparetestline(lines, res[6], testlist[6]...) : [])
 end
 
-function checktests(io = _stdout(); dir=default_dir)
+function checktests(io = _stdout(); dir::Any=nothing)
     totres = []
     totcmp = []
-    sampledir = joinpath(dir, smppath)
+    sampledir = joinpath(getdefdir(dir), smppath)
     for fname in readdir(sampledir)
         lines = readlines(joinpath(sampledir, fname))
         stats = calcstats(lines)
@@ -916,12 +935,12 @@ function checktests(io = _stdout(); dir=default_dir)
     totres, totcmp
 end
 
-function benchdir(io = _stdout(); dir=default_dir)
+function benchdir(io = _stdout();  dir::Any=nothing)
     totres = []
     totlines = []
     totnames = []
     totsizes = []
-    sampledir = joinpath(dir, smppath)
+    sampledir = joinpath(getdefdir(dir), smppath)
     for fname in readdir(sampledir)
         lines = readlines(joinpath(sampledir, fname))
         stats = calcstats(lines)

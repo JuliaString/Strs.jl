@@ -586,29 +586,100 @@ last(str::Str, n::Integer) = str[max(1, prevind(str, ncodeunits(s)+1, n)):end]
 const Chrs = @static VERSION < v"0.7.0-DEV" ? Union{Char,AbstractChar} : CodePoint
 
 @static if VERSION < v"0.7.0-DEV"
-repeat(ch::Char, cnt::Integer) =
-    cnt < 2 ? (cnt < 0 ? repeaterr(cnt) : (cnt == 0 ? empty_str(String) : string(ch%UInt32))) :
-    String(_repeat(UTF8CSE, ch%UInt32, cnt))
+    function repeat(ch::Char, cnt::Integer)
+        cnt > 1 && return String(_repeat(CodeUnitMulti(), UTF8CSE, ch%UInt32, cnt))
+        cnt < 0 && repeaterr(cnt)
+        cnt == 0 ? empty_string : string(Char(ch%UInt32))
+    end
 end
 
 function repeat(ch::CP, cnt::Integer) where {CP <: Chrs}
     C = codepoint_cse(CP)
-    cnt < 2 && (cnt < 0 ? repeaterr(cnt) : (return cnt == 0 ? empty_str(C) : Str(C, ch%UInt32)))
-    Str(C, _repeat(C, ch%UInt32, cnt))
+    cnt > 1 && return Str(C, _repeat(CodePointStyle(C), C, tobase(ch), cnt))
+    cnt < 0 && repeaterr(cnt)
+    cnt == 0 ? empty_str(C) : _convert(C, tobase(ch))
 end
 
 (^)(ch::CP, cnt::Integer) where {CP <: Chrs} = repeat(ch, cnt)
 
-@inline _memcpy(dst::Ptr{T}, src::Ptr{T}, siz) where {T<:CodeUnitTypes} =
-    ccall(:memcpy, Ptr{Cvoid}, (Ptr{Cvoid}, Ptr{Cvoid}, UInt), dst, src, siz)
-@inline _memset(pnt::Ptr{UInt8}, ch::UInt8, cnt) =
-    ccall(:memset, Ptr{Cvoid}, (Ptr{UInt8}, Cint, Csize_t), pnt, ch, cnt)
+# low level mem support functions
 
-@inline function _memset(pnt::Ptr{T}, ch::T, cnt) where {T<:Union{UInt16,UInt32}}
+const (WidChr,OthChr) = @static sizeof(Cwchar_t) == 4 ? (UInt32,UInt16) : (UInt16,UInt32)
+
+_fwd_memchr(ptr::Ptr{UInt8}, byt::UInt8, len::Integer) =
+    ccall(:memchr, Ptr{UInt8}, (Ptr{UInt8}, Int32, Csize_t), ptr, byt, len)
+
+_fwd_memchr(ptr::Ptr{WidChr}, wchr::WidChr, len::Integer) =
+    ccall(:wmemchr, Ptr{WidChr}, (Ptr{WidChr}, Int32, Csize_t), ptr, wchr, len)
+
+_fwd_memchr(beg::Ptr{OthChr}, wchr::OthChr, len::Integer) =
+    _fwd_memchr(beg, ch, bytoff(beg, len))
+
+_fwd_memchr(ptr::Ptr{UInt8}, byt::UInt8, fin::Ptr{UInt8}) =
+    ptr < fin ? _fwd_memchr(ptr, byt, fin - ptr) : C_NULL
+_rev_memchr(ptr::Ptr{UInt8}, byt::UInt8, fin::Ptr{UInt8}) =
+    ptr < fin ? _rev_memchr(ptr, byt, fin - ptr) : C_NULL
+
+_fwd_memchr(ptr::Ptr{WidChr}, wchr::WidChr, fin::Ptr{WidChr}) =
+    ptr < fin ? _fwd_memchr(ptr, wchr, chroff(fin - ptr)) : C_NULL
+
+function _fwd_memchr(pnt::Ptr{T}, wchr::T, fin::Ptr{T}) where {T<:OthChr}
+    while pnt < fin
+        get_codeunit(pnt) == ch && return pnt
+        pnt += sizeof(T)
+    end
+    C_NULL
+end
+
+_rev_memchr(ptr::Ptr{UInt8}, byt::UInt8, len::Integer) =
+    ccall(:memrchr, Ptr{UInt8}, (Ptr{UInt8}, Int32, Csize_t), ptr, byt, len)
+
+function _rev_memchr(beg::Ptr{T}, ch::T, pnt::Ptr{T}) where {T<:Union{UInt16,UInt32}}
+    while (pnt -= sizeof(T)) >= beg
+        get_codeunit(pnt) == ch && return pnt
+    end
+    C_NULL
+end
+
+_rev_memchr(beg::Ptr{T}, ch::T, pos::Integer) where {T<:Union{UInt16,UInt32}} =
+    _rev_memchr(beg, ch, bytoff(beg, pos))
+
+_memcmp(a::Ptr{UInt8}, b::Ptr{UInt8}, len) =
+    ccall(:memcmp, Int32, (Ptr{UInt8}, Ptr{UInt8}, UInt), a, b, len)
+_memcmp(a::Ptr{WidChr}, b::Ptr{WidChr}, len) =
+    ccall(:wmemcmp, Int32, (Ptr{WidChr}, Ptr{WidChr}, UInt), a, b, len)
+
+function _memcmp(apnt::Ptr{OthChr}, bpnt::Ptr{OthChr}, len)
+    fin = bytoff(apnt, len)
+    while apnt < fin
+        (c1 = get_codeunit(apnt)) == (c2 = get_codeunit(bpnt)) || return _cmp(c1, c2)
+        apnt += sizeof(OthChr)
+        bpnt += sizeof(OthChr)
+    end
+    0
+end
+
+_memcmp(a::Union{String, ByteStr}, b::Union{String, ByteStr}, siz) = _memcmp(_pnt(a), _pnt(b), siz)
+_memcmp(a::WordStr, b::WordStr, siz) = _memcmp(_pnt(a), _pnt(b), siz)
+_memcmp(a::QuadStr, b::QuadStr, siz) = _memcmp(_pnt(a), _pnt(b), siz)
+
+_memcpy(dst::Ptr{UInt8}, src::Ptr, siz) =
+    ccall(:memcpy, Ptr{UInt8}, (Ptr{Cvoid}, Ptr{Cvoid}, UInt), dst, src, siz)
+_memcpy(a::Ptr{WidChr}, b::Ptr{WidChr}, len) =
+    ccall(:wmemcpy, Ptr{WidChr}, (Ptr{WidChr}, Ptr{WidChr}, UInt), a, b, len)
+_memcpy(a::Ptr{OthChr}, b::Ptr{OthChr}, len) =
+    ccall(:memcpy, Ptr{OthChr}, (Ptr{OthChr}, Ptr{OthChr}, UInt), a, b, bytoff(OthChr, len))
+
+@inline _memset(pnt::Ptr{UInt8}, ch::UInt8, cnt) =
+    ccall(:memset, Ptr{UInt8}, (Ptr{UInt8}, Cint, Csize_t), pnt, ch, cnt)
+@inline _memset(pnt::Ptr{WidChr}, ch::WidChr, cnt) =
+    ccall(:wmemset, Ptr{WidChr}, (Ptr{WidChr}, Cint, Csize_t), pnt, ch, cnt)
+
+@inline function _memset(pnt::Ptr{OthChr}, ch::OthChr, cnt)
     fin = bytoff(pnt, cnt)
     while pnt < fin
         set_codeunit!(pnt, ch)
-        pnt += sizeof(T)
+        pnt += sizeof(OthChr)
     end
 end
 
@@ -639,7 +710,10 @@ end
     buf
 end
 
-function _repeat(::Type{UTF8CSE}, ch, cnt)
+_repeat(::CodeUnitSingle, ::Type{C}, ch::T, cnt) where {T,C<:CSE} =
+    _repeat_chr(basetype(T), ch, cnt)
+
+function _repeat(::CodeUnitMulti, ::Type{UTF8CSE}, ch, cnt)
     if ch <= 0x7f
         _repeat_chr(UInt8, ch, cnt)
     elseif ch <= 0x7ff
@@ -651,27 +725,26 @@ function _repeat(::Type{UTF8CSE}, ch, cnt)
     end
 end
 
-_repeat(::Type{UTF16CSE}, ch, cnt) =
+_repeat(::CodeUnitMulti, ::Type{UTF16CSE}, ch, cnt) =
     ch <= 0xffff ? _repeat_chr(UInt16, ch, cnt) : _repeat_chr(UInt32, get_utf16_32(ch), cnt)
 
-function repeat(str::T, cnt::Integer) where {T<:Str}
-    cnt < 2 && return cnt == 1 ? str : (cnt == 0 ? empty_str(T) : repeaterr(cnt))
+function repeat(str::T, cnt::Integer) where {C<:CSE,T<:Str{C}}
+    cnt < 2 && return cnt == 1 ? str : (cnt == 0 ? empty_str(C) : repeaterr(cnt))
     CU = codeunit(T)
-    siz = sizeof(str)
-    pnt = _pnt(str)
-    len = siz * cnt
-    buf, out = _allocate(UInt8, len)
-    if siz == sizeof(CU) # common case: repeating a single codeunit string
+    len, pnt = _lenpnt(str)
+    totlen = len * cnt
+    buf, out = _allocate(CU, totlen)
+    if len == 1 # common case: repeating a single codeunit string
         _memset(out, get_codeunit(pnt), cnt)
     else
-        fin = out + len
-        len = chroff(CU, siz)
+        fin = bytoff(out, totlen)
+        siz = bytoff(CU, len)
         while out < fin
             _memcpy(out, pnt, len)
             out += siz
         end
     end
-    Str(cse(T), buf)
+    Str(C, buf)
 end
 (^)(str::T, cnt::Integer) where {T<:Str} = repeat(str, cnt)
 

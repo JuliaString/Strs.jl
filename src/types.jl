@@ -34,21 +34,35 @@ macro cse(cs, e)
     :(CSE{CharSet{$(quotesym(cs)), $(quotesym(e))}()})
 end
 
-const charsets = (
-     :ASCII,   # (7-bit subset of Unicode)
-     :Latin,   # ISO-8859-1 (8-bit subset of Unicode)
-     :UCS2,    # BMP (16-bit subset of Unicode)
-     :UTF32,   # corresponding to codepoints (0-0xd7ff, 0xe000-0x10fff)
-     :Text1,   # Unknown character set, 1 byte
-     :Text2,   # Unknown character set, 2 byte
-     :Text4)   # Unknown character set, 4 byte
+# Define symbols used for characters, codesets, codepoints
 
-for nam in charsets
+const _cpname1 =
+    [:Text1,   # Unknown character set, 1 byte
+     :ASCII,   # (7-bit subset of Unicode)
+     :Latin]   # ISO-8859-1 (8-bit subset of Unicode)
+const _cpname2 =
+    [:Text2,   # Unknown character set, 2 byte
+     :UCS2]    # BMP (16-bit subset of Unicode)
+const _cpname4 =
+    [:Text4,   # Unknown character set, 4 byte
+     :UTF32]   # corresponding to codepoints (0-0xd7ff, 0xe000-0x10fff)
+const _subsetnam =
+    [:_Latin,
+     :_UCS2,
+     :_UTF32]
+const _mbwname =
+    [:UTF8,
+     :UTF16]
+const _binname = vcat(_cpname1, :Binary)
+
+# List of basic character sets
+const charsets = vcat(_cpname1, _cpname2, _cpname4)
+
+for nam in vcat(charsets,
+                :Binary,   # really, no character set at all, not text
+                :UniPlus)  # valid Unicode, plus unknown characters (for String)
     @eval const $(symstr(nam, "CharSet")) = CharSet{$(quotesym(nam))}
 end
-
-const BinaryCharSet  = CharSet{:Binary}  # really, no character set at all, not text
-const UniPlusCharSet = CharSet{:UniPlus} # valid Unicode, plus unknown characters (for String)
 
 # These are to indicate string types that must have at least one character of the type,
 # for the internal types to make up the UniStr union type
@@ -61,6 +75,8 @@ const Native1Byte  = Encoding(:Byte)
 const NativeUTF8   = Encoding(:UTF8)
 @eval show(io::IO, ::Type{NativeUTF8})  = print(io, "UTF-8")
 @eval show(io::IO, ::Type{Native1Byte}) = print(io, "8-bit")
+
+# Allow handling different endian encodings
 
 for (n, l, b, s) in (("2Byte", :LE2, :BE2, "16-bit"),
                      ("4Byte", :LE4, :BE4, "32-bit"),
@@ -126,12 +142,6 @@ const CodeUnitTypes = Union{UInt8, UInt16, UInt32}
 
 abstract type CodePoint <: AbstractChar end
 
-const _cpname1 = [:Text1, :ASCII, :Latin]
-const _cpname2 = [:Text2, :UCS2]
-const _cpname4 = [:Text4, :UTF32]
-const _subsetnam = [:_Latin, :_UCS2, :_UTF32]
-const _mbwname   = [:UTF8, :UTF16] # Multi-byte/word
-
 for (names, siz) in ((_cpname1, 8), (_cpname2, 16), (_cpname4, 32)), nam in names
     chrnam = symstr(nam, "Chr")
     @eval primitive type $chrnam <: CodePoint $siz end
@@ -139,12 +149,15 @@ for (names, siz) in ((_cpname1, 8), (_cpname2, 16), (_cpname4, 32)), nam in name
 end
 primitive type _LatinChr <: CodePoint 8 end
 
+# Define all of the function for mapping CodePoint types to a CharSet
 for nam in charsets
     @eval charset(::Type{$(symstr(nam, "Chr"))}) = $(symstr(nam, "CharSet"))
 end
-charset(::Type{UInt8})     = BinaryCharSet
-charset(::Type{Char})      = UniPlusCharSet
-charset(::Type{_LatinChr}) = LatinSubSet
+
+# Handle a few quirks
+charset(::Type{UInt8})     = BinaryCharSet  # UInt8 instead of "BinaryChr"
+charset(::Type{Char})      = UniPlusCharSet # Char instead of "UniPlusChr"
+charset(::Type{_LatinChr}) = LatinSubSet    # LatinSubSet instead of "_LatinCharSet"
 
 const CodePointTypes = Union{CodeUnitTypes, CodePoint}
 
@@ -155,13 +168,9 @@ const UnicodeChars = Union{ASCIIChr, LatinChars, UCS2Chr, UTF32Chr}
 
 export UnicodeChars
 
-const BuiltInTypes = vcat(_cpname1, _cpname2, _cpname4, _subsetnam, _mbwname)
+# Definition of built-in CSEs (Character Set Encodings)
 
-const BinaryCSE = CSE{BinaryCharSet,  Native1Byte}
-
-const _encnam1 = [:Text1, :Binary, :ASCII, :Latin]
-
-for (cs, enc) in ((Native1Byte, _encnam1), (Native2Byte, _cpname2), (Native4Byte, _cpname4)),
+for (cs, enc) in ((Native1Byte, _binname), (Native2Byte, _cpname2), (Native4Byte, _cpname4)),
     nam in enc
     @eval const $(symstr(nam, "CSE")) = CSE{$(symstr(nam, "CharSet")), $cs}
 end
@@ -172,18 +181,34 @@ const _LatinCSE = CSE{LatinSubSet,  Native1Byte}
 const _UCS2CSE  = CSE{UCS2SubSet,   Native2Byte}
 const _UTF32CSE = CSE{UTF32SubSet,  Native4Byte}
 
-for nam in BuiltInTypes
-    sym = Symbol("$(nam)Str")
-    cse = Symbol("$(nam)CSE")
+for nam in vcat(charsets, :_Latin)
+    @eval codepoint_cse(::Type{$(symstr(nam,"Chr"))}) = $(symstr(nam,"CSE"))
+end
+
+# Definition of built-in Str types
+
+const empty_string = ""
+
+for nam in vcat(_binname, _cpname2, _cpname4, _subsetnam, _mbwname)
+    str = String(nam)
+    sym = symstr(nam, "Str")
+    cse = symstr(nam, "CSE")
     @eval const $sym = Str{$cse, Nothing, Nothing, Nothing}
+    @eval (::Type{$sym})(v::Vector{UInt8}) = convert($sym, v)
     @eval show(io::IO, ::Type{$sym}) = print(io, $(quotesym(sym)))
     @eval show(io::IO, ::Type{$cse}) = print(io, $(quotesym(cse)))
+    low = lowercase(str)
+    if str[1] == '_'
+        @eval empty_str(::Type{$cse}) = $(symstr("empty", low))
+    else
+        emp = symstr("empty_", low)
+        @eval const $emp = Str($cse, empty_string)
+        @eval empty_str(::Type{$cse}) = $emp
+        @eval export $sym
+    end
 end
-show(io::IO, ::Type{BinaryCSE}) = print(io, "BinaryCSE")
-
-for nam in (:ASCII, :Latin, :_Latin, :UCS2, :UTF32, :Text1, :Text2, :Text4)
-    @eval codepoint_cse(::Type{$(Symbol("$(nam)Chr"))}) = $(Symbol("$(nam)CSE"))
-end
+empty_str(::Type{<:Str{C}}) where {C<:CSE} = empty_str(C)
+empty_str(::Type{String}) = empty_string
 
 """Union type for fast dispatching"""
 const UniStr = Union{ASCIIStr, _LatinStr, _UCS2Str, _UTF32Str}
@@ -194,31 +219,6 @@ _allocate(len) = Base._string_n((len+STR_KEEP_NUL-1)%Csize_t)
 function _allocate(::Type{T}, len) where {T <: CodeUnitTypes}
     buf = _allocate((len+STR_KEEP_NUL-1) * sizeof(T))
     buf, reinterpret(Ptr{T}, pointer(buf))
-end
-
-const list = [(:ASCII, :ascii), (:Latin, :latin), (:UCS2,  :ucs2), (:UTF32, :utf32),
-              (:UTF8,  :utf8), (:UTF16, :utf16), (:Binary, :binary)]
-const sublist = [(:_Latin, :_latin), (:_UCS2, :_ucs2), (:_UTF32, :_utf32)]
-
-const empty_string = ""
-const empty_strvec = empty_string
-
-empty_str(::Type{String}) = empty_string
-
-for (nam, low) in vcat(list, sublist)
-    sym = symstr(nam, "Str")
-    @eval const $sym = Str{$(symstr(nam, "CSE")), Nothing,  Nothing, Nothing}
-    @eval const $(symstr("empty_", low)) = Str($(symstr(nam, "CSE")), empty_strvec)
-    @eval const empty_str(::Type{$sym}) = $(symstr("empty_", low))
-    @eval (::Type{$sym})(v::Vector{UInt8}) = convert($sym, v)
-end
-for val in list ; @eval export $(symstr(val[1], "Str")) ; end
-
-@inline function _convert(::Type{T}, a::Vector{UInt8}) where {T<:Str}
-    siz = sizeof(a)
-    buf = _allocate(siz)
-    unsafe_copyto!(pointer(buf), pointer(a), siz)
-    Str(cse(T), buf)
 end
 
 # Various useful groups of character set types
@@ -249,9 +249,6 @@ const ByteStr = Str{<:Byte_CSEs}
 const WordStr = Str{<:Word_CSEs}
 const QuadStr = Str{<:Quad_CSEs}
 const WideStr = Str{<:Wide_CSEs}
-
-const UnicodeByteStrings = Str{<:Union{ASCIICSE, Latin_CSEs}}
-const UnicodeStrings     = Union{String, Str{<:Unicode_CSEs}}
 
 const AbsChar = @static isdefined(Base, :AbstractChar) ? AbstractChar : Union{Char, CodePoint}
 const ByteStrings  = Union{String, ByteStr}
@@ -284,9 +281,10 @@ promote_rule(::Type{T}, ::Type{<:Str{Text1CSE}}) where {T<:Str{Text2CSE}} = T
 promote_rule(::Type{T}, ::Type{<:Str{Text1CSE}}) where {T<:Str{Text4CSE}} = T
 promote_rule(::Type{T}, ::Type{<:Str{Text2CSE}}) where {T<:Str{Text4CSE}} = T
 
-promote_rule(::Type{T}, ::Type{<:Str{ASCIICSE}}) where {T<:Union{LatinStrings,UnicodeStrings,WideStr}} = T
-promote_rule(::Type{T}, ::Type{<:LatinStrings}) where {T<:Union{UnicodeStrings,WideStr}} = T
-promote_rule(::Type{T}, ::Type{<:UCS2Strings})  where {T<:Union{UTF32Strings}} = T
+promote_rule(::Type{String}, ::Type{<:Str{ASCIICSE}}) = String
+promote_rule(::Type{T}, ::Type{<:Str{ASCIICSE}}) where {T<:Str{<:CSE}} = T
+promote_rule(::Type{T}, ::Type{<:Str{Latin_CSEs}}) where {T<:Str{<:Union{UTF8CSE, Wide_CSEs}}} = T
+promote_rule(::Type{T}, ::Type{<:Str{UCS2_CSEs}}) where {T<:Str{UTF32_CSEs}} = T
 
 promote_rule(::Type{T}, ::Type{<:Str{_LatinCSE}}) where {T<:Str{LatinCSE}} = T
 promote_rule(::Type{T}, ::Type{<:Str{_UCS2CSE}})  where {T<:Str{UCS2CSE}} = T
