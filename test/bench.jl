@@ -32,8 +32,8 @@ using Strs
 import Strs: LineCounts, CharTypes, CharStat, calcstats
 import Strs: _LatinStr, _UCS2Str, _UTF32Str, _LatinChr
 
-uninit(T, len)  = @static VERSION < v"0.7.0-DEV" ? T(len) : T(uninitialized, len)
-create_vector(T, len) = uninit(Vector{T}, len)
+uninit(T, len) = @static VERSION < v"0.7.0-DEV" ? T(len) : T(undef, len)
+create_vector(T, len)  = uninit(Vector{T}, len)
 
 import Base: show
 
@@ -147,12 +147,13 @@ function show(io::IO, v::Tuple{String,CharStat})
     pr"\(io)Lines with > 0:   \(s.lines)\n"
 end
 
+_stdout() = @static VERSION < v"0.7.0-DEV" ? STDOUT : stdout
 @static if VERSION < v"0.7.0-DEV"
     const pwc = print_with_color
 else
     pwc(c, io, str) = printstyled(io, str; color = c)
 end
-pwc(c, l) = pwc(c, STDOUT, l)
+pwc(c, l) = pwc(c, _stdout(), l)
 
 pr_ul(io, l) = pwc(:underline, io, l)
 pr_ul(l)     = pwc(:underline, l)
@@ -162,8 +163,8 @@ print_size_ratio(io, val) =
 print_time_ratio(io, val) =
     pwc(val < .95 ? :red : val > 1.05 ? :green : :normal, io, f"\%10.3f(val)")
 
-print_size_ratio(val) = print_size_ratio(STDOUT, val)
-print_time_ratio(val) = print_time_ratio(STDOUT, val)
+print_size_ratio(val) = print_size_ratio(_stdout(), val)
+print_time_ratio(val) = print_time_ratio(_stdout(), val)
 
 print_ratio(val) = pwc(val < .95 ? :red : val > 1.05 ? :green : :normal, f"\%12.3f(val)")
 print_ratio_rev(val) = pwc(val < .95 ? :green : val > 1.05 ? :red : :normal, f"\%12.3f(val)")
@@ -226,7 +227,7 @@ function dispbench(io, totres)
     end
 end
 
-dispbench(totres) = dispbench(STDOUT, totres)
+dispbench(totres) = dispbench(_stdout(), totres)
 
 function countlength(lines::Vector{<:AbstractString})
     cnt = 0
@@ -240,7 +241,7 @@ function dolowercase(lines::Vector{<:AbstractString})
     cnt = 0
     for (i, text) in enumerate(lines)
         val = lowercase(text)
-        cnt += (val == text)
+        cnt += (val !== text)
     end
     cnt
 end
@@ -249,7 +250,7 @@ function douppercase(lines::Vector{<:AbstractString})
     cnt = 0
     for (i, text) in enumerate(lines)
         val = uppercase(text)
-        cnt += (val == text)
+        cnt += (val !== text)
     end
     cnt
 end
@@ -257,15 +258,7 @@ end
 function iteratechars(text::AbstractString)
     cnt = 0
     for ch in text
-        cnt += '0' <= ch <= '9'
-    end
-    cnt
-end
-
-function iteratechars(text::Str)
-    cnt = 0
-    @inbounds for i=1:length(text)
-        cnt += '0' <= text[i] <= '9'
+        cnt += isdigit(ch)
     end
     cnt
 end
@@ -273,7 +266,7 @@ end
 function iteratecps(text::AbstractString)
     cnt = 0
     for ch in codepoints(text)
-        cnt += '0' <= ch <= '9'
+        cnt += isdigit(ch)
     end
     cnt
 end
@@ -281,7 +274,7 @@ end
 function iteratecus(text::AbstractString)
     cnt = 0
     for ch in codeunits(text)
-        cnt += '0' <= ch <= '9'
+        cnt += isdigit(ch)
     end
     cnt
 end
@@ -565,10 +558,10 @@ checkupper(l)   = checkcp(isupper,   l)
 checkalpha(l)   = checkcp(isalpha,   l)
 checknumeric(l) = checkcp(isnumeric, l)
 checkspace(l)   = checkcp(isspace,   l)
-checkalnum(l)   = checkcp(isalnum,   l)
+checkalnum(l)   = checkcp(is_alnum,  l)
 checkprint(l)   = checkcp(isprint,   l)
 checkpunct(l)   = checkcp(ispunct,   l)
-checkgraph(l)   = checkcp(isgraph,   l)
+checkgraph(l)   = checkcp(is_graph,  l)
 
 function wrap(f, lines, io, cnts::LineCounts, t, msg, basetime=0%UInt)
     tst = ""
@@ -613,11 +606,11 @@ const tests =
      (checkascii,   "isascii\nchars"),
      (checkvalid,   "isvalid\nchars"),
      (checklower,   "islower\nchars"),
+     (checkalnum,   "isalnum\nchars"),
      #=
      (checkcntrl,   "iscntrl\nchars"),
      (checkupper,   "isupper\nchars"),
      (checkalpha,   "isalpha\nchars"),
-     (checkalnum,   "isalnum\nchars"),
      (checkspace,   "isspace\nchars"),
      (checkprint,   "isprint\nchars"),
      (checkpunct,   "ispunct\nchars"),
@@ -874,10 +867,11 @@ end
 const testlist =
     (((length, ), "length"),
      ((isascii, isvalid), "isascii, isvalid"),
-     ((lowercase, uppercase, reverse), "lowercase, uppercase, reverse"),
+     #((lowercase, uppercase, reverse), "lowercase, uppercase, reverse"),
+     ((lowercase, uppercase), "lowercase, uppercase"),
      ((isascii, isvalid, iscntrl, islower, isupper, isalpha,
-       isalnum, isspace, isprint, ispunct, isgraph, isdigit, isxdigit),
-      "is(ascii|valid|cntrl|lower|upper|alpha|alnum|space|print|punct|graph|digit|xdigit)"),
+       is_alnum, isspace, isprint, ispunct, is_graph, isdigit, isxdigit),
+      "is(ascii|valid|cntrl|lower|upper|alpha|_alnum|space|print|punct|_graph|digit|xdigit)"),
      ((UInt32, ), "UInt32"),
      ((sizeof, ), "sizeof"))
 
@@ -894,7 +888,7 @@ function compareall(io, lines, res)
      eltype(lines) == UTF8Str ? comparetestline(lines, res[6], testlist[6]...) : [])
 end
 
-function checktests(io = STDOUT, sampledir = defsampledir)
+function checktests(io = _stdout(), sampledir = defsampledir)
     totres = []
     totcmp = []
     for fname in readdir(sampledir)
@@ -923,7 +917,7 @@ function checktests(io = STDOUT, sampledir = defsampledir)
     totres, totcmp
 end
 
-function benchdir(io = STDOUT, sampledir = defsampledir)
+function benchdir(io = _stdout(), sampledir = defsampledir)
     totres = []
     totlines = []
     totnames = []
@@ -934,7 +928,7 @@ function benchdir(io = STDOUT, sampledir = defsampledir)
         show(io, (fname, stats))
         list = [String, UTF8Str, UTF16Str, UTF32Str, UniStr]
         MT = enctyp(stats.maxtyp)
-        push!(list, MT)
+        MT != UTF32Str && push!(list, MT)
         isdefined(Main, :UTF8String) && push!(list, UTF8String, UTF16String, UTF32String)
         numchars = stats.len
         numlines = stats.num

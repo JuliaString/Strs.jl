@@ -632,10 +632,10 @@ end
             string(ch)
         else
             uch = ch%UInt32
-            if ch <= 0x7f
+            if uch <= 0x7f
                 buf = Base._string_n(cnt)
-                ccall(:memset, Ptr{Cvoid}, (Ptr{UInt8}, Cint, Csize_t), pointer(buf), ch, cnt)
-            elseif ch <= 0x7ff
+                ccall(:memset, Ptr{Cvoid}, (Ptr{UInt8}, Cint, Csize_t), pointer(buf), uch, cnt)
+            elseif uch <= 0x7ff
                 buf = Base._string_n(cnt<<1)
                 pnt16 = reinterpret(Ptr{UInt16}, pointer(buf))
                 wrd = (uch >>> 6) | ((uch & 0x3f)%UInt16<<8) | 0x80c0
@@ -643,7 +643,7 @@ end
                     set_codeunit!(pnt16, wrd)
                     pnt16 += 2
                 end
-            elseif ch <= 0xffff
+            elseif uch <= 0xffff
                 buf = Base._string_n(cnt*3)
                 pnt = reinterpret(Ptr{UInt8}, pointer(buf))
                 b1, b2, b3 =

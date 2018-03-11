@@ -96,14 +96,8 @@ isdefined(Base, :AbstractChar)   || (abstract type AbstractChar end ; export Abs
 
 @static isdefined(Base, :codeunits) || include("codeunits.jl")
 
-uninit(T, len) = @static isdefined(Base, :uninitialized) ? T(uninitialized, len) : T(len)
-create_vector(T, len) = uninit(Vector{T}, len)
-
-@static if VERSION < v"0.7.0-DEV"
-    const outhex = hex
-else
-    outhex(v, p=1) = string(v, base=16, pad=p)
-end
+create_vector(T, len)  = @static VERSION < v"0.7.0-DEV" ? Vector{T}(len) : Vector{T}(undef, len)
+outhex(v, p=1) = @static VERSION < v"0.7.0-DEV" ? hex(v,p) : string(v, base=16, pad=p)
 
 include("types.jl")
 include("chars.jl")

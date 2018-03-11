@@ -122,21 +122,36 @@ function utf8proc_map(::Type{T}, str, options::Integer) where {T<:Str}
 end
 
 utf8proc_map(str::T, options::Integer) where {T<:Str} = utf8proc_map(T, UTF8Str(str), options)
-utf8proc_map(str::UTF8Str, options::Integer) = utf8proc_map(UTF8Str, str, options)
+utf8proc_map(str::Str{UTF8CSE}, options::Integer) = utf8proc_map(UTF8Str, str, options)
 
 ############################################################################
 
-import Base: isalpha, isdigit, isxdigit, isalnum, iscntrl, ispunct, isspace, isprint, isgraph,
+import Base: isalpha, isdigit, isxdigit, iscntrl, ispunct, isspace, isprint,
              islower, isupper, lowercase, uppercase, titlecase, lcfirst, ucfirst, isascii
 
 @condimport isnumeric
 @condimport textwidth
+@condimport isalnum
+@condimport isgraph
 
 @static if isdefined(Base, :Unicode) && isdefined(Base.Unicode, :graphemes)
     import Base.Unicode: graphemes
 else
     import Base: graphemes
 end
+
+export is_alnum, is_graph
+
+# Recommended by deprecate
+@static if VERSION < v"0.7.0-DEV"
+    is_alnum(ch::Char) = isalnum(ch)
+    is_graph(ch::Char) = isgraph(ch)
+else
+    is_alnum(ch::Char) = isalpha(ch) || isnumeric(ch)
+    is_graph(ch::Char) = isprint(ch) && !(isspace(ch))
+end
+is_alnum(ch::CodePoint) = isalnum(ch)
+is_graph(ch::CodePoint) = isgraph(ch)
 
 export isgraphemebreak
 
@@ -190,7 +205,7 @@ function normalize(::Type{T}, str::T;
 end
 
 normalize(str::T, options::Integer) where {T<:Str} = normalize(T, UTF8Str(str), options)
-normalize(str::UTF8Str, options::Integer) = normalize(UTF8Str, str, options)
+normalize(str::Str{UTF8CSE}, options::Integer) = normalize(UTF8Str, str, options)
 
 normalize(str::Str, nf::Symbol) =
     utf8proc_map(str, nf == :NFC ? (Uni.STABLE | Uni.COMPOSE) :
@@ -213,8 +228,10 @@ textwidth(str::LatinStrings) = length(str)
 
 ############################################################################
 
-@inline _cat(ch::CodePointTypes) = ccall(:utf8proc_category, Cint, (UInt32,), tobase(ch))
-@inline _cat(ch::Union{UInt32, Text4Chr}) = ch <= '\U10ffff' ? _cat(ch%UTF32Chr) : Cint(30)
+@inline __cat(ch) = ccall(:utf8proc_category, Cint, (UInt32,), ch)
+@inline _cat(ch::CodePoint) = __cat(tobase(ch))
+@inline _cat(ch::CodeUnitTypes) = ch <= 0x10ffff ? __cat(ch) : Cint(30)
+@inline _cat(ch::Text4Chr)  = _cat(ch%UInt32)
 
 # returns code in 0:30 giving Unicode category
 @inline category_code(ch::CodePointTypes) = _cat(ch)
@@ -227,16 +244,18 @@ textwidth(str::LatinStrings) = length(str)
 @inline _titlecase_u(ch) = ccall(:utf8proc_totitle, UInt32, (UInt32,), ch)
 
 # more human-readable representations of the category code
-@inline category_abbrev(ch::CodePointTypes) = _cat_abbr(ch)
-@inline category_abbrev(ch::Union{UInt32, Text4Chr}) = ch <= '\U10ffff' ? _cat_abbr(ch) : "In"
+@inline category_abbrev(ch::CodePoint) = _cat_abbr(ch)
+@inline category_abbrev(ch::CodeUnitTypes)   = ch <= 0x10ffff ? _cat_abbr(ch) : "In"
+@inline category_abbrev(ch::Text4Chr) = category_abbrev(ch%UInt32)
 
 category_string(ch::CodePointTypes) = category_strings[category_code(ch) + 1]
 
 isassigned(ch::CodePointTypes) = category_code(ch) != Uni.CN
 
 _cat_mask(a) = a
-@inline _cat_mask(a, b) = (1 << a%UInt) | (1 << b%UInt)
-@inline _cat_mask(rng::UnitRange) = ((2 << rng.stop%UInt) - 1) & ~((1 << rng.start%UInt) - 1)
+@inline _cat_mask(a, b) = (1%UInt << a%UInt) | (1%UInt << b%UInt)
+@inline _cat_mask(rng::UnitRange) =
+    ((2%UInt << rng.stop%UInt) - 1) & ~((1%UInt << rng.start%UInt) - 1)
 
 @inline _check_mask(ch, mask) = ((1%UInt << _cat(ch)%UInt) & mask) != 0
 
@@ -275,7 +294,7 @@ const _isnumeric_a = _isdigit
 # Definitions for characters in the Latin1 subset of Unicode, but not in the ASCII subset
 
 @inline _isnumeric_l(ch) = (ch <= 0xbe && ((1<<(ch-0xb2)) & 0x1c83) != 0)
-@inline _ispunct_l(ch)   = ((1 << (ch-0x80)) & 0x88c0_0882_0000_0000) != 0
+@inline _ispunct_l(ch)   = ((1%UInt64 << (ch-0x80)) & 0x88c0_0882_0000_0000) != 0
 @inline _isspace_l(ch)   = (ch == 0x85) | (ch == 0xa0)
 @inline _islower_l(c)    = ((0xdf <= c <= 0xff) & (c != 0xf7)) | (c == 0xb5)
 @inline _isupper_l(c)    = (0xc0 <= c%UInt8 <= 0xde) & (c != 0xd7)

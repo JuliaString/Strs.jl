@@ -4,22 +4,23 @@ const ver = "v0.$(VERSION.minor)"
 const git = "https://github.com/JuliaString/"
 const pkgdir = Pkg.dir()
 
+const mparse = @static VERSION < v"0.7.0-DEV" ? parse : Meta.parse
+_rep(str, a, b) = @static VERSION < v"0.7.0-DEV" ? replace(str, a, b) : replace(str, a => b)
+const RC = @static VERSION < v"0.7.0-DEV" ? Base.REPLCompletions : REPL.REPLCompletions
+_stdout() = @static VERSION < v"0.7.0-DEV" ? STDOUT : stdout
+
 @static if VERSION < v"0.7.0-DEV"
     const pwc = print_with_color
-    pwc(c, l) = pwc(c, STDOUT, l)
 else
     pwc(c, io, str) = printstyled(io, str; color = c)
-    pwc(c, l) = pwc(c, stdout, l)
 end
-pr_ul(l)     = pwc(:underline, l)
+
+pwc(c, l) = pwc(c, _stdout(), l)
+pr_ul(l)  = pwc(:underline, l)
 
 const pkglist =
     ["StrTables", "LaTeX_Entities", "Emoji_Entities", "HTML_Entities", "Unicode_Entities",
      "Format", "StringLiterals", "Strs", "StrICU"]
-
-const mparse = @static VERSION < v"0.7.0-DEV" ? parse : Meta.parse
-_rep(str, a, b) = @static VERSION < v"0.7.0-DEV" ? replace(str, a, b) : replace(str, a => b)
-const RC = @static VERSION < v"0.7.0-DEV" ? Base.REPLCompletions : REPL.REPLCompletions
 
 function rmpkg(pkg)
     try
