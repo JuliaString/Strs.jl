@@ -75,13 +75,43 @@ end
               0x80 | ((ch >>> 6) & 0x3f)%UInt8,
               0x80 | (ch & 0x3f)%UInt8)
 
+@inline t_write_utf_2(io, ch) = write(io, get_utf_2(ch)...)
+@inline t_write_utf_3(io, ch) = write(io, get_utf_3(ch)...)
+@inline t_write_utf_4(io, ch) = write(io, get_utf_4(ch)...)
+# Output a character as a 2-byte UTF-8 sequence
+@inline function t_output_utf8_2byte!(pnt, ch)
+    b1, b2 = get_utf_2(ch)
+    set_codeunit!(pnt,     b1)
+    set_codeunit!(pnt + 1, b2)
+    pnt + 2
+end
+
+# Output a character as a 3-byte UTF-8 sequence
+@inline function t_output_utf8_3byte!(pnt, ch)
+    b1, b2, b3 = get_utf_3(ch)
+    set_codeunit!(pnt,     b1)
+    set_codeunit!(pnt + 1, b2)
+    set_codeunit!(pnt + 2, b3)
+    pnt + 3
+end
+
+# Output a character as a 4-byte UTF-8 sequence
+@inline function t_output_utf8_4byte!(pnt, ch)
+    b1, b2, b3, b4 = get_utf_4(ch)
+    set_codeunit!(pnt,     b1)
+    set_codeunit!(pnt + 1, b2)
+    set_codeunit!(pnt + 2, b3)
+    set_codeunit!(pnt + 3, b4)
+    pnt + 4
+end
+
 @inline _write_ucs2(io, ch) =
     ch <= 0x7f ? write(io, ch%UInt8) : ch <= 0x7ff ? _write_utf_2(io, ch) : _write_utf_3(io, ch)
 
 @inline _write_utf32(io, ch) = ch <= 0xffff ? _write_ucs2(io, ch) : _write_utf_4(io, ch)
 
-@inline write(io::IO, ch::UCS2Chr) = _write_ucs2(io, tobase(ch))
-@inline write(io::IO, ch::UTF32Chr) = _write_utf32(io, tobase(ch))
+@inline print(io::IO, ch::UCS2Chr)  = _write_ucs2(io, tobase(ch))
+@inline print(io::IO, ch::UTF32Chr) = _write_utf32(io, tobase(ch))
 
 ## required core functionality ##
 
@@ -336,10 +366,6 @@ function reverse(str::Str{UTF8CSE})
     Str(UTF8CSE, buf)
 end
 
-## outputting UTF-8 strings ##
-
-write(io::IO, str::Str{UTF8CSE}) = write(io, _data(str))
-
 @inline get_ch(dat, pos, off) = (get_codeunit(dat, pos + off) & 0x3f)%UInt32
 
 ## transcoding to UTF-8 ##
@@ -392,6 +418,15 @@ write(io::IO, str::Str{UTF8CSE}) = write(io, _data(str))
 end
 _transcode_utf8(dat::Vector{UInt8}, len) = _transcode_utf8(pointer(dat), len)
 
+# Single character conversion
+function convert(::Type{<:Str{UTF8CSE}}, ch::Unsigned)
+    isunicode(ch) || unierror(UTF_ERR_INVALID, 0, ch)
+    len = ch <= 0x7f ? 1 : (ch < 0x800 ? 2 : (ch > 0xffff ? 4 : 3))
+    buf = _allocate(len)
+    _encode_char_utf8(buf, ch, 0)
+    Str(UTF8CSE, buf)
+end
+
 convert(::Type{UTF8Str}, s::Str{UTF8CSE}) = s
 convert(::Type{UTF8Str}, s::ASCIIStr) = Str(UTF8CSE, s.data)
 
@@ -424,7 +459,7 @@ function convert(::Type{UTF8Str}, str::String)
     # Speed this up if no surrogates, long encodings
     Str(UTF8CSE,
         ((flags & (UTF_LONG | UTF_SURROGATE)) == 0
-         ? _data(str)
+         ? str
          : _transcode_utf8(_pnt(str), len + latinbyte + num2byte + num3byte*2 + num4byte*3)))
 end
 

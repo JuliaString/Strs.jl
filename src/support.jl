@@ -593,7 +593,7 @@ end
 
 function repeat(ch::CP, cnt::Integer) where {CP <: Chrs}
     C = codepoint_cse(CP)
-    cnt < 2 && (cnt < 0 ? repeaterr(cnt) : (return cnt == 0 ? empty_str(C) : Str(C, ch)))
+    cnt < 2 && (cnt < 0 ? repeaterr(cnt) : (return cnt == 0 ? empty_str(C) : Str(C, ch%UInt32)))
     Str(C, _repeat(C, ch%UInt32, cnt))
 end
 

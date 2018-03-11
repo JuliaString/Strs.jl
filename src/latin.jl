@@ -8,95 +8,78 @@ Based in part on code for ASCIIString that used to be in Julia
 
 ## overload methods for efficiency ##
 
-isascii(str::Str{<:_LatinCSE}) = false
+isascii(str::Str{_LatinCSE}) = false
 islatin(str::LatinStrings)     = true
 isbmp(str::LatinStrings)       = true
 isunicode(str::LatinStrings)   = true
 
 bytestring(s::LatinStrings) = s
 
-function string(c::UnicodeByteStrings...)
-    length(c) == 1 && return c[1]
-    n = 0
-    for s in c
-        n += _len(s)
+function string(collection::UnicodeByteStrings...)
+    length(c) == 1 && return collection[1]
+    len = 0
+    for str in collection
+        len += _len(str)
     end
-    buf = _allocate(n)
-    off = 1
-    for str in c
+    buf, pnt = _allocate(len)
+    for str in collection
         len = _len(str)
-        unsafe_copyto!(buf, off, _data(str), 1, len)
-        off += len
+        _memcpy(pnt, _pnt(str), len)
+        pnt += len
     end
     Str(LatinCSE, buf)
 end
 
 # Todo make generic version, with all CodeUnitSingle types
-function reverse(str::T) where {T<:Union{Str{<:ASCIICSE},LatinStrings}}
+function reverse(str::Str{C}) where {C<:Union{ASCIICSE, Latin_CSEs, Text1CSE, BinaryCSE}}
     (len = _len(str)) < 2 && return str
-    pnt = _pnt(str)
-    buf, beg = _allocate(UInt8, len)
-    out = beg + len
-    while out >= beg
-        set_codeunit!(out -= 1, get_codeunit(pnt))
-        pnt += 1
+    GC.@preserve str begin
+        pnt = _pnt(str)
+        buf, beg = _allocate(UInt8, len)
+        out = beg + len
+        while out >= beg
+            set_codeunit!(out -= 1, get_codeunit(pnt))
+            pnt += 1
+        end
+        Str(C, buf)
     end
-    Str(cse(T), buf)
 end
 
 ## outputting Latin 1 strings ##
 
-function write(io::IO, str::LatinStrings)
-    len = sizeof(str)
-    dat = _data(str)
-    # Skip and write out ASCII sequences together
-    cnt = pos = 0
-    while pos < len
-        # Skip to first non-ASCII sequence
-        i = pos
-        ch = 0x0
-        while (ch = dat[i += 1]) < 0x80
-            if i == len
-                # Write out remaining data, from pos+1:i
-                write(io, dat[pos+1:i])
-                return len + cnt
-            end
+function print(io::IO, str::LatinStrings)
+    GC.@preserve str begin
+        pnt = _pnt(str)
+        fin = pnt + sizeof(str)
+        # Skip and write out ASCII sequences together
+        while pnt < fin
+            # Skip to first non-ASCII sequence
+            # Todo: Optimize this to look at chunks at a time to find first non-ASCII
+            beg = pnt
+            ch = 0x00
+            while (ch = get_codeunit(pnt)) < 0x80 && (pnt += 1) < fin ; end
+            # Now we have from beg to < pnt that are ASCII
+            unsafe_write(io, beg, pnt - beg)
+            pnt < fin || break
+            # Todo: Optimize sequences of more than one character > 0x7f
+            # Write out two bytes of Latin1 character encoded as UTF-8
+            write_utf8_2(io, ch)
+            pnt += 1
         end
-        # Now we have from pos+1:i-1 that are ASCII
-        pos+1 <= i-1 && write(io, dat[pos+1:i-1])
-        cnt += 1
-        ch = dat[i]
-        # Write out two bytes of Latin1 character encoded as UTF-8
-        write(io, 0xc0 | (ch >>> 6), 0x80 | (ch & 0x3f))
-        pos = i
     end
-    len + cnt
+    nothing
 end
 
-_write(io::IO, ch::UInt8) =
-    ch <= 0x7f ? write(io, ch) : write(io, 0xc0 | (ch >>> 6), 0x80 | (ch & 0x3f))
+_print(io, ch::UInt8) = ch <= 0x7f ? write(io, ch) : write_utf8_2(io, ch)
+print(io::IO, ch::LatinChars) = _print(io, tobase(ch))
 
-write(io::IO, ch::LatinChars) = _write(io, tobase(ch))
-
-function convert(::Type{T}, ch::UInt32) where {T<:LatinStrings}
-    ch <= 0xff || unierror(UTF_ERR_INVALID_LATIN1, ch)
-    buf = _allocate(1)
-    buf[1] = ch%UInt8
-    Str(cse(T), buf)
-end
-
-function convert(::Type{ASCIIStr}, ch::UInt32)
-    ch <= 0x7f || unierror(UTF_ERR_INVALID_ASCII, ch)
-    buf = _allocate(1)
-    buf[1] = ch%UInt8
-    Str(ASCIICSE, buf)
-end
+write(io::IO, ch::LatinChars) = write(io, tobase(ch))
 
 ## transcoding to Latin1 ##
 
 convert(::Type{T}, s::T) where {T<:LatinStrings} = s
-convert(::Type{T}, s::S) where {T<:LatinStrings,S<:UnicodeByteStrings} = T(_data(s))
-convert(::Type{T}, s::UTF8Str) where {T<:LatinStrings} = convert(T, _data(s))
+convert(::Type{T}, s::S) where {T<:LatinStrings,S<:UnicodeByteStrings} = T(s.data)
+convert(::Type{T}, s::UTF8Str) where {T<:LatinStrings} = convert(T, s.data)
 
 # Assumes that has already been checked for validity
 function _utf8_to_latin(pnt::Ptr{UInt8}, len)
@@ -119,8 +102,12 @@ function convert(::Type{LatinStr}, str::String)
     # get number of bytes to allocate
     len, flags, num4byte, num3byte, num2byte, latinbyte = unsafe_checkstring(str, 1, sizeof(str))
     num4byte + num3byte + num2byte == 0 || unierror(UTF_ERR_INVALID_LATIN1)
-    Str(LatinCSE, flags == 0 ? _data(str) : _utf8_to_latin(_pnt(str), len))
+    Str(LatinCSE, flags == 0 ? str : _utf8_to_latin(_pnt(str), len))
 end
+
+_convert(::Type{_LatinCSE}, ch::UInt8) = _convert(ch <= 0x7f ? ASCIICSE : _LatinCSE, ch)
+convert(::Type{<:Str{_LatinCSE}}, ch::Unsigned) =
+    ch < 0xff ? _convert(_LatinCSE, ch%UInt8) : unierror(UTF_ERR_LATIN1, ch)
 
 function convert(::Type{_LatinStr}, str::String)
     # handle zero length string quickly
@@ -130,7 +117,7 @@ function convert(::Type{_LatinStr}, str::String)
         unsafe_checkstring(str, 1, sizeof(str))
     num4byte + num3byte + num2byte == 0 || unierror(UTF_ERR_INVALID_LATIN1)
     Str(latinbyte == 0 ? ASCIICSE : _LatinCSE,
-        flags == 0 ? _data(str) : _utf8_to_latin(_pnt(str), len))
+        flags == 0 ? str : _utf8_to_latin(_pnt(str), len))
 end
 
 convert(::Type{LatinStr}, a::Vector{UInt8}) = _convert(LatinStr, a)

@@ -53,30 +53,13 @@ function _cnt_non_bmp(len, pnt::Ptr{UInt32})
     cnt
 end
 
-function convert(::Type{UTF32Str}, ch::UInt32)
-    check_valid(cu, 0)
-    buf, pnt = _allocate(UInt32, 1)
-    set_codeunit!(pnt, 1, cu)
-    Str(UTF32CSE, buf)
-end
-
 # Type _UTF32Str must have at least 1 character > 0xffff, so use other types as well
-function convert(::Type{_UTF32Str}, ch::UInt32)
-    check_valid(cu, 0)
-    if cu <= 0xff
-        buf1, pnt1 = _allocate(UInt8, 1)
-        set_codeunit!(pnt1, 1, cu)
-        Str(cu <= 0x7f ? ASCIICSE : _LatinCSE, buf1)
-    elseif cu <= 0xffff
-        buf2, pnt2 = _allocate(UInt16, 1)
-        set_codeunit!(pnt2, 1, cu)
-        Str(_UCS2CSE, buf2)
-    else
-        buf4, pnt4 = _allocate(UInt32, 1)
-        set_codeunit!(pnt4, 1, cu)
-        Str(_UTF32CSE, buf4)
-    end
-end
+convert(::Type{<:Str{_UTF32CSE}}, ch::Unsigned) =
+    (ch > 0xff
+     ? (isunicode(ch)
+        ? (ch <= 0xffff ? _convert(_UCS2CSE, ch%UInt16) : _convert(_UTF32CSE, ch%UInt32))
+        : unierror(UTF_ERR_INVALID, 0, ch))
+     : _convert(_LatinCSE, ch%UInt8))
 
 function convert(::Type{UTF32Str}, str::AbstractString)
     isempty(str) && return empty_utf32

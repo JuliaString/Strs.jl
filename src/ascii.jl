@@ -8,7 +8,7 @@ Based in part on code for ASCIIString that used to be in Julia
 
 ## overload methods for efficiency ##
 
-bytestring(s::Str{<:ASCIICSE}) = s
+bytestring(str::Str{ASCIICSE}) = str
 
 function _string(c)
     n = 0
@@ -25,11 +25,11 @@ function _string(c)
     v
 end
 
-string(c::Str{<:ASCIICSE}...) = length(c) == 1 ? c[1] : Str(ASCIICSE, _string(c))
+string(c::Str{ASCIICSE}...) = length(c) == 1 ? c[1] : Str(ASCIICSE, _string(c))
 
 ## outputting ASCII strings ##
 
-write(io::IO, s::Str{<:ASCIICSE}) = write(io, _data(s))
+write(io::IO, s::Str{ASCIICSE,Nothing}) = write(io, s.data)
 
 write(io::IO, ch::ASCIIChr) = write(io, tobase(ch))
 
@@ -56,7 +56,7 @@ convert(::Type{ASCIIStr}, dat::Vector{UInt8}) =
 
 function convert(::Type{ASCIIStr}, str::String)
     len, flags = unsafe_checkstring(str, 1, sizeof(str))
-    flags == 0 && return Str(ASCIICSE, _data(str))
+    flags == 0 && return Str(ASCIICSE, str)
     (flags & ~UTF_LONG) == 0 || unierror(UTF_ERR_INVALID_ASCII)
     # Handle any long encodings, such as \xc0\x80 for \0 (maybe that should only be for unsafe_str)
     buf, pnt = _allocate(UInt8, len)
@@ -77,6 +77,7 @@ end
 # 5) throw an exception, with enough information that one can determine where in the input
 #    the invalid character was, and what it was
 
+# Todo: optimize this!
 function _convert_ascii(a, invlen, invdat)
     len = length(a)
     cnt = 0
