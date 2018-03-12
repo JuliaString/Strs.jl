@@ -210,11 +210,11 @@ function print(io::IO, str::Str{UTF16CSE})
         if ch <= 0x7f
             write(io, ch%UInt8)
         elseif ch <= 0x7ff
-            _write_utf_2(io, ch)
+            _write_utf8_2(io, ch)
         elseif is_surrogate_lead(ch)
-            _write_utf_4(io, get_supplementary(ch, get_codeunit(pnt += 2)))
+            _write_utf8_4(io, get_supplementary(ch, get_codeunit(pnt += 2)))
         else
-            _write_utf_3(io, ch)
+            _write_utf8_3(io, ch)
         end
         pnt += 2
     end

@@ -99,6 +99,28 @@ isdefined(Base, :AbstractChar)   || (abstract type AbstractChar end ; export Abs
 create_vector(T, len)  = @static VERSION < v"0.7.0-DEV" ? Vector{T}(len) : Vector{T}(undef, len)
 outhex(v, p=1) = @static VERSION < v"0.7.0-DEV" ? hex(v,p) : string(v, base=16, pad=p)
 
+@static if VERSION < v"0.7.0-DEV"
+macro preserve(args...)
+    syms = args[1:end-1]
+    for x in syms
+        isa(x, Symbol) || error("Preserved variable must be a symbol")
+    end
+    #=
+    s, r = gensym(), gensym()
+    esc(quote
+        $s = $(Expr(:gc_preserve_begin, syms...))
+        $r = $(args[end])
+        $(Expr(:gc_preserve_end, s))
+        $r
+        $(args[end])
+    end)
+    =#
+    esc(quote ; $(args[end]) ; end)
+end
+else
+    import Base.GC: @preserve
+end
+
 include("types.jl")
 include("chars.jl")
 include("access.jl")

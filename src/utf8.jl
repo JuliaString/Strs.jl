@@ -33,14 +33,6 @@ Based in part on code for UTF8String that used to be in Julia
     (0xf0 | (ch >>>  18)%UInt8, 0x80 | ((ch >>> 12) & 0x3f)%UInt8,
      0x80 | ((ch >>>  6) & 0x3f)%UInt8, 0x80 | (ch & 0x3f)%UInt8)
 
-@inline eq_bytes(pnt, b1)         = get_codeunit(pnt) == b1
-@inline eq_bytes(pnt, b1, b2)     = get_codeunit(pnt+1) == b2 && eq_bytes(pnt, b1)
-@inline eq_bytes(pnt, b1, b2, b3) = get_codeunit(pnt+2) == b3 && eq_bytes(pnt, b1, b2)
-
-@inline _write_utf8_2(io, ch) = write(io, get_utf8_2(ch)...)
-@inline _write_utf8_3(io, ch) = write(io, get_utf8_3(ch)...)
-@inline _write_utf8_4(io, ch) = write(io, get_utf8_4(ch)...)
-
 # Output a character as a 2-byte UTF-8 sequence
 @inline function output_utf8_2byte!(pnt, ch)
     b1, b2 = get_utf8_2(ch)
@@ -68,10 +60,18 @@ end
     pnt + 4
 end
 
-@inline _write_ucs2(io, ch) =
-    ch <= 0x7f ? write(io, ch%UInt8) : ch <= 0x7ff ? _write_utf_2(io, ch) : _write_utf_3(io, ch)
+@inline eq_bytes(pnt, b1)         = get_codeunit(pnt) == b1
+@inline eq_bytes(pnt, b1, b2)     = get_codeunit(pnt+1) == b2 && eq_bytes(pnt, b1)
+@inline eq_bytes(pnt, b1, b2, b3) = get_codeunit(pnt+2) == b3 && eq_bytes(pnt, b1, b2)
 
-@inline _write_utf32(io, ch) = ch <= 0xffff ? _write_ucs2(io, ch) : _write_utf_4(io, ch)
+@inline _write_utf8_2(io, ch) = write(io, get_utf8_2(ch)...)
+@inline _write_utf8_3(io, ch) = write(io, get_utf8_3(ch)...)
+@inline _write_utf8_4(io, ch) = write(io, get_utf8_4(ch)...)
+
+@inline _write_ucs2(io, ch) =
+    ch <= 0x7f ? write(io, ch%UInt8) : ch <= 0x7ff ? _write_utf8_2(io, ch) : _write_utf8_3(io, ch)
+
+@inline _write_utf32(io, ch) = ch <= 0xffff ? _write_ucs2(io, ch) : _write_utf8_4(io, ch)
 
 @inline print(io::IO, ch::UCS2Chr)  = _write_ucs2(io, tobase(ch))
 @inline print(io::IO, ch::UTF32Chr) = _write_utf32(io, tobase(ch))

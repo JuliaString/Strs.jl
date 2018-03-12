@@ -39,10 +39,14 @@ basetype(::Type{Char})        = UInt32
 
 basetype(::Type{T}) where {T<:CodeUnitTypes} = T
 
+@static if VERSION < v"0.7.0-DEV"
+    tobase(v::Char) = v%UInt32
+else
+    tobase(v::AbstractChar) = codepoint(v)
+end
+
 tobase(v::T) where {T<:CodePoint} = reinterpret(basetype(T), v)
 tobase(v::T) where {T<:CodeUnitTypes} = v
-
-tobase(v::Char) = v%UInt32
 
 codepoint(v::T) where {T<:CodePoint} = tobase(v)
 
@@ -142,11 +146,13 @@ codepoint_rng(::Type{Text4Chr}) = 0%UInt32:typemax(UInt32)
 codepoint_adj(::Type{T}, ch) where {T} = ifelse(ch < 0xd800, ch, ch+0x800)%T
 codepoint_adj(::Type{T}, ch) where {T<:Union{Text2Chr,Text4Chr}} = ch%T
 
-==(x::CodePoint, y::AbsChar) = tobase(x) == tobase(y)
-==(x::AbsChar, y::CodePoint) = tobase(x) == tobase(y)
+==(x::CodePoint, y::AbsChar)   = tobase(x) == tobase(y)
+==(x::AbsChar,   y::CodePoint) = tobase(x) == tobase(y)
+==(x::CodePoint, y::CodePoint) = tobase(x) == tobase(y)
 
 isless(x::CodePoint, y::AbsChar)   = tobase(x) < tobase(y)
 isless(x::AbsChar,   y::CodePoint) = tobase(x) < tobase(y)
+isless(x::CodePoint, y::CodePoint) = tobase(x) < tobase(y)
 
 # This is so that the hash is compatible with isless, but it's very inefficient
 Base.hash(x::CodePoint, h::UInt) = hash(Char(x), h)

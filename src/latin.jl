@@ -35,7 +35,7 @@ end
 # Todo make generic version, with all CodeUnitSingle types
 function reverse(str::Str{C}) where {C<:Union{ASCIICSE, Latin_CSEs, Text1CSE, BinaryCSE}}
     (len = _len(str)) < 2 && return str
-    #GC.@preserve str begin
+    @preserve str begin
         pnt = _pnt(str)
         buf, beg = _allocate(UInt8, len)
         out = beg + len
@@ -44,13 +44,13 @@ function reverse(str::Str{C}) where {C<:Union{ASCIICSE, Latin_CSEs, Text1CSE, Bi
             pnt += 1
         end
         Str(C, buf)
-    #end
+    end
 end
 
 ## outputting Latin 1 strings ##
 
 function print(io::IO, str::LatinStrings)
-    #GC.@preserve str begin
+    @preserve str begin
         pnt = _pnt(str)
         fin = pnt + sizeof(str)
         # Skip and write out ASCII sequences together
@@ -65,14 +65,14 @@ function print(io::IO, str::LatinStrings)
             pnt < fin || break
             # Todo: Optimize sequences of more than one character > 0x7f
             # Write out two bytes of Latin1 character encoded as UTF-8
-            write_utf_2(io, ch)
+            _write_utf8_2(io, ch)
             pnt += 1
         end
-    #end
+    end
     nothing
 end
 
-_print(io, ch::UInt8) = ch <= 0x7f ? write(io, ch) : write_utf_2(io, ch)
+_print(io, ch::UInt8) = ch <= 0x7f ? write(io, ch) : _write_utf8_2(io, ch)
 print(io::IO, ch::LatinChars) = _print(io, ch%UInt8)
 
 write(io::IO, ch::LatinChars) = write(io, ch%UInt8)

@@ -194,9 +194,9 @@ print_ratio_rev(val) = pwc(val < .95 ? :green : val > 1.05 ? :red : :normal, f"\
 
 function dispres(io, xres)
     # (fname, stats, sizes, res)
-    (fname, stats, sizes, res) = xres
+    (fname, stats, sizes, selstat, selsiz, res) = xres
     show(io, (fname, stats))
-    numchars = stats.len
+    show(io, (fname, selstat))
     maxlen = 0
     pos = 0
     for i = 1:length(res)
@@ -221,14 +221,14 @@ function dispres(io, xres)
     end
     r1 = res[1]
     t1 = r1[3]
-    pr"\(io)\n\n\%-12.12s(r1[1])\%6.3f(sizes[1]/numchars)"
+    numchars = selstat.len
+    pr"\(io)\n\n\%-12.12s(r1[1])\%6.3f(sizes[1]/stats.len)"
     for tim in t1
         pr"\(io)\%10.3f(tim[3]/numchars)"
     end
     for i = 2:length(res)
         rn = res[i]
-        pr"\(io)\n\%-12.12s(rn[1])\%6.3f(sizes[i]/numchars)"
-        #print_size_ratio(sizes[i]/numchars)
+        pr"\(io)\n\%-12.12s(rn[1])\%6.3f(sizes[i]/stats.len)"
         tn = rn[3]
         minres = min(length(t1), length(tn))
         for i = 1:minres
@@ -455,41 +455,64 @@ end
 searchres(x::UnitRange) = x.start
 searchres(x::Int) = x
 
-function searchlines(lines, v)
+function searchlines(lines, v, rev=false)
     t = 0
+    if rev
     for text in lines
-        t += searchres(search(text, v))
+        t += searchres(find_last(v, text))
+    end
+    else
+    for text in lines
+        t += searchres(find_first(v, text))
+    end
     end
     t
 end
 
-function searchlines(lines::Vector{UniStr}, v)
+function searchlines(lines::Vector{UniStr}, v, rev=false)
     t = 0
+    if rev
     for text in lines
         if typeof(text) == ASCIIStr
-            t += searchres(search(text::ASCIIStr, v))
+            t += searchres(find_last(v, text::ASCIIStr))
         elseif typeof(text) == _LatinStr
-            t += searchres(search(text::_LatinStr, v))
+            t += searchres(find_last(v, text::_LatinStr))
         elseif typeof(text) == _UCS2Str
-            t += searchres(search(text::_UCS2Str, v))
+            t += searchres(find_last(v, text::_UCS2Str))
         else
-            t += searchres(search(text::_UTF32Str, v))
+            t += searchres(find_last(v, text::_UTF32Str))
         end
+    end
+    else
+    for text in lines
+        if typeof(text) == ASCIIStr
+            t += searchres(find_first(v, text::ASCIIStr))
+        elseif typeof(text) == _LatinStr
+            t += searchres(find_first(v, text::_LatinStr))
+        elseif typeof(text) == _UCS2Str
+            t += searchres(find_first(v, text::_UCS2Str))
+        else
+            t += searchres(find_first(v, text::_UTF32Str))
+        end
+    end
     end
     t
 end
 
 # maybe change all this to be table driven and use @eval!
 
-searchchar(lines::Vector{String}) =
-    searchlines(lines, '\ufffd')
-searchchar(lines::Vector{T}) where {T} =
-    searchlines(lines, codepoint(T)('\ufffd'))
-searchchar(lines::Vector{T}) where {T<:Union{ASCIIStr,LatinStr,_LatinStr}} =
-    searchlines(lines, ASCIIChr(0x1a))
+searchchar(lines::Vector{String}, d=false) =
+    searchlines(lines, '\ufffd', d)
+searchchar(lines::Vector{T}, d=false) where {T} =
+    searchlines(lines, eltype(T)(0xfffd), d)
+searchchar(lines::Vector{T}, d=false) where {T<:Union{ASCIIStr,LatinStr,_LatinStr}} =
+    searchlines(lines, eltype(T)(0x1a), d)
 
-searchstr(lines::Vector{String})      = searchlines(lines, "thy")
-searchstr(lines::Vector{T}) where {T} = searchlines(lines, T("thy"))
+searchstr(lines::Vector{String}, d=false) = searchlines(lines, "thy", d)
+searchstr(lines::Vector{T}, d=false) where {T} = searchlines(lines, T("thy"), d)
+
+rsearchchar(lines) = searchchar(lines, true)
+rsearchstr(lines) = searchstr(lines, true)
 
 # normalize
 # isassigned
@@ -584,12 +607,22 @@ checkprint(l)   = checkcp(isprint,   l)
 checkpunct(l)   = checkcp(ispunct,   l)
 checkgraph(l)   = checkcp(is_graph,  l)
 
-function wrap(f, lines, io, cnts::LineCounts, t, msg, basetime=0%UInt)
+function mintime(f, lines)
+    m = typemax(UInt)
+    for i=1:10
+        ns = time_ns()
+        f(lines)
+        t = time_ns() - ns
+        t < m && (m = t)
+    end
+    m
+end
+
+function wrap(f, lines, io, cnts::LineCounts, t, msg, fast=true, basetime=0%UInt)
     tst = ""
     try
         res = f(lines)
-        raw = @belapsed ($f)($lines)
-        tim = round(UInt64, raw*1e9)
+        tim = fast ? mintime(f, lines) : round(UInt64, 1e9 * @belapsed ($f)($lines))
         push!(t, (msg, res, tim))
         pr"\(io)\%-22s(replace(msg, '\n' => ' ')*':') \%12d(res)"
         pr"\(io) \%12.3f(tim/1000000)"
@@ -616,6 +649,10 @@ const tests =
      (checkreverse, "reverse"),
      (checkrepeat1,  "repeat 1\nstring"),
      (checkrepeat10,  "repeat 10\nstring"),
+     (searchstr,    "search\nstring"),
+     (searchchar,    "search\nchar"),
+#     (rsearchstr,    "rsearch\nstring"),
+#     (rsearchchar,    "rsearch\nchar"),
 #     (checkrepeat1c,  "repeat 1\nchar"),
 #     (checkrepeat10c,  "repeat 10\nchar"),
 #    (countsklength,  "length\nSK"),
@@ -642,16 +679,16 @@ const tests =
      =#
      (douppercase,  "uppercase\nstring"),
      (checktextwidth, "textwidth\nstring"),
-#    (dotitlecase,  "titlecase\nstring"),
+     #    (dotitlecase,  "titlecase\nstring"),
     )
 
-function select_lines(lines::Vector{<:AbstractString})
+function select_lines(lines::Vector{<:AbstractString}; num=1000)
     out = Vector{Int}()
-    sizehint!(out, 100)
+    sizehint!(out, num)
     len = length(lines)
     i = len>>1
     j = len-1
-    while length(out) < 100
+    while length(out) < num
         isempty(lines[i]) || push!(out, i)
         isempty(lines[j]) || push!(out, j)
         i += 1 > len && break
@@ -660,7 +697,7 @@ function select_lines(lines::Vector{<:AbstractString})
     out
 end
 
-function testperf(lines::Vector{T}, io, cnts, docnam, basetime) where {T<:AbstractString}
+function testperf(lines::Vector{T}, io, cnts, docnam, basetime, fast) where {T<:AbstractString}
     # Test performance
     pr_ul(io, f"""\%-22s(docnam) \%12s("Result") \%12s("ms total") """)
     pr_ul(io, f"""\%12s("ns/line") \%12s("ns/char") \%12s("ns/byte")\n""")
@@ -678,7 +715,8 @@ function testperf(lines::Vector{T}, io, cnts, docnam, basetime) where {T<:Abstra
     end
     pos = 0
     for (tst, nam) in tests
-        wrap(tst, lines, io, cnts, t, nam, basetime == nothing ? 0%UInt : basetime[pos += 1][3])
+        wrap(tst, lines, io, cnts, t, nam, fast,
+             basetime == nothing ? 0%UInt : basetime[pos += 1][3])
     end
     #=
     if T != String
@@ -954,7 +992,7 @@ function checktests(io = _stdout(); dir::Any=nothing)
     totres, totcmp
 end
 
-function benchdir(io = _stdout();  dir::Any=nothing)
+function benchdir(io = _stdout();  dir::Any=nothing, fast::Bool=true)
     totres = []
     totlines = []
     totnames = []
@@ -994,11 +1032,12 @@ function benchdir(io = _stdout();  dir::Any=nothing)
 
         # Now test the performance for each
         res = create_vector(Any, length(list))
-        res[1] = testperf(sel[1], io, LineCounts(numlines, numchars, selsiz[1]), names[1], nothing)
+        res[1] = testperf(sel[1], io, LineCounts(numlines, numchars, selsiz[1]),
+                          names[1], nothing, fast)
         basetime = res[1][3]
         for i = 2:length(list)
-            res[i] = testperf(sel[i], io, LineCounts(numlines, numchars, selsiz[i]), names[i],
-                              basetime)
+            res[i] = testperf(sel[i], io, LineCounts(numlines, numchars, selsiz[i]),
+                              names[i], basetime, fast)
         end
         push!(totres, (fname, stats, sizes, selstat, selsiz, res))
 
