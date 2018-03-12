@@ -65,6 +65,24 @@ const downloadedbooks =
 
 getdefdir(dir)::String = dir === nothing ? homedir() : dir
 
+function filter_lines(lines)
+    out = Vector{String}()
+    sizehint!(out, length(lines))
+    # Eliminate initial lines, empty lines, trailing lines
+    checkbeg = true
+    for l in lines
+        if sizeof(l) > 41 && startswith(l, "***") && endswith(l, "***") &&
+            contains(l, " PROJECT GUTENBERG EBOOK") &&
+            contains(l, checkbeg ? "START OF TH" : "END OF TH")
+            checkbeg || break # Found "end of"
+            checkbeg = false
+        else
+            push!(out, l)
+        end
+    end
+    out
+end
+
 """
 Load books from Project Gutenberg site, removing lines added at beginning and end that
 are not part of the book, as much as possible
@@ -77,25 +95,20 @@ function load_gutenberg!(books, list, dict, gutenbergdir)
         lname = joinpath(gutenbergdir, outnam)
         download(joinpath("http://www.gutenberg.org/", nam * ".txt"), lname)
         println("Saved to: ", lname)
-        lines = readlines(lname)
-        # Eliminate initial lines, empty lines, trailing lines
-        pos = 0
-        len = length(lines)
-        while (pos += 1) <= len
-            l = lines[pos]
-            sizeof(l) > 41 && startswith(l, "***") && endswith(l, "***") &&
-                contains(l, "START OF TH") && contains(l, " PROJECT GUTENBERG EBOOK") && break
-        end
-        out = Vector{String}()
-        while (pos += 1) <= len
-            l = lines[pos]
-            sizeof(l) > 41 && startswith(l, "***") && endswith(l, "***") &&
-                contains(l, "END OF TH") && contains(l, " PROJECT GUTENBERG EBOOK") && break
-            isempty(l) || push!(out, l)
-        end
-        push!(books, (outnam, out))
+        push!(books, (outnam, filter_lines(readlines(lname))))
     end
     books
+end
+
+function remove_empty(lines)
+    # Eliminate empty lines
+    len = length(lines)
+    out = Vector{String}()
+    sizehint!(out, len)
+    for l in lines
+        isempty(l) || push!(out, l)
+    end
+    out
 end
 
 """
@@ -113,16 +126,7 @@ function load_books(; dir::Any=nothing)
         cnt = get(dict, lang, 0)
         dict[lang] = cnt + 1
         outnam = cnt == 0 ? "$lang.txt" : "$lang-$cnt.txt"
-        lines = readlines(joinpath(inputdir, nam))
-        # Eliminate empty lines
-        pos = 0
-        len = length(lines)
-        out = Vector{String}()
-        while (pos += 1) <= len
-            l = lines[pos]
-            isempty(l) || push!(out, l)
-        end
-        push!(books, (outnam, out))
+        push!(books, (outnam, readlines(joinpath(inputdir, nam))))
     end
     load_gutenberg!(books, gutenbergbooks, dict, joinpath(defdir, gutpath))
 end
@@ -541,8 +545,8 @@ end
 
 repeat1(str)  = repeat(str, 1)
 repeat10(str) = repeat(str, 10)
-repeat1c(str)  = repeat(str[1], 1)
-repeat10c(str) = repeat(str[1], 10)
+repeat1c(str)  = @inbounds repeat(str[1], 1)
+repeat10c(str) = @inbounds repeat(str[1], 10)
 
 countsklength(l)  = checkstr(sklength, l)
 countoldlength(l) = checkstr(oldlength, l)
@@ -612,8 +616,8 @@ const tests =
      (checkreverse, "reverse"),
      (checkrepeat1,  "repeat 1\nstring"),
      (checkrepeat10,  "repeat 10\nstring"),
-     (checkrepeat1c,  "repeat 1\nchar"),
-     (checkrepeat10c,  "repeat 10\nchar"),
+#     (checkrepeat1c,  "repeat 1\nchar"),
+#     (checkrepeat10c,  "repeat 10\nchar"),
 #    (countsklength,  "length\nSK"),
 #    (countoldlength, "length\nOld"),
      (countchars,   "iteration\nChar"),
@@ -640,6 +644,21 @@ const tests =
      (checktextwidth, "textwidth\nstring"),
 #    (dotitlecase,  "titlecase\nstring"),
     )
+
+function select_lines(lines::Vector{<:AbstractString})
+    out = Vector{Int}()
+    sizehint!(out, 100)
+    len = length(lines)
+    i = len>>1
+    j = len-1
+    while length(out) < 100
+        isempty(lines[i]) || push!(out, i)
+        isempty(lines[j]) || push!(out, j)
+        i += 1 > len && break
+        j -= 1 < 1   && break
+    end
+    out
+end
 
 function testperf(lines::Vector{T}, io, cnts, docnam, basetime) where {T<:AbstractString}
     # Test performance
@@ -949,8 +968,6 @@ function benchdir(io = _stdout();  dir::Any=nothing)
         MT = enctyp(stats.maxtyp)
         MT != UTF32Str && push!(list, MT)
         isdefined(Main, :UTF8String) && push!(list, UTF8String, UTF16String, UTF32String)
-        numchars = stats.len
-        numlines = stats.num
         enc = encode_lines(list, lines)
         # Now calculate and display the size statistics for each
         sizes = [sum(sizeof, enclines) for enclines in enc]
@@ -962,23 +979,30 @@ function benchdir(io = _stdout();  dir::Any=nothing)
         pr"\(io)\nBytes:      "
         for siz in sizes ; pr"\(io)\%12d(siz)" ; end
         pr"\(io)\nBytes/Char: "
-        for siz in sizes ; pr"\(io)\%12.3f(siz/numchars)" ; end
+        for siz in sizes ; pr"\(io)\%12.3f(siz/stats.len)" ; end
         pr"\(io)\nRelative:               "
         for siz in sizes[2:end] ; print_ratio_rev(siz/basesize) ; end
         pr"\n\n"
 
+        # Select the middle 100 non-empty lines of the file for benchmarking
+        sellines = select_lines(lines)
+        sel = [enclines[sellines] for enclines in enc]
+        selsiz = [sum(sizeof, enclines) for enclines in sel]
+        selstat = calcstats(sel[1])
+        numchars = selstat.len
+        numlines = selstat.num
+
         # Now test the performance for each
         res = create_vector(Any, length(list))
-        res[1] = testperf(enc[1], io, LineCounts(numlines, numchars, sizes[1]), names[1], nothing)
+        res[1] = testperf(sel[1], io, LineCounts(numlines, numchars, selsiz[1]), names[1], nothing)
         basetime = res[1][3]
         for i = 2:length(list)
-            res[i] = testperf(enc[i], io, LineCounts(numlines, numchars, sizes[i]), names[i],
+            res[i] = testperf(sel[i], io, LineCounts(numlines, numchars, selsiz[i]), names[i],
                               basetime)
         end
-        push!(totres, (fname, stats, sizes, res))
+        push!(totres, (fname, stats, sizes, selstat, selsiz, res))
 
         push!(totnames, names)
-        push!(totsizes, sizes)
         push!(totlines, enc)
 
         print(divline)
