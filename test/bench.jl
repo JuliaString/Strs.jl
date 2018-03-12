@@ -47,7 +47,7 @@ const gutenbergbooks =
     (("files/2600/2600-0",        "English"), # War & Peace, some other languages in quotes
      ("files/1400/1400-0",        "English"), # Great Expectations, uses Unicode quotes
      ("files/42286/42286-0",      "Hungarian"),
-     ("files/8119/8119-0",        "Polish"),
+     #("files/8119/8119-0",        "Polish"), # couldn't get this to load correctly
      ("files/32941/32941-0",      "Japanese"),
      ("files/24264/24264-0",      "Chinese"),
      ("files/40687/40687-0",      "Telugu"), # Third most spoken in India, official

@@ -229,7 +229,7 @@ function uppercase(str::_LatinStr)
     fin = beg + len
     while pnt < fin
         ch = get_codeunit(pnt)
-        ((ch == 0xb5) | (ch == 0xff)) && return _widenupper(beg, pnt, len)
+        ((ch == 0xb5) | (ch == 0xff)) && return _widenupper(beg, pnt-beg, len)
         _can_upper(ch) && return _upper(_LatinStr, beg, pnt-beg, len)
         pnt += 1
     end

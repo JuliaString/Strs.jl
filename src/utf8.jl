@@ -25,30 +25,6 @@ Based in part on code for UTF8String that used to be in Julia
      | ((get_codeunit(pnt - 1)%UInt32 & 0x3f) << 6)
      | (get_codeunit(pnt) & 0x3f))
 
-# Output a character as a 2-byte UTF-8 sequence
-@inline function output_utf8_2byte!(pnt, ch)
-    set_codeunit!(pnt,     0xc0 | (ch >>> 6))
-    set_codeunit!(pnt + 1, 0x80 | (ch & 0x3f))
-    pnt + 2
-end
-
-# Output a character as a 3-byte UTF-8 sequence
-@inline function output_utf8_3byte!(pnt, ch)
-    set_codeunit!(pnt,     0xe0 | ((ch >>> 12) & 0x3f))
-    set_codeunit!(pnt + 1, 0x80 | ((ch >>> 6) & 0x3f))
-    set_codeunit!(pnt + 2, 0x80 | (ch & 0x3f))
-    pnt + 3
-end
-
-# Output a character as a 4-byte UTF-8 sequence
-@inline function output_utf8_4byte!(pnt, ch)
-    set_codeunit!(pnt,     0xf0 | (ch >>> 18))
-    set_codeunit!(pnt + 1, 0x80 | ((ch >>> 12) & 0x3f))
-    set_codeunit!(pnt + 2, 0x80 | ((ch >>> 6) & 0x3f))
-    set_codeunit!(pnt + 3, 0x80 | (ch & 0x3f))
-    pnt + 4
-end
-
 @inline get_utf8_2(ch) =
     0xc0 | (ch >>> 6)%UInt8, 0x80 | (ch & 0x3f)%UInt8
 @inline get_utf8_3(ch) =
@@ -61,34 +37,21 @@ end
 @inline eq_bytes(pnt, b1, b2)     = get_codeunit(pnt+1) == b2 && eq_bytes(pnt, b1)
 @inline eq_bytes(pnt, b1, b2, b3) = get_codeunit(pnt+2) == b3 && eq_bytes(pnt, b1, b2)
 
-@inline _write_utf_2(io, ch) =
-    write(io, 0xc0 | (ch >>> 6)%UInt8, 0x80 | (ch & 0x3f)%UInt8)
+@inline _write_utf8_2(io, ch) = write(io, get_utf8_2(ch)...)
+@inline _write_utf8_3(io, ch) = write(io, get_utf8_3(ch)...)
+@inline _write_utf8_4(io, ch) = write(io, get_utf8_4(ch)...)
 
-@inline _write_utf_3(io, ch) =
-    write(io, 0xe0 | ((ch >>> 12) & 0x3f)%UInt8,
-              0x80 | ((ch >>> 6) & 0x3f)%UInt8,
-              0x80 | (ch & 0x3f)%UInt8)
-
-@inline _write_utf_4(io, ch) =
-    write(io, 0xf0 | (ch >>> 18)%UInt8,
-              0x80 | ((ch >>> 12) & 0x3f)%UInt8,
-              0x80 | ((ch >>> 6) & 0x3f)%UInt8,
-              0x80 | (ch & 0x3f)%UInt8)
-
-@inline t_write_utf_2(io, ch) = write(io, get_utf_2(ch)...)
-@inline t_write_utf_3(io, ch) = write(io, get_utf_3(ch)...)
-@inline t_write_utf_4(io, ch) = write(io, get_utf_4(ch)...)
 # Output a character as a 2-byte UTF-8 sequence
-@inline function t_output_utf8_2byte!(pnt, ch)
-    b1, b2 = get_utf_2(ch)
+@inline function output_utf8_2byte!(pnt, ch)
+    b1, b2 = get_utf8_2(ch)
     set_codeunit!(pnt,     b1)
     set_codeunit!(pnt + 1, b2)
     pnt + 2
 end
 
 # Output a character as a 3-byte UTF-8 sequence
-@inline function t_output_utf8_3byte!(pnt, ch)
-    b1, b2, b3 = get_utf_3(ch)
+@inline function output_utf8_3byte!(pnt, ch)
+    b1, b2, b3 = get_utf8_3(ch)
     set_codeunit!(pnt,     b1)
     set_codeunit!(pnt + 1, b2)
     set_codeunit!(pnt + 2, b3)
@@ -96,8 +59,8 @@ end
 end
 
 # Output a character as a 4-byte UTF-8 sequence
-@inline function t_output_utf8_4byte!(pnt, ch)
-    b1, b2, b3, b4 = get_utf_4(ch)
+@inline function output_utf8_4byte!(pnt, ch)
+    b1, b2, b3, b4 = get_utf8_4(ch)
     set_codeunit!(pnt,     b1)
     set_codeunit!(pnt + 1, b2)
     set_codeunit!(pnt + 2, b3)

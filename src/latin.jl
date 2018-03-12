@@ -65,17 +65,17 @@ function print(io::IO, str::LatinStrings)
             pnt < fin || break
             # Todo: Optimize sequences of more than one character > 0x7f
             # Write out two bytes of Latin1 character encoded as UTF-8
-            write_utf8_2(io, ch)
+            write_utf_2(io, ch)
             pnt += 1
         end
     #end
     nothing
 end
 
-_print(io, ch::UInt8) = ch <= 0x7f ? write(io, ch) : write_utf8_2(io, ch)
-print(io::IO, ch::LatinChars) = _print(io, tobase(ch))
+_print(io, ch::UInt8) = ch <= 0x7f ? write(io, ch) : write_utf_2(io, ch)
+print(io::IO, ch::LatinChars) = _print(io, ch%UInt8)
 
-write(io::IO, ch::LatinChars) = write(io, tobase(ch))
+write(io::IO, ch::LatinChars) = write(io, ch%UInt8)
 
 ## transcoding to Latin1 ##
 
