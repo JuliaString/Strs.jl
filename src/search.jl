@@ -391,10 +391,12 @@ else
     contains(hay::Str, chr::Char)                 = _srch_chr(Fwd(), hay, chr, 1) != 0
     contains(hay::AbstractString, chr::CodePoint) = _srch_chr(Fwd(), hay, chr, 1) != 0
 end
-contains(hay::Str, str::AbstractString)       = _srch_str(Fwd(), hay, str, 1) != 0
-contains(hay::AbstractString, str::Str)       = _srch_str(Fwd(), hay, str, 1) != 0
+contains(hay::Str, str::Str)            = _srch_str(Fwd(), hay, str, 1) != 0
+contains(hay::Str, str::AbstractString) = _srch_str(Fwd(), hay, str, 1) != 0
+contains(hay::AbstractString, str::Str) = _srch_str(Fwd(), hay, str, 1) != 0
 
 in(chr::CodePoint, str::AbstractString) = contains(str, chr)
 in(chr::AbsChar,   str::Str)            = contains(str, chr)
+in(pat::Str, str::Str)                  = contains(str, pat)
 in(pat::Str, str::AbstractString)       = contains(str, pat)
 in(pat::AbstractString, str::Str)       = contains(str, pat)
