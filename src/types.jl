@@ -1,7 +1,7 @@
 #=
 Basic types for characters and strings
 
-Copyright 2017 Gandalf Software, Inc., Scott P. Jones
+Copyright 2017-2018 Gandalf Software, Inc., Scott P. Jones
 Licensed under MIT License, see LICENSE.md
 
 Encodings inspired from collaborations on the following packages:
@@ -114,13 +114,12 @@ struct Str{T,SubStr,Cache,Hash} <: AbstractString
     cache::Cache
     hash::Hash
 
-    ((::Type{Str})(::CSE_T, v::String)
-        where {CSE_T<:CSE} =
-      new{CSE_T,Nothing,Nothing,Nothing}(v,nothing,nothing,nothing))
-    ((::Type{Str})(::Type{CSE_T}, v::String)
-        where {CSE_T<:CSE} =
-      new{CSE_T,Nothing,Nothing,Nothing}(v,nothing,nothing,nothing))
+    ((::Type{Str})(::Type{T}, v::String, s::S, c::C, h::H) where {T<:CSE,S,C,H} =
+     new{T,S,C,H}(v,s,c,h))
 end
+
+(::Type{Str})(::Type{C}, v::String) where {C<:CSE} = Str(C, v, nothing, nothing, nothing)
+(::Type{Str})(::Type{C}, v::Str) where {C<:CSE} = Str(C, v.data, nothing, nothing, nothing)
 
 # Handle change from endof -> lastindex
 @static if !isdefined(Base, :lastindex)
@@ -206,6 +205,7 @@ for nam in vcat(_binname, _cpname2, _cpname4, _subsetnam, _mbwname)
         @eval empty_str(::Type{$cse}) = $emp
         @eval export $sym
     end
+    @eval convert(::Type{T}, str::T) where {T<:$sym} = str
 end
 empty_str(::Type{<:Str{C}}) where {C<:CSE} = empty_str(C)
 empty_str(::Type{String}) = empty_string
@@ -238,8 +238,8 @@ const Quad_CSEs     = Union{Text4CSE, UTF32_CSEs}          # 32-bit code units
 const Wide_CSEs     = Union{UTF16CSE, UCS2_CSEs, UTF32_CSEs}
 const WordQuad_CSEs = Union{Text2CSE,Text4CSE,UCS2CSE,UTF16CSE,UTF32CSE}
 
-const BinaryStrings = Str{BinaryCSE}
 const ASCIIStrings  = Str{ASCIICSE}
+const BinaryStrings = Str{<:Binary_CSEs}
 const RawStrings    = Str{<:Raw_CSEs}
 const LatinStrings  = Str{<:Latin_CSEs}
 const UCS2Strings   = Str{<:UCS2_CSEs}
@@ -250,20 +250,32 @@ const WordStr = Str{<:Word_CSEs}
 const QuadStr = Str{<:Quad_CSEs}
 const WideStr = Str{<:Wide_CSEs}
 
+basecse(::Type{C}) where {C<:CSE} = C
+basecse(::Type{_LatinCSE}) = LatinCSE
+basecse(::Type{_UCS2CSE})  = UCS2CSE
+basecse(::Type{_UTF32CSE}) = UTF32CSE
+
 const AbsChar = @static isdefined(Base, :AbstractChar) ? AbstractChar : Union{Char, CodePoint}
 const ByteStrings  = Union{String, ByteStr}
 
 ## Get the character set / encoding used by a string type
 cse(::Type{<:AbstractString}) = UTF8CSE # Default unless overridden
+cse(::Type{<:SubString{T}}) where {T} = cse(T)
+cse(::Type{<:SubString{<:Str{C}}}) where {C<:SubSet_CSEs} = basecse(C)
 cse(::Type{<:Str{C}}) where {C<:CSE} = C
 cse(str::AbstractString) = cse(typeof(str))
 
 charset(::Type{<:AbstractString}) = UniPlusCharSet # Default unless overridden
-charset(::Type{<:Str{CSE{CS}}}) where {CS} = CS
+charset(::Type{<:SubString{T}}) where {T} = charset(T)
+charset(::Type{<:SubString{<:Str{C}}}) where {C<:SubSet_CSEs} = charset(basecse(C))
+charset(::Type{C}) where {CS,C<:CSE{CS}} = CS
+charset(::Type{<:Str{C}}) where {C} = charset(C)
 charset(str::AbstractString) = charset(typeof(str))
 
 encoding(::Type{<:AbstractString}) = UTF8Encoding # Julia likes to think of this as the default
-encoding(::Type{<:Str{CSE{CS,E}}}) where {CS,E} = E
+encoding(::Type{<:SubString{T}}) where {T} = encoding(T)
+encoding(::Type{C}) where {CS,E,C<:CSE{CS,E}} = E
+encoding(::Type{<:Str{C}}) where {C} = encoding(C)
 encoding(str::AbstractString) = encoding(typeof(str))
 
 promote_rule(::Type{T}, ::Type{T}) where {T<:CodePoint} = T
@@ -323,3 +335,10 @@ _len(s::QuadStr) = sizeof(s) >>> 2
 
 Base.need_full_hex(c::CodePoint) = isxdigit(c)
 Base.escape_nul(c::CodePoint) = ('0' <= c <= '7') ? "\\x00" : "\\0"
+
+Base.SubString(str::Str{C}) where {C<:SubSet_CSEs} =
+    SubString(Str(basecse(C), str))
+Base.SubString(str::Str{C}, off::Int) where {C<:SubSet_CSEs} =
+    SubString(Str(basecse(C), str), off)
+Base.SubString(str::Str{C}, off::Int, fin::Int) where {C<:SubSet_CSEs} =
+    SubString(Str(basecse(C), str), off, fin)

@@ -30,7 +30,7 @@ function _encode_ascii_latin(pnt::Ptr{UInt8}, len)
     buf
 end
 
-function _str(str::T) where {T<:Union{Vector{UInt8}, BinaryStr, Text1Str, String}}
+function _str(str::T) where {T<:Union{Vector{UInt8}, BinaryStrings, String}}
     # handle zero length string quickly
     (siz = sizeof(str)) == 0 && return empty_ascii
     pnt = _pnt(str)
@@ -70,17 +70,18 @@ function _str_encode(str::T, len, flags) where {T<:Str}
     end
 end
 
-function convert(::Type{Str}, str::AbstractString)
+function convert(::Type{<:Str}, str::AbstractString)
     # handle zero length string quickly
     isempty(str) && return empty_ascii
     len, flags = unsafe_checkstring(str)
     _str_encode(str, len, flags)
 end
-convert(::Type{Str}, str::String) = _str(str)
-convert(::Type{Str}, str::T) where {T<:Str} = str
+convert(::Type{<:Str}, str::String) = _str(str)
 
 convert(::Type{UniStr}, str::AbstractString) = _str(str)
-convert(::Type{UniStr}, str::Str{C}) where {C<:Union{ASCIICSE,_LatinCSE,_UCS2CSE,_UTF32CSE}} = str
+convert(::Type{UniStr}, str::String)         = _str(str)
+convert(::Type{UniStr}, str::Str{<:Union{ASCIICSE,SubSet_CSEs}}) = str
+
 function convert(::Type{UniStr}, str::T) where {T<:Str}
     # handle zero length string quickly
     isempty(str) && return empty_ascii
@@ -122,9 +123,9 @@ function unsafe_str(str::T;
             Str(ASCIICSE, _data(str))
         end
     elseif num4byte != 0
-        Str(_UTF32CSE, _encode_utf32(dat, len))
+        Str(_UTF32CSE, _encode_utf32(pnt, len))
     elseif num2byte + num3byte != 0
-        Str(_UCS2CSE, _encode_utf16(dat, len))
+        Str(_UCS2CSE, _encode_utf16(pnt, len))
     else
         Str(latin1byte == 0 ? ASCIICSE : _LatinCSE, _encode_ascii_latin(_pnt(str), len))
     end
@@ -157,17 +158,18 @@ function unsafe_str(str::T;
             Str(Text4CSE, buf)
         else
             buf, pnt = _allocate(eltype(T), siz)
-            @inbounds for (i, ch) in enumerate(str)
-                set_codeunit!(pnt, i, ch)
+            @inbounds for ch in str
+                set_codeunit!(pnt, ch)
+                pnt += sizeof(T)
             end
             Str(T == UInt32 ? Text4CSE : Text2CSE, buf)
         end
     elseif num4byte != 0
-        Str(_UTF32CSE, _encode_utf32(dat, len))
+        Str(_UTF32CSE, _encode_utf32(str, len))
     elseif num2byte + num3byte != 0
-        Str(_UCS2CSE, _encode_utf16(dat, len))
+        Str(_UCS2CSE, _encode_utf16(str, len))
     else
-        Str(latin1byte == 0 ? ASCIICSE : _LatinCSE, _encode_ascii_latin(dat, len))
+        Str(latin1byte == 0 ? ASCIICSE : _LatinCSE, _encode_ascii_latin(str, len))
     end
 end
 

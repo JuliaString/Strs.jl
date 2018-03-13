@@ -21,6 +21,8 @@ include("types.jl")
 @testset "Pointer functions" begin include("pointer.jl") end
 @testset "Search functions"  begin include("search.jl")  end
 
+include("regex.jl")
+
 @testset "Unicode Strings" begin
 # Unicode errors
 let io = IOBuffer()

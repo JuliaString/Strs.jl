@@ -447,10 +447,10 @@ end
 
 # Todo: Some of these need to be fixed to account for SubStr, when that is added
 convert(::Type{T},  str::S) where {T<:UCS2Strings, S<:UCS2Strings} = str
-convert(::Type{UTF16Str}, str::Str{UTF16CSE}) = str
+convert(::Type{UTF16Str}, str::UTF16Str) = str
 convert(::Type{UTF16Str}, str::UCS2Strings) = Str(UTF16CSE, str.data)
 
-unsafe_convert(::Type{Ptr{UInt16}}, s::Str{<:UTF16CSE}) = _pnt(s)
+unsafe_convert(::Type{Ptr{UInt16}}, s::Str{UTF16CSE}) = _pnt(s)
 
 function convert(::Type{UTF16Str}, dat::AbstractVector{UInt16})
     isempty(dat) && return empty_utf16
