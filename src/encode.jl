@@ -80,7 +80,7 @@ convert(::Type{Str}, str::String) = _str(str)
 convert(::Type{Str}, str::T) where {T<:Str} = str
 
 convert(::Type{UniStr}, str::AbstractString) = _str(str)
-convert(::Type{UniStr}, str::T) where {T<:Union{ASCIIStr,_LatinStr,_UCS2Str,_UTF32Str}} = str
+convert(::Type{UniStr}, str::Str{C}) where {C<:Union{ASCIICSE,_LatinCSE,_UCS2CSE,_UTF32CSE}} = str
 function convert(::Type{UniStr}, str::T) where {T<:Str}
     # handle zero length string quickly
     isempty(str) && return empty_ascii
@@ -97,19 +97,30 @@ function unsafe_str(str::T;
                     ) where {T <: Union{Vector{UInt8}, BinaryStr, Text1Str, String}}
     # handle zero length string quickly
     (siz = sizeof(str)) == 0 && return empty_ascii
-    dat = _data(str)
+    pnt = _pnt(str)
     len, flags, num4byte, num3byte, num2byte, latin1byte, invalids =
-        unsafe_checkstring(dat, 1, siz;
+        unsafe_checkstring(pnt, 1, siz;
                            accept_long_null  = accept_long_null,
                            accept_surrogates = accept_surrogates,
                            accept_long_char  = accept_long_char,
                            accept_invalids   = accept_invalids)
     if invalids != 0
-        Str(Text1CSE, dat)
+        if T == Vector{UInt8}
+            buf, out = _allocate(UInt8, siz)
+            unsafe_copyto!(out, 1, pnt, 1, siz)
+            Str(Text1CSE, buf)
+        else
+            Str(Text1CSE, _data(str))
+        end
     elseif flags == 0
         # Don't allow this to be aliased to a mutable Vector{UInt8}
-        T == Vector{UInt8} && (dat = unsafe_copyto!(_allocate(siz), 1, dat, 1, siz))
-        Str(ASCIICSE, dat)
+        if T == Vector{UInt8}
+            buf, out = _allocate(UInt8, siz)
+            unsafe_copyto!(out, 1, pnt, 1, siz)
+            Str(ASCIICSE, buf)
+        else
+            Str(ASCIICSE, _data(str))
+        end
     elseif num4byte != 0
         Str(_UTF32CSE, _encode_utf32(dat, len))
     elseif num2byte + num3byte != 0
@@ -160,25 +171,22 @@ function unsafe_str(str::T;
     end
 end
 
-
 function Str(v::Vector{UInt8})
-    siz = sizeof(v)
-    buf, pnt = _allocate(UInt8, siz)
-    @inbounds unsafe_copyto!(pnt, pointer(v), siz)
+    len = length(v)
+    buf = _allocate(siz)
+    _memcpy(pointer(buf), pointer(v), siz)
     Str(Text1CSE, buf)
 end
-
 function Str(v::Vector{UInt16})
     len = length(v)
-    buf, pnt = _allocate(UInt16, v)
-    @inbounds unsafe_copyto!(pnt, pointer(v), len)
+    buf, pnt = _allocate(UInt16, siz)
+    _memcpy(pnt, pointer(v), siz)
     Str(Text2CSE, buf)
 end
-
 function Str(v::Vector{UInt32})
     len = length(v)
-    buf, pnt = _allocate(UInt32, len)
-    @inbounds unsafe_copyto!(buf, pointer(v), len)
+    buf, pnt = _allocate(UInt32, siz)
+    _memcpy(pnt, pointer(v), len)
     Str(Text4CSE, buf)
 end
 

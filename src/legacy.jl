@@ -4,31 +4,12 @@
 
 # Renamed from ascii to to_ascii, to prevent issues
 to_ascii(str) = convert(ASCIIStr, str)
+to_ascii(pnt::Ptr{UInt8}) = convert(ASCIIStr, unsafe_string(p))
+to_ascii(pnt::Ptr{UInt8}, len::Integer) = convert(ASCIIStr, unsafe_string(p, len))
 
-to_ascii(pnt::Ptr{UInt8}) =
-    to_ascii(pnt, pnt == C_NULL ? Csize_t(0) : ccall(:strlen, Csize_t, (Ptr{UInt8},), pnt))
-to_ascii(pnt::Ptr{UInt8}, len::Integer) = begin
-    pnt == C_NULL && nullerr()
-    vec = ccall(:jl_pchar_to_array, Vector{UInt8}, (Ptr{UInt8}, Csize_t), pnt, len)
-    isvalid(ASCIIStr, vec) || unierror(UTF_ERR_INVALID_ASCII)
-    Str(ASCIICSE, vec)
-end
-
-latin1(x) = convert(_LatinStr, x)
-latin1(p::Ptr{UInt8}) =
-    latin1(p, p == C_NULL ? Csize_t(0) : ccall(:strlen, Csize_t, (Ptr{UInt8},), p))
-function latin1(p::Ptr{UInt8}, len::Integer)
-    p == C_NULL && nulerr()
-    Str(_LatinCSE, ccall(:jl_pchar_to_array, Vector{UInt8}, (Ptr{UInt8}, Csize_t), p, len))
-end
-
-utf8(x) = convert(UTF8Str, x)
-function utf8(p::Ptr{UInt8}, len::Integer)
-    p == C_NULL && nullerr()
-    Str(UTF8CSE, ccall(:jl_pchar_to_array, Vector{UInt8}, (Ptr{UInt8}, Csize_t), p, len))
-end
-utf8(p::Ptr{UInt8}) =
-    utf8(p, p == C_NULL ? Csize_t(0) : ccall(:strlen, Csize_t, (Ptr{UInt8},), p))
+latin1(x) = convert(LatinCSE, x)
+latin1(p::Ptr{UInt8}) = latin1(unsafe_string(p))
+latin1(p::Ptr{UInt8}, len::Integer) = latin1(unsafe_string(p, len))
 
 """
     utf8(s)
@@ -37,7 +18,7 @@ Create a UTF-8 string from a byte array, array of `UInt8`, or any other string t
 must be valid UTF-8. Conversions of byte arrays check for a byte-order marker in the first
 two bytes, and do not include it in the resulting string.)
 """
-utf8(s)
+utf8(x) = convert(UTF8Str, x)
 
 """
     utf8(::Union{Ptr{UInt8}, Ptr{Int8}} [, length])
@@ -46,19 +27,8 @@ Create a string from the address of a NUL-terminated UTF-8 string. A copy is mad
 pointer can be safely freed. If `length` is specified, the string does not have to be
 NUL-terminated.
 """
-utf8(::Union{Ptr{UInt16}, Ptr{Int16}}, length=length)
-
-utf16(x) = convert(UTF16Str, x)
-utf16(p::Ptr{Int16}) = utf16(reinterpret(Ptr{UInt16}, p))
-utf16(p::Ptr{Int16}, len::Integer) = utf16(reinterpret(Ptr{UInt16}, p), len)
-
-function utf16(pnt::Ptr{UInt16})
-    len = 0
-    while unsafe_load(pnt, len + 1) != 0
-        len += 1
-    end
-    utf16(pnt, len)
-end
+utf8(p::Ptr{UInt8}) = utf8(unsafe_string(p))
+utf8(p::Ptr{UInt8}, len::Integer) = utf8(unsafe_string(p, len))
 
 """
     utf16(s)
@@ -67,7 +37,7 @@ Create a UTF-16 string from a byte array, array of `UInt16`, or any other string
 must be valid UTF-16. Conversions of byte arrays check for a byte-order marker in the first
 two bytes, and do not include it in the resulting string.)
 """
-utf16(s)
+utf16(x) = convert(UTF16Str, x)
 
 """
     utf16(::Union{Ptr{UInt16}, Ptr{Int16}} [, length])
@@ -76,24 +46,19 @@ Create a string from the address of a NUL-terminated UTF-16 string. A copy is ma
 pointer can be safely freed. If `length` is specified, the string does not have to be
 NUL-terminated.
 """
-utf16(::Union{Ptr{UInt16}, Ptr{Int16}}, length=length)
-
-utf32(x) = convert(UTF32Str, x)
-
-# These are broken by #24999
-
-#utf32(p::Union{Ptr{Char}, Ptr{Int32}}, len::Integer) = utf32(reinterpret(Ptr{UInt32}, p), len)
-#utf32(p::Union{Ptr{Char}, Ptr{Int32}}) = utf32(reinterpret(Ptr{UInt32}, p))
-
-function utf32(pnt::Ptr{UInt32})
+function utf16(pnt::Ptr{UInt16}, len::Unsigned)
+    buf, out = _allocate(UInt16, len)
+    _memcpy(out, pnt, len)
+    Str(UTF16CSE, buf)
+end
+function utf16(pnt::Ptr{UInt16})
     len = 0
     while (ch = unsafe_load(pnt, len += 1)) != 0
         check_valid(ch, len)
     end
-    buf, out = _allocate(UInt32, len)
-    unsafe_copyto!(out, 1, pnt, 1, len)
-    Str(UTF32CSE, buf)
+    utf16(pnt, len%UInt)
 end
+utf16(pnt, len::Signed) = len < 0 ? error("negative length") : utf16(pnt, len%Unsigned)
 
 """
     utf32(s)
@@ -102,13 +67,30 @@ Create a UTF-32 string from a byte array, array of `Char` or `UInt32`, or any ot
 type. (Conversions of byte arrays check for a byte-order marker in the first four bytes, and
 do not include it in the resulting string.)
 """
-utf32(s)
+utf32(x) = convert(UTF32Str, x)
+
+# These are broken by #24999
+
+#utf32(p::Union{Ptr{Char}, Ptr{Int32}}, len::Integer) = utf32(reinterpret(Ptr{UInt32}, p), len)
+#utf32(p::Union{Ptr{Char}, Ptr{Int32}}) = utf32(reinterpret(Ptr{UInt32}, p))
 
 """
-    utf32(::Union{Ptr{Char}, Ptr{UInt32}, Ptr{Int32}} [, length])
+    utf32(::Ptr{UInt32}, [, length])
 
 Create a string from the address of a NUL-terminated UTF-32 string. A copy is made; the
 pointer can be safely freed. If `length` is specified, the string does not have to be
 NUL-terminated.
 """
-utf32(::Union{Ptr{Char}, Ptr{UInt32}, Ptr{Int32}}, length=length)
+function utf32(pnt::Ptr{UInt32}, len::Unsigned)
+    buf, out = _allocate(UInt32, len)
+    _memcpy(out, pnt, len)
+    Str(UTF32CSE, buf)
+end
+function utf32(pnt::Ptr{UInt32})
+    len = 0
+    while (ch = unsafe_load(pnt, len += 1)) != 0
+        check_valid(ch, len)
+    end
+    utf32(pnt, len%UInt)
+end
+utf32(pnt, len::Signed) = len < 0 ? error("negative length") : utf32(pnt, len%Unsigned)

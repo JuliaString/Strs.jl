@@ -583,91 +583,170 @@ end
 first(str::Str, n::Integer) = str[1:min(end, nextind(str, 0, n))]
 last(str::Str, n::Integer) = str[max(1, prevind(str, ncodeunits(s)+1, n)):end]
 
-#reverseind(s::Str, i::Integer) = thisind(s, ncodeunits(s)-i+1)
-function repeat(str::T, cnt::Integer) where {T<:Str}
-    cnt < 2 && return cnt == 1 ? str : (cnt == 0 ? empty_str(T) : repeaterr(cnt))
-    siz = sizeof(str)
-    pnt = _pnt(str)
-    buf = _allocate(siz * cnt)
-    out = pointer(buf)
-    if sizeof(codeunit(T)) == 1 && siz == 1 # common case: repeating a single-byte string
-        ccall(:memset, Ptr{Cvoid}, (Ptr{UInt8}, Cint, Csize_t), out, get_codeunit(pnt), cnt)
-    else
-        while (cnt -= 1) >= 0
-            ccall(:memcpy, Ptr{Cvoid}, (Ptr{Cvoid}, Ptr{Cvoid}, UInt), out, pnt, siz)
-            out += siz
-        end
-    end
-    Str(cse(T), buf)
-end
-(^)(str::T, cnt::Integer) where {T<:Str} = repeat(str, cnt)
-
-function repeat(ch::CP, cnt::Integer) where {CP <: CodePoint}
-    T = codepoint_cse(CP)
-    cnt < 1 && return cnt == 0 ? empty_str(Str{T}) : repeaterr(cnt)
-    siz = sizeof(CP)
-    buf = _allocate(siz * cnt)
-    if siz == 1
-        ccall(:memset, Ptr{Cvoid}, (Ptr{UInt8}, Cint, Csize_t), pointer(buf), ch, cnt)
-    else
-        uintch = tobase(ch)
-        out = reinterpret(Ptr{basetype(CP)}, pointer(buf))
-        # Note, this can be optimized by writing out chunks
-        while (cnt -= 1) >= 0
-            set_codeunit!(out, uintch)
-            out += siz
-        end
-    end
-    Str(T, buf)
-end
-(^)(ch::CP, cnt::Integer) where {CP <: CodePoint} = repeat(ch, cnt)
+const Chrs = @static VERSION < v"0.7.0-DEV" ? Union{Char,AbstractChar} : CodePoint
 
 @static if VERSION < v"0.7.0-DEV"
     function repeat(ch::Char, cnt::Integer)
-        if cnt < 0
-            repeaterr(cnt)
-        elseif cnt == 0
-            empty_str(String)
-        elseif cnt == 1
-            string(ch)
-        else
-            uch = ch%UInt32
-            if uch <= 0x7f
-                buf = Base._string_n(cnt)
-                ccall(:memset, Ptr{Cvoid}, (Ptr{UInt8}, Cint, Csize_t), pointer(buf), uch, cnt)
-            elseif uch <= 0x7ff
-                buf = Base._string_n(cnt<<1)
-                pnt16 = reinterpret(Ptr{UInt16}, pointer(buf))
-                wrd = (uch >>> 6) | ((uch & 0x3f)%UInt16<<8) | 0x80c0
-                while (cnt -= 1) >= 0
-                    set_codeunit!(pnt16, wrd)
-                    pnt16 += 2
-                end
-            elseif uch <= 0xffff
-                buf = Base._string_n(cnt*3)
-                pnt = reinterpret(Ptr{UInt8}, pointer(buf))
-                b1, b2, b3 =
-                    0xe0 | ((uch >>> 12) & 0x3f), 0x80 | ((uch >>> 6) & 0x3f), 0x80 | (uch & 0x3f)
-                while (cnt -= 1) >= 0
-                    set_codeunit!(pnt, b1)
-                    set_codeunit!(pnt + 1, b2)
-                    set_codeunit!(pnt + 2, b3)
-                    pnt += 3
-                end
-            else
-                buf = Base._string_n(cnt<<2)
-                pnt32 = reinterpret(Ptr{UInt32}, pointer(buf))
-                dbl = (uch >>> 18) | ((uch & 0x3f)%UInt32<<8) | 0x808080f0
-                while (cnt -= 1) >= 0
-                    set_codeunit!(pnt32, dbl)
-                    pnt32 += 4
-                end
-            end
-            buf
+        cnt > 1 && return String(_repeat(CodeUnitMulti(), UTF8CSE, ch%UInt32, cnt))
+        cnt < 0 && repeaterr(cnt)
+        cnt == 0 ? empty_string : string(Char(ch%UInt32))
+    end
+end
+
+function repeat(ch::CP, cnt::Integer) where {CP <: Chrs}
+    C = codepoint_cse(CP)
+    cnt > 1 && return Str(C, _repeat(CodePointStyle(C), C, tobase(ch), cnt))
+    cnt < 0 && repeaterr(cnt)
+    cnt == 0 ? empty_str(C) : _convert(C, tobase(ch))
+end
+
+(^)(ch::CP, cnt::Integer) where {CP <: Chrs} = repeat(ch, cnt)
+
+# low level mem support functions
+
+const (WidChr,OthChr) = @static sizeof(Cwchar_t) == 4 ? (UInt32,UInt16) : (UInt16,UInt32)
+
+_fwd_memchr(ptr::Ptr{UInt8}, byt::UInt8, len::Integer) =
+    ccall(:memchr, Ptr{UInt8}, (Ptr{UInt8}, Int32, Csize_t), ptr, byt, len)
+
+_fwd_memchr(ptr::Ptr{WidChr}, wchr::WidChr, len::Integer) =
+    ccall(:wmemchr, Ptr{WidChr}, (Ptr{WidChr}, Int32, Csize_t), ptr, wchr, len)
+
+_fwd_memchr(beg::Ptr{OthChr}, wchr::OthChr, len::Integer) =
+    _fwd_memchr(beg, ch, bytoff(beg, len))
+
+_fwd_memchr(ptr::Ptr{UInt8}, byt::UInt8, fin::Ptr{UInt8}) =
+    ptr < fin ? _fwd_memchr(ptr, byt, fin - ptr) : C_NULL
+_rev_memchr(ptr::Ptr{UInt8}, byt::UInt8, fin::Ptr{UInt8}) =
+    ptr < fin ? _rev_memchr(ptr, byt, fin - ptr) : C_NULL
+
+_fwd_memchr(ptr::Ptr{WidChr}, wchr::WidChr, fin::Ptr{WidChr}) =
+    ptr < fin ? _fwd_memchr(ptr, wchr, chroff(fin - ptr)) : C_NULL
+
+function _fwd_memchr(pnt::Ptr{T}, wchr::T, fin::Ptr{T}) where {T<:OthChr}
+    while pnt < fin
+        get_codeunit(pnt) == ch && return pnt
+        pnt += sizeof(T)
+    end
+    C_NULL
+end
+
+_rev_memchr(ptr::Ptr{UInt8}, byt::UInt8, len::Integer) =
+    ccall(:memrchr, Ptr{UInt8}, (Ptr{UInt8}, Int32, Csize_t), ptr, byt, len)
+
+function _rev_memchr(beg::Ptr{T}, ch::T, pnt::Ptr{T}) where {T<:Union{UInt16,UInt32}}
+    while (pnt -= sizeof(T)) >= beg
+        get_codeunit(pnt) == ch && return pnt
+    end
+    C_NULL
+end
+
+_rev_memchr(beg::Ptr{T}, ch::T, pos::Integer) where {T<:Union{UInt16,UInt32}} =
+    _rev_memchr(beg, ch, bytoff(beg, pos))
+
+_memcmp(a::Ptr{UInt8}, b::Ptr{UInt8}, len) =
+    ccall(:memcmp, Int32, (Ptr{UInt8}, Ptr{UInt8}, UInt), a, b, len)
+_memcmp(a::Ptr{WidChr}, b::Ptr{WidChr}, len) =
+    ccall(:wmemcmp, Int32, (Ptr{WidChr}, Ptr{WidChr}, UInt), a, b, len)
+
+function _memcmp(apnt::Ptr{OthChr}, bpnt::Ptr{OthChr}, len)
+    fin = bytoff(apnt, len)
+    while apnt < fin
+        (c1 = get_codeunit(apnt)) == (c2 = get_codeunit(bpnt)) || return _cmp(c1, c2)
+        apnt += sizeof(OthChr)
+        bpnt += sizeof(OthChr)
+    end
+    0
+end
+
+_memcmp(a::Union{String, ByteStr}, b::Union{String, ByteStr}, siz) = _memcmp(_pnt(a), _pnt(b), siz)
+_memcmp(a::WordStr, b::WordStr, siz) = _memcmp(_pnt(a), _pnt(b), siz)
+_memcmp(a::QuadStr, b::QuadStr, siz) = _memcmp(_pnt(a), _pnt(b), siz)
+
+_memcpy(dst::Ptr{UInt8}, src::Ptr, siz) =
+    ccall(:memcpy, Ptr{UInt8}, (Ptr{Cvoid}, Ptr{Cvoid}, UInt), dst, src, siz)
+_memcpy(a::Ptr{WidChr}, b::Ptr{WidChr}, len) =
+    ccall(:wmemcpy, Ptr{WidChr}, (Ptr{WidChr}, Ptr{WidChr}, UInt), a, b, len)
+_memcpy(a::Ptr{OthChr}, b::Ptr{OthChr}, len) =
+    ccall(:memcpy, Ptr{OthChr}, (Ptr{OthChr}, Ptr{OthChr}, UInt), a, b, bytoff(OthChr, len))
+
+@inline _memset(pnt::Ptr{UInt8}, ch::UInt8, cnt) =
+    ccall(:memset, Ptr{UInt8}, (Ptr{UInt8}, Cint, Csize_t), pnt, ch, cnt)
+@inline _memset(pnt::Ptr{WidChr}, ch::WidChr, cnt) =
+    ccall(:wmemset, Ptr{WidChr}, (Ptr{WidChr}, Cint, Csize_t), pnt, ch, cnt)
+
+@inline function _memset(pnt::Ptr{OthChr}, ch::OthChr, cnt)
+    fin = bytoff(pnt, cnt)
+    while pnt < fin
+        set_codeunit!(pnt, ch)
+        pnt += sizeof(OthChr)
+    end
+end
+
+# Little-endian output here
+@inline get_utf8_16(ch) =
+    (ch >>> 6) | ((ch & 0x3f)%UInt16<<8) | 0x80c0
+@inline get_utf8_32(ch) =
+    (ch & 0xc0000 << 6) | (ch & 0x3f000 << 4) | (ch & 0xfc0 << 2) | (ch & 0x3f) | 0x808080f0
+@inline get_utf16_32(ch) =
+    (0xd7c0 + (ch >>> 10))%UInt16 << 6 | (0xdc00 + (ch & 0x3ff))%UInt32
+
+@inline function _repeat_chr(::Type{T}, ch, cnt) where {T<:CodeUnitTypes}
+    buf, pnt = _allocate(T, cnt)
+    _memset(pnt, ch%T, cnt)
+    buf
+end
+
+@inline function _repeat_3(ch, cnt)
+    buf, pnt = _allocate(UInt8, cnt*3)
+    b1, b2, b3 = get_utf8_3(ch)
+    fin = pnt + cnt*3
+    while pnt < fin
+        set_codeunit!(pnt,     b1)
+        set_codeunit!(pnt + 1, b2)
+        set_codeunit!(pnt + 2, b3)
+        pnt += 3
+    end
+    buf
+end
+
+_repeat(::CodeUnitSingle, ::Type{C}, ch::T, cnt) where {T,C<:CSE} =
+    _repeat_chr(basetype(T), ch, cnt)
+
+function _repeat(::CodeUnitMulti, ::Type{UTF8CSE}, ch, cnt)
+    if ch <= 0x7f
+        _repeat_chr(UInt8, ch, cnt)
+    elseif ch <= 0x7ff
+        _repeat_chr(UInt16, get_utf8_16(ch), cnt)
+    elseif ch <= 0xffff
+        _repeat_3(ch, cnt)
+    else
+        _repeat_chr(UInt32, get_utf8_32(ch), cnt)
+    end
+end
+
+_repeat(::CodeUnitMulti, ::Type{UTF16CSE}, ch, cnt) =
+    ch <= 0xffff ? _repeat_chr(UInt16, ch, cnt) : _repeat_chr(UInt32, get_utf16_32(ch), cnt)
+
+function repeat(str::T, cnt::Integer) where {C<:CSE,T<:Str{C}}
+    cnt < 2 && return cnt == 1 ? str : (cnt == 0 ? empty_str(C) : repeaterr(cnt))
+    CU = codeunit(T)
+    len, pnt = _lenpnt(str)
+    totlen = len * cnt
+    buf, out = _allocate(CU, totlen)
+    if len == 1 # common case: repeating a single codeunit string
+        _memset(out, get_codeunit(pnt), cnt)
+    else
+        fin = bytoff(out, totlen)
+        siz = bytoff(CU, len)
+        while out < fin
+            _memcpy(out, pnt, len)
+            out += siz
         end
     end
-    (^)(ch::Char, cnt::Integer) = repeat(ch, cnt)
+    Str(C, buf)
 end
+(^)(str::T, cnt::Integer) where {T<:Str} = repeat(str, cnt)
 
 # Definitions for C compatible strings, that don't allow embedded
 # '\0', and which are terminated by a '\0'

@@ -25,30 +25,6 @@ Based in part on code for UTF8String that used to be in Julia
      | ((get_codeunit(pnt - 1)%UInt32 & 0x3f) << 6)
      | (get_codeunit(pnt) & 0x3f))
 
-# Output a character as a 2-byte UTF-8 sequence
-@inline function output_utf8_2byte!(pnt, ch)
-    set_codeunit!(pnt,     0xc0 | (ch >>> 6))
-    set_codeunit!(pnt + 1, 0x80 | (ch & 0x3f))
-    pnt + 2
-end
-
-# Output a character as a 3-byte UTF-8 sequence
-@inline function output_utf8_3byte!(pnt, ch)
-    set_codeunit!(pnt,     0xe0 | ((ch >>> 12) & 0x3f))
-    set_codeunit!(pnt + 1, 0x80 | ((ch >>> 6) & 0x3f))
-    set_codeunit!(pnt + 2, 0x80 | (ch & 0x3f))
-    pnt + 3
-end
-
-# Output a character as a 4-byte UTF-8 sequence
-@inline function output_utf8_4byte!(pnt, ch)
-    set_codeunit!(pnt,     0xf0 | (ch >>> 18))
-    set_codeunit!(pnt + 1, 0x80 | ((ch >>> 12) & 0x3f))
-    set_codeunit!(pnt + 2, 0x80 | ((ch >>> 6) & 0x3f))
-    set_codeunit!(pnt + 3, 0x80 | (ch & 0x3f))
-    pnt + 4
-end
-
 @inline get_utf8_2(ch) =
     0xc0 | (ch >>> 6)%UInt8, 0x80 | (ch & 0x3f)%UInt8
 @inline get_utf8_3(ch) =
@@ -57,35 +33,52 @@ end
     (0xf0 | (ch >>>  18)%UInt8, 0x80 | ((ch >>> 12) & 0x3f)%UInt8,
      0x80 | ((ch >>>  6) & 0x3f)%UInt8, 0x80 | (ch & 0x3f)%UInt8)
 
+# Output a character as a 2-byte UTF-8 sequence
+@inline function output_utf8_2byte!(pnt, ch)
+    b1, b2 = get_utf8_2(ch)
+    set_codeunit!(pnt,     b1)
+    set_codeunit!(pnt + 1, b2)
+    pnt + 2
+end
+
+# Output a character as a 3-byte UTF-8 sequence
+@inline function output_utf8_3byte!(pnt, ch)
+    b1, b2, b3 = get_utf8_3(ch)
+    set_codeunit!(pnt,     b1)
+    set_codeunit!(pnt + 1, b2)
+    set_codeunit!(pnt + 2, b3)
+    pnt + 3
+end
+
+# Output a character as a 4-byte UTF-8 sequence
+@inline function output_utf8_4byte!(pnt, ch)
+    b1, b2, b3, b4 = get_utf8_4(ch)
+    set_codeunit!(pnt,     b1)
+    set_codeunit!(pnt + 1, b2)
+    set_codeunit!(pnt + 2, b3)
+    set_codeunit!(pnt + 3, b4)
+    pnt + 4
+end
+
 @inline eq_bytes(pnt, b1)         = get_codeunit(pnt) == b1
 @inline eq_bytes(pnt, b1, b2)     = get_codeunit(pnt+1) == b2 && eq_bytes(pnt, b1)
 @inline eq_bytes(pnt, b1, b2, b3) = get_codeunit(pnt+2) == b3 && eq_bytes(pnt, b1, b2)
 
-@inline _write_utf_2(io, ch) =
-    write(io, 0xc0 | (ch >>> 6)%UInt8, 0x80 | (ch & 0x3f)%UInt8)
-
-@inline _write_utf_3(io, ch) =
-    write(io, 0xe0 | ((ch >>> 12) & 0x3f)%UInt8,
-              0x80 | ((ch >>> 6) & 0x3f)%UInt8,
-              0x80 | (ch & 0x3f)%UInt8)
-
-@inline _write_utf_4(io, ch) =
-    write(io, 0xf0 | (ch >>> 18)%UInt8,
-              0x80 | ((ch >>> 12) & 0x3f)%UInt8,
-              0x80 | ((ch >>> 6) & 0x3f)%UInt8,
-              0x80 | (ch & 0x3f)%UInt8)
+@inline _write_utf8_2(io, ch) = write(io, get_utf8_2(ch)...)
+@inline _write_utf8_3(io, ch) = write(io, get_utf8_3(ch)...)
+@inline _write_utf8_4(io, ch) = write(io, get_utf8_4(ch)...)
 
 @inline _write_ucs2(io, ch) =
-    ch <= 0x7f ? write(io, ch%UInt8) : ch <= 0x7ff ? _write_utf_2(io, ch) : _write_utf_3(io, ch)
+    ch <= 0x7f ? write(io, ch%UInt8) : ch <= 0x7ff ? _write_utf8_2(io, ch) : _write_utf8_3(io, ch)
 
-@inline _write_utf32(io, ch) = ch <= 0xffff ? _write_ucs2(io, ch) : _write_utf_4(io, ch)
+@inline _write_utf32(io, ch) = ch <= 0xffff ? _write_ucs2(io, ch) : _write_utf8_4(io, ch)
 
-@inline write(io::IO, ch::UCS2Chr) = _write_ucs2(io, tobase(ch))
-@inline write(io::IO, ch::UTF32Chr) = _write_utf32(io, tobase(ch))
+@inline print(io::IO, ch::UCS2Chr)  = _write_ucs2(io, tobase(ch))
+@inline print(io::IO, ch::UTF32Chr) = _write_utf32(io, tobase(ch))
 
 ## required core functionality ##
 
-function lastindex(str::Str{<:UTF8CSE})
+function lastindex(str::Str{UTF8CSE})
     (len = _len(str)) == 0 && return len
     pnt = _pnt(str) + len
     while is_valid_continuation(get_codeunit(pnt -= 1)) ; end
@@ -118,7 +111,7 @@ const hi_mask = 0x8080_8080_8080_8080
     count_ones(xor(((val << 1) | val), hi_mask) & hi_mask)
 end
 
-function _length(::CodeUnitMulti, str::Str{<:UTF8CSE})
+function _length(::CodeUnitMulti, str::Str{UTF8CSE})
     (siz = sizeof(str)) < 2 && return siz
     pnt, fin = _calcpnt(str, siz)
     cnt = siz
@@ -128,7 +121,7 @@ function _length(::CodeUnitMulti, str::Str{<:UTF8CSE})
     pnt - CHUNKSZ == fin ? cnt : (cnt - _count_cont(unsafe_load(pnt) & _mask_bytes(siz)))
 end
 
-function isascii(str::T) where {T<:Union{Str{<:UTF8CSE}, LatinStr}}
+function isascii(str::Str{<:Union{UTF8CSE, LatinCSE, Binary_CSEs}})
     (siz = sizeof(str)) == 0 && return true
     pnt, fin = _calcpnt(str, siz)
     while (pnt += CHUNKSZ) <= fin
@@ -173,7 +166,7 @@ end
 # which indicates a non-Latin1 character
 all_latin(val) = ((val & (val<<1) & (val<<2 | (val<<3) | (val<<4) | (val<<5))) & hi_mask) == 0
 
-function islatin(str::Str{<:UTF8CSE})
+function islatin(str::Str{<:Union{UTF8CSE, Binary_CSEs}})
     (siz = sizeof(str)) == 0 && return true
     pnt, fin = _calcpnt(str, siz)
     while (pnt += CHUNKSZ) <= fin
@@ -185,7 +178,7 @@ end
 # All 4 top bits must be 1 (i.e. 0xfx) for this to be non-BMP
 all_bmp(val) = ((val | (val<<1) | (val<<2) | (val<<3)) & hi_mask) == 0
 
-function isbmp(str::Str{<:UTF8CSE})
+function isbmp(str::Str{UTF8CSE})
     (siz = sizeof(str)) == 0 && return true
     pnt, fin = _calcpnt(str, siz)
     while (pnt += CHUNKSZ) <= fin
@@ -194,7 +187,7 @@ function isbmp(str::Str{<:UTF8CSE})
     pnt - CHUNKSZ == fin && all_bmp(unsafe_load(pnt) & _mask_bytes(siz))
 end
 
-isunicode(str::Str{<:UTF8CSE}) = true
+isunicode(str::Str{UTF8CSE}) = true
 
 function _nextcpfun(::CodeUnitMulti, ::Type{UTF8CSE}, pnt)
     ch = get_codeunit(pnt)
@@ -210,7 +203,7 @@ function _nextcpfun(::CodeUnitMulti, ::Type{UTF8CSE}, pnt)
 end
 
 # Gets next codepoint
-@propagate_inbounds function _next(::CodeUnitMulti, T, str::Str{<:UTF8CSE}, pos::Integer)
+@propagate_inbounds function _next(::CodeUnitMulti, T, str::Str{UTF8CSE}, pos::Integer)
     len = _len(str)
     @boundscheck 0 < pos <= len || boundserr(str, pos)
     pnt = _pnt(str) + pos - 1
@@ -227,11 +220,11 @@ end
     end
 end
 
-done(str::Str{<:UTF8CSE}, i::Int) = i > sizeof(str.data)
+done(str::Str{UTF8CSE}, i::Int) = i > sizeof(str.data)
 
-length(it::CodePoints{String}, i::Int) = length(it.xs)
+length(it::CodePoints{<:AbstractString}, i::Int) = length(it.xs)
 
-@propagate_inbounds function next(it::CodePoints{String}, state)
+@propagate_inbounds function next(it::CodePoints{<:AbstractString}, state)
     ch, state = next(it.xs, state)
     UTF32Chr(ch%UInt32), state
 end
@@ -243,25 +236,25 @@ end
 
 @inline checkcont(pnt) = is_valid_continuation(get_codeunit(pnt))
 
-function _reverseind(::CodeUnitMulti, str::Str{<:UTF8CSE}, pos::Integer)
+function _reverseind(::CodeUnitMulti, str::Str{UTF8CSE}, pos::Integer)
     pnt = _pnt(str) + _len(str) + 1 - pos
     pos - (checkcont(pnt) ? (checkcont(pnt - 1) ? (checkcont(pnt - 2) ? 3 : 2) : 1) : 0)
 end
 
 ## overload methods for efficiency ##
 
-bytestring(str::Str{<:UTF8CSE}) = str
+bytestring(str::Str{UTF8CSE}) = str
 
-@inline _isvalid_char_pos(::CodeUnitMulti, str::Str{<:UTF8CSE}, pos::Integer) =
+@inline _isvalid_char_pos(::CodeUnitMulti, str::Str{UTF8CSE}, pos::Integer) =
     !is_valid_continuation(get_codeunit(_pnt(str), pos))
 
-@propagate_inbounds function _thisind(::CodeUnitMulti, str::Str{<:UTF8CSE}, pos::Integer)
+@propagate_inbounds function _thisind(::CodeUnitMulti, str::Str{UTF8CSE}, pos::Integer)
     @boundscheck 0 < pos <= _len(str) || boundserr(str, pos)
     pnt = _pnt(str) + pos - 1
     pos - (checkcont(pnt) ? (checkcont(pnt - 1) ? (checkcont(pnt - 2) ? 3 : 2) : 1) : 0)
 end
 
-@propagate_inbounds function _nextind(T::CodeUnitMulti, str::Str{<:UTF8CSE}, pos::Integer)
+@propagate_inbounds function _nextind(T::CodeUnitMulti, str::Str{UTF8CSE}, pos::Integer)
     pos == 0 && return 1
     numcu = _len(str)
     @boundscheck 1 <= pos <= numcu || boundserr(str, pos)
@@ -274,7 +267,7 @@ end
               : ifelse(cu < 0xe0, 2, ifelse(cu < 0xf0, 3, 4))))
 end
 
-@propagate_inbounds function _prevind(T::CodeUnitMulti, str::Str{<:UTF8CSE}, pos::Integer)
+@propagate_inbounds function _prevind(T::CodeUnitMulti, str::Str{UTF8CSE}, pos::Integer)
     pos == 1 && return 0
     numcu = _len(str)
     pos == numcu + 1 && @inbounds return _thisind(T, str, numcu)
@@ -289,7 +282,7 @@ end
     end
 end
 
-@propagate_inbounds function getindex(str::Str{<:UTF8CSE}, rng::UnitRange{Int})
+@propagate_inbounds function getindex(str::Str{UTF8CSE}, rng::UnitRange{Int})
     isempty(rng) && return SubString(empty_utf8, 1, 0)
     beg = first(rng) 
     len = _len(str)
@@ -306,12 +299,12 @@ end
     SubString(str, beg, lst)
 end
 
-const _ByteStr = Union{Str{<:ASCIICSE}, Str{<:UTF8CSE}, String}
+const _ByteStr = Union{Str{ASCIICSE}, Str{UTF8CSE}, String}
 
 string(c::_ByteStr...) = length(c) == 1 ? c[1]::UTF8Str : UTF8Str(_string(c))
     # ^^ at least one must be UTF-8 or the ASCII-only method would get called
 
-function reverse(str::Str{<:UTF8CSE})
+function reverse(str::Str{UTF8CSE})
     (len = _len(str)) < 2 && return str
     buf, beg = _allocate(UInt8, len)
     out = beg + len
@@ -335,10 +328,6 @@ function reverse(str::Str{<:UTF8CSE})
     end
     Str(UTF8CSE, buf)
 end
-
-## outputting UTF-8 strings ##
-
-write(io::IO, str::Str{<:UTF8CSE}) = write(io, _data(str))
 
 @inline get_ch(dat, pos, off) = (get_codeunit(dat, pos + off) & 0x3f)%UInt32
 
@@ -392,7 +381,16 @@ write(io::IO, str::Str{<:UTF8CSE}) = write(io, _data(str))
 end
 _transcode_utf8(dat::Vector{UInt8}, len) = _transcode_utf8(pointer(dat), len)
 
-convert(::Type{UTF8Str}, s::Str{<:UTF8CSE}) = s
+# Single character conversion
+function convert(::Type{<:Str{UTF8CSE}}, ch::Unsigned)
+    isunicode(ch) || unierror(UTF_ERR_INVALID, 0, ch)
+    len = ch <= 0x7f ? 1 : (ch < 0x800 ? 2 : (ch > 0xffff ? 4 : 3))
+    buf = _allocate(len)
+    _encode_char_utf8(buf, ch, 0)
+    Str(UTF8CSE, buf)
+end
+
+convert(::Type{UTF8Str}, s::Str{UTF8CSE}) = s
 convert(::Type{UTF8Str}, s::ASCIIStr) = Str(UTF8CSE, s.data)
 
 # Note: this will have to change back to s.endof for v0.6!
@@ -424,7 +422,7 @@ function convert(::Type{UTF8Str}, str::String)
     # Speed this up if no surrogates, long encodings
     Str(UTF8CSE,
         ((flags & (UTF_LONG | UTF_SURROGATE)) == 0
-         ? _data(str)
+         ? str
          : _transcode_utf8(_pnt(str), len + latinbyte + num2byte + num3byte*2 + num4byte*3)))
 end
 

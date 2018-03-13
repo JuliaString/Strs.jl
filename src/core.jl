@@ -2,13 +2,13 @@
 Core functions
 
 
-Copyright 2017 Gandalf Software, Inc., Scott P. Jones, and others (see Julia contributors)
+Copyright 2017-2018 Gandalf Software, Inc., Scott P. Jones, and others (see Julia contributors)
 Licensed under MIT License, see LICENSE.md
 
 Inspired by / derived from code in Julia
 =#
 
-# Need to optimize these to avoid doing array reinterpret
+# Todo: Need to optimize these to avoid doing array reinterpret
 #=
 getindex(s::T, r::Vector) where {T} = T(getindex(_data(s), r))
 getindex(s::T, r) where {T} = T(getindex(_data(s), r))
@@ -149,5 +149,40 @@ end
 @propagate_inbounds Base._collect(::Type{S}, str::T, isz::Base.HasLength) where {S,T<:Str} =
     _collectstr(CodePointStyle(T), S, str)
 
-# Extra functions
-convert(str::Str, ch::Char) = convert(str, UInt32(ch))
+@inline function check_valid(ch, pos)
+    is_surrogate_codeunit(ch) && unierror(UTF_ERR_SURROGATE, pos, ch)
+    ch <= 0x10ffff || unierror(UTF_ERR_INVALID, pos, ch)
+    ch
+end
+
+# Convert single characters to strings
+convert(::Type{T}, ch::Char) where {T<:Str} = convert(T, UInt32(ch))
+
+function _convert(::Type{C}, ch::T) where {C<:CSE,T<:CodeUnitTypes}
+    buf, pnt = _allocate(T, 1)
+    set_codeunit!(pnt, ch)
+    Str(C, buf)
+end
+
+# Todo: These should be made more generic, work for all CodeUnitSingle types
+
+convert(::Type{<:Str{ASCIICSE}}, ch::Unsigned) =
+    isascii(ch) ? _convert(ASCIICSE, ch%UInt8) : unierror(UTF_ERR_INVALID_ASCII, 0, ch)
+convert(::Type{<:Str{LatinCSE}}, ch::Unsigned) =
+    islatin(ch) ? _convert(LatinCSE, ch%UInt8) : unierror(UTF_ERR_INVALID_LATIN1, 0, ch)
+convert(::Type{<:Str{UCS2CSE}}, ch::Unsigned) =
+    isbmp(ch) ? _convert(UCS2CSE, ch%UInt16) : unierror(UTF_ERR_INVALID, 0, ch)
+convert(::Type{<:Str{UTF32CSE}}, ch::Unsigned) =
+    isbmp(ch) ? _convert(UTF32CSE, ch%UInt32) : unierror(UTF_ERR_INVALID, 0, ch)
+
+convert(::Type{T}, ch::Signed) where {T<:Str} = ch < 0 ? ncharerr(ch) : convert(T, ch%Unsigned)
+
+## outputting Str strings ##
+
+write(io::IO, str::Str{<:CSE,Nothing}) = write(io, str.data)
+
+# Todo: handle substring of Str
+
+# optimized methods to avoid iterating over chars
+print(io::IO, str::Union{T,SubString{T}}) where {T<:Str{<:Union{ASCIICSE,UTF8CSE},Nothing}} =
+    (write(io, str.data); nothing)

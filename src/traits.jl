@@ -134,15 +134,23 @@ _isvalid(::ValidatedStyle, ::Type{UTF32CharSet}, ::Type{<:CharSet}, val) =
     isunicode(val)
 
 # no checking needed for cases where it is a superset of T
-(_isvalid(::AlwaysValid, ::Type{LatinCharSet}, ::Type{T}, str)
+(_isvalid(::AlwaysValid, ::Type{LatinCharSet}, ::Type{T}, val)
   where {T<:Union{Text1CharSet,ASCIICharSet,LatinSubSet}}) = true
 
-(_isvalid(::AlwaysValid, ::Type{UCS2CharSet}, ::Type{T}, str)
+(_isvalid(::AlwaysValid, ::Type{UCS2CharSet}, ::Type{T}, val)
   where {T<:Union{Text1CharSet,ASCIICharSet,LatinCharSet,LatinSubSet,UCS2SubSet}}) = true
 
-(_isvalid(::AlwaysValid, ::Type{UTF32CharSet}, ::Type{T}, str)
+(_isvalid(::AlwaysValid, ::Type{UTF32CharSet}, ::Type{T}, val)
   where {T<:Union{Text1CharSet,ASCIICharSet,LatinCharSet,UCS2CharSet,LatinSubSet,UCS2SubSet,UTF32SubSet}}) =
     true
+
+# no subsets allowed for these
+_isvalid(::AlwaysValid, ::Type{LatinSubSet}, ::Type{ASCIICharSet}, val) = false
+(_isvalid(::AlwaysValid, ::Type{UCS2SubSet}, ::Type{T}, val)
+  where {T<:Union{Text1CharSet,ASCIICharSet,LatinCharSet,LatinSubSet}}) = false
+(_isvalid(::AlwaysValid, ::Type{UTF32SubSet}, ::Type{T}, val)
+ where {T<:Union{Text1CharSet,Text2CharSet,ASCIICharSet,LatinCharSet,
+                 UCS2CharSet,LatinSubSet,UCS2SubSet}}) = false
 
 (_isvalid(::AlwaysValid, ::Type{S}, ::Type{<:CodeUnitTypes}, chr)
  where {S<:Union{Text1CharSet,Text2CharSet,Text4CharSet}}) =
