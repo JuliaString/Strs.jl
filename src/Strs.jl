@@ -97,6 +97,10 @@ isdefined(Base, :AbstractChar)   || (abstract type AbstractChar end ; export Abs
 
 @static isdefined(Base, :codeunits) || include("codeunits.jl")
 
+export find
+function fnd end
+const find = fnd
+
 create_vector(T, len)  = @static VERSION < v"0.7.0-DEV" ? Vector{T}(len) : Vector{T}(undef, len)
 outhex(v, p=1) = @static VERSION < v"0.7.0-DEV" ? hex(v,p) : string(v, base=16, pad=p)
 

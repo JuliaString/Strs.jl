@@ -189,8 +189,6 @@ print(io::IO, str::Union{T,SubString{T}}) where {T<:Str{<:Union{ASCIICSE,UTF8CSE
 
 #Str(str::SubString{<:Str}) = unsafe_string(pointer(str.string, str.offset+1), str.ncodeunits)
 
-thisind(str::SubString{<:Str}, i::Int) = _thisind_str(str, i)
-nextind(str::SubString{<:Str}, i::Int) = _nextind_str(str, i)
 #=
 function cmp(a::SubString{String}, b::SubString{String})
     na = sizeof(a)

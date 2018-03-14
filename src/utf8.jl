@@ -80,14 +80,15 @@ end
 
 ## required core functionality ##
 
+utf_trail(c::UInt8) = (0xe5000000 >>> ((c & 0xf0) >> 3)) & 0x3
+
 function lastindex(str::Str{UTF8CSE})
     (len = _len(str)) == 0 && return len
-    pnt = _pnt(str) + len
+    beg = _pnt(str)
+    pnt = beg + len
     while is_valid_continuation(get_codeunit(pnt -= 1)) ; end
-    pnt - _pnt(str) + 1
+    Int(pnt + 1 - beg)
 end
-
-utf_trail(c::UInt8) = (0xe5000000 >>> ((c & 0xf0) >> 3)) & 0x3
 
 #=
 _cont(byt, n) = (byt >>> n)%UInt8 != 0x80

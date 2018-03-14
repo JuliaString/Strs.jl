@@ -111,7 +111,7 @@ split(str::T, splitter::AbstractChar;
 function _split(str::T, splitter, limit::Integer, keep_empty::Bool, strs::Array) where {T<:Str}
     i = 1
     n = lastindex(str)
-    r = find_next(splitter, str, 1)
+    r = find(Fwd, splitter, str)
     if r != 0:-1
         j, k = first(r), nextind(str,last(r))
         while 0 < j <= n && length(strs) != limit-1
@@ -121,7 +121,7 @@ function _split(str::T, splitter, limit::Integer, keep_empty::Bool, strs::Array)
                 i = k
             end
             (k <= j) && (k = nextind(str,j))
-            r = find_next(splitter, str, k)
+            r = find(Fwd, splitter, str, k)
             r == 0:-1 && break
             j, k = first(r), nextind(str,last(r))
         end
@@ -147,12 +147,12 @@ rsplit(str::T, splitter::AbstractChar;
 
 function _rsplit(str::Str, splitter, limit::Integer, keep_empty::Bool, strs::Array)
     n = lastindex(str)
-    r = find_prev(splitter, str, n)
+    r = find(Rev, splitter, str, n)
     j, k = first(r), last(r)
     while j > 0 && k > 0 && length(strs) != limit-1
-        (keep_empty || k < n) && pushfirst!(strs, SubString(str,nextind(str,k),n))
+        (keep_empty || k < n) && pushfirst!(strs, SubString(str, nextind(str, k), n))
         n = prevind(str, j)
-        r = find_prev(splitter, str, n)
+        r = find(Rev, splitter, str, n)
         j, k = first(r), last(r)
     end
     (keep_empty || n > 0) && pushfirst!(strs, SubString(str,1,n))
@@ -178,14 +178,14 @@ function replace(str::Str, pat_repl::Pair; count::Integer=typemax(Int))
     count == 0 && return str
     count < 0 && throw(DomainError(count, "`count` must be non-negative."))
     n = 1
-    i = a = 1
+    i = 1
     e = lastindex(str)
-    r = find_next(pattern, str, 1)
+    r = fnd(Fwd, pattern, str)
     # Just return the string if not found
     j, k = first(r), last(r)
     out = IOBuffer(sizehint=floor(Int, 1.2 * sizeof(str)))
     while j != 0
-        if i == a || i <= k
+        if i == 1 || i <= k
             unsafe_write(out, pointer(str, i), UInt(j-i))
             _replace(out, repl, str, r, pattern)
         end
@@ -196,7 +196,7 @@ function replace(str::Str, pat_repl::Pair; count::Integer=typemax(Int))
         else
             i = k = nextind(str, k)
         end
-        r = find_next(pattern, str, k)
+        r = fnd(Fwd, pattern, str, k)
         r == 0:-1 || n == count && break
         j, k = first(r), last(r)
         n += 1

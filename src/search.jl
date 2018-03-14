@@ -1,97 +1,77 @@
 # This file includes code originally from Julia.
 # License is MIT: https://julialang.org/license
 
-export find_next, find_first, find_prev, find_last, found, find_result
-
-"""
-    find_next(pattern::Union{Regex,AbstractString}, string::AbstractString, start::Integer)
-
-Find the next occurrence of `pattern` in `string` starting at position `start`.
-`pattern` can be either a string, or a regular expression, in which case `string`
-must be of type `String`, `ASCIIStr`, `UTF8Str` (or a `SubString` of one of those types)
-
-The return value is a range of indexes where the matching sequence is found, such that
-`s[find_next(x, s, i)] == x`:
-
-`find_next("substring", string, i)` = `start:end` such that
-`string[start:end] == "substring"`, or `0:-1` if unmatched.
-
-# Examples
-```jldoctest
-julia> find_next("z", "Hello to the world", 1)
-0:-1
-
-julia> find_next("o", "Hello to the world", 6)
-8:8
-
-julia> find_next("Julia", "JuliaLang", 2)
-1:5
-```
-"""
-function find_next end
-
-"""
-    find_first(pattern::Union{Regex,AbstractString}, string::AbstractString)
-
-Find the first occurrence of `pattern` in `string`. Equivalent to
-[`find_next(pattern, string, 1)`](@ref).
-
-# Examples
-```jldoctest
-julia> find_first("z", "Hello to the world")
-0:-1
-
-julia> find_first("Julia", "JuliaLang")
-1:5
-```
-"""
-function find_first end
-
-"""
-    find_prev(pattern::AbstractString, string::AbstractString, start::Integer)
-
-Find the previous occurrence of `pattern` in `string` starting at position `start`.
-
-The return value is a range of indexes where the matching sequence is found, such that
-`s[find_prev(x, s, i)] == x`:
-
-`find_prev("substring", string, i)` = `start:end` such that
-`string[start:end] == "substring"`, or `0:-1` if unmatched.
-
-# Examples
-```jldoctest
-julia> find_prev("z", "Hello to the world", 18)
-0:-1
-
-julia> find_prev("o", "Hello to the world", 18)
-15:15
-
-julia> find_prev("Julia", "JuliaLang", 6)
-1:5
-```
-"""
-function find_prev  end
-
-"""
-    find_last(pattern::AbstractString, string::AbstractString)
-
-Find the last occurrence of `pattern` in `string`. Equivalent to
-[`find_last(pattern, string, lastindex(s))`](@ref).
-
-# Examples
-```jldoctest
-julia> find_last("o", "Hello to the world")
-15:15
-
-julia> find_last("Julia", "JuliaLang")
-1:5
-```
-"""
-function find_last  end
+export found, find_result, fnd
+export Dir, Fwd, Rev
 
 abstract type Dir end
 struct Fwd <: Dir end
 struct Rev <: Dir end
+
+"""
+    find(Fwd, pattern::Union{Regex,AbstractString}, string::AbstractString, start::Integer=1)
+
+Find the next occurrence of `pattern` in `string` starting at position `start`.
+`pattern` can be either a string, or a regular expression, in which case `string`
+must be of type `String`, `ASCIIStr`, `UTF8Str` (or a `SubString` of one of those types)
+dir can be either Fwd or Rev
+
+The return value is a range of indexes where the matching sequence is found, such that
+`s[find(Fwd, x, s, i)] == x`:
+
+`find(Fwd, "substring", string, i)` = `start:end` such that
+`string[start:end] == "substring"`, or `0:-1` if unmatched.
+
+# Examples
+```jldoctest
+julia> find(Fwd, "z", "Hello to the world", 1)
+0:-1
+
+julia> find(Fwd, "o", "Hello to the world", 6)
+8:8
+
+julia> find(Fwd, "Julia", "JuliaLang", 2)
+1:5
+
+julia> find(Fwd, "z", "Hello to the world")
+0:-1
+
+julia> find(Fwd, "Julia", "JuliaLang")
+1:5
+```
+"""
+fnd(::Type{Fwd}, pat, str, pos)
+
+"""
+    find(Rev, pattern::AbstractString, string::AbstractString, start::Integer=lastindex(string))
+
+Find the previous occurrence of `pattern` in `string` starting at position `start`.
+
+The return value is a range of indexes where the matching sequence is found, such that
+`s[find(Rev, x, s, i)] == x`:
+
+`find(Rev, "substring", string, i)` = `start:end` such that
+`string[start:end] == "substring"`, or `0:-1` if unmatched.
+
+# Examples
+```jldoctest
+julia> find(Rev, "z", "Hello to the world", 18)
+0:-1
+
+julia> find(Rev, "o", "Hello to the world", 18)
+15:15
+
+julia> find(Rev, "Julia", "JuliaLang", 6)
+1:5
+
+julia> find(Rev, "o", "Hello to the world")
+15:15
+
+julia> find(Rev, "Julia", "JuliaLang")
+1:5
+```
+"""
+fnd(::Type{Rev}, pat, str, pos)
 
 const _not_found = 0:-1
 
@@ -99,8 +79,6 @@ found(::Type{<:AbstractString}, v) = v != 0
 find_result(::Type{<:AbstractString}, v) = v
 
 @static if VERSION < v"0.7.0-DEV"
-
-find_next(pat::Regex, str::AbstractString, pos::Integer) = Base.findnext(str, pat, pos)
 
 export EqualTo, equalto, OccursIn, occursin
 
@@ -146,16 +124,16 @@ else
 
 import Base: EqualTo, equalto, OccursIn, occursin
 
-find_next(pat::Regex, str::AbstractString, pos::Integer) =
-    coalesce(findnext(pat, str, pos), _not_found)
+nothing_sentinel(i) = i == 0 ? nothing : i
+Base.findnext(a, b::Str, i) = nothing_sentinel(fnd(Fwd, a, b, i))
+Base.findfirst(a, b::Str)   = nothing_sentinel(fnd(Fwd, a, b))
+Base.findprev(a, b::Str, i) = nothing_sentinel(fnd(Rev, a, b, i))
+Base.findlast(a, b::Str)    = nothing_sentinel(fnd(Rev, a, b))
+Base.findnext(a::Str, b::AbstractString, i) = nothing_sentinel(fnd(Fwd, a, b, i))
+Base.findfirst(a::Str, b::AbstractString)   = nothing_sentinel(fnd(Fwd, a, b))
+Base.findprev(a::Str, b::AbstractString, i) = nothing_sentinel(fnd(Rev, a, b, i))
+Base.findlast(a::Str, b::AbstractString)    = nothing_sentinel(fnd(Rev, a, b))
 
-#=
-    nothing_sentinel(i) = i == 0 ? nothing : i
-    Base.findnext(a, b, i) = nothing_sentinel(find_next(a, b, i))
-    Base.findfirst(a, b)   = nothing_sentinel(find_first(a, b))
-    Base.findprev(a, b, i) = nothing_sentinel(find_prev(a, b, i))
-    Base.findlast(a, b)    = nothing_sentinel(find_last(a, b))
-=#
 end
 
 @inline function _srch_pred(::Fwd, testf, str, pos)
@@ -174,29 +152,27 @@ end
     pos
 end
 
-function _srch_check(dir, testf, str, pos)
+function fnd(::Type{D}, fun::Function, str::AbstractString, pos::Integer) where {D<:Dir}
     if pos < 1 || pos > ncodeunits(str)
         @boundscheck boundserr(str, pos)
         return 0
     end
     @inbounds isvalid(str, pos) || index_error(str, pos)
-    _srch_pred(dir, testf, str, pos)
+    _srch_pred(D(), fun, str, pos)
 end
 
-find_next(pred::EqualTo{<:AbsChar}, str::AbstractString, pos::Integer) =
-    _srch_chr(Fwd(), str, pred.x, pos)
-find_prev(pred::EqualTo{<:AbsChar}, str::AbstractString, pos::Integer) =
-    _srch_chr(Rev(), str, pred.x, pos)
+const PatType = Union{Function, AbsChar, AbstractString, Regex}
 
-find_next(ch::AbsChar, str::AbstractString, pos::Integer) = _srch_chr(Fwd(), str, ch, pos)
-find_prev(ch::AbsChar, str::AbstractString, pos::Integer) = _srch_chr(Rev(), str, ch, pos)
+fnd(::Type{Fwd}, pat::PatType, str::AbstractString) = fnd(Fwd, pat, str, 1)
+fnd(::Type{Rev}, pat::PatType, str::AbstractString) = fnd(Rev, pat, str, lastindex(str))
 
-find_first(a, b) = find_next(a, b, 1)
-find_last(a,  b) = find_prev(a, b, lastindex(b))
+fnd(pat::PatType, ::Type{D}, str::AbstractString) where {D<:Dir} = fnd(D, pat, str)
 
-# AbstractString implementations of the generic find_next/find_prev interfaces
-find_next(fun::Function, str::AbstractString, pos::Integer) = _srch_check(Fwd(), fun, str, pos)
-find_prev(fun::Function, str::AbstractString, pos::Integer) = _srch_check(Rev(), fun, str, pos)
+# AbstractString implementations of the generic find interfaces
+
+# Defined with function first, for do syntax
+fnd(fun::Function, ::Type{D}, str::AbstractString, pos::Integer) where {D<:Dir} =
+    fnd(D(), fun, str, pos)
 
 @inline function _srch_codeunit(::Fwd, beg::Ptr{T}, cu::T, pos, len) where {T<:CodeUnitTypes}
     if sizeof(Cwchar_t) == sizeof(T) || T == UInt8
@@ -216,24 +192,26 @@ end
 
 @inline function _srch_codeunit(::Rev, beg::Ptr{UInt8}, cu::UInt8, pos)
     pnt = _rev_memchr(beg, cu, pos)
+    #println("beg=$beg, cu=$cu, pos=$pos => $pnt")
     pnt == C_NULL ? 0 : chrdiff(pnt, beg) + 1
 end
 
 @inline function _srch_codeunit(::Rev, beg::Ptr{T}, cu::T, pos) where {T<:Union{UInt16,UInt32}}
     pnt = bytoff(beg, pos)
     while (pnt -= sizeof(T)) >= beg && get_codeunit(pnt) != cu ; end
+    #println("beg=$beg, cu=$cu, T=$T, pos=$pos => $pnt")
     chrdiff(pnt, beg) + 1
 end
 
 # _srch_cp is only called with values that are valid for that string type,
 # and checking as already been done on the position (pos)
 # These definitions only work for CodeUnitSingle types
-_srch_cp(::Fwd, str::T, cp::AbsChar, pos, len) where {T<:Str} =
-    _srch_codeunit(Fwd(), _pnt(str), cp%codeunit(T), pos, len)
-_srch_cp(::Rev, str::T, cp::AbsChar, pos, len) where {T<:Str} =
-    _srch_codeunit(Rev(), _pnt(str), cp%codeunit(T), pos)
+_srch_cp(::Fwd, ::CodeUnitSingle, str::T, cp::AbsChar, pos, len) where {T<:Str} =
+    @preserve str _srch_codeunit(Fwd(), _pnt(str), cp%codeunit(T), pos, len)
+_srch_cp(::Rev, ::CodeUnitSingle, str::T, cp::AbsChar, pos, len) where {T<:Str} =
+    @preserve str _srch_codeunit(Rev(), _pnt(str), cp%codeunit(T), pos)
 
-function _srch_cp(::Fwd, str, cp, pos, len)
+function _srch_cp(::Fwd, cus, str, cp, pos, len)
     @inbounds while pos <= len
         str[pos] == cp && return pos
         pos = nextind(str, pos)
@@ -241,15 +219,21 @@ function _srch_cp(::Fwd, str, cp, pos, len)
     0
 end
 
-function _srch_cp(::Rev, str, cp, pos, len)
+function _srch_cp(::Rev, cus, str, cp, pos, len)
+    #print("_srch_cp(::Rev, $cus, \"$str\", '$(Char(cp))', $pos, $len)")
     @inbounds while pos > 0
+        #print("\n\tpos=$pos, $(str[pos])")
         str[pos] == cp && return pos
         pos = prevind(str, pos)
     end
+    #println(" => 0")
     0
 end
 
-function _srch_chr(dir, str, ch, pos::Integer)
+fnd(::Type{D}, pred::EqualTo{<:AbsChar}, str::AbstractString, pos::Integer) where {D<:Dir} =
+    fnd(D, pred.x, str, pos)
+
+function fnd(::Type{D}, ch::AbsChar, str::AbstractString, pos::Integer) where {D<:Dir}
     if pos < 1
         @boundscheck (pos == 0 && isempty(str)) || boundserr(str, pos)
         return 0
@@ -259,17 +243,15 @@ function _srch_chr(dir, str, ch, pos::Integer)
         @boundscheck (len == 0 && pos == 1) || boundserr(str, pos)
         return 0
     end
-    @inbounds isvalid(str, pos) || index_error(str, pos)
+    # Only check if CodeUnitMulti
+    (cus = CodePointStyle(str)) === CodeUnitMulti() && (@inbounds !isvalid(str, pos)) &&
+        index_error(str, pos)
+    #println("fnd(::$D, '$ch', \"$str\", $pos) => $(isvalid(eltype(str), ch))")
     # Check here if ch is valid for the type of string
-    isvalid(eltype(str), ch) ? _srch_cp(dir, str, ch, pos, len) : 0
+    isvalid(eltype(str), ch) ? _srch_cp(D(), cus, str, ch, pos, len) : 0
 end
 
 # Substring searching
-
-find_next(needle::AbstractString, str::AbstractString, pos::Integer) =
-    _srch_str(Fwd(), str, needle, pos)
-find_prev(needle::AbstractString, str::AbstractString, pos::Integer) =
-    _srch_str(Rev(), str, needle, pos)
 
 # Todo: make use of CompareStyle trait to improve performance
 
@@ -286,10 +268,16 @@ find_prev(needle::AbstractString, str::AbstractString, pos::Integer) =
 end
 
 function _srch_strings(::Fwd, ::CompareStyle, str, needle, ch, nxtsub, pos, slen, tlen)
-    while (pos = _srch_cp(Fwd(), str, ch, pos, slen)) != 0
+    cu = CodePointStyle(str)
+    while (pos = _srch_cp(Fwd(), cu, str, ch, pos, slen)) != 0
         nxt = nextind(str, pos)
         res = _cmp_str(str, nxt, needle, nxtsub)
         res == 0 || return pos:res
+        #= if res != 0
+            println("$(typeof(str)), $(typeof(needle)), \"$str\", \"$needle\", '$ch', " *
+                    "nxtsub=$nxtsub, pos=$pos, slen=$slen, tlen=$tlen => $j, $(pos+j)")
+            return pos:res
+        end=#
         pos = nxt
         done(str, nxt) && break
     end
@@ -302,9 +290,15 @@ function _srch_strings(::Rev, ::CompareStyle, str, needle, ch, nxtsub, pos, slen
     # We are always checking 2 or more characters here
     prv = prevind(str, pos)
     prv == 0 && return _not_found
-    while (pos = _srch_cp(Rev(), str, ch, prv, slen)) != 0
+    cu = CodePointStyle(str)
+    while (pos = _srch_cp(Rev(), cu, str, ch, prv, slen)) != 0
         res = _cmp_str(str, nextind(str, pos), needle, nxtsub)
         res == 0 || return pos:res
+        #= if res != 0
+            println("$(typeof(str)), $(typeof(needle)), \"$str\", \"$needle\", '$ch', " *
+                    "nxtsub=$nxtsub, pos=$pos, slen=$slen, tlen=$tlen => $j, $(pos+j)")
+            return pos:res
+        end=#
         (prv = prevind(str, pos)) == 0 && break
     end
     _not_found
@@ -340,7 +334,7 @@ function _srch_strings(::Fwd, ::Union{ByteCompare,WidenCompare}, str, needle,
             end
 
             # match found
-            j == tlen - 1 && return pos:pos+j
+            j == tlen - 1 && return pos:thisind(str, pos + j)
 
             # no match, try to rule out the next character
             if pos <= slen && _check_bloom_mask(bloom_mask, spnt, pos + tlen)
@@ -356,7 +350,7 @@ function _srch_strings(::Fwd, ::Union{ByteCompare,WidenCompare}, str, needle,
     _not_found
 end
 
-function _srch_str(dir::Dir, str::AbstractString, needle::AbstractString, pos::Integer)
+function fnd(::Type{D}, needle::AbstractString, str::AbstractString, pos::Integer) where {D<:Dir}
     # Check for fast case of a single codeunit (should check for single character also)
     slen = ncodeunits(str)
     if slen == 0
@@ -376,22 +370,22 @@ function _srch_str(dir::Dir, str::AbstractString, needle::AbstractString, pos::I
     isvalid(eltype(str), ch) || return _not_found
     # Check if single character
     if nxt > tlen
-        pos = _srch_cp(dir, str, ch, pos, slen)
+        pos = _srch_cp(D(), CodePointStyle(str), str, ch, pos, slen)
         return pos == 0 ? _not_found : (pos:pos)
     end
-    _srch_strings(dir, cmp, str, needle, ch, nxt, pos, slen, tlen)
+    _srch_strings(D(), cmp, str, needle, ch, nxt, pos, slen, tlen)
 end
 
 @static if VERSION < v"0.7.0-DEV"
-    contains(hay::AbstractString, chr::AbsChar)   = _srch_chr(Fwd(), hay, chr, 1) != 0
+    contains(hay::AbstractString, chr::AbsChar)   = first(fnd(Fwd, chr, hay)) != 0
 else
     # Avoid type piracy
-    contains(hay::Str, chr::Char)                 = _srch_chr(Fwd(), hay, chr, 1) != 0
-    contains(hay::AbstractString, chr::CodePoint) = _srch_chr(Fwd(), hay, chr, 1) != 0
+    contains(hay::Str, chr::Char)                 = first(fnd(Fwd, chr, hay)) != 0
+    contains(hay::AbstractString, chr::CodePoint) = first(fnd(Fwd, chr, hay)) != 0
 end
-contains(hay::Str, str::Str)            = _srch_str(Fwd(), hay, str, 1) != 0
-contains(hay::Str, str::AbstractString) = _srch_str(Fwd(), hay, str, 1) != 0
-contains(hay::AbstractString, str::Str) = _srch_str(Fwd(), hay, str, 1) != 0
+contains(hay::Str, str::Str)            = first(fnd(Fwd, str, hay)) != 0
+contains(hay::Str, str::AbstractString) = first(fnd(Fwd, str, hay)) != 0
+contains(hay::AbstractString, str::Str) = first(fnd(Fwd, str, hay)) != 0
 
 in(chr::CodePoint, str::AbstractString) = contains(str, chr)
 in(chr::AbsChar,   str::Str)            = contains(str, chr)
@@ -404,10 +398,12 @@ using Base.PCRE
 using Base: DEFAULT_COMPILER_OPTS, DEFAULT_MATCH_OPTS
 import Base: Regex, match
 
-const ByteRegexCSE = Union{ASCIICSE,Latin_CSEs,Binary_CSEs}
+const Regex_CSEs = Union{ASCIICSE,Latin_CSEs,Binary_CSEs}
 
-cvt_compile(::Type{<:ByteRegexCSE}, co) = co & ~PCRE.UTF
-cvt_match(::Type{<:ByteRegexCSE}, co)   = co & ~PCRE.NO_UTF_CHECK
+cvt_compile(::Type{<:CSE}, co)  = cvt_compile(UTF8CSE, co)
+cvt_match(::Type{<:CSE}, co)    = cvt_match(UTF8CSE, co)
+cvt_compile(::Type{Regex_CSEs}, co) = co & ~PCRE.UTF
+cvt_match(::Type{Regex_CSEs}, co)   = co & ~PCRE.NO_UTF_CHECK
 cvt_compile(::Type{UTF8CSE}, co)  = co | PCRE.NO_UTF_CHECK | PCRE.UTF
 cvt_match(::Type{UTF8CSE}, co)    = co | PCRE.NO_UTF_CHECK
 
@@ -504,25 +500,33 @@ function _match(::Type{C}, re, str, idx, add_opts) where {C<:CSE}
         return nothing
     ovec = re.ovec
     n = div(length(ovec),2) - 1
-    ss = C == _LatinCSE ? Str{LatinCSE}(str) : str
-    mat = SubString(ss, ovec[1]+1, prevind(ss, ovec[2]+1))
-    cap = Union{Nothing,SubString{typeof(ss)}}[ovec[2i+1] == PCRE.UNSET ? nothing :
-                                        SubString(ss, ovec[2i+1]+1,
-                                                  prevind(ss, ovec[2i+2]+1)) for i=1:n]
+    mat = SubString(str, ovec[1]+1, prevind(str, ovec[2]+1))
+    cap = Union{Nothing,SubString{typeof(str)}}[ovec[2i+1] == PCRE.UNSET ?
+                                               nothing :
+                                               SubString(str, ovec[2i+1]+1,
+                                                         prevind(str, ovec[2i+2]+1)) for i=1:n]
     off = Int[ ovec[2i+1]+1 for i=1:n ]
     RegexMatchStr(mat, cap, Int(ovec[1]+1), off, re)
 end
 
-match(re::Regex, str::Str, idx::Integer, add_opts::UInt32=UInt32(0)) =
-    _match(cse(str), re, str, Int(idx), add_opts)
+match(re::Regex, str::Str{C}, idx::Integer, add_opts::UInt32=UInt32(0)) where {C<:CSE} =
+    error("Regex not supported yet on strings with codeunit == UInt16 or UInt32")
+match(re::Regex, str::Str{C}, idx::Integer, add_opts::UInt32=UInt32(0)) where {C<:Regex_CSEs} =
+    _match(C, re, str, Int(idx), add_opts)
+match(re::Regex, str::Str{UTF8CSE}, idx::Integer, add_opts::UInt32=UInt32(0)) =
+    _match(UTF8CSE, re, str, Int(idx), add_opts)
+match(re::Regex, str::Str{_LatinCSE}, idx::Integer, add_opts::UInt32=UInt32(0)) =
+    _match(LatinCSE, re, Str{LatinCSE}(str), Int(idx), add_opts)
 
-function find_next(re::Regex, str::Union{Str{C},SubString{<:Str{C}}},
-                   idx::Integer) where {C<:Byte_CSEs}
+
+function fnd(::Type{Fwd}, re::Regex,
+             str::Union{AbstractString,SubString{AbstractString}}, idx::Integer)
     if idx > ncodeunits(str)
         @boundscheck boundserr(str, idx)
-        return nothing
+        return _not_found
     end
+    C = cse(str)
     check_compile(C, re)
     (PCRE.exec(re.regex, str, idx-1, cvt_match(C, re.match_options), re.match_data)
-     ? ((Int(re.ovec[1])+1):prevind(str,Int(re.ovec[2])+1)) : nothing)
+     ? ((Int(re.ovec[1])+1):prevind(str,Int(re.ovec[2])+1)) : _not_found)
 end
