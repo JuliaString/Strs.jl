@@ -32,21 +32,6 @@ function string(collection::_UBS...)
     Str(LatinCSE, buf)
 end
 
-# Todo make generic version, with all CodeUnitSingle types
-function reverse(str::Str{C}) where {C<:Union{ASCIICSE, Latin_CSEs, Text1CSE, BinaryCSE}}
-    (len = _len(str)) < 2 && return str
-    @preserve str begin
-        pnt = _pnt(str)
-        buf, beg = _allocate(UInt8, len)
-        out = beg + len
-        while out >= beg
-            set_codeunit!(out -= 1, get_codeunit(pnt))
-            pnt += 1
-        end
-        Str(C, buf)
-    end
-end
-
 ## outputting Latin 1 strings ##
 
 function print(io::IO, str::LatinStrings)

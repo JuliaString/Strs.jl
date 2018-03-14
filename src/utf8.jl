@@ -1,7 +1,9 @@
 #=
 UTF8Str type
 
-Copyright 2017 Gandalf Software, Inc., Scott P. Jones, and other contributors to the Julia language
+Copyright 2017-2018 Gandalf Software, Inc., Scott P. Jones,
+and other contributors to the Julia language
+
 Licensed under MIT License, see LICENSE.md
 Based in part on code for UTF8String that used to be in Julia
 =#
@@ -304,11 +306,9 @@ const _ByteStr = Union{Str{ASCIICSE}, Str{UTF8CSE}, String}
 string(c::_ByteStr...) = length(c) == 1 ? c[1]::UTF8Str : UTF8Str(_string(c))
     # ^^ at least one must be UTF-8 or the ASCII-only method would get called
 
-function reverse(str::Str{UTF8CSE})
-    (len = _len(str)) < 2 && return str
-    buf, beg = _allocate(UInt8, len)
+function _reverse(::CodeUnitMulti, ::Type{UTF8CSE}, len, pnt::Ptr{T}) where {T<:CodeUnitTypes}
+    buf, beg = _allocate(T, len)
     out = beg + len
-    pnt = _pnt(str)
     while out >= beg
         ch = get_codeunit(pnt)
         if ch > 0xdf

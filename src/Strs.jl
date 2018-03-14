@@ -74,7 +74,8 @@ import Base: containsnul, convert, getindex, length, map, pointer, collect, in,
              codeunit, start, next, done, nextind, prevind, reverseind,
              typemin, typemax, isvalid, rem, size, ndims, first, last, eltype, isempty, in,
              isless, ==, -, +, *, ^, cmp, promote_rule, one, repeat, filter,
-             print, show, isimmutable
+             print, show, isimmutable, startswith, endswith, chop, chomp,
+             lstrip, rstrip, strip, lpad, rpad, split, rsplit, replace, ascii
     
 @condimport ind2chr
 @condimport chr2ind
@@ -144,8 +145,6 @@ include("stats.jl")
 include("legacy.jl")
 include("utf8case.jl")
 include("utf16case.jl")
-#include("util.jl")
-#include("substring.jl")
-#include("io.jl")
+include("util.jl")
 
 end # module Strs

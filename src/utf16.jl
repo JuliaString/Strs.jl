@@ -127,9 +127,7 @@ function reverseind(str::Str{<:UTF16CSE}, i::Integer)
     is_surrogate_trail(get_codeunit(pnt, j)) ? j - 1 : j
 end
 
-function reverse(str::Str{<:UTF16CSE})
-    (len = _len(str)) < 2 && return str
-    pnt = _pnt(str)
+function _reverse(::CodeUnitMulti, ::Type{UTF16CSE}, len, pnt::Ptr{T}) where {T<:CodeUnitTypes}
     buf, beg = _allocate(UInt16, len)
     out = bytoff(beg, len)
     while out > beg
@@ -139,19 +137,6 @@ function reverse(str::Str{<:UTF16CSE})
         pnt += 2
     end
     Str(UTF16CSE, buf)
-end
-
-function reverse(str::Str{C}) where {C<:Union{Text2CSE,Text4CSE,UCS2_CSEs,UTF32_CSEs}}
-    (len = _len(str)) < 2 && return str
-    pnt = _pnt(str)
-    T = codeunit(str)
-    buf, beg = _allocate(T, len)
-    out = bytoff(beg, len)
-    while out > beg
-        set_codeunit!(out -= sizeof(T), get_codeunit(pnt))
-        pnt += sizeof(T)
-    end
-    Str(C, buf)
 end
 
 @inline _isvalid_char_pos(::CodeUnitMulti, str::Str{<:UTF16CSE}, pos::Integer) =

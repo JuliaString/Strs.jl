@@ -186,3 +186,48 @@ write(io::IO, str::Str{<:CSE,Nothing}) = write(io, str.data)
 # optimized methods to avoid iterating over chars
 print(io::IO, str::Union{T,SubString{T}}) where {T<:Str{<:Union{ASCIICSE,UTF8CSE},Nothing}} =
     (write(io, str.data); nothing)
+
+#Str(str::SubString{<:Str}) = unsafe_string(pointer(str.string, str.offset+1), str.ncodeunits)
+
+thisind(str::SubString{<:Str}, i::Int) = _thisind_str(str, i)
+nextind(str::SubString{<:Str}, i::Int) = _nextind_str(str, i)
+#=
+function cmp(a::SubString{String}, b::SubString{String})
+    na = sizeof(a)
+    nb = sizeof(b)
+    c = ccall(:memcmp, Int32, (Ptr{UInt8}, Ptr{UInt8}, UInt),
+              pointer(a), pointer(b), min(na, nb))
+    return c < 0 ? -1 : c > 0 ? +1 : cmp(na, nb)
+end
+=#
+# don't make unnecessary copies when passing substrings to C functions
+cconvert(::Type{Ptr{Union{UInt8,Int8}}}, s::SubString{ByteStrings}) = s
+
+function unsafe_convert(::Type{Ptr{R}}, s::SubString{ByteStrings}) where R<:Union{Int8, UInt8}
+    convert(Ptr{R}, pointer(s.string)) + s.offset
+end
+
+pointer(x::SubString{ByteStrings}) = pointer(x.string) + x.offset
+pointer(x::SubString{ByteStrings}, i::Integer) = pointer(x.string) + x.offset + (i-1)
+
+function _reverse(::CodeUnitSingle, ::Type{C}, len, pnt::Ptr{T}) where {C<:CSE,T<:CodeUnitTypes}
+    buf, beg = _allocate(T, len)
+    out = bytoff(beg, len)
+    while out > beg
+        set_codeunit!(out -= sizeof(T), get_codeunit(pnt))
+        pnt += sizeof(T)
+    end
+    Str(C, buf)
+end
+
+function _reverse(::CodeUnitMulti, ::Type{C}, str) where {C<:CSE}
+    len = ncodeunits(str)
+    @inbounds ((t = nextind(str, 1)) > len || nextind(str, t) > len) && return str
+    @preserve str _reverse(CodeUnitMulti(), C, len, _pnt(str))
+end
+_reverse(::CodeUnitSingle, ::Type{C}, str) where {C<:CSE} =
+    (len = ncodeunits(str)) < 3 ? str :
+    (@preserve str _reverse(CodeUnitSingle(), C, len, _pnt(str)))
+
+reverse(str::T) where {C<:CSE,T<:Union{Str{C},SubString{Str{C}}}} =
+    _reverse(CodePointStyle(str), C, str)
