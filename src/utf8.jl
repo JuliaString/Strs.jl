@@ -287,7 +287,7 @@ end
 
 @propagate_inbounds function getindex(str::Str{UTF8CSE}, rng::UnitRange{Int})
     isempty(rng) && return SubString(empty_utf8, 1, 0)
-    beg = first(rng) 
+    beg = first(rng)
     len = _len(str)
     @boundscheck 1 <= beg <= len || boundserr(str, beg)
     pnt = _pnt(str)
@@ -296,7 +296,7 @@ end
     lst = last(rng)
     @boundscheck lst > len && boundserr(str, lst)
     if lst != len
-        ch = get_codeunit(pnt + lst)
+        ch = get_codeunit(pnt, lst)
         is_valid_continuation(ch) && unierror(UTF_ERR_INVALID_INDEX, lst, ch)
     end
     SubString(str, beg, lst)

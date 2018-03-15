@@ -26,7 +26,8 @@ function endswith(a::AbstractString, b::AbstractString)
     all(splat(==), zip(a, b)) && isempty(b)
 end
 endswith(str::AbstractString, chars::Chars) = !isempty(str) && last(str) in chars
-end
+
+end # if false
 
 startswith(a::Str{C}, b::Str{C}) where {C<:CSE} =
     (len = _len(b)) <= _len(a) && _memcmp(_pnt(a), _pnt(b), len) == 0
@@ -38,7 +39,7 @@ endswith(a::Str{C}, b::Str{C}) where {C<:CSE} =
 function chop(s::AbstractString; head::Integer = 0, tail::Integer = 1)
     SubString(s, nextind(s, firstindex(s), head), prevind(s, lastindex(s), tail))
 end
-end
+end # if false
 
 function chomp(str::Str)
     len, pnt = _lenpnt(str)
@@ -101,12 +102,14 @@ rpad(ch::CodePoint, cnt::Integer, pad::AbsChar=' ') =
 split(str::T, splitter;
       limit::Integer=0, keep::Bool=true) where {T<:Str} =
     _split(str, splitter, limit, keep, T <: SubString ? T[] : SubString{T}[])
-split(str::T, splitter::Union{Tuple{Vararg{<:AbstractChar}},AbstractVector{<:AbstractChar},Set{<:AbstractChar}};
+split(str::T, splitter::Union{Tuple{Vararg{<:AbstractChar}},
+                              AbstractVector{<:AbstractChar},
+                              Set{<:AbstractChar}};
       limit::Integer=0, keep::Bool=true) where {T<:Str} =
-    _split(str, occursin(splitter), limit, keep, T <: SubString ? T[] : SubString{T}[])
+    _split(str, in(splitter), limit, keep, T <: SubString ? T[] : SubString{T}[])
 split(str::T, splitter::AbstractChar;
       limit::Integer=0, keep::Bool=true) where {T<:Str} =
-    _split(str, equalto(splitter), limit, keep, T <: SubString ? T[] : SubString{T}[])
+    _split(str, ==(splitter), limit, keep, T <: SubString ? T[] : SubString{T}[])
 
 function _split(str::T, splitter, limit::Integer, keep_empty::Bool, strs::Array) where {T<:Str}
     i = 1
@@ -143,7 +146,7 @@ rsplit(str::T, splitter::Union{Tuple{Vararg{<:AbstractChar}},
   _rsplit(str, occursin(splitter), limit, keep, T <: SubString ? T[] : SubString{T}[])
 rsplit(str::T, splitter::AbstractChar;
        limit::Integer=0, keep::Bool=true) where {T<:Str} =
-  _rsplit(str, equalto(splitter), limit, keep, T <: SubString ? T[] : SubString{T}[])
+  _rsplit(str, ==(splitter), limit, keep, T <: SubString ? T[] : SubString{T}[])
 
 function _rsplit(str::Str, splitter, limit::Integer, keep_empty::Bool, strs::Array)
     n = lastindex(str)
@@ -159,19 +162,20 @@ function _rsplit(str::Str, splitter, limit::Integer, keep_empty::Bool, strs::Arr
     strs
 end
 
-_replace(io, repl, str, r, pattern) = print(io, repl)
+_replace(io, repl, str, r, pattern) =
+    print(io, repl)
 _replace(io, repl::Function, str, r, pattern) =
     print(io, repl(SubString(str, first(r), last(r))))
 _replace(io, repl::Function, str, r, pattern::Function) =
     print(io, repl(str[first(r)]))
 
 replace(str::Str, pat_repl::Pair{<:AbstractChar}; count::Integer=typemax(Int)) =
-    replace(str, equalto(first(pat_repl)) => last(pat_repl); count=count)
+    replace(str, ==(first(pat_repl)) => last(pat_repl); count=count)
 
 replace(str::Str, pat_repl::Pair{<:Union{Tuple{Vararg{<:AbstractChar}},
                                          AbstractVector{<:AbstractChar},Set{<:AbstractChar}}};
         count::Integer=typemax(Int)) =
-    replace(str, occursin(first(pat_repl)) => last(pat_repl), count=count)
+    replace(str, in(first(pat_repl)) => last(pat_repl), count=count)
 
 function replace(str::Str, pat_repl::Pair; count::Integer=typemax(Int))
     pattern, repl = pat_repl
@@ -181,11 +185,14 @@ function replace(str::Str, pat_repl::Pair; count::Integer=typemax(Int))
     i = 1
     e = lastindex(str)
     r = fnd(Fwd, pattern, str)
+    (j = first(r)) == 0 && return str
     # Just return the string if not found
-    j, k = first(r), last(r)
+
     out = IOBuffer(sizehint=floor(Int, 1.2 * sizeof(str)))
-    while j != 0
+    while true
+        k = last(r)
         if i == 1 || i <= k
+            println("$i $k $(pointer(str, i)), $(j-i)")
             unsafe_write(out, pointer(str, i), UInt(j-i))
             _replace(out, repl, str, r, pattern)
         end
@@ -197,12 +204,14 @@ function replace(str::Str, pat_repl::Pair; count::Integer=typemax(Int))
             i = k = nextind(str, k)
         end
         r = fnd(Fwd, pattern, str, k)
-        r == 0:-1 || n == count && break
-        j, k = first(r), last(r)
+        println("$r $i $j $k $n")
+        j = first(r)
+        j == 0 && break
+        n == count && break
         n += 1
     end
-    write(out, SubString(str,i))
-    Str(cse(str), take!(out))
+    print(out, SubString(str, i))
+    String(take!(out))
 end
 
 # TODO: allow transform as the first argument to replace?

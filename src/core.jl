@@ -177,17 +177,8 @@ convert(::Type{<:Str{UTF32CSE}}, ch::Unsigned) =
 
 convert(::Type{T}, ch::Signed) where {T<:Str} = ch < 0 ? ncharerr(ch) : convert(T, ch%Unsigned)
 
-## outputting Str strings ##
-
-write(io::IO, str::Str{<:CSE,Nothing}) = write(io, str.data)
-
-# Todo: handle substring of Str
-
-# optimized methods to avoid iterating over chars
-print(io::IO, str::Union{T,SubString{T}}) where {T<:Str{<:Union{ASCIICSE,UTF8CSE},Nothing}} =
-    (write(io, str.data); nothing)
-
-#Str(str::SubString{<:Str}) = unsafe_string(pointer(str.string, str.offset+1), str.ncodeunits)
+Str(str::SubString{<:Str{C}}) where {C<:Byte_CSEs} =
+    Str(C, unsafe_string(pointer(str.string, str.offset+1), str.ncodeunits))
 
 #=
 function cmp(a::SubString{String}, b::SubString{String})
@@ -201,12 +192,8 @@ end
 # don't make unnecessary copies when passing substrings to C functions
 cconvert(::Type{Ptr{Union{UInt8,Int8}}}, s::SubString{ByteStrings}) = s
 
-function unsafe_convert(::Type{Ptr{R}}, s::SubString{ByteStrings}) where R<:Union{Int8, UInt8}
+unsafe_convert(::Type{Ptr{R}}, s::SubString{ByteStrings}) where R<:Union{Int8, UInt8} =
     convert(Ptr{R}, pointer(s.string)) + s.offset
-end
-
-pointer(x::SubString{ByteStrings}) = pointer(x.string) + x.offset
-pointer(x::SubString{ByteStrings}, i::Integer) = pointer(x.string) + x.offset + (i-1)
 
 function _reverse(::CodeUnitSingle, ::Type{C}, len, pnt::Ptr{T}) where {C<:CSE,T<:CodeUnitTypes}
     buf, beg = _allocate(T, len)

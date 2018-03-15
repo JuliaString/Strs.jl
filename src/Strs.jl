@@ -96,6 +96,7 @@ isdefined(Base, :Cvoid)          || (const Cvoid = Void)
 isdefined(Base, :AbstractChar)   || (abstract type AbstractChar end ; export AbstractChar)
 
 @static isdefined(Base, :codeunits) || include("codeunits.jl")
+@static isdefined(Base, :Fix2)      || include("fix2.jl")
 
 export find
 function fnd end
@@ -144,11 +145,13 @@ include("utf32.jl")
 include("search.jl")
 include("utf8search.jl")
 include("utf16search.jl")
+include("regex.jl")
 include("encode.jl")
 include("stats.jl")
 include("legacy.jl")
 include("utf8case.jl")
 include("utf16case.jl")
 include("util.jl")
+include("io.jl") 
 
 end # module Strs

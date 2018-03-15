@@ -1,5 +1,10 @@
-# This file includes code originally from Julia.
-# License is MIT: https://julialang.org/license
+#=
+Search functions for Str strings
+
+Copyright 2018 Gandalf Software, Inc., Scott P. Jones, and other contributors to the Julia language
+Licensed under MIT License, see LICENSE.md
+Based in part on julia/base/strings/search.jl
+=#
 
 export found, find_result, fnd
 export Dir, Fwd, Rev
@@ -80,49 +85,7 @@ find_result(::Type{<:AbstractString}, v) = v
 
 @static if VERSION < v"0.7.0-DEV"
 
-export EqualTo, equalto, OccursIn, occursin
-
-struct EqualTo{T} <: Function
-    x::T
-
-    EqualTo(x::T) where {T} = new{T}(x)
-end
-
-(f::EqualTo)(y) = isequal(f.x, y)
-
-"""
-    equalto(x)
-
-Create a function that compares its argument to `x` using [`isequal`](@ref); i.e. returns
-`y->isequal(x,y)`.
-
-The returned function is of type `Base.EqualTo`. This allows dispatching to
-specialized methods by using e.g. `f::Base.EqualTo` in a method signature.
-"""
-const equalto = EqualTo
-
-struct OccursIn{T} <: Function
-    x::T
-
-    OccursIn(x::T) where {T} = new{T}(x)
-end
-
-(f::OccursIn)(y) = y in f.x
-
-"""
-    occursin(x)
-
-Create a function that checks whether its argument is [`in`](@ref) `x`; i.e. returns
-`y -> y in x`.
-
-The returned function is of type `Base.OccursIn`. This allows dispatching to
-specialized methods by using e.g. `f::Base.OccursIn` in a method signature.
-"""
-const occursin = OccursIn
-
 else
-
-import Base: EqualTo, equalto, OccursIn, occursin
 
 nothing_sentinel(i) = i == 0 ? nothing : i
 Base.findnext(a, b::Str, i) = nothing_sentinel(fnd(Fwd, a, b, i))
@@ -230,7 +193,8 @@ function _srch_cp(::Rev, cus, str, cp, pos, len)
     0
 end
 
-fnd(::Type{D}, pred::EqualTo{<:AbsChar}, str::AbstractString, pos::Integer) where {D<:Dir} =
+fnd(::Type{D}, pred::P, str::AbstractString,
+    pos::Integer) where {P<:Base.Fix2{Union{typeof(==),typeof(isequal)}, <:AbsChar}, D<:Dir} =
     fnd(D, pred.x, str, pos)
 
 function fnd(::Type{D}, ch::AbsChar, str::AbstractString, pos::Integer) where {D<:Dir}
@@ -392,141 +356,3 @@ in(chr::AbsChar,   str::Str)            = contains(str, chr)
 in(pat::Str, str::Str)                  = contains(str, pat)
 in(pat::Str, str::AbstractString)       = contains(str, pat)
 in(pat::AbstractString, str::Str)       = contains(str, pat)
-
-using Base.PCRE
-
-using Base: DEFAULT_COMPILER_OPTS, DEFAULT_MATCH_OPTS
-import Base: Regex, match
-
-const Regex_CSEs = Union{ASCIICSE,Latin_CSEs,Binary_CSEs}
-
-cvt_compile(::Type{<:CSE}, co)  = cvt_compile(UTF8CSE, co)
-cvt_match(::Type{<:CSE}, co)    = cvt_match(UTF8CSE, co)
-cvt_compile(::Type{Regex_CSEs}, co) = co & ~PCRE.UTF
-cvt_match(::Type{Regex_CSEs}, co)   = co & ~PCRE.NO_UTF_CHECK
-cvt_compile(::Type{UTF8CSE}, co)  = co | PCRE.NO_UTF_CHECK | PCRE.UTF
-cvt_match(::Type{UTF8CSE}, co)    = co | PCRE.NO_UTF_CHECK
-
-Regex(pattern::Str{C}, co, mo) where {C<:Byte_CSEs} =
-    Regex(String(pattern), cvt_compile(C, co), mo)
-Regex(pattern::Str{C}) where {C<:Byte_CSEs} =
-    Regex(String(pattern),
-          cvt_compile(C, DEFAULT_COMPILER_OPTS), cvt_match(C, DEFAULT_MATCH_OPTS))
-
-function _update_compiler_opts(flags)
-    options = DEFAULT_COMPILER_OPTS
-    for f in flags
-        options |= f=='i' ? PCRE.CASELESS  :
-                   f=='m' ? PCRE.MULTILINE :
-                   f=='s' ? PCRE.DOTALL    :
-                   f=='x' ? PCRE.EXTENDED  :
-                   throw(ArgumentError("unknown regex flag: $f"))
-    end
-    options
-end
-
-Regex(pattern::Str{C}, flags::AbstractString) where {C<:Byte_CSEs} =
-    Regex(pattern, cvt_compile(C, _update_compile_opts(flags)), cvt_match(C, DEFAULT_MATCH_OPTS))
-
-struct RegexMatchStr{T<:AbstractString}
-    match::T
-    captures::Vector{Union{Nothing,T}}
-    offset::Int
-    offsets::Vector{Int}
-    regex::Regex
-end
-
-function show(io::IO, m::RegexMatchStr)
-    print(io, "RegexMatchStr(")
-    show(io, m.match)
-    idx_to_capture_name = PCRE.capture_names(m.regex.regex)
-    if !isempty(m.captures)
-        print(io, ", ")
-        for i = 1:length(m.captures)
-            # If the capture group is named, show the name.
-            # Otherwise show its index.
-            capture_name = get(idx_to_capture_name, i, i)
-            print(io, capture_name, "=")
-            show(io, m.captures[i])
-            if i < length(m.captures)
-                print(io, ", ")
-            end
-        end
-    end
-    print(io, ")")
-end
-
-# Capture group extraction
-getindex(m::RegexMatchStr, idx::Integer) = m.captures[idx]
-function getindex(m::RegexMatchStr, name::Symbol)
-    idx = PCRE.substring_number_from_name(m.regex.regex, name)
-    idx <= 0 && error("no capture group named $name found in regex")
-    m[idx]
-end
-
-getindex(m::RegexMatchStr, name::AbstractString) = m[Symbol(name)]
-
-"""
-Check if the compile flags match the current search
-
-If not, free up old compilation, and recompile
-For better performance, the Regex object should hold spots for 5 compiled regexes,
-for 8-bit, UTF-8, 16-bit, UTF-16, and 32-bit code units
-"""
-function check_compile(::Type{C}, regex::Regex) where {C<:CSE}
-    # ASCII is compatible with all (current) types, don't recompile
-    re = regex.regex
-    C == ASCIICSE && re != C_NULL && return
-    oldopt = regex.compile_options
-    cvtcomp = cvt_compile(C, oldopt)
-    if cvtcomp != oldopt
-        regex.compile_options = cvtcomp
-        re == C_NULL || (PCRE.free_re(re); regex.regex = re = C_NULL)
-        regex.match_data == C_NULL ||
-            (PCRE.free_match_data(regex.match_data); regex.match_data = C_NULL)
-    end
-    if re == C_NULL
-        regex.regex = re = PCRE.compile(regex.pattern, cvtcomp)
-        PCRE.jit_compile(re)
-        regex.match_data = PCRE.create_match_data(re)
-        regex.ovec = PCRE.get_ovec(regex.match_data)
-    end
-    nothing
-end
-
-function _match(::Type{C}, re, str, idx, add_opts) where {C<:CSE}
-    check_compile(C, re)
-    PCRE.exec(re.regex, str, idx-1, cvt_match(C, re.match_options | add_opts), re.match_data) ||
-        return nothing
-    ovec = re.ovec
-    n = div(length(ovec),2) - 1
-    mat = SubString(str, ovec[1]+1, prevind(str, ovec[2]+1))
-    cap = Union{Nothing,SubString{typeof(str)}}[ovec[2i+1] == PCRE.UNSET ?
-                                               nothing :
-                                               SubString(str, ovec[2i+1]+1,
-                                                         prevind(str, ovec[2i+2]+1)) for i=1:n]
-    off = Int[ ovec[2i+1]+1 for i=1:n ]
-    RegexMatchStr(mat, cap, Int(ovec[1]+1), off, re)
-end
-
-match(re::Regex, str::Str{C}, idx::Integer, add_opts::UInt32=UInt32(0)) where {C<:CSE} =
-    error("Regex not supported yet on strings with codeunit == UInt16 or UInt32")
-match(re::Regex, str::Str{C}, idx::Integer, add_opts::UInt32=UInt32(0)) where {C<:Regex_CSEs} =
-    _match(C, re, str, Int(idx), add_opts)
-match(re::Regex, str::Str{UTF8CSE}, idx::Integer, add_opts::UInt32=UInt32(0)) =
-    _match(UTF8CSE, re, str, Int(idx), add_opts)
-match(re::Regex, str::Str{_LatinCSE}, idx::Integer, add_opts::UInt32=UInt32(0)) =
-    _match(LatinCSE, re, Str{LatinCSE}(str), Int(idx), add_opts)
-
-
-function fnd(::Type{Fwd}, re::Regex,
-             str::Union{AbstractString,SubString{AbstractString}}, idx::Integer)
-    if idx > ncodeunits(str)
-        @boundscheck boundserr(str, idx)
-        return _not_found
-    end
-    C = cse(str)
-    check_compile(C, re)
-    (PCRE.exec(re.regex, str, idx-1, cvt_match(C, re.match_options), re.match_data)
-     ? ((Int(re.ovec[1])+1):prevind(str,Int(re.ovec[2])+1)) : _not_found)
-end

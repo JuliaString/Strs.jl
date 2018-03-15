@@ -27,12 +27,6 @@ end
 
 string(c::Str{ASCIICSE}...) = length(c) == 1 ? c[1] : Str(ASCIICSE, _string(c))
 
-## outputting ASCII strings ##
-
-write(io::IO, s::Str{ASCIICSE,Nothing}) = write(io, s.data)
-
-write(io::IO, ch::ASCIIChr) = write(io, tobase(ch))
-
 ## transcoding to ASCII ##
 
 function convert(::Type{ASCIIStr}, str::AbstractString)

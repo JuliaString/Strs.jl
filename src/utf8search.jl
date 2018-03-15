@@ -36,24 +36,27 @@ function _srch_cp(::Rev, ::CodeUnitMulti, str::Str{UTF8CSE}, cp::AbsChar, pos, l
     @preserve str begin
         (ch = tobase(cp)) < 0x80 && return _srch_codeunit(Rev(), _pnt(str), ch%UInt8, pos)
         init = beg = _pnt(str)
-        pnt = beg + @inbounds nextind(str, pos) - 1
+        pnt = beg + @inbounds nextind(str, pos)
         if ch <= 0x7ff
+            pnt > (beg += 1) || return 0
             b1, b2 = get_utf8_2(ch)
-            beg += 1
-            while pnt > beg && (pnt = _rev_memchr(beg, b2, pnt + 1)) != C_NULL
+            while (pnt = _rev_memchr(beg, b2, pnt - beg)) != C_NULL
                 eq_bytes(pnt - 1, b1) && return Int(pnt - init)
+                pnt > beg || break
             end
         elseif ch <= 0xffff
+            pnt > (beg += 2) || return 0
             b1, b2, b3 = get_utf8_3(ch)
-            beg += 2
-            while pnt > beg && (pnt = _rev_memchr(beg, b3, pnt + 1)) != C_NULL
+            while (pnt = _rev_memchr(beg, b3, pnt - beg)) != C_NULL
                 eq_bytes(pnt - 2, b1, b2) && return Int(pnt - 1 - init)
+                pnt > beg || break
             end
         else
+            pnt > (beg += 3) || return 0
             b1, b2, b3, b4 = get_utf8_4(ch)
-            start = beg + 3
-            while pnt > beg && (pnt = _rev_memchr(beg, b4, pnt + 1)) != C_NULL
+            while (pnt = _rev_memchr(beg, b4, pnt - beg)) != C_NULL
                 eq_bytes(pnt - 3, b1, b2, b3) && return Int(pnt - 2 - init)
+                pnt > beg || break
             end
         end
     0

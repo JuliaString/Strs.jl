@@ -32,36 +32,6 @@ function string(collection::_UBS...)
     Str(LatinCSE, buf)
 end
 
-## outputting Latin 1 strings ##
-
-function print(io::IO, str::LatinStrings)
-    @preserve str begin
-        pnt = _pnt(str)
-        fin = pnt + sizeof(str)
-        # Skip and write out ASCII sequences together
-        while pnt < fin
-            # Skip to first non-ASCII sequence
-            # Todo: Optimize this to look at chunks at a time to find first non-ASCII
-            beg = pnt
-            ch = 0x00
-            while (ch = get_codeunit(pnt)) < 0x80 && (pnt += 1) < fin ; end
-            # Now we have from beg to < pnt that are ASCII
-            unsafe_write(io, beg, pnt - beg)
-            pnt < fin || break
-            # Todo: Optimize sequences of more than one character > 0x7f
-            # Write out two bytes of Latin1 character encoded as UTF-8
-            _write_utf8_2(io, ch)
-            pnt += 1
-        end
-    end
-    nothing
-end
-
-_print(io, ch::UInt8) = ch <= 0x7f ? write(io, ch) : _write_utf8_2(io, ch)
-print(io::IO, ch::LatinChars) = _print(io, ch%UInt8)
-
-write(io::IO, ch::LatinChars) = write(io, ch%UInt8)
-
 ## transcoding to Latin1 ##
 
 convert(::Type{T}, s::T) where {T<:LatinStrings} = s

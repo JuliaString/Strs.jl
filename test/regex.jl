@@ -49,14 +49,14 @@ target = """71.163.72.113 - - [30/Jul/2014:16:40:55 -0700] "GET emptymind.org/th
         @test_throws ArgumentError match(r"test", GenericString("this is a test"))
         @test_throws ArgumentError fnd(Fwd, r"test", GenericString("this is a test"))
 
-# Named subpatterns
-let m = match(r"(?<a>.)(.)(?<b>.)", T("xyz"))
-    @test (m[:a], m[2], m["b"]) == ("x", "y", "z")
-    @test sprint(show, m) == "RegexMatchStr(\"xyz\", a=\"x\", 2=\"y\", b=\"z\")"
-end
+        # Named subpatterns
+        let m = match(r"(?<a>.)(.)(?<b>.)", T("xyz"))
+            @test (m[:a], m[2], m["b"]) == ("x", "y", "z")
+            @test sprint(show, m) == "RegexMatchStr(\"xyz\", a=\"x\", 2=\"y\", b=\"z\")"
+        end
 
-# Backcapture reference in substitution string
-@test replace(T("abcde"), r"(..)(?P<byname>d)" => s"\g<byname>xy\\\1") == "adxy\\bce"
+        # Backcapture reference in substitution string
+        @test replace(T("abcde"), r"(..)(?P<byname>d)" => s"\g<byname>xy\\\1") == "adxy\\bce"
         @test_throws ErrorException replace("a", r"(?P<x>)" => s"\g<y>")
 end
 end

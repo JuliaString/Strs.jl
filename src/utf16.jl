@@ -171,17 +171,6 @@ function print(io::IO, str::UCS2Strings)
     nothing
 end
 
-function print(io::IO, str::UTF32Strings)
-    len, pnt = _lenpnt(str)
-    cnt = 0
-    fin = bytoff(pnt, len)
-    while pnt < fin
-        _write_utf32(io, get_codeunit(pnt))
-        pnt += 4
-    end
-    nothing
-end
-
 ## output UTF-16 string ##
 
 function print(io::IO, str::Str{UTF16CSE})

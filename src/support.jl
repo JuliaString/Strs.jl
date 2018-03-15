@@ -617,8 +617,6 @@ _fwd_memchr(beg::Ptr{OthChr}, wchr::OthChr, len::Integer) =
 
 _fwd_memchr(ptr::Ptr{UInt8}, byt::UInt8, fin::Ptr{UInt8}) =
     ptr < fin ? _fwd_memchr(ptr, byt, fin - ptr) : C_NULL
-_rev_memchr(ptr::Ptr{UInt8}, byt::UInt8, fin::Ptr{UInt8}) =
-    ptr < fin ? _rev_memchr(ptr, byt, fin - ptr) : C_NULL
 
 _fwd_memchr(ptr::Ptr{WidChr}, wchr::WidChr, fin::Ptr{WidChr}) =
     ptr < fin ? _fwd_memchr(ptr, wchr, chroff(fin - ptr)) : C_NULL
@@ -634,15 +632,13 @@ end
 _rev_memchr(ptr::Ptr{UInt8}, byt::UInt8, len::Integer) =
     ccall(:memrchr, Ptr{UInt8}, (Ptr{UInt8}, Int32, Csize_t), ptr, byt, len)
 
-function _rev_memchr(beg::Ptr{T}, ch::T, pnt::Ptr{T}) where {T<:Union{UInt16,UInt32}}
+function _rev_memchr(beg::Ptr{T}, ch::T, len::Integer) where {T<:Union{UInt16,UInt32}}
+    pnt = bytoff(beg, len)
     while (pnt -= sizeof(T)) >= beg
         get_codeunit(pnt) == ch && return pnt
     end
     C_NULL
 end
-
-_rev_memchr(beg::Ptr{T}, ch::T, pos::Integer) where {T<:Union{UInt16,UInt32}} =
-    _rev_memchr(beg, ch, bytoff(beg, pos))
 
 _memcmp(a::Ptr{UInt8}, b::Ptr{UInt8}, len) =
     ccall(:memcmp, Int32, (Ptr{UInt8}, Ptr{UInt8}, UInt), a, b, len)
@@ -776,17 +772,9 @@ function containsnul(str::QuadStr)
 end
 
 # pointer conversions of ASCII/UTF8/UTF16/UTF32 strings:
-pointer(s::Union{ByteStr, WideStr}) = _pnt(s)
-pointer(s::ByteStr, i::Integer) = _pnt(s) + i - 1
-pointer(s::WideStr, i::Integer) = _pnt(s) + (i - 1)*sizeof(codeunit(s))
+pointer(str::Str) = _pnt(str)
+pointer(str::Str, pos::Integer) = bytoff(_pnt(str), pos - 1)
 
 # pointer conversions of SubString of ASCII/UTF8/UTF16/UTF32:
-pointer(x::SubString{<:ByteStr}) =
-    _pnt(x.string) + x.offset
-pointer(x::SubString{<:ByteStr}, i::Integer) =
-    _pnt(x.string) + x.offset + (i-1)
-pointer(x::SubString{<:WideStr}) =
-    _pnt(x.string) + x.offset*sizeof(codeunit(x.string))
-pointer(x::SubString{<:WideStr}, i::Integer) =
-    _pnt(x.string) + (x.offset + (i-1))*sizeof(codeunit(x.string))
-
+pointer(x::SubString{<:Str}) = bytoff(_pnt(x.string), x.offset)
+pointer(x::SubString{<:Str}, pos::Integer) = bytoff(_pnt(x.string), x.offset + pos - 1)
