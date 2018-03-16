@@ -66,18 +66,6 @@ end
 @inline eq_bytes(pnt, b1, b2)     = get_codeunit(pnt+1) == b2 && eq_bytes(pnt, b1)
 @inline eq_bytes(pnt, b1, b2, b3) = get_codeunit(pnt+2) == b3 && eq_bytes(pnt, b1, b2)
 
-@inline _write_utf8_2(io, ch) = write(io, get_utf8_2(ch)...)
-@inline _write_utf8_3(io, ch) = write(io, get_utf8_3(ch)...)
-@inline _write_utf8_4(io, ch) = write(io, get_utf8_4(ch)...)
-
-@inline _write_ucs2(io, ch) =
-    ch <= 0x7f ? write(io, ch%UInt8) : ch <= 0x7ff ? _write_utf8_2(io, ch) : _write_utf8_3(io, ch)
-
-@inline _write_utf32(io, ch) = ch <= 0xffff ? _write_ucs2(io, ch) : _write_utf8_4(io, ch)
-
-@inline print(io::IO, ch::UCS2Chr)  = _write_ucs2(io, tobase(ch))
-@inline print(io::IO, ch::UTF32Chr) = _write_utf32(io, tobase(ch))
-
 ## required core functionality ##
 
 utf_trail(c::UInt8) = (0xe5000000 >>> ((c & 0xf0) >> 3)) & 0x3

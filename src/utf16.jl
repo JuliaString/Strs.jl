@@ -159,42 +159,6 @@ end
 
 # These need to change to output directly, not converted to UTF-8
 
-## outputting UCS2 strings ##
-
-function print(io::IO, str::UCS2Strings)
-    len, pnt = _lenpnt(str)
-    fin = bytoff(pnt, len)
-    while pnt < fin
-        _write_ucs2(io, get_codeunit(pnt))
-        pnt += 2
-    end
-    nothing
-end
-
-## output UTF-16 string ##
-
-function print(io::IO, str::Str{UTF16CSE})
-    pnt = _lenpnt(str)
-    siz = sizeof(str)
-    # Skip and write out ASCII sequences together
-    fin = pnt + siz
-    while pnt < fin
-        ch = get_codeunit(pnt)
-        # Handle 0x80-0x7ff
-        if ch <= 0x7f
-            write(io, ch%UInt8)
-        elseif ch <= 0x7ff
-            _write_utf8_2(io, ch)
-        elseif is_surrogate_lead(ch)
-            _write_utf8_4(io, get_supplementary(ch, get_codeunit(pnt += 2)))
-        else
-            _write_utf8_3(io, ch)
-        end
-        pnt += 2
-    end
-    nothing
-end
-
 # Single character conversion
 
 @inline function _convert_utf_n(::Type{C}, ch::UInt32) where {C<:UTF16CSE}
