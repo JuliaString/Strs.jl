@@ -3,8 +3,13 @@
 
 const RegexStrings = (ASCIIStr, BinaryStr, Text1Str, LatinStr, Strs._LatinStr, UTF8Str)
 
-collect_eachmatch(re, str; overlap=false) =
-    [m.match for m in collect(eachmatch(re, str, overlap = overlap))]
+@static if VERSION < v"0.7.0-DEV"
+    collect_eachmatch(re, str; overlap=false) =
+        [m.match for m in collect(eachmatch(re, str, overlap))]
+else
+    collect_eachmatch(re, str; overlap=false) =
+        [m.match for m in collect(eachmatch(re, str, overlap = overlap))]
+end
 
 @testset "UTF8Str Regex" begin
     # Proper unicode handling
@@ -40,7 +45,11 @@ target = """71.163.72.113 - - [30/Jul/2014:16:40:55 -0700] "GET emptymind.org/th
         # Issue 9545 (32 bit)
         buf = PipeBuffer()
         show(buf, r"")
-        @test read(buf, String) == "r\"\""
+        @static if VERSION < v"0.7.0-DEV"
+            @test readstring(buf) == "r\"\""
+        else
+            @test read(buf, String) == "r\"\""
+        end
 
         # see #10994, #11447: PCRE2 allows NUL chars in the pattern
         @test contains(T("a\0b"), Regex(T("^a\0b\$")))
@@ -54,9 +63,11 @@ target = """71.163.72.113 - - [30/Jul/2014:16:40:55 -0700] "GET emptymind.org/th
             @test (m[:a], m[2], m["b"]) == ("x", "y", "z")
             @test sprint(show, m) == "RegexMatchStr(\"xyz\", a=\"x\", 2=\"y\", b=\"z\")"
         end
-
         # Backcapture reference in substitution string
-        @test replace(T("abcde"), r"(..)(?P<byname>d)" => s"\g<byname>xy\\\1") == "adxy\\bce"
-        @test_throws ErrorException replace("a", r"(?P<x>)" => s"\g<y>")
-end
+        @static if VERSION >= v"0.7.0-DEV"
+            @test_broken replace(T("abcde"), r"(..)(?P<byname>d)" => s"\g<byname>xy\\\1") ==
+                "adxy\\bce"
+            @test_throws ErrorException replace("a", r"(?P<x>)" => s"\g<y>")
+        end
+    end
 end

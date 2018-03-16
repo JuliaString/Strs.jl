@@ -60,7 +60,7 @@ function show(io::IO, m::RegexMatchStr)
     print(io, "RegexMatchStr(")
     show(io, m.match)
     idx_to_capture_name = PCRE.capture_names(m.regex.regex)
-    if !isempty(m.captures)
+    if !is_empty(m.captures)
         print(io, ", ")
         for i = 1:length(m.captures)
             # If the capture group is named, show the name.

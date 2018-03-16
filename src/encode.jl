@@ -34,7 +34,7 @@ function _str(str::T) where {T<:Union{Vector{UInt8}, BinaryStrings, String}}
     # handle zero length string quickly
     (siz = sizeof(str)) == 0 && return empty_ascii
     pnt = _pnt(str)
-    len, flags, num4byte, num3byte, num2byte, latin1byte = unsafe_checkstring(pnt, 1, siz)
+    len, flags, num4byte, num3byte, num2byte, latin1byte = unsafe_check_string(pnt, 1, siz)
     if flags == 0
         buf, out = _allocate(UInt8, len)
         unsafe_copyto!(out, pnt, len)
@@ -72,8 +72,8 @@ end
 
 function convert(::Type{<:Str}, str::AbstractString)
     # handle zero length string quickly
-    isempty(str) && return empty_ascii
-    len, flags = unsafe_checkstring(str)
+    is_empty(str) && return empty_ascii
+    len, flags = unsafe_check_string(str)
     _str_encode(str, len, flags)
 end
 convert(::Type{<:Str}, str::String) = _str(str)
@@ -84,7 +84,7 @@ convert(::Type{UniStr}, str::Str{<:Union{ASCIICSE,SubSet_CSEs}}) = str
 
 function convert(::Type{UniStr}, str::T) where {T<:Str}
     # handle zero length string quickly
-    isempty(str) && return empty_ascii
+    is_empty(str) && return empty_ascii
     len, flags = count_chars(T, _pnt(str), _len(str))
     _str_encode(str, len, flags)
 end
@@ -100,11 +100,11 @@ function unsafe_str(str::T;
     (siz = sizeof(str)) == 0 && return empty_ascii
     pnt = _pnt(str)
     len, flags, num4byte, num3byte, num2byte, latin1byte, invalids =
-        unsafe_checkstring(pnt, 1, siz;
-                           accept_long_null  = accept_long_null,
-                           accept_surrogates = accept_surrogates,
-                           accept_long_char  = accept_long_char,
-                           accept_invalids   = accept_invalids)
+        unsafe_check_string(pnt, 1, siz;
+                            accept_long_null  = accept_long_null,
+                            accept_surrogates = accept_surrogates,
+                            accept_long_char  = accept_long_char,
+                            accept_invalids   = accept_invalids)
     if invalids != 0
         if T == Vector{UInt8}
             buf, out = _allocate(UInt8, siz)
@@ -142,11 +142,11 @@ function unsafe_str(str::T;
     # handle zero length string quickly
     siz == 0 && return empty_ascii
     len, flags, num4byte, num3byte, num2byte, latin1, invalids =
-        unsafe_checkstring(str, 1, siz;
-                           accept_long_null  = accept_long_null,
-                           accept_surrogates = accept_surrogates,
-                           accept_long_char  = accept_long_char,
-                           accept_invalids   = accept_invalids)
+        unsafe_check_string(str, 1, siz;
+                            accept_long_null  = accept_long_null,
+                            accept_surrogates = accept_surrogates,
+                            accept_long_char  = accept_long_char,
+                            accept_invalids   = accept_invalids)
     if flags == 0
         Str(ASCIICSE, unsafe_copyto!(_allocate(siz), 1, str, 1, siz))
     elseif invalids

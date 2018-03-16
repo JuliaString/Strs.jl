@@ -100,8 +100,11 @@ Base.findlast(a::Str, b::AbstractString)    = nothing_sentinel(fnd(Rev, a, b))
 end
 
 @inline function _srch_pred(::Fwd, testf, str, pos)
-    for (j, d) in pairs(SubString(str, pos))
-        testf(d) && return pos + j - 1
+    len = ncodeunits(str)
+    while pos <= len
+        @inbounds ch = str[pos]
+        testf(ch) && return pos
+        pos = nextind(str, pos)
     end
     0
 end
@@ -120,7 +123,7 @@ function fnd(::Type{D}, fun::Function, str::AbstractString, pos::Integer) where 
         @boundscheck boundserr(str, pos)
         return 0
     end
-    @inbounds isvalid(str, pos) || index_error(str, pos)
+    @inbounds is_valid(str, pos) || index_error(str, pos)
     _srch_pred(D(), fun, str, pos)
 end
 
@@ -194,7 +197,7 @@ function _srch_cp(::Rev, cus, str, cp, pos, len)
 end
 
 fnd(::Type{D}, pred::P, str::AbstractString,
-    pos::Integer) where {P<:Base.Fix2{Union{typeof(==),typeof(isequal)}, <:AbsChar}, D<:Dir} =
+    pos::Integer) where {P<:Fix2{Union{typeof(==),typeof(isequal)}, <:AbsChar}, D<:Dir} =
     fnd(D, pred.x, str, pos)
 
 function fnd(::Type{D}, ch::AbsChar, str::AbstractString, pos::Integer) where {D<:Dir}
@@ -208,11 +211,11 @@ function fnd(::Type{D}, ch::AbsChar, str::AbstractString, pos::Integer) where {D
         return 0
     end
     # Only check if CodeUnitMulti
-    (cus = CodePointStyle(str)) === CodeUnitMulti() && (@inbounds !isvalid(str, pos)) &&
-        index_error(str, pos)
-    #println("fnd(::$D, '$ch', \"$str\", $pos) => $(isvalid(eltype(str), ch))")
+    (cus = CodePointStyle(str)) === CodeUnitMulti() &&
+        (@inbounds is_valid(str, pos) || index_error(str, pos))
+    #println("fnd(::$D, '$ch', \"$str\", $pos) => $(is_valid(eltype(str), ch))")
     # Check here if ch is valid for the type of string
-    isvalid(eltype(str), ch) ? _srch_cp(D(), cus, str, ch, pos, len) : 0
+    is_valid(eltype(str), ch) ? _srch_cp(D(), cus, str, ch, pos, len) : 0
 end
 
 # Substring searching
@@ -233,15 +236,10 @@ end
 
 function _srch_strings(::Fwd, ::CompareStyle, str, needle, ch, nxtsub, pos, slen, tlen)
     cu = CodePointStyle(str)
-    while (pos = _srch_cp(Fwd(), cu, str, ch, pos, slen)) != 0
+    @inbounds while (pos = _srch_cp(Fwd(), cu, str, ch, pos, slen)) != 0
         nxt = nextind(str, pos)
         res = _cmp_str(str, nxt, needle, nxtsub)
         res == 0 || return pos:res
-        #= if res != 0
-            println("$(typeof(str)), $(typeof(needle)), \"$str\", \"$needle\", '$ch', " *
-                    "nxtsub=$nxtsub, pos=$pos, slen=$slen, tlen=$tlen => $j, $(pos+j)")
-            return pos:res
-        end=#
         pos = nxt
         done(str, nxt) && break
     end
@@ -249,21 +247,15 @@ function _srch_strings(::Fwd, ::CompareStyle, str, needle, ch, nxtsub, pos, slen
 end
 
 function _srch_strings(::Rev, ::CompareStyle, str, needle, ch, nxtsub, pos, slen, tlen)
-    # We don't know if tlen and slen are even compatible
-    # This should be changed to be efficient if both are CodeUnitSingle
-    # We are always checking 2 or more characters here
-    prv = prevind(str, pos)
-    prv == 0 && return _not_found
-    cu = CodePointStyle(str)
-    while (pos = _srch_cp(Rev(), cu, str, ch, prv, slen)) != 0
-        res = _cmp_str(str, nextind(str, pos), needle, nxtsub)
-        res == 0 || return pos:res
-        #= if res != 0
-            println("$(typeof(str)), $(typeof(needle)), \"$str\", \"$needle\", '$ch', " *
-                    "nxtsub=$nxtsub, pos=$pos, slen=$slen, tlen=$tlen => $j, $(pos+j)")
-            return pos:res
-        end=#
-        (prv = prevind(str, pos)) == 0 && break
+    @inbounds begin
+        prv = prevind(str, pos)
+        prv == 0 && return _not_found
+        cu = CodePointStyle(str)
+        while (pos = _srch_cp(Rev(), cu, str, ch, prv, slen)) != 0
+            res = _cmp_str(str, nextind(str, pos), needle, nxtsub)
+            res == 0 || return pos:res
+            (prv = prevind(str, pos)) == 0 && break
+        end
     end
     _not_found
 end
@@ -271,13 +263,7 @@ end
 _search_bloom_mask(ch) = UInt64(1) << (ch & 63)
 _check_bloom_mask(mask, pnt, off) = (mask & _search_bloom_mask(get_codeunit(pnt, off))) == 0
 
-# This should work for compatible CSEs, like ASCII & Latin, ASCII & UTF8, etc.
-# See equals trait
-function _srch_strings(::Fwd, ::Union{ByteCompare,WidenCompare}, str, needle,
-                       ch, nxtsub, pos, slen, tlen)
-    spnt = _pnt(str)
-    npnt = _pnt(needle)
-
+function _srch_str_bloom(str, spnt, npnt, ch, pos, slen, tlen)
     tlast = get_codeunit(npnt, tlen)
     bloom_mask = _search_bloom_mask(tlast)
     skip = tlen - 1
@@ -298,7 +284,7 @@ function _srch_strings(::Fwd, ::Union{ByteCompare,WidenCompare}, str, needle,
             end
 
             # match found
-            j == tlen - 1 && return pos:thisind(str, pos + j)
+            j == tlen - 1 && return pos:_thisind(CodePointStyle(str), str, slen, spnt, pos + j)
 
             # no match, try to rule out the next character
             if pos <= slen && _check_bloom_mask(bloom_mask, spnt, pos + tlen)
@@ -314,6 +300,11 @@ function _srch_strings(::Fwd, ::Union{ByteCompare,WidenCompare}, str, needle,
     _not_found
 end
 
+# This should work for compatible CSEs, like ASCII & Latin, ASCII & UTF8, etc.
+# See equals trait
+_srch_strings(::Fwd, ::Union{ByteCompare,WidenCompare}, str, needle, ch, nxtsub, pos, slen, tlen) =
+    @preserve str needle _srch_str_bloom(str, _pnt(str), _pnt(needle), ch, pos, slen, tlen)
+
 function fnd(::Type{D}, needle::AbstractString, str::AbstractString, pos::Integer) where {D<:Dir}
     # Check for fast case of a single codeunit (should check for single character also)
     slen = ncodeunits(str)
@@ -326,12 +317,12 @@ function fnd(::Type{D}, needle::AbstractString, str::AbstractString, pos::Intege
         @boundscheck boundserr(str, pos)
         return _not_found
     end
-    @inbounds isvalid(str, pos) || index_error(str, pos)
+    @inbounds is_valid(str, pos) || index_error(str, pos)
     tlen = ncodeunits(needle)
     tlen == 0 && return pos:pos-1
     (cmp = CanContain(str, needle)) === NoCompare() && return _not_found
     @inbounds ch, nxt = next(needle, 1)
-    isvalid(eltype(str), ch) || return _not_found
+    is_valid(eltype(str), ch) || return _not_found
     # Check if single character
     if nxt > tlen
         pos = _srch_cp(D(), CodePointStyle(str), str, ch, pos, slen)
@@ -341,11 +332,15 @@ function fnd(::Type{D}, needle::AbstractString, str::AbstractString, pos::Intege
 end
 
 @static if VERSION < v"0.7.0-DEV"
-    contains(hay::AbstractString, chr::AbsChar)   = first(fnd(Fwd, chr, hay)) != 0
+    contains(hay::AbstractString, chr::AbsChar)    = first(fnd(Fwd, chr, hay)) != 0
+    contains(hay::AbstractString, pat::Regex)      = first(fnd(Fwd, pat, hay)) != 0
+    contains(hay::AbstractString, pat::Regex, pos) = first(fnd(Fwd, pat, hay, pos)) != 0
 else
     # Avoid type piracy
-    contains(hay::Str, chr::Char)                 = first(fnd(Fwd, chr, hay)) != 0
-    contains(hay::AbstractString, chr::CodePoint) = first(fnd(Fwd, chr, hay)) != 0
+    contains(hay::Str, chr::Char)                  = first(fnd(Fwd, chr, hay)) != 0
+    contains(hay::Str, pat::Regex)                 = first(fnd(Fwd, pat, hay)) != 0
+    contains(hay::Str, pat::Regex, pos)            = first(fnd(Fwd, pat, hay, pos)) != 0
+    contains(hay::AbstractString, chr::CodePoint)  = first(fnd(Fwd, chr, hay)) != 0
 end
 contains(hay::Str, str::Str)            = first(fnd(Fwd, str, hay)) != 0
 contains(hay::Str, str::AbstractString) = first(fnd(Fwd, str, hay)) != 0

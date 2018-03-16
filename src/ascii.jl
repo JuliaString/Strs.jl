@@ -35,7 +35,7 @@ function convert(::Type{ASCIIStr}, str::AbstractString)
     len = length(str)
     buf, pnt = _allocate(UInt8, len)
     @inbounds for ch in str
-        isascii(ch) || unierror(UTF_ERR_INVALID_ASCII, pnt - pointer(buf) + 1, ch)
+        is_ascii(ch) || unierror(UTF_ERR_INVALID_ASCII, pnt - pointer(buf) + 1, ch)
         set_codeunit!(pnt, ch%UInt8)
         pnt += 1
     end
@@ -43,13 +43,13 @@ function convert(::Type{ASCIIStr}, str::AbstractString)
 end
 
 convert(::Type{ASCIIStr}, str::T) where {T<:Union{LatinStr,UTF8Str}} =
-    isascii(str) ? _convert(ASCIIStr, _data(str)) : unierror(UTF_ERR_INVALID_ASCII)
+    is_ascii(str) ? _convert(ASCIIStr, str.data) : unierror(UTF_ERR_INVALID_ASCII)
 
 convert(::Type{ASCIIStr}, dat::Vector{UInt8}) =
-    isascii(dat) ? _convert(ASCIIStr, dat) : unierror(UTF_ERR_INVALID_ASCII)
+    is_ascii(dat) ? _convert(ASCIIStr, dat) : unierror(UTF_ERR_INVALID_ASCII)
 
 function convert(::Type{ASCIIStr}, str::String)
-    len, flags = unsafe_checkstring(str, 1, sizeof(str))
+    len, flags = unsafe_check_string(str, 1, sizeof(str))
     flags == 0 && return Str(ASCIICSE, str)
     (flags & ~UTF_LONG) == 0 || unierror(UTF_ERR_INVALID_ASCII)
     # Handle any long encodings, such as \xc0\x80 for \0 (maybe that should only be for unsafe_str)
@@ -67,7 +67,7 @@ end
 # 3) use a substition string
 # 4) use a substition function, which gets passed the location of the start of the invalid sequence
 #    and returns a replacement string, and the new location after the invalid sequence.
-#    Note: for that to work, would need to use the same function in the checkstring function
+#    Note: for that to work, would need to use the same function in the check_string function
 # 5) throw an exception, with enough information that one can determine where in the input
 #    the invalid character was, and what it was
 
@@ -95,10 +95,10 @@ function _convert_ascii(a, invlen, invdat)
 end
 
 convert(::Type{ASCIIStr}, a::Vector{UInt8}, invalids_as::String) =
-    _convert_ascii(a, sizeof(invalids_as), _data(ascii(invalids_as)))
+    _convert_ascii(a, sizeof(invalids_as), ascii(invalids_as))
 
-convert(::Type{ASCIIStr}, a::Vector{UInt8}, invalids_as::Str{<:ASCIICSE}) =
-    _convert_ascii(a, sizeof(invalids_as), _data(invalids_as))
+convert(::Type{ASCIIStr}, a::Vector{UInt8}, invalids_as::Str{ASCIICSE}) =
+    _convert_ascii(a, sizeof(invalids_as), invalids_as.data)
 
 convert(::Type{ASCIIStr}, a::Vector{UInt8}, invalids_as::AbstractString) =
     convert(ASCIIStr, a, ascii(invalids_as))

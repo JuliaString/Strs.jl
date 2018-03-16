@@ -106,7 +106,7 @@ function remove_empty(lines)
     out = Vector{String}()
     sizehint!(out, len)
     for l in lines
-        isempty(l) || push!(out, l)
+        is_empty(l) || push!(out, l)
     end
     out
 end
@@ -279,7 +279,7 @@ end
 function iteratechars(text::AbstractString)
     cnt = 0
     for ch in text
-        cnt += isdigit(ch)
+        cnt += is_digit(ch)
     end
     cnt
 end
@@ -287,7 +287,7 @@ end
 function iteratecps(text::AbstractString)
     cnt = 0
     for ch in codepoints(text)
-        cnt += isdigit(ch)
+        cnt += is_digit(ch)
     end
     cnt
 end
@@ -295,7 +295,7 @@ end
 function iteratecus(text::AbstractString)
     cnt = 0
     for ch in codeunits(text)
-        cnt += isdigit(ch)
+        cnt += is_digit(ch)
     end
     cnt
 end
@@ -351,7 +351,7 @@ end
 function checktext(fun, lines::Vector{<:AbstractString})
     cnt = 0
     for text in lines
-        isempty(text) || fun(text)
+        is_empty(text) || fun(text)
         cnt += 1
     end
     cnt
@@ -573,7 +573,7 @@ repeat10c(str) = @inbounds repeat(str[1], 10)
 
 countsklength(l)  = checkstr(sklength, l)
 countoldlength(l) = checkstr(oldlength, l)
-checktextwidth(l) = checkstr(textwidth, l)
+checktextwidth(l) = checkstr(text_width, l)
 
 checkrepeat1(l)   = checktext(repeat1, l)
 checkrepeat10(l)  = checktext(repeat10, l)
@@ -586,26 +586,26 @@ countchars(l)   = checkstr(iteratechars, l)
 countcps(l)     = checkstr(iteratecps, l)
 countcus(l)     = checkstr(iteratecus, l)
 
-validstr(l)     = checkstr(isvalid, l)
-asciistr(l)     = checkstr(isascii, l)
+validstr(l)     = checkstr(is_valid, l)
+asciistr(l)     = checkstr(is_ascii, l)
 
-validchars(l)   = checkchars(isvalid, l)
-asciichars(l)   = checkchars(isascii, l)
+validchars(l)   = checkchars(is_valid, l)
+asciichars(l)   = checkchars(is_ascii, l)
 
-checkvalid(l)   = checkcp(isvalid,   l)
-checkascii(l)   = checkcp(isascii,   l)
-checkcntrl(l)   = checkcp(iscntrl,   l)
-checkdigit(l)   = checkcp(isdigit,   l)
-checkxdigit(l)  = checkcp(isxdigit,  l)
-checklower(l)   = checkcp(islower,   l)
-checkupper(l)   = checkcp(isupper,   l)
-checkalpha(l)   = checkcp(isalpha,   l)
-checknumeric(l) = checkcp(isnumeric, l)
-checkspace(l)   = checkcp(isspace,   l)
-checkalnum(l)   = checkcp(is_alnum,  l)
-checkprint(l)   = checkcp(isprint,   l)
-checkpunct(l)   = checkcp(ispunct,   l)
-checkgraph(l)   = checkcp(is_graph,  l)
+checkvalid(l)   = checkcp(is_valid,     l)
+checkascii(l)   = checkcp(is_ascii,     l)
+checkcntrl(l)   = checkcp(is_control,   l)
+checkdigit(l)   = checkcp(is_digit,     l)
+checkxdigit(l)  = checkcp(is_hex_digit, l)
+checklower(l)   = checkcp(is_lowercase, l)
+checkupper(l)   = checkcp(is_uppercase, l)
+checkalpha(l)   = checkcp(is_alpha,     l)
+checknumeric(l) = checkcp(is_numeric,   l)
+checkspace(l)   = checkcp(is_space,     l)
+checkalnum(l)   = checkcp(is_alphanumeric, l)
+checkprint(l)   = checkcp(is_printable,    l)
+checkpunct(l)   = checkcp(is_punctuation,  l)
+checkgraph(l)   = checkcp(is_graphic,      l)
 
 function mintime(f, lines)
     m = typemax(UInt)
@@ -689,8 +689,8 @@ function select_lines(lines::Vector{<:AbstractString}; num=1000)
     i = len>>1
     j = len-1
     while length(out) < num
-        isempty(lines[i]) || push!(out, i)
-        isempty(lines[j]) || push!(out, j)
+        is_empty(lines[i]) || push!(out, i)
+        is_empty(lines[j]) || push!(out, j)
         i += 1 > len && break
         j -= 1 < 1   && break
     end
@@ -836,13 +836,13 @@ function comparetestline(lines, results, list, displist)
                 res == funres[j] ||
                     push!(fundiff, typeof(res) == Bool ? (j, text) : (j, text, res, funres[j]))
             end
-            isempty(fundiff) || push!(diff, (i, fun, fundiff))
+            is_empty(fundiff) || push!(diff, (i, fun, fundiff))
         catch ex
             typeof(ex) == InterruptException && rethrow()
             pr"Failed test \(fun): \(sprint(showerror, ex, catch_backtrace()))"
         end
     end
-    if isempty(diff)
+    if is_empty(diff)
         pwc(:green, "\r\u2714\n")
     else
         pwc(:red, "\e[s\rX\e[u")
@@ -874,15 +874,15 @@ function comparetestchar(lines, results, list, displist)
                     res == chrres[k] ||
                         push!(chrdiff, typeof(res) == Bool ? (k, ch) : (k, ch, res, chrres[k]))
                 end
-                isempty(chrdiff) || push!(fundiff, (j, text, chrdiff))
+                is_empty(chrdiff) || push!(fundiff, (j, text, chrdiff))
             end
-            isempty(fundiff) || push!(diff, (i, fun, fundiff))
+            is_empty(fundiff) || push!(diff, (i, fun, fundiff))
         catch ex
             typeof(ex) == InterruptException && rethrow()
             pr"Failed test \(fun): \(sprint(showerror, ex, catch_backtrace()))"
         end
     end
-    if isempty(diff)
+    if is_empty(diff)
         pwc(:green, "\r\u2714\n")
     else
         pwc(:red, "\e[s\rX\e[u")
@@ -914,15 +914,15 @@ function comparetestcu(lines, results, list, displist)
                     res == chrres[k] ||
                         push!(chrdiff, typeof(res) == Bool ? (k, ch) : (k, ch, res, chrres[k]))
                 end
-                isempty(chrdiff) || push!(fundiff, (j, text, chrdiff))
+                is_empty(chrdiff) || push!(fundiff, (j, text, chrdiff))
             end
-            isempty(fundiff) || push!(diff, (i, fun, fundiff))
+            is_empty(fundiff) || push!(diff, (i, fun, fundiff))
         catch ex
             typeof(ex) == InterruptException && rethrow()
             pr"Failed test \(fun): \(sprint(showerror, ex, catch_backtrace()))"
         end
     end
-    if isempty(diff)
+    if is_empty(diff)
         pwc(:green, "\r\u2714\n")
     else
         pwc(:red, "\e[s\rX\e[u")
@@ -940,12 +940,14 @@ function comparetestcu(lines, results, list, displist)
 end
 
 const testlist =
-    (((length, textwidth), "length, textwidth"),
-     ((isascii, isvalid), "isascii, isvalid"),
+    (((length, text_width), "length, text_width"),
+     ((is_ascii, is_valid), "is_ascii, is_valid"),
      ((lowercase, uppercase, reverse), "lowercase, uppercase, reverse"),
-     ((isascii, isvalid, iscntrl, islower, isupper, isalpha,
-       is_alnum, isspace, isprint, ispunct, is_graph, isdigit, isxdigit),
-      "is(ascii|valid|cntrl|lower|upper|alpha|_alnum|space|print|punct|_graph|digit|xdigit)"),
+     ((is_ascii, is_valid, is_control, is_lowercase, is_uppercase, is_alpha,
+       is_alphanumeric, is_space, is_printable, is_punctuation, is_graphic,
+       is_digit, is_hex_digit),
+      "is_(ascii|valid|control|lowercase|uppercase|alpha|alphanumeric|space|printable|" *
+      "punctuation|graphic|digit|hex_digit)"),
      ((UInt32, ), "UInt32"),
      ((sizeof, ), "sizeof"))
 

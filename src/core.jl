@@ -37,6 +37,7 @@ _nextcp(::Type{T}, pnt) where {T} = _nextcpfun(CodePointStyle(T), T, pnt)
 _length(::CodeUnitSingle, str) = (@_inline_meta(); _len(str))
 
 _thisind(::CodeUnitSingle, str, i) = Int(i)
+_thisind(::CodeUnitSingle, str, len, pnt, i) = Int(i)
 
 _prevind(::CodeUnitSingle, str, i) = Int(i) - 1
 @propagate_inbounds function _prevind(::CodeUnitSingle, str, i, nchar)
@@ -85,7 +86,7 @@ end
 @propagate_inbounds chr2ind(str::T, i::Int) where {T<:Str} =
     _chr2ind(CodePointStyle(T), str, i)
 
-@propagate_inbounds function isvalid(str::T, i::Integer) where {T<:Str}
+@propagate_inbounds function is_valid(str::T, i::Integer) where {T<:Str}
     @_inline_meta()
     @boundscheck 1 <= i <= _len(str) || return false
     _isvalid_char_pos(CodePointStyle(T), str, i)
@@ -99,7 +100,7 @@ _isvalid_char_pos(::CodeUnitSingle, str, i) = true
 @propagate_inbounds length(str::S) where {S<:SubString{T}} where {T<:Str} =
     _lastindex(CodePointStyle(T), str)
 
-isvalid(str::T, i::Integer) where {T<:SubString{<:Str}} =
+is_valid(str::T, i::Integer) where {T<:SubString{<:Str}} =
     (start(str) <= i <= _lastindex(CodePointStyle(T), str))
 
 @propagate_inbounds ind2chr(str::S, i::Integer) where {S<:SubString{T}} where {T<:Str} =
@@ -167,13 +168,13 @@ end
 # Todo: These should be made more generic, work for all CodeUnitSingle types
 
 convert(::Type{<:Str{ASCIICSE}}, ch::Unsigned) =
-    isascii(ch) ? _convert(ASCIICSE, ch%UInt8) : unierror(UTF_ERR_INVALID_ASCII, 0, ch)
+    is_ascii(ch) ? _convert(ASCIICSE, ch%UInt8) : unierror(UTF_ERR_INVALID_ASCII, 0, ch)
 convert(::Type{<:Str{LatinCSE}}, ch::Unsigned) =
-    islatin(ch) ? _convert(LatinCSE, ch%UInt8) : unierror(UTF_ERR_INVALID_LATIN1, 0, ch)
+    is_latin(ch) ? _convert(LatinCSE, ch%UInt8) : unierror(UTF_ERR_INVALID_LATIN1, 0, ch)
 convert(::Type{<:Str{UCS2CSE}}, ch::Unsigned) =
-    isbmp(ch) ? _convert(UCS2CSE, ch%UInt16) : unierror(UTF_ERR_INVALID, 0, ch)
+    is_bmp(ch) ? _convert(UCS2CSE, ch%UInt16) : unierror(UTF_ERR_INVALID, 0, ch)
 convert(::Type{<:Str{UTF32CSE}}, ch::Unsigned) =
-    isbmp(ch) ? _convert(UTF32CSE, ch%UInt32) : unierror(UTF_ERR_INVALID, 0, ch)
+    is_bmp(ch) ? _convert(UTF32CSE, ch%UInt32) : unierror(UTF_ERR_INVALID, 0, ch)
 
 convert(::Type{T}, ch::Signed) where {T<:Str} = ch < 0 ? ncharerr(ch) : convert(T, ch%Unsigned)
 
@@ -195,24 +196,25 @@ cconvert(::Type{Ptr{Union{UInt8,Int8}}}, s::SubString{ByteStrings}) = s
 unsafe_convert(::Type{Ptr{R}}, s::SubString{ByteStrings}) where R<:Union{Int8, UInt8} =
     convert(Ptr{R}, pointer(s.string)) + s.offset
 
-function _reverse(::CodeUnitSingle, ::Type{C}, len, pnt::Ptr{T}) where {C<:CSE,T<:CodeUnitTypes}
-    buf, beg = _allocate(T, len)
-    out = bytoff(beg, len)
-    while out > beg
-        set_codeunit!(out -= sizeof(T), get_codeunit(pnt))
-        pnt += sizeof(T)
+function _reverse(::CodeUnitSingle, ::Type{C}, len, str::Str{C}) where {C<:CSE}
+    len < 2 && return str
+    @preserve str begin
+        pnt = _pnt(str)
+        T = codeunit(C)
+        buf, beg = _allocate(T, len)
+        out = bytoff(beg, len)
+        while out > beg
+            set_codeunit!(out -= sizeof(T), get_codeunit(pnt))
+            pnt += sizeof(T)
+        end
+        Str(C, buf)
     end
-    Str(C, buf)
 end
 
-function _reverse(::CodeUnitMulti, ::Type{C}, str) where {C<:CSE}
-    len = ncodeunits(str)
-    @inbounds ((t = nextind(str, 1)) > len || nextind(str, t) > len) && return str
+function _reverse(::CodeUnitMulti, ::Type{C}, len, str) where {C<:CSE}
+    @inbounds ((t = nextind(str, 0)) > len || nextind(str, t) > len) && return str
     @preserve str _reverse(CodeUnitMulti(), C, len, _pnt(str))
 end
-_reverse(::CodeUnitSingle, ::Type{C}, str) where {C<:CSE} =
-    (len = ncodeunits(str)) < 3 ? str :
-    (@preserve str _reverse(CodeUnitSingle(), C, len, _pnt(str)))
 
 reverse(str::T) where {C<:CSE,T<:Union{Str{C},SubString{Str{C}}}} =
-    _reverse(CodePointStyle(str), C, str)
+    _reverse(CodePointStyle(str), C, _len(str), str)

@@ -77,16 +77,7 @@ const UTF_ERR_NORMALIZE         = " is not one of :NFC, :NFD, :NFKC, :NFKD"
     unierror(string("End position ", endpos, " is less than start position (", startpos, ")"))
 @noinline repeaterr(cnt) = throw(ArgumentError("repeat count $cnt must be >= 0"))
 
-@static if VERSION < v"0.7.0-DEV"
-    struct StringIndexError <: Exception
-        string::AbstractString
-        index::Integer
-    end
-    @noinline index_error(s::AbstractString, i::Integer) =
-        throw(StringIndexError(s, Int(i)))
-else
-    const index_error = Base.string_index_err
-end
+@static isdefined(Base, :string_index_err) && (const index_error = Base.string_index_err)
 
 ## Functions to check validity of UTF-8, UTF-16, and UTF-32 encoded strings,
 #  and also to return information necessary to convert to other encodings
@@ -122,7 +113,7 @@ end
 Validates and calculates number of characters in a UTF-8,UTF-16 or UTF-32 encoded vector/string
 
 Warning: this function does not check the bounds of the start or end positions
-Use `checkstring` to make sure the bounds are checked
+Use `check_string` to make sure the bounds are checked
 
 Input Arguments:
 
@@ -145,9 +136,9 @@ Throws:
 
 * `UnicodeError`
 """
-function unsafe_checkstring end
+function unsafe_check_string end
 
-retcheck(totalchar, flags, invalids, latin1byte, num2byte, num3byte, num4byte) =
+_ret_check(totalchar, flags, invalids, latin1byte, num2byte, num3byte, num4byte) =
     (totalchar,
      ifelse(latin1byte == 0, 0, UTF_LATIN1) |
      ifelse(num2byte   == 0, 0, UTF_UNICODE2) |
@@ -156,12 +147,12 @@ retcheck(totalchar, flags, invalids, latin1byte, num2byte, num3byte, num4byte) =
      ifelse(invalids   == 0, 0, UTF_INVALID) | flags,
      num4byte, num3byte, num2byte, latin1byte, invalids)
 
-function unsafe_checkstring(dat::T, pos, endpos;
-                            accept_long_null  = false,
-                            accept_surrogates = false,
-                            accept_long_char  = false,
-                            accept_invalids   = false
-                            ) where {T<:Union{AbstractVector{UInt8}, Ptr{UInt8}, String}}
+function unsafe_check_string(dat::T, pos, endpos;
+                             accept_long_null  = false,
+                             accept_surrogates = false,
+                             accept_long_char  = false,
+                             accept_invalids   = false
+                             ) where {T<:Union{AbstractVector{UInt8}, Ptr{UInt8}, String}}
     flags = 0%UInt
     totalchar = latin1byte = num2byte = num3byte = num4byte = invalids = 0
     @inbounds while pos <= endpos
@@ -288,14 +279,14 @@ function unsafe_checkstring(dat::T, pos, endpos;
             end
         end
     end
-    retcheck(totalchar, flags, invalids, latin1byte, num2byte, num3byte, num4byte)
+    _ret_check(totalchar, flags, invalids, latin1byte, num2byte, num3byte, num4byte)
 end
 
-function unsafe_checkstring(dat::Union{AbstractVector{T}, Ptr{T}}, pos, endpos;
-                            accept_long_null  = false,
-                            accept_surrogates = false,
-                            accept_long_char  = false,
-                            accept_invalids   = false) where {T<:Union{UInt16,UInt32}}
+function unsafe_check_string(dat::Union{AbstractVector{T}, Ptr{T}}, pos, endpos;
+                             accept_long_null  = false,
+                             accept_surrogates = false,
+                             accept_long_char  = false,
+                             accept_invalids   = false) where {T<:Union{UInt16,UInt32}}
     flags = 0%UInt
     totalchar = latin1byte = num2byte = num3byte = num4byte = invalids = 0
     @inbounds while pos <= endpos
@@ -345,14 +336,14 @@ function unsafe_checkstring(dat::Union{AbstractVector{T}, Ptr{T}}, pos, endpos;
             end
         end
     end
-    retcheck(totalchar, flags, invalids, latin1byte, num2byte, num3byte, num4byte)
+    _ret_check(totalchar, flags, invalids, latin1byte, num2byte, num3byte, num4byte)
 end
 
-function unsafe_checkstring(str::T;
-                            accept_long_null  = false,
-                            accept_surrogates = false,
-                            accept_long_char  = false,
-                            accept_invalids   = false) where {T<:AbstractString}
+function unsafe_check_string(str::T;
+                             accept_long_null  = false,
+                             accept_surrogates = false,
+                             accept_long_char  = false,
+                             accept_invalids   = false) where {T<:AbstractString}
     flags = 0%UInt
     totalchar = latin1byte = num2byte = num3byte = num4byte = invalids = 0
     pos = start(str)
@@ -401,7 +392,7 @@ function unsafe_checkstring(str::T;
         end
         pos = nxt
     end
-    retcheck(totalchar, flags, invalids, latin1byte, num2byte, num3byte, num4byte)
+    _ret_check(totalchar, flags, invalids, latin1byte, num2byte, num3byte, num4byte)
 end
 
 """
@@ -430,7 +421,7 @@ function count_chars(::Type{UTF8Str}, ::Type{S}, dat::Union{AbstractVector{S}, P
             num4byte += 1
         end
     end
-    retcheck(totalchar, 0%UInt, 0, latin1byte, num2byte, num3byte, num4byte)
+    _ret_check(totalchar, 0%UInt, 0, latin1byte, num2byte, num3byte, num4byte)
 end
 
 """
@@ -462,7 +453,7 @@ function count_chars(::Type{T}, ::Type{S}, dat::Union{AbstractVector{S}, Ptr{S}}
             num4byte += 1
         end
     end
-    retcheck(totalchar, 0%UInt, 0, latin1byte, num2byte, num3byte, num4byte)
+    _ret_check(totalchar, 0%UInt, 0, latin1byte, num2byte, num3byte, num4byte)
 end
 
 count_chars(T, dat, len) = count_chars(T, codeunit(T), dat, 1, len)
@@ -471,7 +462,7 @@ count_chars(T, dat, len) = count_chars(T, codeunit(T), dat, 1, len)
 Validates and calculates number of characters in a UTF-8,UTF-16 or UTF-32 encoded vector/string
 
 This function checks the bounds of the start and end positions
-Use `unsafe_checkstring` to avoid that overhead if the bounds have already been checked
+Use `unsafe_check_string` to avoid that overhead if the bounds have already been checked
 
 Input Arguments:
 
@@ -497,17 +488,17 @@ Throws:
 
 * `UnicodeError`
 """
-function checkstring end
+function check_string end
 
 # No need to check bounds if using defaults
-checkstring(dat; kwargs...) = unsafe_checkstring(dat, 1, lastindex(dat); kwargs...)
+check_string(dat; kwargs...) = unsafe_check_string(dat, 1, lastindex(dat); kwargs...)
 
 # Make sure that beginning and end positions are bounds checked
-function checkstring(dat, startpos, endpos = lastindex(dat); kwargs...)
+function check_string(dat, startpos, endpos = lastindex(dat); kwargs...)
     checkbounds(dat, startpos)
     checkbounds(dat, endpos)
     endpos < startpos && argerror(startpos, endpos)
-    unsafe_checkstring(dat, startpos, endpos; kwargs...)
+    unsafe_check_string(dat, startpos, endpos; kwargs...)
 end
 
 byte_string_classify(data::Vector{UInt8}) =
@@ -530,7 +521,7 @@ function bytestring(s::AbstractString...)
     (siz = sizeof(str)) == 0 && return empty_ascii
     dat = _pnt(str)
     len, flags, num4byte, num3byte, num2byte, latin1, invalids =
-        unsafe_checkstring(dat, 1, siz)
+        unsafe_check_string(dat, 1, siz)
     if flags & ~UTF_INVALID == 0
         Str(invalids == 0 ? ASCIICSE : Text1CSE, _data(str))
     else

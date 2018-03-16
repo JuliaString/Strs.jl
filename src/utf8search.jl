@@ -36,7 +36,7 @@ function _srch_cp(::Rev, ::CodeUnitMulti, str::Str{UTF8CSE}, cp::AbsChar, pos, l
     @preserve str begin
         (ch = tobase(cp)) < 0x80 && return _srch_codeunit(Rev(), _pnt(str), ch%UInt8, pos)
         init = beg = _pnt(str)
-        pnt = beg + @inbounds nextind(str, pos)
+        @inbounds pnt = beg + nextind(str, pos)
         if ch <= 0x7ff
             pnt > (beg += 1) || return 0
             b1, b2 = get_utf8_2(ch)

@@ -14,25 +14,25 @@ using Base: Chars, _default_delims
 
 #Todo: Make fast version for Str, using CompareStyle & Contains
 
-function startswith(a::AbstractString, b::AbstractString)
+function starts_with(a::AbstractString, b::AbstractString)
     a, b = Iterators.Stateful(a), Iterators.Stateful(b)
-    all(splat(==), zip(a, b)) && isempty(b)
+    all(splat(==), zip(a, b)) && is_empty(b)
 end
-startswith(str::AbstractString, chars::Chars) = !isempty(str) && first(str) in chars
+starts_with(str::AbstractString, chars::Chars) = !is_empty(str) && first(str) in chars
 
-function endswith(a::AbstractString, b::AbstractString)
+function ends_with(a::AbstractString, b::AbstractString)
     a = Iterators.Stateful(Iterators.reverse(a))
     b = Iterators.Stateful(Iterators.reverse(b))
-    all(splat(==), zip(a, b)) && isempty(b)
+    all(splat(==), zip(a, b)) && is_empty(b)
 end
-endswith(str::AbstractString, chars::Chars) = !isempty(str) && last(str) in chars
+ends_with(str::AbstractString, chars::Chars) = !is_empty(str) && last(str) in chars
 
 end # if false
 
-startswith(a::Str{C}, b::Str{C}) where {C<:CSE} =
+starts_with(a::Str{C}, b::Str{C}) where {C<:CSE} =
     (len = _len(b)) <= _len(a) && _memcmp(_pnt(a), _pnt(b), len) == 0
 
-endswith(a::Str{C}, b::Str{C}) where {C<:CSE} =
+ends_with(a::Str{C}, b::Str{C}) where {C<:CSE} =
     (lenb = _len(b)) <= (lena = _len(a)) && _memcmp(_pnt(a) + lena - lenb, _pnt(b), lenb) == 0
 
 @static if false
@@ -185,6 +185,7 @@ function replace(str::Str, pat_repl::Pair; count::Integer=typemax(Int))
     i = 1
     e = lastindex(str)
     r = fnd(Fwd, pattern, str)
+    print("fnd(Fwd, \"$pattern\", \"str\") => $r")
     (j = first(r)) == 0 && return str
     # Just return the string if not found
 
@@ -192,8 +193,9 @@ function replace(str::Str, pat_repl::Pair; count::Integer=typemax(Int))
     while true
         k = last(r)
         if i == 1 || i <= k
+            print(out, SubString(str, i, thisind(str, j)))
             println("$i $k $(pointer(str, i)), $(j-i)")
-            unsafe_write(out, pointer(str, i), UInt(j-i))
+            #unsafe_write(out, pointer(str, i), UInt(j-i))
             _replace(out, repl, str, r, pattern)
         end
         if k < j
@@ -204,21 +206,19 @@ function replace(str::Str, pat_repl::Pair; count::Integer=typemax(Int))
             i = k = nextind(str, k)
         end
         r = fnd(Fwd, pattern, str, k)
-        println("$r $i $j $k $n")
-        j = first(r)
-        j == 0 && break
-        n == count && break
-        n += 1
+        println("fnd(Fwd, \"$pattern\", \"str\", $k) => $r, i=$i, j=$j, n=$n")
+        (j = first(r)) == 0 && break
+        (n += 1) == count && break
     end
     print(out, SubString(str, i))
-    String(take!(out))
+    Str(cse(str), String(take!(out)))
 end
 
 # TODO: allow transform as the first argument to replace?
 
 ascii_err() = throw(ArgumentError("Not a valid ASCII string"))
 ascii(str::Union{T,SubString{T}}) where {T<:Str{CSE}} =
-    isascii(str) ? ASCIIStr(str) : ascii_err()
+    is_ascii(str) ? ASCIIStr(str) : ascii_err()
 ascii(str::Union{T,SubString{T}}) where {T<:Str{SubSet_CSEs}} = ascii_err()
 ascii(str::Union{T,SubString{T}}) where {T<:Str{ASCIICSE}} = str
 

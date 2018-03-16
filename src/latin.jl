@@ -8,10 +8,10 @@ Based in part on code for ASCIIString that used to be in Julia
 
 ## overload methods for efficiency ##
 
-isascii(str::Str{_LatinCSE}) = false
-islatin(str::LatinStrings)   = true
-isbmp(str::LatinStrings)     = true
-isunicode(str::LatinStrings) = true
+is_ascii(str::Str{_LatinCSE}) = false
+is_latin(str::LatinStrings)   = true
+is_bmp(str::LatinStrings)     = true
+is_unicode(str::LatinStrings) = true
 
 bytestring(s::LatinStrings) = s
 
@@ -55,9 +55,9 @@ end
 
 function convert(::Type{LatinStr}, str::String)
     # handle zero length string quickly
-    isempty(str) && return empty_latin
+    is_empty(str) && return empty_latin
     # get number of bytes to allocate
-    len, flags, num4byte, num3byte, num2byte, latinbyte = unsafe_checkstring(str, 1, sizeof(str))
+    len, flags, num4byte, num3byte, num2byte, latinbyte = unsafe_check_string(str, 1, sizeof(str))
     num4byte + num3byte + num2byte == 0 || unierror(UTF_ERR_INVALID_LATIN1)
     Str(LatinCSE, flags == 0 ? str : _utf8_to_latin(_pnt(str), len))
 end
@@ -68,21 +68,21 @@ convert(::Type{<:Str{_LatinCSE}}, ch::Unsigned) =
 
 function convert(::Type{_LatinStr}, str::String)
     # handle zero length string quickly
-    isempty(str) && return empty_ascii
+    is_empty(str) && return empty_ascii
     # get number of bytes to allocate
     len, flags, num4byte, num3byte, num2byte, latinbyte =
-        unsafe_checkstring(str, 1, sizeof(str))
+        unsafe_check_string(str, 1, sizeof(str))
     num4byte + num3byte + num2byte == 0 || unierror(UTF_ERR_INVALID_LATIN1)
     Str(latinbyte == 0 ? ASCIICSE : _LatinCSE,
         flags == 0 ? str : _utf8_to_latin(_pnt(str), len))
 end
 
 convert(::Type{LatinStr}, a::Vector{UInt8}) = _convert(LatinStr, a)
-convert(::Type{_LatinStr}, a::Vector{UInt8}) = _convert(isascii(a) ? ASCIIStr : _LatinStr, a)
+convert(::Type{_LatinStr}, a::Vector{UInt8}) = _convert(is_ascii(a) ? ASCIIStr : _LatinStr, a)
 
 function convert(::Type{T}, str::AbstractString) where {T<:LatinStrings}
     # Might want to have invalids_as here
-    len, flags = unsafe_checkstring(str)
+    len, flags = unsafe_check_string(str)
     (flags & ~(UTF_LONG | UTF_LATIN1)) == 0 || unierror(UTF_ERR_INVALID_LATIN1)
     buf, pnt = _allocate(UInt8, len)
     @inbounds for ch in str

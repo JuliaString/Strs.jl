@@ -1,5 +1,5 @@
 # Test starting and different position
-@test checkstring(UInt32[0x110000, 0x1f596], 2) == (1,0x10,1,0,0,0,0)
+@test check_string(UInt32[0x110000, 0x1f596], 2) == (1,0x10,1,0,0,0,0)
 
 # Test valid sequences
 for (seq, res) in (
@@ -39,5 +39,5 @@ for (seq, res) in (
     ([0x0ffff],            (1,8,0,1,0,0,0)),  # End of 3-byte range
     ([0x10000],            (1,16,1,0,0,0,0)), # \U10000, beginning of 4-byte range
     ([0x10ffff],           (1,16,1,0,0,0,0))) # \U10ffff, end of 4-byte range
-    @test checkstring(seq) == res
+    @test check_string(seq) == res
 end

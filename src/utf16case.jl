@@ -42,7 +42,7 @@ function lowercase(str::Str{UTF16CSE})
         prv = pnt
         (ch > 0xd7ff # May be surrogate pair
          ? _isupper_u(ch > 0xdfff ? ch%UInt32 : get_supplementary(ch, get_codeunit(pnt += 2)))
-         : (isascii(ch) ? _isupper_a(ch) : (islatin(ch) ? _isupper_l(ch) : _isupper_u(ch)))) &&
+         : (is_ascii(ch) ? _isupper_a(ch) : (is_latin(ch) ? _isupper_l(ch) : _isupper_u(ch)))) &&
              return _lower(UTF16Str, beg, prv-beg, _len(str))
         pnt += 2
     end
@@ -56,9 +56,9 @@ function _upper(::Type{<:Str{UTF16CSE}}, beg, off, len)
     out += off
     while out < fin
         ch = get_codeunit(out)
-        if isascii(ch)
+        if is_ascii(ch)
             _islower_a(ch) && set_codeunit!(out, ch -= 0x20)
-        elseif islatin(ch)
+        elseif is_latin(ch)
             if _can_upper_l(ch)
                 set_codeunit!(out, ch -= 0x20)
             elseif ch == 0xb5
