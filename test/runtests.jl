@@ -37,11 +37,15 @@ end
 
 # Test for CESU-8 sequences
 let ch = 0x10000
-    for hichar = 0xd800:0xdbff
-        for lochar = 0xdc00:0xdfff
-            @test_throws UnicodeError convert(UTF8Str, utf8(Char[hichar, lochar]).data)
-            ch += 1
-        end
+    for hichar = 0xd800:0xdbff, lochar = 0xdc00:0xdfff
+        seq = string(Char(hichar), Char(lochar))
+        # Normal conversion throws an error
+        @test_throws UnicodeError utf8(seq)
+        # Unsafe conversions return invalid strings as Text*Str
+        @test typeof(unsafe_str(seq)) == Text1Str
+        # With accept_surrogates flag, return converted to valid string (_UTF32Str)
+        @test unsafe_str(seq;accept_surrogates=true)[1]%UInt == ch
+        ch += 1
     end
 end
 

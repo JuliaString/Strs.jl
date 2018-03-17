@@ -18,46 +18,54 @@ const _hi_bit_16  = 0x8000_8000_8000_8000
 function _length(::CodeUnitMulti, str::T) where {T<:Str{UTF16CSE,Nothing}}
     (siz = sizeof(str)) == 0 && return 0
     siz == 2 && return 1
-    cnt = chroff(UInt16, siz)
-    pnt, fin = _calcpnt(str, siz)
-    while (pnt += CHUNKSZ) <= fin
-        cnt -= count_ones(_get_masked(pnt))
+    @preserve str begin
+        cnt = chroff(UInt16, siz)
+        pnt, fin = _calcpnt(str, siz)
+        while (pnt += CHUNKSZ) <= fin
+            cnt -= count_ones(_get_masked(pnt))
+        end
+        pnt - CHUNKSZ == fin ? cnt : (cnt - count_ones(_get_masked(pnt) & _mask_bytes(siz)))
     end
-    pnt - CHUNKSZ == fin ? cnt : (cnt - count_ones(_get_masked(pnt) & _mask_bytes(siz)))
 end
 
 function is_ascii(str::T) where {T<:Str{<:Union{Text2CSE, UCS2CSE, UTF16CSE},Nothing}}
     (siz = sizeof(str)) == 0 && return true
-    siz < CHUNKSZ &&
-        return ((unsafe_load(_pnt64(str)) & _mask_bytes(siz)) & _ascii_mask(UInt16)) == 0
-    pnt, fin = _calcpnt(str, siz)
-    while (pnt += CHUNKSZ) <= fin
-        (unsafe_load(pnt) & _ascii_mask(UInt16)) == 0 || return false
+    @preserve str begin
+        siz < CHUNKSZ &&
+            return ((unsafe_load(_pnt64(str)) & _mask_bytes(siz)) & _ascii_mask(UInt16)) == 0
+        pnt, fin = _calcpnt(str, siz)
+        while (pnt += CHUNKSZ) <= fin
+            (unsafe_load(pnt) & _ascii_mask(UInt16)) == 0 || return false
+        end
+        pnt - CHUNKSZ == fin || ((unsafe_load(pnt) & _mask_bytes(siz)) & _ascii_mask(UInt16)) == 0
     end
-    pnt - CHUNKSZ == fin || ((unsafe_load(pnt) & _mask_bytes(siz)) & _ascii_mask(UInt16)) == 0
 end
 
 function is_latin(str::T) where {T<:Str{<:Union{Text2CSE, UCS2CSE, UTF16CSE},Nothing}}
     (siz = sizeof(str)) == 0 && return true
-    siz < CHUNKSZ &&
-        return ((unsafe_load(_pnt64(str)) & _mask_bytes(siz)) & _latin_mask(UInt16)) == 0
-    pnt, fin = _calcpnt(str, siz)
-    while (pnt += CHUNKSZ) <= fin
-        (unsafe_load(pnt) & _latin_mask) == 0 || return false
+    @preserve str begin
+        siz < CHUNKSZ &&
+            return ((unsafe_load(_pnt64(str)) & _mask_bytes(siz)) & _latin_mask(UInt16)) == 0
+        pnt, fin = _calcpnt(str, siz)
+        while (pnt += CHUNKSZ) <= fin
+            (unsafe_load(pnt) & _latin_mask) == 0 || return false
+        end
+        pnt - CHUNKSZ == fin || ((unsafe_load(pnt) & _mask_bytes(siz)) & _latin_mask(UInt16)) == 0
     end
-    pnt - CHUNKSZ == fin || ((unsafe_load(pnt) & _mask_bytes(siz)) & _latin_mask(UInt16)) == 0
 end
 
 # Check for any surrogate characters
 function is_bmp(str::T) where {T<:Str{UTF16CSE,Nothing}}
     (siz = sizeof(str)) == 0 && return true
-    siz < CHUNKSZ && return (_get_masked(_pnt64(str)) & _mask_bytes(siz)) == 0
+    @preserve str begin
+        siz < CHUNKSZ && return (_get_masked(_pnt64(str)) & _mask_bytes(siz)) == 0
 
-    pnt, fin = _calcpnt(str, siz)
-    while (pnt += CHUNKSZ) <= fin
-        _get_masked(pnt) == 0 || return false
+        pnt, fin = _calcpnt(str, siz)
+        while (pnt += CHUNKSZ) <= fin
+            _get_masked(pnt) == 0 || return false
+        end
+        pnt - CHUNKSZ == fin || (_get_masked(pnt) & _mask_bytes(siz)) == 0
     end
-    pnt - CHUNKSZ == fin || (_get_masked(pnt) & _mask_bytes(siz)) == 0
 end
 
 is_ascii(str::Str{_UCS2CSE}) = false
@@ -458,8 +466,7 @@ function _maprest(fun, str, len, pnt, fin, buf, out, uc)
     Str(UTF16CSE, totbuf)
 end
 
-function map(fun, str::T) where {C<:Union{UCS2CSE, UTF16CSE},T<:Str{C}}
-    (len = _len(str)) == 0 && return empty_str(T)
+function _map(::Type{C}, ::Type{T}, fun, len, str) where {C<:CSE, T<:Str}
     pnt = _pnt(str)
     buf, out = _allocate(UInt16, len)
     surrflag = false
@@ -487,7 +494,7 @@ function map(fun, str::T) where {C<:Union{UCS2CSE, UTF16CSE},T<:Str{C}}
     end
     out < outend && resize!(buf, out - pointer(buf))
     if !surrflag
-        Str(cse(T), buf)
+        Str(C, buf)
     elseif T == _UCS2Str
         # Convert to 32-bit, to keep result in UniStr type union
         # TODO: check this
@@ -496,3 +503,6 @@ function map(fun, str::T) where {C<:Union{UCS2CSE, UTF16CSE},T<:Str{C}}
         Str(UTF16CSE, buf)
     end
 end
+
+map(fun, str::T) where {C<:Union{UCS2CSE, UTF16CSE},T<:Str{C}} =
+    (len = _len(str)) == 0 ? empty_str(T) : @preserve str _map(C, T, fun, len, str)

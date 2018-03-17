@@ -42,7 +42,7 @@ function _cmp(::UTF16Compare, a, b)
     end
 end
 
-function _cpcmp(a::T, b) where {C<:CSE,T<:Str{C}}
+@inline function _cpcmp(a::T, b) where {C<:CSE,T<:Str{C}}
     len, pnt = _lenpnt(a)
     fin = pnt + sizeof(a)
     pos = start(b)
@@ -73,9 +73,9 @@ function _cmp(::CodePointCompare, a::S, b::T) where {CSE1,CSE2,S<:Str{CSE1},T<:S
     ifelse(pnt2 < fin2, -1, 0)
 end
 
-cmp(a::Str, b::AbstractString) = _cmp(CompareStyle(a, b), a, b)
-cmp(a::AbstractString, b::Str) = _cmp(CompareStyle(a, b), a, b)
-cmp(a::Str, b::Str)            = _cmp(CompareStyle(a, b), a, b)
+cmp(a::Str, b::AbstractString) = @preserve a _cmp(CompareStyle(a, b), a, b)
+cmp(a::AbstractString, b::Str) = @preserve b _cmp(CompareStyle(a, b), a, b)
+cmp(a::Str, b::Str)            = @preserve a b _cmp(CompareStyle(a, b), a, b)
 
 # Todo: handle comparisons of UTF16 specially, to compare first non-matching character
 # as if comparing Char to Char, to get ordering correct when dealing with > 0xffff non-BMP
@@ -135,9 +135,9 @@ _iseq(::WidenCompare,     a, b) = _wideneq(a, b)
 _iseq(::ASCIICompare,     a, b) = _cpeq(a, b) # This can be optimized later
 _iseq(::CodePointCompare, a, b) = _cpeq(a, b)
 
-==(a::AbstractString, b::Str) = _iseq(EqualsStyle(a, b), a, b)
-==(a::Str, b::AbstractString) = _iseq(EqualsStyle(a, b), a, b)
-==(a::Str, b::Str)            = _iseq(EqualsStyle(a, b), a, b)
+==(a::AbstractString, b::Str) = @preserve b _iseq(EqualsStyle(a, b), a, b)
+==(a::Str, b::AbstractString) = @preserve a _iseq(EqualsStyle(a, b), a, b)
+==(a::Str, b::Str)            = @preserve a b _iseq(EqualsStyle(a, b), a, b)
 
 isless(a::AbstractString, b::Str) = cmp(a, b) < 0
 isless(a::Str, b::AbstractString) = cmp(a, b) < 0

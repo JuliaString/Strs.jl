@@ -10,30 +10,36 @@ Based in part on code for UTF32String that used to be in Julia
 
 function is_ascii(str::Str{UTF32CSE})
     (siz = sizeof(str)) == 0 && return true
-    pnt, fin = _calcpnt(str, siz)
-    while (pnt += CHUNKSZ) <= fin
-        (unsafe_load(pnt) & _ascii_mask(UInt32)) == 0 || return false
+    @preserve str begin
+        pnt, fin = _calcpnt(str, siz)
+        while (pnt += CHUNKSZ) <= fin
+            (unsafe_load(pnt) & _ascii_mask(UInt32)) == 0 || return false
+        end
+        pnt - CHUNKSZ == fin || unsafe_load(reinterpret(Ptr{UInt32}, pnt)) <= 0x7f
     end
-    pnt - CHUNKSZ == fin || unsafe_load(reinterpret(Ptr{UInt32}, pnt)) <= 0x7f
 end
 
 function is_latin(str::Str{UTF32CSE})
     (siz = sizeof(str)) == 0 && return true
-    pnt, fin = _calcpnt(str, siz)
-    while (pnt += CHUNKSZ) <= fin
-        (unsafe_load(pnt) & _latin_mask(UInt32)) == 0 || return false
+    @preserve str begin
+        pnt, fin = _calcpnt(str, siz)
+        while (pnt += CHUNKSZ) <= fin
+            (unsafe_load(pnt) & _latin_mask(UInt32)) == 0 || return false
+        end
+        pnt - CHUNKSZ == fin || unsafe_load(reinterpret(Ptr{UInt32}, pnt)) <= 0xff
     end
-    pnt - CHUNKSZ == fin || unsafe_load(reinterpret(Ptr{UInt32}, pnt)) <= 0xff
 end
 
 const _bmp_mask_32   = 0xffff0000_ffff0000
 function is_bmp(str::Str{UTF32CSE})
     (siz = sizeof(str)) == 0 && return true
-    pnt, fin = _calcpnt(str, siz)
-    while (pnt += CHUNKSZ) <= fin
-        (unsafe_load(pnt) & _bmp_mask_32) == 0 || return false
+    @preserve str begin
+        pnt, fin = _calcpnt(str, siz)
+        while (pnt += CHUNKSZ) <= fin
+            (unsafe_load(pnt) & _bmp_mask_32) == 0 || return false
+        end
+        pnt- CHUNKSZ  == fin || unsafe_load(reinterpret(Ptr{UInt32}, pnt)) <= 0xffff
     end
-    pnt- CHUNKSZ  == fin || unsafe_load(reinterpret(Ptr{UInt32}, pnt)) <= 0xffff
 end
 
 is_unicode(str::Str{UTF32CSE})  = true
@@ -80,7 +86,9 @@ function convert(::Type{<:Str{UTF32CSE}}, str::String)
     # Validate UTF-8 encoding, and get number of words to create
     len, flags = unsafe_check_string(str, 1, len)
     # Optimize case where no characters > 0x7f, no invalid
-    Str(UTF32CSE, flags == 0 ? _cvtsize(UInt32, str, len) : _encode_utf32(_pnt(str), len))
+    @preserve str begin
+        Str(UTF32CSE, flags == 0 ? _cvtsize(UInt32, str, len) : _encode_utf32(_pnt(str), len))
+    end
 end
 
 @inline function get_cp(pnt)
@@ -159,17 +167,19 @@ function convert(::Type{<:Str{UTF32CSE}}, str::Str{UTF8CSE})
     (len = _len(str)) == 0 && return empty_str(UTF32CSE)
     cnt = _length(CodeUnitMulti(), str)
     # Optimize case where no characters > 0x7f, otherwise has multi-byte UTF-8 sequences
-    Str(UTF32CSE,
-        (cnt == len
-         ? _cvtsize(UInt32, _pnt(str), cnt)
-         : _transcode_utf8_to_utf32(_pnt(str), cnt)))
+    @preserve str begin
+        Str(UTF32CSE,
+            (cnt == len
+             ? _cvtsize(UInt32, _pnt(str), cnt)
+             : _transcode_utf8_to_utf32(_pnt(str), cnt)))
+    end
 end
 
 # This can rely on the fact that an ASCIIStr, LatinStr, UCS2Str is always valid
 convert(::Type{<:Str{UTF32CSE}}, str::Str{<:Union{ASCIICSE,Latin_CSEs,UCS2_CSEs}}) =
     ((siz = sizeof(str)) == 0
      ? empty_str(UTF32CSE)
-     : Str(UTF32CSE, _cvtsize(UInt32, _pnt(str), siz)))
+     : @preserve str Str(UTF32CSE, _cvtsize(UInt32, _pnt(str), siz)))
 
 # This can rely on the fact that a UTF16Str is always valid
 function convert(::Type{<:Str{UTF32CSE}}, str::Str{UTF16CSE})
@@ -178,9 +188,11 @@ function convert(::Type{<:Str{UTF32CSE}}, str::Str{UTF16CSE})
     # Get number of characters to create
     cnt = _length(CodeUnitMulti(), str)
     # No surrogate pairs, do optimized copy
-    Str(UTF32CSE, cnt == len
-        ? _cvtsize(UInt32, _pnt(str), cnt)
-        : _transcode_utf16_to_utf32(_pnt(str), cnt))
+    @preserve str begin
+        Str(UTF32CSE, cnt == len
+            ? _cvtsize(UInt32, _pnt(str), cnt)
+            : _transcode_utf16_to_utf32(_pnt(str), cnt))
+    end
 end
 
 function convert(::Type{<:Str{UTF16CSE}}, str::Str{<:UTF32_CSEs})
@@ -188,10 +200,12 @@ function convert(::Type{<:Str{UTF16CSE}}, str::Str{<:UTF32_CSEs})
     (len = _len(str)) == 0 && return empty_utf16
     # get number of words to allocate
     # This can be faster just be checking how many > 0xffff
-    pnt = _pnt(str)
-    nonbmp = _cnt_non_bmp(len, pnt)
-    # optimized path, no surrogates
-    Str(UTF16CSE, nonbmp == 0 ? _cvtsize(UInt16, pnt, len) : _encode_utf16(pnt, len + nonbmp))
+    @preserve str begin
+        pnt = _pnt(str)
+        nonbmp = _cnt_non_bmp(len, pnt)
+        # optimized path, no surrogates
+        Str(UTF16CSE, nonbmp == 0 ? _cvtsize(UInt16, pnt, len) : _encode_utf16(pnt, len + nonbmp))
+    end
 end
 
 function convert(::Type{<:Str{C}}, str::Str{<:UTF32_CSEs}) where {C<:UCS2_CSEs}
@@ -200,22 +214,24 @@ function convert(::Type{<:Str{C}}, str::Str{<:UTF32_CSEs}) where {C<:UCS2_CSEs}
     (len = _len(str)) == 0 && return empty_str(UCS2CSE)
     # Check if conversion is valid
     is_bmp(str) || unierror(UTF_ERR_INVALID_UCS2)
-    Str(UCS2CSE, _cvtsize(UInt16, _pnt(str), len))
+    @preserve str Str(UCS2CSE, _cvtsize(UInt16, _pnt(str), len))
 end
 
 const UniRawChar = Union{UInt32, Int32, Text4Chr, Char}
 
 function convert(::Type{T}, dat::AbstractVector{<:UniRawChar}) where {T<:UTF32Strings}
     (len = length(dat)) == 0 && empty_str(T)
-    buf, pnt = _allocate(UInt32, len)
-    fin = bytoff(pnt, len)
-    pos = 0
-    while pnt < fin
-        @inbounds ch = dat[pos += 1]%UInt32
-        set_codeunit!(pnt, check_valid(ch, pos))
-        pnt += sizeof(UInt32)
+    @preserve buf begin
+        buf, pnt = _allocate(UInt32, len)
+        fin = bytoff(pnt, len)
+        pos = 0
+        while pnt < fin
+            @inbounds ch = dat[pos += 1]%UInt32
+            set_codeunit!(pnt, check_valid(ch, pos))
+            pnt += sizeof(UInt32)
+        end
+        Str(cse(T), buf)
     end
-    Str(cse(T), buf)
 end
 
 # Not sure this is valid anymore, want to avoid type piracy
@@ -226,13 +242,13 @@ convert(::Type{T}, v::AbstractVector{<:UniRawChar}) where {T<:AbstractString} =
 function convert(::Type{Vector{UInt32}}, str::QuadStr)
     len = _len(str)
     vec = create_vector(UInt32, len)
-    _memcpy(pointer(vec), _pnt(str), len)
+    @preserve str _memcpy(pointer(vec), _pnt(str), len)
     vec
 end
 
 # I don't think this will work for Char anymore, broken by #24999
-unsafe_convert(::Type{Ptr{T}}, s::Str{<:Quad_CSEs}) where {T<:UniRawChar} =
-    convert(Ptr{T}, _pnt(s))
+unsafe_convert(::Type{Ptr{T}}, str::Str{<:Quad_CSEs}) where {T<:UniRawChar} =
+    @preserve str convert(Ptr{T}, _pnt(str))
 
 # Should check for 0xxxxxfeff and 0xfffexxxx as well, might be 16-bit encoded
 _convert(pnt::Ptr{T}, len, T1) where {T<:Union{UInt32,UInt32_U,UInt32_S,UInt32_US}} =
@@ -248,15 +264,17 @@ function convert(::Type{T}, bytes::AbstractArray{UInt8}) where {T<:UTF32Strings}
     len = length(bytes)
     len & 3 == 0 || unierror(UTF_ERR_ODD_BYTES_32, len, 0)
     len >>>= 2
-    pnt = pointer(bytes)
-    if reinterpret(UInt, pnt) & 3 == 0
-        buf, out = _convert(reinterpret(Ptr{UInt32}, pnt), len, swappedtype(UInt32))
-    else
-        buf, out = _convert(reinterpret(Ptr{UInt32_U}, pnt), len, swappedtype(UInt32_U))
+    @preserve bytes begin
+        pnt = pointer(bytes)
+        if reinterpret(UInt, pnt) & 3 == 0
+            buf, out = _convert(reinterpret(Ptr{UInt32}, pnt), len, swappedtype(UInt32))
+        else
+            buf, out = _convert(reinterpret(Ptr{UInt32_U}, pnt), len, swappedtype(UInt32_U))
+        end
+        # Todo, this needs better handling
+        is_valid(T, out, len) || unierror(UTF_ERR_INVALID, 0, 0)
+        Str(cse(T), buf)
     end
-    # Todo, this needs better handling
-    is_valid(T, out, len) || unierror(UTF_ERR_INVALID, 0, 0)
-    Str(cse(T), buf)
 end
 
 function is_valid(::Type{<:UTF32Strings}, str::Vector{<:UniRawChar})
@@ -270,29 +288,33 @@ end
 is_valid(str::Vector{Char}) = is_valid(UTF32Str, str)
 
 function map(fun, str::Str{UTF32CSE})
-    len = _len(str)
-    fin = bytoff(pnt, len)
-    buf, pnt = _allocate(UInt32, len)
-    while pnt < fin
-        set_codeunit!(out, check_valid(fun(get_codeunit(pnt))))
-        pnt += sizeof(UInt32)
-        out += sizeof(UInt32)
+    @preserve str buf begin
+        len, pnt = _lenpnt(str)
+        buf, out = _allocate(UInt32, len)
+        fin = bytoff(pnt, len)
+        while pnt < fin
+            set_codeunit!(out, check_valid(fun(get_codeunit(pnt))))
+            pnt += sizeof(UInt32)
+            out += sizeof(UInt32)
+        end
+        Str(UTF32CSE, buf)
     end
-    Str(UTF32CSE, buf)
 end
 
 # Make sure the result actually still has at least one character > 0xffff
 function map(fun, str::Str{_UTF32CSE})
-    len, pnt = _lenpnt(str)
-    fin = bytoff(pnt, len)
-    buf, out = _allocate(UInt32, len)
-    msk = 0%UInt32
-    while pnt < fin
-        ch = check_valid(fun(get_codeunit(pnt)))
-        msk |= ch
-        set_codeunit!(out, ch)
-        pnt += sizeof(UInt32)
-        out += sizeof(UInt32)
+    @preserve str buf begin
+        len, pnt = _lenpnt(str)
+        fin = bytoff(pnt, len)
+        buf, out = _allocate(UInt32, len)
+        msk = 0%UInt32
+        while pnt < fin
+            ch = check_valid(fun(get_codeunit(pnt)))
+            msk |= ch
+            set_codeunit!(out, ch)
+            pnt += sizeof(UInt32)
+            out += sizeof(UInt32)
+        end
+        Str(ifelse(msk < 0xffff, UTF32CSE, _UTF32CSE), buf)
     end
-    Str(ifelse(msk < 0xffff, UTF32CSE, _UTF32CSE), buf)
 end
