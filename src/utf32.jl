@@ -221,8 +221,8 @@ const UniRawChar = Union{UInt32, Int32, Text4Chr, Char}
 
 function convert(::Type{T}, dat::AbstractVector{<:UniRawChar}) where {T<:UTF32Strings}
     (len = length(dat)) == 0 && empty_str(T)
+    buf, pnt = _allocate(UInt32, len)
     @preserve buf begin
-        buf, pnt = _allocate(UInt32, len)
         fin = bytoff(pnt, len)
         pos = 0
         while pnt < fin

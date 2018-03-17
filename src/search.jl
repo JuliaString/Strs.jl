@@ -6,9 +6,6 @@ Licensed under MIT License, see LICENSE.md
 Based in part on julia/base/strings/search.jl
 =#
 
-export found, find_result, fnd
-export Dir, Fwd, Rev
-
 abstract type Dir end
 struct Fwd <: Dir end
 struct Rev <: Dir end

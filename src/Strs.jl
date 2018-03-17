@@ -48,9 +48,25 @@ Note: for good substring performance, some of the operations that are optimized 
 # Convenience functions
 export to_ascii, utf8, utf16, utf32
 
-export unsafe_str, codeunit, codeunits, codepoints, @str_str
+export str, unsafe_str, codepoints #, @str_str
 
 export category_code, category_string, category_abbrev, is_mutable
+
+# From types.jl
+export Str, UniStr, CSE, CodePoint, CharSet, Encoding, @cs_str, @enc_str, @cse
+export cse, charset, encoding
+
+# Note: the generated *Str, *Chr, *CSE, *CharSet and encoding names
+# (Native*, Swapped*, UTF8Encoding) for the built-in types are exported directly from types.jl
+
+export BIG_ENDIAN, LITTLE_ENDIAN
+
+# From search.jl
+export found, find_result, fnd
+export Dir, Fwd, Rev
+
+# From unicode.jl
+export is_assigned, is_grapheme_break, is_grapheme_break!
 
 symstr(s...) = Symbol(string(s...))
 quotesym(s...) = Expr(:quote, symstr(s...))
@@ -62,16 +78,16 @@ end
 using Base: @_inline_meta, @propagate_inbounds, @_propagate_inbounds_meta
 
 import Base: containsnul, convert, getindex, length, map, pointer, collect, in,
-             reverse, rsearch, search, sizeof, string, unsafe_convert, unsafe_load, write,
-             codeunit, start, next, done, nextind, prevind, reverseind,
+             reverse, sizeof, string, unsafe_convert, unsafe_load, write,
+             start, next, done, nextind, prevind, reverseind,
              typemin, typemax, rem, size, ndims, first, last, eltype,
              isless, ==, -, +, *, ^, cmp, promote_rule, one, repeat, filter,
-             print, show, isimmutable, chop, chomp, replace, ascii,
-             lstrip, rstrip, strip, lpad, rpad, split, rsplit, uppercase, lowercase
+             print, show, isimmutable, chop, chomp, replace, ascii, uppercase, lowercase,
+             lstrip, rstrip, strip, lpad, rpad, split, rsplit
 
 # Conditionally import names that are only in v0.6 or in master
-for sym in (:ind2chr, :chr2ind, :thisind, :codeunits, :ncodeunits, :bytestring, :firstindex,
-            :lastindex, :contains, :isfound, :codepoint, :Fix2)
+for sym in (:ind2chr, :chr2ind, :thisind, :codeunit, :codeunits, :ncodeunits, :bytestring,
+            :firstindex, :lastindex, :contains, :isfound, :codepoint, :Fix2)
     if isdefined(Base, sym)
         @eval import Base: $sym
     else
@@ -81,11 +97,11 @@ end
 
 # Possibly import functions, give new names with underscores
 
-for (oldname, newname) in ((:textwidth, :text_width),
+for (oldname, newname) in ((:textwidth,      :text_width),
                            (:lowercasefirst, :lowercase_first),
                            (:uppercasefirst, :uppercase_first),
-                           (:startswith, :starts_with),
-                           (:endswith, :ends_with))
+                           (:startswith,     :starts_with),
+                           (:endswith,       :ends_with))
     if isdefined(Base, oldname)
         @eval import Base: $oldname
         @eval const $newname = $oldname
@@ -95,8 +111,10 @@ end
 
 # Possibly import `is` functions, give more readable names starting with `is_`
 
-for (oldn, newn) in
-    [(:xdigit, :hex_digit), (:cntrl, :control), (:punct, :punctuation), (:print, :printable)]
+for (oldn, newn) in ((:xdigit, :hex_digit),
+                     (:cntrl,  :control),
+                     (:punct,  :punctuation),
+                     (:print,  :printable))
     oldname, newname = symstr("is",  oldn), symstr("is_", newn)
     if isdefined(Base, oldname)
         @eval import Base: $oldname
@@ -137,7 +155,6 @@ end
 const unimod = @static isdefined(Base, :UTF8proc) ? :UTF8proc : :Unicode
 
 @eval import Base.$unimod: isgraphemebreak, isgraphemebreak!, graphemes
-export is_grapheme_break, is_grapheme_break!
 const is_grapheme_break  = isgraphemebreak
 const is_grapheme_break! = isgraphemebreak!
 

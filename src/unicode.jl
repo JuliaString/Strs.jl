@@ -18,7 +18,6 @@ Licensed under MIT License, see LICENSE.md
 else
     Base.Unicode.normalize(str::Str, opt) = normalize(str, opt)
     Base.Unicode.isassigned(ch::CodePoint) = is_assigned(ch)
-    export is_assigned
     is_graphic(ch::Char) = is_graphic(tobase(ch))
     is_alphanumeric(ch::Char) = is_alphanumeric(tobase(ch))
 end
