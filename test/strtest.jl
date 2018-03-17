@@ -1,15 +1,17 @@
-@static VERSION < v"0.7.0-DEV" || (using Pkg, REPL)
+const V6_COMPAT = VERSION < v"0.7.0-DEV"
+
+@static V6_COMPAT || (using Pkg, REPL)
 
 const ver = "v0.$(VERSION.minor)"
 const git = "https://github.com/JuliaString/"
 const pkgdir = Pkg.dir()
 
-const mparse = @static VERSION < v"0.7.0-DEV" ? parse : Meta.parse
-_rep(str, a, b) = @static VERSION < v"0.7.0-DEV" ? replace(str, a, b) : replace(str, a => b)
-const RC = @static VERSION < v"0.7.0-DEV" ? Base.REPLCompletions : REPL.REPLCompletions
-_stdout() = @static VERSION < v"0.7.0-DEV" ? STDOUT : stdout
+const mparse    = @static V6_COMPAT ? parse : Meta.parse
+_rep(str, a, b) = @static V6_COMPAT ? replace(str, a, b) : replace(str, a => b)
+const RC        = @static V6_COMPAT ? Base.REPLCompletions : REPL.REPLCompletions
+_stdout()       = @static V6_COMPAT ? STDOUT : stdout
 
-@static if VERSION < v"0.7.0-DEV"
+@static if V6_COMPAT
     const pwc = print_with_color
 else
     pwc(c, io, str) = printstyled(io, str; color = c)

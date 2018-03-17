@@ -8,8 +8,6 @@ Based in part on code for ASCIIString that used to be in Julia
 
 ## overload methods for efficiency ##
 
-bytestring(str::Str{ASCIICSE}) = str
-
 function _string(c)
     n = 0
     for s in c

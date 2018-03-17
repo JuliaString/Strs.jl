@@ -6,12 +6,8 @@ const Cvoid = Void
 abstract type AbstractChar end
 export AbstractChar
 
-export StringIndexError
-struct StringIndexError <: Exception
-    string::AbstractString
-    index::Integer
-end
-@noinline index_error(s::AbstractString, i::Integer) = throw(StringIndexError(s, Int(i)))
+@noinline index_error(s::AbstractString, i::Integer) =
+    throw(UnicodeError(UTF_ERR_INVALID_INDEX, Int(i), codeunit(s, i)))
 
 function thisind(str::String, pos::Integer)
     @boundscheck 0 < pos <= _len(str) || boundserr(str, pos)
@@ -36,3 +32,7 @@ macro preserve(args...)
     =#
     esc(quote ; $(args[end]) ; end)
 end
+
+Base.SubString(str::AbstractString, rng::UnitRange) = SubString(str, first(rng), last(rng))
+
+Base.checkbounds(::Type{Bool}, s::AbstractString, i::Integer) = 1 <= i <= ncodeunits(s)

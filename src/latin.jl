@@ -13,8 +13,6 @@ is_latin(str::LatinStrings)   = true
 is_bmp(str::LatinStrings)     = true
 is_unicode(str::LatinStrings) = true
 
-bytestring(s::LatinStrings) = s
-
 const _UBS = Str{<:Union{ASCIICSE, Latin_CSEs}}
 
 function string(collection::_UBS...)

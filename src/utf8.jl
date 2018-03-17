@@ -234,8 +234,6 @@ end
 
 ## overload methods for efficiency ##
 
-bytestring(str::Str{UTF8CSE}) = str
-
 @inline _isvalid_char_pos(::CodeUnitMulti, str::Str{UTF8CSE}, pos::Integer) =
     !is_valid_continuation(get_codeunit(_pnt(str), pos))
 

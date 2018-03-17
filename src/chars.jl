@@ -1,7 +1,7 @@
 #=
 CodePoint support
 
-Copyright 2017 Gandalf Software, Inc., Scott P. Jones
+Copyright 2017-2018 Gandalf Software, Inc., Scott P. Jones
 Licensed under MIT License, see LICENSE.md
 In part based on code for Char in Julia
 =#
@@ -41,7 +41,7 @@ basetype(::Type{Char})        = UInt32
 
 basetype(::Type{T}) where {T<:CodeUnitTypes} = T
 
-@static if VERSION < v"0.7.0-DEV"
+@static if V6_COMPAT
     tobase(v::Char) = v%UInt32
 else
     tobase(v::AbstractChar) = codepoint(v)

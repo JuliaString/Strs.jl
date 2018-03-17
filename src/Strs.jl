@@ -45,6 +45,8 @@ Note: for good substring performance, some of the operations that are optimized 
 (or more) at a time, will need to deal with masking the initial chunk, not just the final chunk.
 =#
 
+const V6_COMPAT = VERSION < v"0.7.0-DEV"
+
 # Convenience functions
 export to_ascii, utf8, utf16, utf32
 
@@ -53,7 +55,7 @@ export str, unsafe_str, codepoints #, @str_str
 export category_code, category_string, category_abbrev, is_mutable
 
 # From types.jl
-export Str, UniStr, CSE, CodePoint, CharSet, Encoding, @cs_str, @enc_str, @cse
+export Str, Chr, UniStr, CSE, CodePoint, CharSet, Encoding, @cs_str, @enc_str, @cse
 export cse, charset, encoding
 
 # Note: the generated *Str, *Chr, *CSE, *CharSet and encoding names
@@ -62,8 +64,8 @@ export cse, charset, encoding
 export BIG_ENDIAN, LITTLE_ENDIAN
 
 # From search.jl
-export found, find_result, fnd
-export Dir, Fwd, Rev
+export found, find_result
+export FindOp, Direction, Fwd, Rev
 
 # From unicode.jl
 export is_assigned, is_grapheme_break, is_grapheme_break!
@@ -86,8 +88,9 @@ import Base: containsnul, convert, getindex, length, map, pointer, collect, in,
              lstrip, rstrip, strip, lpad, rpad, split, rsplit
 
 # Conditionally import names that are only in v0.6 or in master
-for sym in (:ind2chr, :chr2ind, :thisind, :codeunit, :codeunits, :ncodeunits, :bytestring,
-            :firstindex, :lastindex, :contains, :isfound, :codepoint, :Fix2)
+for sym in (:ind2chr, :chr2ind, :contains,
+            :codeunit, :codeunits, :ncodeunits,
+            :thisind, :firstindex, :lastindex, :isfound, :codepoint, :Fix2)
     if isdefined(Base, sym)
         @eval import Base: $sym
     else
@@ -126,7 +129,7 @@ end
 # Handle renames where function was deprecated
 
 export is_alphanumeric, is_graphic, is_lowercase, is_uppercase
-@static if VERSION < v"0.7.0-DEV"
+@static if V6_COMPAT
     import Base: isalnum, isgraph, islower, isupper
     const is_alphanumeric = isalnum
     const is_graphic      = isgraph
@@ -158,20 +161,27 @@ const unimod = @static isdefined(Base, :UTF8proc) ? :UTF8proc : :Unicode
 const is_grapheme_break  = isgraphemebreak
 const is_grapheme_break! = isgraphemebreak!
 
-@static VERSION < v"0.7.0-DEV" || import Base.GC: @preserve
-@static VERSION < v"0.7.0-DEV" && include("compat.jl")
+@static V6_COMPAT || import Base.GC: @preserve
+@static V6_COMPAT && include("compat.jl")
 @static isdefined(Base, :codeunits) || include("codeunits.jl")
 @static isdefined(Base, :Fix2)      || include("fix2.jl")
 
-export find
-function fnd end
-const find = fnd
+# Work around deprecation on v0.7
+@static if V6_COMPAT
+    import Base: find
+else
+    import Base: findall
+    const find = findall
+    #function find end
+end
+export fnd
+const fnd = find
 
 # Handle changes in array allocation
-create_vector(T, len)  = @static VERSION < v"0.7.0-DEV" ? Vector{T}(len) : Vector{T}(undef, len)
+create_vector(T, len)  = @static V6_COMPAT ? Vector{T}(len) : Vector{T}(undef, len)
 
 # Add new short name for deprecated hex function
-outhex(v, p=1) = @static VERSION < v"0.7.0-DEV" ? hex(v,p) : string(v, base=16, pad=p)
+outhex(v, p=1) = @static V6_COMPAT ? hex(v,p) : string(v, base=16, pad=p)
 
 include("types.jl")
 include("chars.jl")

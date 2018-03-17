@@ -104,6 +104,8 @@ show(io::IO, ::Type{Encoding{S}}) where {S}  = print(io, "Encoding{", string(S),
 show(io::IO, ::Type{CSE{CS,E}}) where {S,T,CS<:CharSet{S},E<:Encoding{T}} =
     print(io, "CSE{", string(S), ", ", string(T), "}")
 
+const CodeUnitTypes = Union{UInt8, UInt16, UInt32}
+
 # Note: this is still in transition to expressing character set, encoding
 # and optional cached info for hashes, UTF-8/UTF-16 encodings, subsets, etc.
 # via more type parameters
@@ -114,12 +116,17 @@ struct Str{T,SubStr,Cache,Hash} <: AbstractString
     cache::Cache
     hash::Hash
 
-    ((::Type{Str})(::Type{T}, v::String, s::S, c::C, h::H) where {T<:CSE,S,C,H} =
-     new{T,S,C,H}(v,s,c,h))
+    (::Type{Str})(::Type{T}, v::String, s::S, c::C, h::H) where {T<:CSE,S,C,H} =
+        new{T,S,C,H}(v,s,c,h)
 end
 
 (::Type{Str})(::Type{C}, v::String) where {C<:CSE} = Str(C, v, nothing, nothing, nothing)
 (::Type{Str})(::Type{C}, v::Str) where {C<:CSE} = Str(C, v.data, nothing, nothing, nothing)
+
+struct Chr{CS<:CharSet,T<:CodeUnitTypes} <: AbstractChar
+    v::T
+    (::Type{Chr})(::Type{CS}, v::T) where {CS<:CharSet,T<:CodeUnitTypes} = new{CS,T}(v)
+end
 
 # Handle change from endof -> lastindex
 @static if !isdefined(Base, :lastindex)
@@ -134,8 +141,6 @@ end
 end
 
 # This needs to be redone, with character sets and the code unit as part of the type
-
-const CodeUnitTypes = Union{UInt8, UInt16, UInt32}
 
 abstract type CodePoint <: AbstractChar end
 
@@ -261,8 +266,6 @@ basecse(::Type{_UTF32CSE}) = UTF32CSE
 
 const AbsChar = @static isdefined(Base, :AbstractChar) ? AbstractChar : Union{Char, CodePoint}
 
-const ByteStrings  = Union{String, ByteStr}
-
 ## Get the character set / encoding used by a string type
 cse(::Type{<:AbstractString}) = UTF8CSE # Default unless overridden
 cse(::Type{String}) = UniPlusCSE         # allows invalid sequences
@@ -314,8 +317,7 @@ sizeof(s::Str) = sizeof(s.data) + 1 - STR_KEEP_NUL
 """Codeunits of string as a Vector"""
 _data(s::Vector{UInt8}) = s
 _data(s::String)  = s
-_data(s::ByteStr) =
-    @static VERSION < v"0.7.0-DEV" ? Vector{UInt8}(s.data) : unsafe_wrap(Vector{UInt8}, s.data)
+_data(s::ByteStr) = @static V6_COMPAT ? Vector{UInt8}(s.data) : unsafe_wrap(Vector{UInt8}, s.data)
 
 """Pointer to codeunits of string"""
 _pnt(s::Union{String,Vector{UInt8}}) = pointer(s)
@@ -349,3 +351,5 @@ Base.SubString(str::Str{C}, off::Int) where {C<:SubSet_CSEs} =
     SubString(Str(basecse(C), str), off)
 Base.SubString(str::Str{C}, off::Int, fin::Int) where {C<:SubSet_CSEs} =
     SubString(Str(basecse(C), str), off, fin)
+
+@static V6_COMPAT && (sizeof(s::SubString{<:Str}) = s.endof == 0 ? 0 : nextind(s, s.endof) - 1)
