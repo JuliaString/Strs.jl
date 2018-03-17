@@ -205,7 +205,7 @@ for nam in vcat(_binname, _cpname2, _cpname4, _subsetnam, _mbwname)
         @eval empty_str(::Type{$cse}) = $emp
         @eval export $sym
     end
-    @eval convert(::Type{T}, str::T) where {T<:$sym} = str
+    @eval convert(::Type{$sym}, str::$sym) = str
 end
 empty_str(::Type{<:Str{C}}) where {C<:CSE} = empty_str(C)
 empty_str(::Type{String}) = empty_string

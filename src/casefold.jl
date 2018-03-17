@@ -8,9 +8,9 @@ Licensed under MIT License, see LICENSE.md
 _lowercase_l(ch) = ifelse(_isupper_al(ch), ch + 0x20, ch)
 _uppercase_l(ch) = ifelse(_can_upper(ch),  ch - 0x20, ch)
 
-_lowercase(ch) = islatin(ch) ? _lowercase_l(ch) : _lowercase_u(ch)
-_uppercase(ch) = islatin(ch) ? _uppercase_l(ch) : _uppercase_u(ch)
-_titlecase(ch) = islatin(ch) ? _uppercase_l(ch) : _titlecase_u(ch)
+_lowercase(ch) = is_latin(ch) ? _lowercase_l(ch) : _lowercase_u(ch)
+_uppercase(ch) = is_latin(ch) ? _uppercase_l(ch) : _uppercase_u(ch)
+_titlecase(ch) = is_latin(ch) ? _uppercase_l(ch) : _titlecase_u(ch)
 
 lowercase(ch::T) where {T<:CodePointTypes} = T(_lowercase(tobase(ch)))
 uppercase(ch::T) where {T<:CodePointTypes} = T(_uppercase(tobase(ch)))
@@ -20,7 +20,7 @@ lowercase(ch::ASCIIChr) = ifelse(isupper(ch), ASCIIChr(ch + 0x20), ch)
 uppercase(ch::ASCIIChr) = ifelse(islower(ch), ASCIIChr(ch - 0x20), ch)
 titlecase(ch::ASCIIChr) = uppercase(ch)
 
-function ucfirst(str::ASCIIStr)
+function uppercase_first(str::ASCIIStr)
     (len = _len(str)) == 0 && return str
     pnt = _pnt(str)
     ch = get_codeunit(pnt)
@@ -31,7 +31,7 @@ function ucfirst(str::ASCIIStr)
     Str(ASCIICSE, out)
 end
 
-function lcfirst(str::ASCIIStr)
+function lowercase_first(str::ASCIIStr)
     (len = _len(str)) == 0 && return str
     pnt = _pnt(str)
     ch = get_codeunit(pnt)
@@ -103,7 +103,7 @@ function lowercase(str::ASCIIStr)
     str
 end
 
-function ucfirst(str::LatinStr)
+function uppercase_first(str::LatinStr)
     (len = _len(str)) == 0 && return str
     pnt = _pnt(str)
     ch = get_codeunit(pnt)
@@ -115,7 +115,7 @@ function ucfirst(str::LatinStr)
 end
 
 # Special handling for characters that can't map into Latin1
-function ucfirst(str::_LatinStr)
+function uppercase_first(str::_LatinStr)
     (len = _len(str)) == 0 && return str
     pnt = _pnt(str)
     ch = get_codeunit(pnt)
@@ -137,7 +137,7 @@ function ucfirst(str::_LatinStr)
     end
 end
 
-function lcfirst(str::T) where {T<:LatinStrings}
+function lowercase_first(str::T) where {T<:LatinStrings}
     (len = _len(str)) == 0 && return str
     pnt = _pnt(str)
     ch = get_codeunit(pnt)
@@ -291,7 +291,7 @@ function _lower(::Type{T}, beg, off, len) where {T<:_UCS2Str}
         end
         out += sizeof(CU)
     end
-    if flg && islatin(buf)
+    if flg && is_latin(buf)
         out = pointer(buf)
         buf = _allocate(len)
         _narrow!(pointer(buf), out, out + len)

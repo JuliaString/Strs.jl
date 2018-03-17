@@ -1,12 +1,12 @@
 # Test bounds checking
 let b1 = codeunits("abcdef")
-    @test_throws BoundsError checkstring(b1, -10)
-    @test_throws BoundsError checkstring(b1, 0)
-    @test_throws BoundsError checkstring(b1, 7)
-    @test_throws BoundsError checkstring(b1, 3, -10)
-    @test_throws BoundsError checkstring(b1, 3, 0)
-    @test_throws BoundsError checkstring(b1, 3, 7)
-    @test_throws UnicodeError checkstring(b1, 3, 1)
+    @test_throws BoundsError check_string(b1, -10)
+    @test_throws BoundsError check_string(b1, 0)
+    @test_throws BoundsError check_string(b1, 7)
+    @test_throws BoundsError check_string(b1, 3, -10)
+    @test_throws BoundsError check_string(b1, 3, 0)
+    @test_throws BoundsError check_string(b1, 3, 7)
+    @test_throws UnicodeError check_string(b1, 3, 1)
 end
 
 let str = UTF8Str("this is a test\uff")

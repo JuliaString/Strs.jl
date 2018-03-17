@@ -48,7 +48,9 @@ Note: for good substring performance, some of the operations that are optimized 
 # Convenience functions
 export to_ascii, utf8, utf16, utf32
 
-export unsafe_str, codeunit, codeunits, codepoints, @str_str, @condimport
+export unsafe_str, codeunit, codeunits, codepoints, @str_str
+
+export category_code, category_string, category_abbrev, is_mutable
 
 symstr(s...) = Symbol(string(s...))
 quotesym(s...) = Expr(:quote, symstr(s...))
@@ -57,74 +59,108 @@ macro str_str(string)
     :( unsafe_str($(esc(string))) )
 end
 
-"""Import the symbol from Base if defined, otherwise export it"""
-macro condimport(sym)
-    :( if isdefined(Base, $(quotesym(sym))) ; import Base: $sym ; else ; export $sym ; end )
-end        
-
-"""Import the symbol from module if defined, otherwise export it"""
-macro condimport(mod, sym)
-    :( if isdefined($mod, $(quotesym(sym))) ; import $mod: $sym ; else ; export $sym ; end )
-end
-
 using Base: @_inline_meta, @propagate_inbounds, @_propagate_inbounds_meta
 
 import Base: containsnul, convert, getindex, length, map, pointer, collect, in,
              reverse, rsearch, search, sizeof, string, unsafe_convert, unsafe_load, write,
              codeunit, start, next, done, nextind, prevind, reverseind,
-             typemin, typemax, isvalid, rem, size, ndims, first, last, eltype, isempty, in,
+             typemin, typemax, rem, size, ndims, first, last, eltype,
              isless, ==, -, +, *, ^, cmp, promote_rule, one, repeat, filter,
-             print, show, isimmutable
-    
-@condimport ind2chr
-@condimport chr2ind
-@condimport thisind
-@condimport codeunits
-@condimport ncodeunits
-@condimport bytestring
-@condimport firstindex
-@condimport lastindex
-@condimport contains
-@condimport isfound
-@condimport codepoint
+             print, show, isimmutable, chop, chomp, replace, ascii,
+             lstrip, rstrip, strip, lpad, rpad, split, rsplit, uppercase, lowercase
 
-isdefined(Base, :copyto!)        || (const copyto! = copy!)
-isdefined(Base, :unsafe_copyto!) || (const unsafe_copyto! = unsafe_copy!)
-isdefined(Base, :Nothing)        || (const Nothing = Void)
-isdefined(Base, :Cvoid)          || (const Cvoid = Void)
-isdefined(Base, :AbstractChar)   || (abstract type AbstractChar end ; export AbstractChar)
-
-@static isdefined(Base, :codeunits) || include("codeunits.jl")
-
-create_vector(T, len)  = @static VERSION < v"0.7.0-DEV" ? Vector{T}(len) : Vector{T}(undef, len)
-outhex(v, p=1) = @static VERSION < v"0.7.0-DEV" ? hex(v,p) : string(v, base=16, pad=p)
-
-@static if VERSION < v"0.7.0-DEV"
-macro preserve(args...)
-    syms = args[1:end-1]
-    for x in syms
-        isa(x, Symbol) || error("Preserved variable must be a symbol")
+# Conditionally import names that are only in v0.6 or in master
+for sym in (:ind2chr, :chr2ind, :thisind, :codeunits, :ncodeunits, :bytestring, :firstindex,
+            :lastindex, :contains, :isfound, :codepoint, :Fix2)
+    if isdefined(Base, sym)
+        @eval import Base: $sym
+    else
+        @eval export $sym
     end
-    #=
-    s, r = gensym(), gensym()
-    esc(quote
-        $s = $(Expr(:gc_preserve_begin, syms...))
-        $r = $(args[end])
-        $(Expr(:gc_preserve_end, s))
-        $r
-        $(args[end])
-    end)
-    =#
-    esc(quote ; $(args[end]) ; end)
 end
+
+# Possibly import functions, give new names with underscores
+
+for (oldname, newname) in ((:textwidth, :text_width),
+                           (:lowercasefirst, :lowercase_first),
+                           (:uppercasefirst, :uppercase_first),
+                           (:startswith, :starts_with),
+                           (:endswith, :ends_with))
+    if isdefined(Base, oldname)
+        @eval import Base: $oldname
+        @eval const $newname = $oldname
+    end
+    @eval export $newname
+end
+
+# Possibly import `is` functions, give more readable names starting with `is_`
+
+for (oldn, newn) in
+    [(:xdigit, :hex_digit), (:cntrl, :control), (:punct, :punctuation), (:print, :printable)]
+    oldname, newname = symstr("is",  oldn), symstr("is_", newn)
+    if isdefined(Base, oldname)
+        @eval import Base: $oldname
+        @eval const $newname = $oldname
+    end
+    @eval export $newname
+end
+
+# Handle renames where function was deprecated
+
+export is_alphanumeric, is_graphic, is_lowercase, is_uppercase
+@static if VERSION < v"0.7.0-DEV"
+    import Base: isalnum, isgraph, islower, isupper
+    const is_alphanumeric = isalnum
+    const is_graphic      = isgraph
+    const is_lowercase    = islower
+    const is_uppercase    = isupper
 else
-    import Base.GC: @preserve
+    import Base: islowercase, isuppercase
+    const is_lowercase = islowercase
+    const is_uppercase = isuppercase
 end
+
+# Possibly import `is` functions, rename to start with `is_`
+
+for nam in (:ascii, :digit, :space, :alpha, :numeric, :valid, :defined, :empty)
+    oldname, newname = symstr("is",  nam), symstr("is_", nam)
+    if isdefined(Base, oldname)
+        @eval import Base: $oldname
+        @eval const $newname = $oldname
+    end
+    @eval export $newname
+end
+
+# Location of isgraphemebreak moved from Base.UTF8proc to Base.Unicode,
+# import and add new names with underscores
+
+const unimod = @static isdefined(Base, :UTF8proc) ? :UTF8proc : :Unicode
+
+@eval import Base.$unimod: isgraphemebreak, isgraphemebreak!, graphemes
+export is_grapheme_break, is_grapheme_break!
+const is_grapheme_break  = isgraphemebreak
+const is_grapheme_break! = isgraphemebreak!
+
+@static VERSION < v"0.7.0-DEV" || import Base.GC: @preserve
+@static VERSION < v"0.7.0-DEV" && include("compat.jl")
+@static isdefined(Base, :codeunits) || include("codeunits.jl")
+@static isdefined(Base, :Fix2)      || include("fix2.jl")
+
+export find
+function fnd end
+const find = fnd
+
+# Handle changes in array allocation
+create_vector(T, len)  = @static VERSION < v"0.7.0-DEV" ? Vector{T}(len) : Vector{T}(undef, len)
+
+# Add new short name for deprecated hex function
+outhex(v, p=1) = @static VERSION < v"0.7.0-DEV" ? hex(v,p) : string(v, base=16, pad=p)
 
 include("types.jl")
 include("chars.jl")
 include("access.jl")
 include("traits.jl")
+include("utf8proc.jl")
 include("unicode.jl")
 include("casefold.jl")
 include("iters.jl")
@@ -139,13 +175,13 @@ include("utf32.jl")
 include("search.jl")
 include("utf8search.jl")
 include("utf16search.jl")
+include("regex.jl")
 include("encode.jl")
 include("stats.jl")
 include("legacy.jl")
 include("utf8case.jl")
 include("utf16case.jl")
-#include("util.jl")
-#include("substring.jl")
-#include("io.jl")
+include("util.jl")
+include("io.jl") 
 
 end # module Strs

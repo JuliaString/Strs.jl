@@ -4,7 +4,7 @@
 @static VERSION < v"0.7.0-DEV" ? (using Base.Test) : (using Test)
 
 using Strs
-import Strs: checkstring, UTF_ERR_SHORT, UnicodeError, codepoint_adj, codepoint_rng
+import Strs: check_string, UTF_ERR_SHORT, UnicodeError, codepoint_adj, codepoint_rng
 
 # Function to help generating strings for tests
 randchar(::Type{T}) where {T} = codepoint_adj(T, rand(codepoint_rng(T)))

@@ -1,7 +1,9 @@
 #=
 UTF8Str type
 
-Copyright 2017 Gandalf Software, Inc., Scott P. Jones, and other contributors to the Julia language
+Copyright 2017-2018 Gandalf Software, Inc., Scott P. Jones,
+and other contributors to the Julia language
+
 Licensed under MIT License, see LICENSE.md
 Based in part on code for UTF8String that used to be in Julia
 =#
@@ -64,28 +66,17 @@ end
 @inline eq_bytes(pnt, b1, b2)     = get_codeunit(pnt+1) == b2 && eq_bytes(pnt, b1)
 @inline eq_bytes(pnt, b1, b2, b3) = get_codeunit(pnt+2) == b3 && eq_bytes(pnt, b1, b2)
 
-@inline _write_utf8_2(io, ch) = write(io, get_utf8_2(ch)...)
-@inline _write_utf8_3(io, ch) = write(io, get_utf8_3(ch)...)
-@inline _write_utf8_4(io, ch) = write(io, get_utf8_4(ch)...)
-
-@inline _write_ucs2(io, ch) =
-    ch <= 0x7f ? write(io, ch%UInt8) : ch <= 0x7ff ? _write_utf8_2(io, ch) : _write_utf8_3(io, ch)
-
-@inline _write_utf32(io, ch) = ch <= 0xffff ? _write_ucs2(io, ch) : _write_utf8_4(io, ch)
-
-@inline print(io::IO, ch::UCS2Chr)  = _write_ucs2(io, tobase(ch))
-@inline print(io::IO, ch::UTF32Chr) = _write_utf32(io, tobase(ch))
-
 ## required core functionality ##
+
+utf_trail(c::UInt8) = (0xe5000000 >>> ((c & 0xf0) >> 3)) & 0x3
 
 function lastindex(str::Str{UTF8CSE})
     (len = _len(str)) == 0 && return len
-    pnt = _pnt(str) + len
+    beg = _pnt(str)
+    pnt = beg + len
     while is_valid_continuation(get_codeunit(pnt -= 1)) ; end
-    pnt - _pnt(str) + 1
+    Int(pnt + 1 - beg)
 end
-
-utf_trail(c::UInt8) = (0xe5000000 >>> ((c & 0xf0) >> 3)) & 0x3
 
 #=
 _cont(byt, n) = (byt >>> n)%UInt8 != 0x80
@@ -121,7 +112,7 @@ function _length(::CodeUnitMulti, str::Str{UTF8CSE})
     pnt - CHUNKSZ == fin ? cnt : (cnt - _count_cont(unsafe_load(pnt) & _mask_bytes(siz)))
 end
 
-function isascii(str::Str{<:Union{UTF8CSE, LatinCSE, Binary_CSEs}})
+function is_ascii(str::Str{<:Union{UTF8CSE, LatinCSE, Binary_CSEs}})
     (siz = sizeof(str)) == 0 && return true
     pnt, fin = _calcpnt(str, siz)
     while (pnt += CHUNKSZ) <= fin
@@ -137,7 +128,7 @@ _ascii_mask(::Type{UInt32}) = 0xffffff80_ffffff80
 _latin_mask(::Type{UInt16}) = 0xff00_ff00_ff00_ff00
 _latin_mask(::Type{UInt32}) = 0xffffff00_ffffff00
 
-function isascii(vec::Vector{T}) where {T<:CodeUnitTypes}
+function is_ascii(vec::Vector{T}) where {T<:CodeUnitTypes}
     (siz = sizeof(vec)) == 0 && return true
     pnt = pointer(vec)
     fin = pnt + siz
@@ -164,30 +155,30 @@ end
 
 # Todo! Here you need to see that 0b11yyyyxx at least 1 y must be set,
 # which indicates a non-Latin1 character
-all_latin(val) = ((val & (val<<1) & (val<<2 | (val<<3) | (val<<4) | (val<<5))) & hi_mask) == 0
+_all_latin(val) = ((val & (val<<1) & (val<<2 | (val<<3) | (val<<4) | (val<<5))) & hi_mask) == 0
 
-function islatin(str::Str{<:Union{UTF8CSE, Binary_CSEs}})
+function is_latin(str::Str{<:Union{UTF8CSE, Binary_CSEs}})
     (siz = sizeof(str)) == 0 && return true
     pnt, fin = _calcpnt(str, siz)
     while (pnt += CHUNKSZ) <= fin
-        all_latin(unsafe_load(pnt)) || return false
+        _all_latin(unsafe_load(pnt)) || return false
     end
-    pnt - CHUNKSZ == fin || all_latin(unsafe_load(pnt) & _mask_bytes(siz))
+    pnt - CHUNKSZ == fin || _all_latin(unsafe_load(pnt) & _mask_bytes(siz))
 end
 
 # All 4 top bits must be 1 (i.e. 0xfx) for this to be non-BMP
-all_bmp(val) = ((val | (val<<1) | (val<<2) | (val<<3)) & hi_mask) == 0
+_all_bmp(val) = ((val | (val<<1) | (val<<2) | (val<<3)) & hi_mask) == 0
 
-function isbmp(str::Str{UTF8CSE})
+function is_bmp(str::Str{UTF8CSE})
     (siz = sizeof(str)) == 0 && return true
     pnt, fin = _calcpnt(str, siz)
     while (pnt += CHUNKSZ) <= fin
-        all_bmp(unsafe_load(pnt)) || return false
+        _all_bmp(unsafe_load(pnt)) || return false
     end
-    pnt - CHUNKSZ == fin && all_bmp(unsafe_load(pnt) & _mask_bytes(siz))
+    pnt - CHUNKSZ == fin && _all_bmp(unsafe_load(pnt) & _mask_bytes(siz))
 end
 
-isunicode(str::Str{UTF8CSE}) = true
+is_unicode(str::Str{UTF8CSE}) = true
 
 function _nextcpfun(::CodeUnitMulti, ::Type{UTF8CSE}, pnt)
     ch = get_codeunit(pnt)
@@ -248,11 +239,16 @@ bytestring(str::Str{UTF8CSE}) = str
 @inline _isvalid_char_pos(::CodeUnitMulti, str::Str{UTF8CSE}, pos::Integer) =
     !is_valid_continuation(get_codeunit(_pnt(str), pos))
 
-@propagate_inbounds function _thisind(::CodeUnitMulti, str::Str{UTF8CSE}, pos::Integer)
-    @boundscheck 0 < pos <= _len(str) || boundserr(str, pos)
-    pnt = _pnt(str) + pos - 1
+@inline function _thisind_utf8(str, len, pnt, pos::Int)
+    @boundscheck 0 < pos <= len || boundserr(str, pos)
+    pnt += pos - 1
     pos - (checkcont(pnt) ? (checkcont(pnt - 1) ? (checkcont(pnt - 2) ? 3 : 2) : 1) : 0)
 end
+
+@propagate_inbounds _thisind(::CodeUnitMulti, str::Str{UTF8CSE}, len, pnt, pos::Integer) =
+    _thisind_utf8(str, len, pnt, Int(pos))
+@propagate_inbounds _thisind(::CodeUnitMulti, str::String, len, pnt, pos::Integer) =
+    _thisind_utf8(str, len, pnt, Int(pos))
 
 @propagate_inbounds function _nextind(T::CodeUnitMulti, str::Str{UTF8CSE}, pos::Integer)
     pos == 0 && return 1
@@ -269,10 +265,10 @@ end
 
 @propagate_inbounds function _prevind(T::CodeUnitMulti, str::Str{UTF8CSE}, pos::Integer)
     pos == 1 && return 0
-    numcu = _len(str)
-    pos == numcu + 1 && @inbounds return _thisind(T, str, numcu)
+    numcu, pnt = _lenpnt(str)
+    pos == numcu + 1 && @inbounds return _thisind(T, str, numcu, pnt, numcu)
     @boundscheck 1 < pos <= (numcu + 1) || boundserr(str, pos)
-    pnt = _pnt(str) + pos - 1
+    pnt += pos - 1
     if checkcont(pnt)
         pos - (checkcont(pnt - 1) ? (checkcont(pnt - 2) ? 3 : 2) : 1)
     elseif pos == 2
@@ -284,7 +280,7 @@ end
 
 @propagate_inbounds function getindex(str::Str{UTF8CSE}, rng::UnitRange{Int})
     isempty(rng) && return SubString(empty_utf8, 1, 0)
-    beg = first(rng) 
+    beg = first(rng)
     len = _len(str)
     @boundscheck 1 <= beg <= len || boundserr(str, beg)
     pnt = _pnt(str)
@@ -293,7 +289,7 @@ end
     lst = last(rng)
     @boundscheck lst > len && boundserr(str, lst)
     if lst != len
-        ch = get_codeunit(pnt + lst)
+        ch = get_codeunit(pnt, lst)
         is_valid_continuation(ch) && unierror(UTF_ERR_INVALID_INDEX, lst, ch)
     end
     SubString(str, beg, lst)
@@ -304,11 +300,9 @@ const _ByteStr = Union{Str{ASCIICSE}, Str{UTF8CSE}, String}
 string(c::_ByteStr...) = length(c) == 1 ? c[1]::UTF8Str : UTF8Str(_string(c))
     # ^^ at least one must be UTF-8 or the ASCII-only method would get called
 
-function reverse(str::Str{UTF8CSE})
-    (len = _len(str)) < 2 && return str
-    buf, beg = _allocate(UInt8, len)
+function _reverse(::CodeUnitMulti, ::Type{UTF8CSE}, len, pnt::Ptr{T}) where {T<:CodeUnitTypes}
+    buf, beg = _allocate(T, len)
     out = beg + len
-    pnt = _pnt(str)
     while out >= beg
         ch = get_codeunit(pnt)
         if ch > 0xdf
@@ -383,7 +377,7 @@ _transcode_utf8(dat::Vector{UInt8}, len) = _transcode_utf8(pointer(dat), len)
 
 # Single character conversion
 function convert(::Type{<:Str{UTF8CSE}}, ch::Unsigned)
-    isunicode(ch) || unierror(UTF_ERR_INVALID, 0, ch)
+    is_unicode(ch) || unierror(UTF_ERR_INVALID, 0, ch)
     len = ch <= 0x7f ? 1 : (ch < 0x800 ? 2 : (ch > 0xffff ? 4 : 3))
     buf = _allocate(len)
     _encode_char_utf8(buf, ch, 0)
@@ -401,7 +395,7 @@ function convert(::Type{UTF8Str}, dat::Vector{UInt8})
     # handle zero length string quickly
     isempty(dat) && return empty_utf8
     # get number of bytes to allocate
-    len, flags, num4byte, num3byte, num2byte, latinbyte = unsafe_checkstring(dat, 1, _len(dat))
+    len, flags, num4byte, num3byte, num2byte, latinbyte = unsafe_check_string(dat, 1, _len(dat))
     # Copy, but eliminate over-long encodings and surrogate pairs
     if flags & (UTF_LONG | UTF_SURROGATE) == 0
         siz = sizeof(dat)
@@ -417,7 +411,7 @@ function convert(::Type{UTF8Str}, str::String)
     # handle zero length string quickly
     isempty(str) && return empty_utf8
     # get number of bytes to allocate
-    len, flags, num4byte, num3byte, num2byte, latinbyte = unsafe_checkstring(str, 1, sizeof(str))
+    len, flags, num4byte, num3byte, num2byte, latinbyte = unsafe_check_string(str, 1, sizeof(str))
     # Copy, but eliminate over-long encodings and surrogate pairs
     # Speed this up if no surrogates, long encodings
     Str(UTF8CSE,
@@ -430,7 +424,7 @@ function convert(::Type{UTF8Str}, str::AbstractString)
     # handle zero length string quickly
     isempty(str) && return empty_utf8
     # get number of bytes to allocate
-    len, flags, num4byte, num3byte, num2byte, latinbyte = unsafe_checkstring(str)
+    len, flags, num4byte, num3byte, num2byte, latinbyte = unsafe_check_string(str)
     if flags == 0
         # Speed this up if only ASCII, no overlong encodings
         buf, pnt = _allocate(len)

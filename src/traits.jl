@@ -61,7 +61,7 @@ CodePointStyle(::Type{T}) where {T<:AbstractString} = CodePointStyle(cse(T))
 CodePointStyle(::Type{<:SubString{T}}) where {T<:AbstractString} = CodePointStyle(T)
 CodePointStyle(v::AbstractString) = CodePointStyle(typeof(v))
 
-ismulti(str::AbstractString) = CodePointStyle(str) === CodeUnitMulti()
+is_multi(str::AbstractString) = CodePointStyle(str) === CodeUnitMulti()
 
 # Type of character set
 
@@ -120,18 +120,18 @@ CharSetStyle(::Type{UInt16})    = CharSetUnknown()
 CharSetStyle(::Type{UInt32})    = CharSetUnknown()
 
 # must check range if CS1 is smaller than CS2, even if CS2 is valid for it's range
-_isvalid(::ValidatedStyle, ::Type{ASCIICharSet}, ::Type{T}, val) where {T<:CharSet} = isascii(val)
+_isvalid(::ValidatedStyle, ::Type{ASCIICharSet}, ::Type{T}, val) where {T<:CharSet} = is_ascii(val)
 
 (_isvalid(::ValidatedStyle, ::Type{LatinCharSet}, ::Type{T}, val)
  where {T<:Union{Text2CharSet, Text4CharSet, UCS2CharSet, UTF32CharSet}}) =
-     islatin(val)
+     is_latin(val)
 
 (_isvalid(::ValidatedStyle, ::Type{UCS2CharSet}, ::Type{T}, val)
  where {T<:Union{Text2CharSet, Text4CharSet, UTF32CharSet}}) =
-     isbmp(val)
+     is_bmp(val)
 
 _isvalid(::ValidatedStyle, ::Type{UTF32CharSet}, ::Type{<:CharSet}, val) =
-    isunicode(val)
+    is_unicode(val)
 
 # no checking needed for cases where it is a superset of T
 (_isvalid(::AlwaysValid, ::Type{LatinCharSet}, ::Type{T}, val)
@@ -157,12 +157,12 @@ _isvalid(::AlwaysValid, ::Type{LatinSubSet}, ::Type{ASCIICharSet}, val) = false
      chr <= typemax(S)
  
 # Different character sets
-isvalid(::Type{Str{<:CSE{CS1}}}, str::T) where {T<:Str{<:CSE{CS2}},CS1} where {CS2} =
+is_valid(::Type{Str{<:CSE{CS1}}}, str::T) where {T<:Str{<:CSE{CS2}},CS1} where {CS2} =
     _isvalid(ValidatedStyle(T), CS1, CS2, str)
 
 # Same character set
-isvalid(::Type{Str{<:CSE{CS}}}, str::T) where {T<:Str{<:CSE{CS}}} where {CS} =
-     _isvalid(ValidatedStyle(T), str)
+is_valid(::Type{Str{<:CSE{CS}}}, str::T) where {T<:Str{<:CSE{CS}}} where {CS} =
+    _isvalid(ValidatedStyle(T), str)
 
 _isvalid(::AlwaysValid, v) = true
 
@@ -171,14 +171,14 @@ _isvalid(::UnknownValidity, str::T) where {T<:Str} = _isvalid(T, _pnt(str), _len
 # By default, check that it is valid Unicode codepoint
 _isvalid(::UnknownValidity, v) = _isvalid(UnknownValidity(), UTF32CharSet, charset(v), v)
 
-isvalid(::Type{T}, str::T) where {T<:Str}       = _isvalid(ValidatedStyle(T), str)
-isvalid(::Type{T}, chr::T) where {T<:CodePoint} = _isvalid(ValidatedStyle(T), chr)
+is_valid(::Type{T}, str::T) where {T<:Str}       = _isvalid(ValidatedStyle(T), str)
+is_valid(::Type{T}, chr::T) where {T<:CodePoint} = _isvalid(ValidatedStyle(T), chr)
 
-isvalid(str::T) where {T<:Str}       = _isvalid(ValidatedStyle(T), str)
-isvalid(chr::T) where {T<:CodePoint} = _isvalid(ValidatedStyle(T), chr)
+is_valid(str::T) where {T<:Str}       = _isvalid(ValidatedStyle(T), str)
+is_valid(chr::T) where {T<:CodePoint} = _isvalid(ValidatedStyle(T), chr)
 
 # Different character set
-function isvalid(::Type{S}, chr::T) where {S<:CodePoint, T<:CodePoint}
+function is_valid(::Type{S}, chr::T) where {S<:CodePoint, T<:CodePoint}
     CS = charset(S)
     CT = charset(T)
     CS == CT ? _isvalid(ValidatedStyle(T), chr) : _isvalid(ValidatedStyle(T), CS, CT, chr)
@@ -187,13 +187,13 @@ end
 # Not totally sure how to get rid of some of these, they really should be handled
 # by the compiler, using the ValidatedStyle trait along with the character sets
 
-_isvalid_chr(::Type{ASCIICharSet}, v)  = isascii(v)
-_isvalid_chr(::Type{LatinCharSet}, v)  = islatin(v)
-_isvalid_chr(::Type{UCS2CharSet},  v)  = isbmp(v)
-_isvalid_chr(::Type{UTF32CharSet}, v)  = isunicode(v)
-_isvalid_chr(::Type{LatinSubSet}, v)   = islatin(v)
-_isvalid_chr(::Type{UCS2SubSet},  v)   = isbmp(v)
-_isvalid_chr(::Type{UTF32SubSet}, v)   = isunicode(v)
+_isvalid_chr(::Type{ASCIICharSet}, v)  = is_ascii(v)
+_isvalid_chr(::Type{LatinCharSet}, v)  = is_latin(v)
+_isvalid_chr(::Type{UCS2CharSet},  v)  = is_bmp(v)
+_isvalid_chr(::Type{UTF32CharSet}, v)  = is_unicode(v)
+_isvalid_chr(::Type{LatinSubSet}, v)   = is_latin(v)
+_isvalid_chr(::Type{UCS2SubSet},  v)   = is_bmp(v)
+_isvalid_chr(::Type{UTF32SubSet}, v)   = is_unicode(v)
 _isvalid_chr(::Type{Text1CharSet}, v)  = v <= typemax(UInt8)
 _isvalid_chr(::Type{Text2CharSet}, v)  = v <= typemax(UInt16)
 _isvalid_chr(::Type{Text4CharSet}, v)  = v <= typemax(UInt32)
@@ -202,16 +202,16 @@ _isvalid_chr(::Type{BinaryCharSet}, v) = v <= typemax(UInt8)
 # Not totally sure about this, base Char is rather funky in v0.7
 _isvalid_chr(::Type{UniPlusCharSet}, v) = v <= typemax(UInt32)
 
-isvalid(::Type{T}, v::Unsigned) where {T<:CodePoint} =
+is_valid(::Type{T}, v::Unsigned) where {T<:CodePoint} =
     _isvalid_chr(charset(T), v)
-isvalid(::Type{T}, v::Signed) where {T<:CodePoint} =
+is_valid(::Type{T}, v::Signed) where {T<:CodePoint} =
     v >= 0 && _isvalid_chr(charset(T), v%Unsigned)
 
-isvalid(::Type{Char}, ch::UnicodeChars) = true
-isvalid(::Type{Char}, ch::Text1Chr) = true
-isvalid(::Type{Char}, ch::Text2Chr) = isbmp(ch)
-isvalid(::Type{Char}, ch::Text4Chr) = isunicode(ch)
-isvalid(::Type{T},    ch::Char) where {T<:CodePoint} = isvalid(T, ch%UInt32)
+is_valid(::Type{Char}, ch::UnicodeChars) = true
+is_valid(::Type{Char}, ch::Text1Chr) = true
+is_valid(::Type{Char}, ch::Text2Chr) = is_bmp(ch)
+is_valid(::Type{Char}, ch::Text4Chr) = is_unicode(ch)
+is_valid(::Type{T},    ch::Char) where {T<:CodePoint} = is_valid(T, ch%UInt32)
 
 # For now, there is only support for immutable `Str`s, when mutable `Str`s are added.
 
@@ -233,9 +233,11 @@ MutableStyle(A::AbstractString) = MutableStyle(typeof(A))
 
 MutableStyle(A::Str) = ImmutableStr()
 
-_isimmutable(::ImmutableStr, str::Type{T}) where {T<:Str} = true
-_isimmutable(::MutableStr, str::Type{T}) where {T<:Str} = false
-isimmutable(::Type{T}) where {T<:Str} = _isimmutable(MutableStyle(T))
+_ismutable(::ImmutableStr, str::Type{T}) where {T<:Str} = false
+_ismutable(::MutableStr, str::Type{T}) where {T<:Str} = true
+is_mutable(::Type{T}) where {T<:Str} = _ismutable(MutableStyle(T))
+
+isimmutable(str::T) where {T<:Str} = !is_mutable(T)
 
 # Comparison traits
 
