@@ -31,10 +31,11 @@ end
 
 ## character column width function ##
 
-text_width(ch::CodeUnitTypes) = utf8proc_charwidth(ch)
-text_width(ch::ASCIIChr) = 1
-text_width(ch::LatinChars) = 1
+text_width(ch::UInt8)     = Int(ifelse(ch < 0x7f, ch > 0x1f, ch > 0x9f & ch != 0xad))
+text_width(ch::UInt16)    = utf8proc_charwidth(ch)
+text_width(ch::UInt32)    = utf8proc_charwidth(ch)
 text_width(ch::CodePoint) = text_width(tobase(ch))
+text_width(ch::ASCIIChr)  = Int(32 <= tobase(ch) <= 126)
 
 text_width(str::Str) = mapreduce(text_width, +, 0, str)
 text_width(str::Str{Union{ASCIICSE,Latin_CSEs}}) = length(str)

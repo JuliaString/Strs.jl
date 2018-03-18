@@ -302,7 +302,7 @@ function teststr(T)
             @test_throws BoundsError nextind(ss, ncodeunits(ss)+1)
             end
             if !V6_COMPAT
-                @test_throws BoundsError prevind(s, 0)
+                # @test_throws BoundsError prevind(s, 0)
                 @test_throws BoundsError prevind(ss, 0)
             end
         end
