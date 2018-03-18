@@ -81,8 +81,11 @@ end
     (@_inline_meta(); _prevind(CodePointStyle(T), str, i, nchar))
 @propagate_inbounds nextind(str::T, i::Int, nchar::Int) where {T<:Str} =
     (@_inline_meta(); _nextind(CodePointStyle(T), str, i, nchar))
+
+# This is deprecated on v0.7, recommended change to length(str, 1, i)
 @propagate_inbounds ind2chr(str::T, i::Int) where {T<:Str} =
     _ind2chr(CodePointStyle(T), str, i)
+# This is deprecated on v0.7, recommended change to nextind(str, 0, i)
 @propagate_inbounds chr2ind(str::T, i::Int) where {T<:Str} =
     _chr2ind(CodePointStyle(T), str, i)
 
@@ -174,7 +177,7 @@ convert(::Type{<:Str{LatinCSE}}, ch::Unsigned) =
 convert(::Type{<:Str{UCS2CSE}}, ch::Unsigned) =
     is_bmp(ch) ? _convert(UCS2CSE, ch%UInt16) : unierror(UTF_ERR_INVALID, 0, ch)
 convert(::Type{<:Str{UTF32CSE}}, ch::Unsigned) =
-    is_bmp(ch) ? _convert(UTF32CSE, ch%UInt32) : unierror(UTF_ERR_INVALID, 0, ch)
+    is_unicode(ch) ? _convert(UTF32CSE, ch%UInt32) : unierror(UTF_ERR_INVALID, 0, ch)
 
 convert(::Type{T}, ch::Signed) where {T<:Str} = ch < 0 ? ncharerr(ch) : convert(T, ch%Unsigned)
 
@@ -191,10 +194,13 @@ function cmp(a::SubString{String}, b::SubString{String})
 end
 =#
 # don't make unnecessary copies when passing substrings to C functions
-cconvert(::Type{Ptr{Union{UInt8,Int8}}}, s::SubString{ByteStrings}) = s
+cconvert(::Type{Ptr{UInt8}}, str::SubString{<:ByteStr}) = str
+cconvert(::Type{Ptr{Int8}},  str::SubString{<:ByteStr}) = str
 
-unsafe_convert(::Type{Ptr{R}}, s::SubString{ByteStrings}) where R<:Union{Int8, UInt8} =
-    convert(Ptr{R}, pointer(s.string)) + s.offset
+unsafe_convert(::Type{Ptr{UInt8}}, s::SubString{<:ByteStr}) =
+    convert(Ptr{UInt8}, pointer(s.string)) + s.offset
+unsafe_convert(::Type{Ptr{Int8}}, s::SubString{<:ByteStr}) =
+    convert(Ptr{Int8}, pointer(s.string)) + s.offset
 
 function _reverse(::CodeUnitSingle, ::Type{C}, len, str::Str{C}) where {C<:CSE}
     len < 2 && return str

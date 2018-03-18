@@ -1,13 +1,17 @@
 # This file includes code that was formerly a part of Julia.
 # License is MIT: http://julialang.org/license
 
-@static VERSION < v"0.7.0-DEV" ? (using Base.Test) : (using Test)
+const V6_COMPAT = VERSION < v"0.7.0-DEV"
+
+@static V6_COMPAT ? (using Base.Test) : (using Test)
 
 using Strs
 import Strs: check_string, UTF_ERR_SHORT, UnicodeError, codepoint_adj, codepoint_rng
 
 # Function to help generating strings for tests
 randchar(::Type{T}) where {T} = codepoint_adj(T, rand(codepoint_rng(T)))
+
+const IndexError = isdefined(Base, :StringIndexError) ? StringIndexError : UnicodeError
 
 include("basics.jl")
 include("types.jl")
@@ -20,6 +24,7 @@ include("types.jl")
 @testset "Conversion errors" begin include("convert.jl") end
 @testset "Pointer functions" begin include("pointer.jl") end
 @testset "Search functions"  begin include("search.jl")  end
+@testset "SubStrings"        begin include("substr.jl")  end
 
 include("regex.jl")
 
@@ -37,11 +42,15 @@ end
 
 # Test for CESU-8 sequences
 let ch = 0x10000
-    for hichar = 0xd800:0xdbff
-        for lochar = 0xdc00:0xdfff
-            @test_throws UnicodeError convert(UTF8Str, utf8(Char[hichar, lochar]).data)
-            ch += 1
-        end
+    for hichar = 0xd800:0xdbff, lochar = 0xdc00:0xdfff
+        seq = string(Char(hichar), Char(lochar))
+        # Normal conversion throws an error
+        @test_throws UnicodeError utf8(seq)
+        # Unsafe conversions return invalid strings as Text*Str
+        @test typeof(unsafe_str(seq)) == Text1Str
+        # With accept_surrogates flag, return converted to valid string (_UTF32Str)
+        @test unsafe_str(seq;accept_surrogates=true)[1]%UInt == ch
+        ch += 1
     end
 end
 

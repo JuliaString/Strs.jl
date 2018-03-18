@@ -513,27 +513,6 @@ isvalid(::Type{UTF8Str},   s::Vector{UInt8}) = byte_string_classify(s) != 0
 isvalid(::Type{LatinStr},  s::Vector{UInt8}) = true
 isvalid(::Type{_LatinStr}, s::Vector{UInt8}) = true
 
-bytestring() = empty_ascii
-
-function bytestring(s::AbstractString...)
-    str = Base.print_to_string(s...)
-    # handle zero length string quickly
-    (siz = sizeof(str)) == 0 && return empty_ascii
-    dat = _pnt(str)
-    len, flags, num4byte, num3byte, num2byte, latin1, invalids =
-        unsafe_check_string(dat, 1, siz)
-    if flags & ~UTF_INVALID == 0
-        Str(invalids == 0 ? ASCIICSE : Text1CSE, _data(str))
-    else
-        # This takes care of long encodings, CESU-8 surrogate characters, etc.
-        Str(UTF8CSE, _transcode_utf8(dat, len))
-    end
-end
-
-bytestring(s::Vector{UInt8}) = bytestring(String(s))
-bytestring(p::Union{Ptr{UInt8}, Ptr{Int8}, Cstring}) = unsafe_string(p)
-bytestring(p::Union{Ptr{UInt8}, Ptr{Int8}}, len::Integer) = unsafe_string(p,len)
-
 for sym in (:bin, :oct, :dec, :hex)
     @eval import Base:$sym
     @eval ($sym)(x::CodePoint, p::Int) = ($sym)(tobase(x), p, false)
@@ -574,9 +553,9 @@ end
 first(str::Str, n::Integer) = str[1:min(end, nextind(str, 0, n))]
 last(str::Str, n::Integer) = str[max(1, prevind(str, ncodeunits(s)+1, n)):end]
 
-const Chrs = @static VERSION < v"0.7.0-DEV" ? Union{Char,AbstractChar} : CodePoint
+const Chrs = @static V6_COMPAT ? Union{Char,AbstractChar} : CodePoint
 
-@static if VERSION < v"0.7.0-DEV"
+@static if V6_COMPAT
     function repeat(ch::Char, cnt::Integer)
         cnt > 1 && return String(_repeat(CodeUnitMulti(), UTF8CSE, ch%UInt32, cnt))
         cnt < 0 && repeaterr(cnt)

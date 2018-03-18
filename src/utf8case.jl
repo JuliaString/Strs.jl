@@ -147,43 +147,47 @@ function _upper_utf8(beg, off, len)
 end
 
 function lowercase(str::Str{UTF8CSE})
-    pnt = beg = _pnt(str)
-    fin = beg + sizeof(str)
-    while pnt < fin
-        ch = get_codeunit(pnt)
-        prv = pnt
-        (ch < 0x80
-         ? _isupper_a(ch)
-         : (ch < 0xc4
-            ? _isupper_l((ch << 6) | (get_codeunit(pnt += 1) & 0x3f))
-            : _isupper_u(ch >= 0xf0
-                         ? get_utf8_4byte(pnt += 3, ch)
-                         : (ch < 0xe0
-                            ? get_utf8_2byte(pnt += 1, ch)
-                            : get_utf8_3byte(pnt += 2, ch))%UInt32))) &&
-            return _lower_utf8(beg, prv-beg, _len(str))
-        pnt += 1
+    @preserve str begin
+        pnt = beg = _pnt(str)
+        fin = beg + sizeof(str)
+        while pnt < fin
+            ch = get_codeunit(pnt)
+            prv = pnt
+            (ch < 0x80
+             ? _isupper_a(ch)
+             : (ch < 0xc4
+                ? _isupper_l((ch << 6) | (get_codeunit(pnt += 1) & 0x3f))
+                : _isupper_u(ch >= 0xf0
+                             ? get_utf8_4byte(pnt += 3, ch)
+                             : (ch < 0xe0
+                                ? get_utf8_2byte(pnt += 1, ch)
+                                : get_utf8_3byte(pnt += 2, ch))%UInt32))) &&
+                                    return _lower_utf8(beg, prv-beg, _len(str))
+            pnt += 1
+        end
+        str
     end
-    str
 end
 
 function uppercase(str::Str{UTF8CSE})
-    pnt = beg = _pnt(str)
-    fin = beg + sizeof(str)
-    while pnt < fin
-        ch = get_codeunit(pnt)
-        prv = pnt
-        (ch < 0x80
-         ? _islower_a(ch)
-         : (ch < 0xc4
-            ? _can_upper_only_latin((ch << 6) | (get_codeunit(pnt += 1) & 0x3f))
-            : _islower_u(ch >= 0xf0
-                         ? get_utf8_4byte(pnt += 3, ch)
-                         : (ch < 0xe0
-                            ? get_utf8_2byte(pnt += 1, ch)
-                            : get_utf8_3byte(pnt += 2, ch))%UInt32))) &&
-            return _upper_utf8(beg, prv-beg, _len(str))
-        pnt += 1
+    @preserve str begin
+        pnt = beg = _pnt(str)
+        fin = beg + sizeof(str)
+        while pnt < fin
+            ch = get_codeunit(pnt)
+            prv = pnt
+            (ch < 0x80
+             ? _islower_a(ch)
+             : (ch < 0xc4
+                ? _can_upper_only_latin((ch << 6) | (get_codeunit(pnt += 1) & 0x3f))
+                : _islower_u(ch >= 0xf0
+                             ? get_utf8_4byte(pnt += 3, ch)
+                             : (ch < 0xe0
+                                ? get_utf8_2byte(pnt += 1, ch)
+                                : get_utf8_3byte(pnt += 2, ch))%UInt32))) &&
+                                    return _upper_utf8(beg, prv-beg, _len(str))
+            pnt += 1
+        end
+        str
     end
-    str
 end

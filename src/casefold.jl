@@ -22,24 +22,28 @@ titlecase(ch::ASCIIChr) = uppercase(ch)
 
 function uppercase_first(str::ASCIIStr)
     (len = _len(str)) == 0 && return str
-    pnt = _pnt(str)
-    ch = get_codeunit(pnt)
-    _islower_a(ch) || return str
-    out = _allocate(len)
-    unsafe_copyto!(out, pnt, len)
-    set_codeunit!(out, ch - 0x20)
-    Str(ASCIICSE, out)
+    @preserve str begin
+        pnt = _pnt(str)
+        ch = get_codeunit(pnt)
+        _islower_a(ch) || return str
+        out = _allocate(len)
+        unsafe_copyto!(out, pnt, len)
+        set_codeunit!(out, ch - 0x20)
+        Str(ASCIICSE, out)
+    end
 end
 
 function lowercase_first(str::ASCIIStr)
     (len = _len(str)) == 0 && return str
-    pnt = _pnt(str)
-    ch = get_codeunit(pnt)
-    _isupper_a(ch) || return str
-    out = _allocate(len)
-    unsafe_copyto!(out, pnt, len)
-    set_codeunit!(out, ch + 0x20)
-    Str(ASCIICSE, out)
+    @preserve str begin
+        pnt = _pnt(str)
+        ch = get_codeunit(pnt)
+        _isupper_a(ch) || return str
+        out = _allocate(len)
+        unsafe_copyto!(out, pnt, len)
+        set_codeunit!(out, ch + 0x20)
+        Str(ASCIICSE, out)
+    end
 end
 
 function _upper(::Type{ASCIIStr}, beg::Ptr{UInt8}, off, len)
@@ -83,69 +87,79 @@ end
 
 function uppercase(str::ASCIIStr)
     (len = _len(str)) == 0 && return str
-    pnt = beg = _pnt(str)
-    fin = beg + len
-    while pnt < fin
-        _islower_a(get_codeunit(pnt)) && return _upper(ASCIIStr, beg, pnt-beg, len)
-        pnt += 1
+    @preserve str begin
+        pnt = beg = _pnt(str)
+        fin = beg + len
+        while pnt < fin
+            _islower_a(get_codeunit(pnt)) && return _upper(ASCIIStr, beg, pnt-beg, len)
+            pnt += 1
+        end
     end
     str
 end
 
 function lowercase(str::ASCIIStr)
     (len = _len(str)) == 0 && return str
-    pnt = beg = _pnt(str)
-    fin = beg + len
-    while pnt < fin
-        _isupper_a(get_codeunit(pnt)) && return _lower(ASCIIStr, beg, pnt-beg, len)
-        pnt += 1
+    @preserve str begin
+        pnt = beg = _pnt(str)
+        fin = beg + len
+        while pnt < fin
+            _isupper_a(get_codeunit(pnt)) && return _lower(ASCIIStr, beg, pnt-beg, len)
+            pnt += 1
+        end
     end
     str
 end
 
 function uppercase_first(str::LatinStr)
     (len = _len(str)) == 0 && return str
-    pnt = _pnt(str)
-    ch = get_codeunit(pnt)
-    _can_upper(ch) || return str
-    buf, out = _allocate(UInt8, len)
-    set_codeunit!(out, ch - 0x20)
-    len > 1 && unsafe_copyto!(out, pnt+1, len-1)
-    Str(LatinCSE, buf)
+    @preserve str begin
+        pnt = _pnt(str)
+        ch = get_codeunit(pnt)
+        _can_upper(ch) || return str
+        buf, out = _allocate(UInt8, len)
+        set_codeunit!(out, ch - 0x20)
+        len > 1 && unsafe_copyto!(out, pnt+1, len-1)
+        Str(LatinCSE, buf)
+    end
 end
 
 # Special handling for characters that can't map into Latin1
 function uppercase_first(str::_LatinStr)
     (len = _len(str)) == 0 && return str
-    pnt = _pnt(str)
-    ch = get_codeunit(pnt)
-    if _can_upper(ch)
-        buf, out8 = _allocate(UInt8, len)
-        set_codeunit!(out8, ch - 0x20)
-        len > 1 && unsafe_copyto!(out8, pnt+1, len-1)
-        Str(_LatinCSE, buf)
-    elseif (ch == 0xb5) | (ch == 0xff)
-        buf, out = _allocate(UInt16, len)
-        set_codeunit!(out, ifelse(ch == 0xb5, 0x39c, 0x178))
-        # Perform the widen operation on the rest (should be done via SIMD)
-        @inbounds for i = 2:len
-            set_codeunit!(out += 2, get_codeunit(pnt += 2)%UInt16)
+    @preserve str begin
+        pnt = _pnt(str)
+        ch = get_codeunit(pnt)
+        if _can_upper(ch)
+            buf, out8 = _allocate(UInt8, len)
+            set_codeunit!(out8, ch - 0x20)
+            len > 1 && unsafe_copyto!(out8, pnt+1, len-1)
+            Str(_LatinCSE, buf)
+        elseif (ch == 0xb5) | (ch == 0xff)
+            buf, out = _allocate(UInt16, len)
+            set_codeunit!(out, ifelse(ch == 0xb5, 0x39c, 0x178))
+            # Perform the widen operation on the rest (should be done via SIMD)
+            @inbounds for i = 2:len
+                set_codeunit!(out += 2, get_codeunit(pnt += 2)%UInt16)
+            end
+            Str(_UCS2CSE, buf)
+        else
+            str
         end
-        Str(_UCS2CSE, buf)
-    else
-        str
     end
 end
 
 function lowercase_first(str::T) where {T<:LatinStrings}
     (len = _len(str)) == 0 && return str
-    pnt = _pnt(str)
-    ch = get_codeunit(pnt)
-    _isupper(ch) || return str
-    buf, out = _allocate(UInt8, len)
-    set_codeunit!(out, ch + 0x20)
-    len > 1 && unsafe_copyto!(out, pnt+1, len-1)
-    Str(cse(T), buf)
+    @preserve str begin
+        pnt = _pnt(str)
+        ch = get_codeunit(pnt)
+        _isupper(ch) || return str
+        buf, out = _allocate(UInt8, len)
+        set_codeunit!(out, ch + 0x20)
+        len > 1 && unsafe_copyto!(out, pnt+1, len-1)
+        Str(cse(T), buf)
+    end
 end
 
 lowercase(ch::T) where {T<:LatinChars} = T(_lowercase_l(tobase(ch)))
@@ -194,7 +208,7 @@ const _narrow! = _widen!  # When this is optimized for SSE/AVX/etc. instructions
 function _widenupper(beg::Ptr{UInt8}, off, len)
     buf, out = _allocate(UInt16, len)
     fin = out + len
-    cur = beg + len
+    cur = beg + off
     _widen!(out, beg, cur)
     out += off
     while out < fin
@@ -214,24 +228,28 @@ end
 
 function uppercase(str::LatinStr)
     (len = _len(str)) == 0 && return str
-    pnt = beg = _pnt(str)
-    fin = beg + len
-    while pnt < fin
-        _can_upper(get_codeunit(pnt)) && return _upper(LatinStr, beg, pnt-beg, len)
-        pnt += 1
+    @preserve str begin
+        pnt = beg = _pnt(str)
+        fin = beg + len
+        while pnt < fin
+            _can_upper(get_codeunit(pnt)) && return _upper(LatinStr, beg, pnt-beg, len)
+            pnt += 1
+        end
     end
     str
 end
 
 function uppercase(str::_LatinStr)
     (len = _len(str)) == 0 && return str
-    pnt = beg = _pnt(str)
-    fin = beg + len
-    while pnt < fin
-        ch = get_codeunit(pnt)
-        ((ch == 0xb5) | (ch == 0xff)) && return _widenupper(beg, pnt-beg, len)
-        _can_upper(ch) && return _upper(_LatinStr, beg, pnt-beg, len)
-        pnt += 1
+    @preserve str begin
+        pnt = beg = _pnt(str)
+        fin = beg + len
+        while pnt < fin
+            ch = get_codeunit(pnt)
+            ((ch == 0xb5) | (ch == 0xff)) && return _widenupper(beg, pnt-beg, len)
+            _can_upper(ch) && return _upper(_LatinStr, beg, pnt-beg, len)
+            pnt += 1
+        end
     end
     str
 end
@@ -251,11 +269,13 @@ end
 
 function lowercase(str::T) where {T<:LatinStrings}
     (len = _len(str)) == 0 && return str
-    pnt = beg = _pnt(str)
-    fin = beg + len
-    while pnt < fin
-        _isupper_al(get_codeunit(pnt)) && return _lower(T, beg, pnt-beg, len)
-        pnt += 1
+    @preserve str begin
+        pnt = beg = _pnt(str)
+        fin = beg + len
+        while pnt < fin
+            _isupper_al(get_codeunit(pnt)) && return _lower(T, beg, pnt-beg, len)
+            pnt += 1
+        end
     end
     str
 end
@@ -322,12 +342,14 @@ function _lower(::Type{T}, beg, off, len) where {T<:Union{UCS2Str,UTF32Strings}}
 end
 
 function lowercase(str::T) where {T<:Union{UCS2Strings, UTF32Strings}}
-    CU = codeunit(T)
-    pnt = beg = _pnt(str)
-    fin = beg + sizeof(str)
-    while pnt < fin
-        _can_lower_ch(get_codeunit(pnt)) && return _lower(T, beg, pnt-beg, _len(str))
-        pnt += sizeof(CU)
+    @preserve str begin
+        CU = codeunit(T)
+        pnt = beg = _pnt(str)
+        fin = beg + sizeof(str)
+        while pnt < fin
+            _can_lower_ch(get_codeunit(pnt)) && return _lower(T, beg, pnt-beg, _len(str))
+            pnt += sizeof(CU)
+        end
     end
     str
 end
@@ -357,12 +379,14 @@ function _upper(::Type{T}, beg, off, len) where {T<:Union{UCS2Strings,UTF32Strin
 end
 
 function uppercase(str::T) where {T<:Union{UCS2Strings, UTF32Strings}}
-    CU = codeunit(T)
-    pnt = beg = _pnt(str)
-    fin = beg + sizeof(str)
-    while pnt < fin
-        _can_upper_ch(get_codeunit(pnt)) && return _upper(T, beg, pnt-beg, _len(str))
-        pnt += sizeof(CU)
+    @preserve str begin
+        CU = codeunit(T)
+        pnt = beg = _pnt(str)
+        fin = beg + sizeof(str)
+        while pnt < fin
+            _can_upper_ch(get_codeunit(pnt)) && return _upper(T, beg, pnt-beg, _len(str))
+            pnt += sizeof(CU)
+        end
+        str
     end
-    str
 end

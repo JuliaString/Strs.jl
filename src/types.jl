@@ -8,9 +8,6 @@ Encodings inspired from collaborations on the following packages:
 https://github.com/quinnj/Strings.jl with @quinnj (Jacob Quinn)
 https://github.com/nalimilan/StringEncodings.jl with @nalimilan (Milan Bouchet-Valat)
 =#
-export Str, UniStr, CodePoint, CharSet, Encoding, @cs_str, @enc_str, @cse, charset, encoding
-export BIG_ENDIAN, LITTLE_ENDIAN
-
 const BIG_ENDIAN    = (ENDIAN_BOM == 0x01020304)
 const LITTLE_ENDIAN = !BIG_ENDIAN
 
@@ -71,10 +68,12 @@ const LatinSubSet  = CharSet{:LatinSubSet} # Has at least 1 character > 0x7f, al
 const UCS2SubSet   = CharSet{:UCS2SubSet}  # Has at least 1 character > 0xff, all <= 0xffff
 const UTF32SubSet  = CharSet{:UTF32SubSet} # Has at least 1 non-BMP character in string
 
+export Native1Byte, UTF8Encoding
 const Native1Byte  = Encoding(:Byte)
-const NativeUTF8   = Encoding(:UTF8)
-@eval show(io::IO, ::Type{NativeUTF8})  = print(io, "UTF-8")
+const UTF8Encoding = Encoding(:UTF8)
+@eval show(io::IO, ::Type{UTF8Encoding})  = print(io, "UTF-8")
 @eval show(io::IO, ::Type{Native1Byte}) = print(io, "8-bit")
+
 
 # Allow handling different endian encodings
 
@@ -84,6 +83,7 @@ for (n, l, b, s) in (("2Byte", :LE2, :BE2, "16-bit"),
     nat, swp = BIG_ENDIAN ? (b, l) : (l, b)
     natnam = symstr("Native",  n)
     swpnam = symstr("Swapped", n)
+    @eval export $nat, $swp
     @eval const $natnam = Encoding($(quotesym("N", n)))
     @eval const $swpnam = Encoding($(quotesym("S", n)))
     @eval const $nat = $natnam
@@ -104,6 +104,8 @@ show(io::IO, ::Type{Encoding{S}}) where {S}  = print(io, "Encoding{", string(S),
 show(io::IO, ::Type{CSE{CS,E}}) where {S,T,CS<:CharSet{S},E<:Encoding{T}} =
     print(io, "CSE{", string(S), ", ", string(T), "}")
 
+const CodeUnitTypes = Union{UInt8, UInt16, UInt32}
+
 # Note: this is still in transition to expressing character set, encoding
 # and optional cached info for hashes, UTF-8/UTF-16 encodings, subsets, etc.
 # via more type parameters
@@ -114,30 +116,31 @@ struct Str{T,SubStr,Cache,Hash} <: AbstractString
     cache::Cache
     hash::Hash
 
-    ((::Type{Str})(::Type{T}, v::String, s::S, c::C, h::H) where {T<:CSE,S,C,H} =
-     new{T,S,C,H}(v,s,c,h))
+    (::Type{Str})(::Type{T}, v::String, s::S, c::C, h::H) where {T<:CSE,S,C,H} =
+        new{T,S,C,H}(v,s,c,h)
 end
 
 (::Type{Str})(::Type{C}, v::String) where {C<:CSE} = Str(C, v, nothing, nothing, nothing)
 (::Type{Str})(::Type{C}, v::Str) where {C<:CSE} = Str(C, v.data, nothing, nothing, nothing)
 
+struct Chr{CS<:CharSet,T<:CodeUnitTypes} <: AbstractChar
+    v::T
+    (::Type{Chr})(::Type{CS}, v::T) where {CS<:CharSet,T<:CodeUnitTypes} = new{CS,T}(v)
+end
+
 # Handle change from endof -> lastindex
 @static if !isdefined(Base, :lastindex)
-    export lastindex
     lastindex(str::AbstractString) = Base.endof(str)
     lastindex(arr::AbstractArray) = Base.endof(arr)
     Base.endof(str::Str) = lastindex(str)
 end
 @static if !isdefined(Base, :firstindex)
-    export firstindex
     firstindex(str::AbstractString) = 1
     # AbstractVector might be an OffsetArray
     firstindex(str::Vector) = 1
 end
 
 # This needs to be redone, with character sets and the code unit as part of the type
-
-const CodeUnitTypes = Union{UInt8, UInt16, UInt32}
 
 abstract type CodePoint <: AbstractChar end
 
@@ -150,22 +153,24 @@ primitive type _LatinChr <: CodePoint 8 end
 
 # Define all of the function for mapping CodePoint types to a CharSet
 for nam in charsets
-    @eval charset(::Type{$(symstr(nam, "Chr"))}) = $(symstr(nam, "CharSet"))
+    csnam = symstr(nam, "CharSet")
+    @eval charset(::Type{$(symstr(nam, "Chr"))}) = $csnam
+    @eval export $csnam
 end
 
 # Handle a few quirks
+charset(::Type{<:AbstractChar}) = UTF32CharSet
 charset(::Type{UInt8})     = BinaryCharSet  # UInt8 instead of "BinaryChr"
 charset(::Type{Char})      = UniPlusCharSet # Char instead of "UniPlusChr"
 charset(::Type{_LatinChr}) = LatinSubSet    # LatinSubSet instead of "_LatinCharSet"
+
+export BinaryCharSet, UniPlusCharSet
 
 const CodePointTypes = Union{CodeUnitTypes, CodePoint}
 
 const LatinChars   = Union{LatinChr, _LatinChr}
 const ByteChars    = Union{ASCIIChr, LatinChr, _LatinChr, Text1Chr}
 const WideChars    = Union{UCS2Chr, UTF32Chr}
-const UnicodeChars = Union{ASCIIChr, LatinChars, UCS2Chr, UTF32Chr}
-
-export UnicodeChars
 
 # Definition of built-in CSEs (Character Set Encodings)
 
@@ -173,16 +178,20 @@ for (cs, enc) in ((Native1Byte, _binname), (Native2Byte, _cpname2), (Native4Byte
     nam in enc
     @eval const $(symstr(nam, "CSE")) = CSE{$(symstr(nam, "CharSet")), $cs}
 end
-const UTF8CSE   = CSE{UTF32CharSet, NativeUTF8}
+const UTF8CSE   = CSE{UTF32CharSet, UTF8Encoding}
 const UTF16CSE  = CSE{UTF32CharSet, NativeUTF16}
 
 const _LatinCSE = CSE{LatinSubSet,  Native1Byte}
 const _UCS2CSE  = CSE{UCS2SubSet,   Native2Byte}
 const _UTF32CSE = CSE{UTF32SubSet,  Native4Byte}
 
+export UniPlusCSE
+const UniPlusCSE = CSE{UniPlusCharSet, UTF8Encoding}
+
 for nam in vcat(charsets, :_Latin)
     @eval codepoint_cse(::Type{$(symstr(nam,"Chr"))}) = $(symstr(nam,"CSE"))
 end
+codepoint_cse(::Type{Char}) = UniPlusCSE
 
 # Definition of built-in Str types
 
@@ -203,7 +212,7 @@ for nam in vcat(_binname, _cpname2, _cpname4, _subsetnam, _mbwname)
         emp = symstr("empty_", low)
         @eval const $emp = Str($cse, empty_string)
         @eval empty_str(::Type{$cse}) = $emp
-        @eval export $sym
+        @eval export $sym, $cse
     end
     @eval convert(::Type{$sym}, str::$sym) = str
 end
@@ -256,16 +265,17 @@ basecse(::Type{_UCS2CSE})  = UCS2CSE
 basecse(::Type{_UTF32CSE}) = UTF32CSE
 
 const AbsChar = @static isdefined(Base, :AbstractChar) ? AbstractChar : Union{Char, CodePoint}
-const ByteStrings  = Union{String, ByteStr}
 
 ## Get the character set / encoding used by a string type
 cse(::Type{<:AbstractString}) = UTF8CSE # Default unless overridden
+cse(::Type{String}) = UniPlusCSE         # allows invalid sequences
 cse(::Type{<:SubString{T}}) where {T} = cse(T)
 cse(::Type{<:SubString{<:Str{C}}}) where {C<:SubSet_CSEs} = basecse(C)
 cse(::Type{<:Str{C}}) where {C<:CSE} = C
 cse(str::AbstractString) = cse(typeof(str))
 
-charset(::Type{<:AbstractString}) = UniPlusCharSet # Default unless overridden
+charset(::Type{<:AbstractString}) = UTF32CharSet # Default unless overridden
+charset(::Type{String}) = UniPlusCharSet # allows invalid sequences
 charset(::Type{<:SubString{T}}) where {T} = charset(T)
 charset(::Type{<:SubString{<:Str{C}}}) where {C<:SubSet_CSEs} = charset(basecse(C))
 charset(::Type{C}) where {CS,C<:CSE{CS}} = CS
@@ -307,8 +317,7 @@ sizeof(s::Str) = sizeof(s.data) + 1 - STR_KEEP_NUL
 """Codeunits of string as a Vector"""
 _data(s::Vector{UInt8}) = s
 _data(s::String)  = s
-_data(s::ByteStr) =
-    @static VERSION < v"0.7.0-DEV" ? Vector{UInt8}(s.data) : unsafe_wrap(Vector{UInt8}, s.data)
+_data(s::ByteStr) = @static V6_COMPAT ? Vector{UInt8}(s.data) : unsafe_wrap(Vector{UInt8}, s.data)
 
 """Pointer to codeunits of string"""
 _pnt(s::Union{String,Vector{UInt8}}) = pointer(s)
@@ -342,3 +351,5 @@ Base.SubString(str::Str{C}, off::Int) where {C<:SubSet_CSEs} =
     SubString(Str(basecse(C), str), off)
 Base.SubString(str::Str{C}, off::Int, fin::Int) where {C<:SubSet_CSEs} =
     SubString(Str(basecse(C), str), off, fin)
+
+@static V6_COMPAT && (sizeof(s::SubString{<:Str}) = s.endof == 0 ? 0 : nextind(s, s.endof) - 1)

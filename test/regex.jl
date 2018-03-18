@@ -3,7 +3,7 @@
 
 const RegexStrings = (ASCIIStr, BinaryStr, Text1Str, LatinStr, Strs._LatinStr, UTF8Str)
 
-@static if VERSION < v"0.7.0-DEV"
+@static if V6_COMPAT
     collect_eachmatch(re, str; overlap=false) =
         [m.match for m in collect(eachmatch(re, str, overlap))]
 else
@@ -45,7 +45,7 @@ target = """71.163.72.113 - - [30/Jul/2014:16:40:55 -0700] "GET emptymind.org/th
         # Issue 9545 (32 bit)
         buf = PipeBuffer()
         show(buf, r"")
-        @static if VERSION < v"0.7.0-DEV"
+        @static if V6_COMPAT
             @test readstring(buf) == "r\"\""
         else
             @test read(buf, String) == "r\"\""
@@ -64,7 +64,7 @@ target = """71.163.72.113 - - [30/Jul/2014:16:40:55 -0700] "GET emptymind.org/th
             @test sprint(show, m) == "RegexMatchStr(\"xyz\", a=\"x\", 2=\"y\", b=\"z\")"
         end
         # Backcapture reference in substitution string
-        @static if VERSION >= v"0.7.0-DEV"
+        @static if !V6_COMPAT
             @test_broken replace(T("abcde"), r"(..)(?P<byname>d)" => s"\g<byname>xy\\\1") ==
                 "adxy\\bce"
             @test_throws ErrorException replace("a", r"(?P<x>)" => s"\g<y>")

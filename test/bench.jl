@@ -21,6 +21,8 @@ res = load_results(fname) # Loads the results from the given file
 dispbench(res)            # Displays the results in a pretty format
 =#
 
+const V6_COMPAT = VERSION < v"0.7.0-DEV"
+
 using BenchmarkTools
 
 const test_legacy = false
@@ -34,7 +36,7 @@ using Strs
 import Strs: LineCounts, CharTypes, CharStat, calcstats
 import Strs: _LatinStr, _UCS2Str, _UTF32Str, _LatinChr
 
-uninit(T, len) = @static VERSION < v"0.7.0-DEV" ? T(len) : T(undef, len)
+uninit(T, len) = @static V6_COMPAT ? T(len) : T(undef, len)
 create_vector(T, len)  = uninit(Vector{T}, len)
 
 import Base: show
@@ -170,8 +172,8 @@ function show(io::IO, v::Tuple{String,CharStat})
     pr"\(io)Lines with > 0:   \(s.lines)\n"
 end
 
-_stdout() = @static VERSION < v"0.7.0-DEV" ? STDOUT : stdout
-@static if VERSION < v"0.7.0-DEV"
+_stdout() = @static V6_COMPAT ? STDOUT : stdout
+@static if V6_COMPAT
     const pwc = print_with_color
 else
     pwc(c, io, str) = printstyled(io, str; color = c)

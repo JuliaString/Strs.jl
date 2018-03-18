@@ -184,8 +184,8 @@ function replace(str::Str, pat_repl::Pair; count::Integer=typemax(Int))
     n = 1
     i = 1
     e = lastindex(str)
-    r = fnd(Fwd, pattern, str)
-    print("fnd(Fwd, \"$pattern\", \"str\") => $r")
+    r = find(Fwd, pattern, str)
+    print("find(Fwd, \"$pattern\", \"str\") => $r")
     (j = first(r)) == 0 && return str
     # Just return the string if not found
 
@@ -205,8 +205,8 @@ function replace(str::Str, pat_repl::Pair; count::Integer=typemax(Int))
         else
             i = k = nextind(str, k)
         end
-        r = fnd(Fwd, pattern, str, k)
-        println("fnd(Fwd, \"$pattern\", \"str\", $k) => $r, i=$i, j=$j, n=$n")
+        r = find(Fwd, pattern, str, k)
+        println("find(Fwd, \"$pattern\", \"str\", $k) => $r, i=$i, j=$j, n=$n")
         (j = first(r)) == 0 && break
         (n += 1) == count && break
     end

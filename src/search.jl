@@ -6,12 +6,10 @@ Licensed under MIT License, see LICENSE.md
 Based in part on julia/base/strings/search.jl
 =#
 
-export found, find_result, fnd
-export Dir, Fwd, Rev
-
-abstract type Dir end
-struct Fwd <: Dir end
-struct Rev <: Dir end
+abstract type FindOp end
+abstract type Direction <: FindOp end
+struct Fwd <: Direction end
+struct Rev <: Direction end
 
 """
     find(Fwd, pattern::Union{Regex,AbstractString}, string::AbstractString, start::Integer=1)
@@ -45,7 +43,7 @@ julia> find(Fwd, "Julia", "JuliaLang")
 1:5
 ```
 """
-fnd(::Type{Fwd}, pat, str, pos)
+find(::Type{Fwd}, pat, str, pos)
 
 """
     find(Rev, pattern::AbstractString, string::AbstractString, start::Integer=lastindex(string))
@@ -76,26 +74,24 @@ julia> find(Rev, "Julia", "JuliaLang")
 1:5
 ```
 """
-fnd(::Type{Rev}, pat, str, pos)
+find(::Type{Rev}, pat, str, pos)
 
 const _not_found = 0:-1
 
 found(::Type{<:AbstractString}, v) = v != 0
 find_result(::Type{<:AbstractString}, v) = v
 
-@static if VERSION < v"0.7.0-DEV"
-
-else
+@static if !V6_COMPAT
 
 nothing_sentinel(i) = i == 0 ? nothing : i
-Base.findnext(a, b::Str, i) = nothing_sentinel(fnd(Fwd, a, b, i))
-Base.findfirst(a, b::Str)   = nothing_sentinel(fnd(Fwd, a, b))
-Base.findprev(a, b::Str, i) = nothing_sentinel(fnd(Rev, a, b, i))
-Base.findlast(a, b::Str)    = nothing_sentinel(fnd(Rev, a, b))
-Base.findnext(a::Str, b::AbstractString, i) = nothing_sentinel(fnd(Fwd, a, b, i))
-Base.findfirst(a::Str, b::AbstractString)   = nothing_sentinel(fnd(Fwd, a, b))
-Base.findprev(a::Str, b::AbstractString, i) = nothing_sentinel(fnd(Rev, a, b, i))
-Base.findlast(a::Str, b::AbstractString)    = nothing_sentinel(fnd(Rev, a, b))
+Base.findnext(a, b::Str, i) = nothing_sentinel(find(Fwd, a, b, i))
+Base.findfirst(a, b::Str)   = nothing_sentinel(find(Fwd, a, b))
+Base.findprev(a, b::Str, i) = nothing_sentinel(find(Rev, a, b, i))
+Base.findlast(a, b::Str)    = nothing_sentinel(find(Rev, a, b))
+Base.findnext(a::Str, b::AbstractString, i) = nothing_sentinel(find(Fwd, a, b, i))
+Base.findfirst(a::Str, b::AbstractString)   = nothing_sentinel(find(Fwd, a, b))
+Base.findprev(a::Str, b::AbstractString, i) = nothing_sentinel(find(Rev, a, b, i))
+Base.findlast(a::Str, b::AbstractString)    = nothing_sentinel(find(Rev, a, b))
 
 end
 
@@ -118,7 +114,7 @@ end
     pos
 end
 
-function fnd(::Type{D}, fun::Function, str::AbstractString, pos::Integer) where {D<:Dir}
+function find(::Type{D}, fun::Function, str::AbstractString, pos::Integer) where {D<:Direction}
     if pos < 1 || pos > ncodeunits(str)
         @boundscheck boundserr(str, pos)
         return 0
@@ -129,16 +125,16 @@ end
 
 const PatType = Union{Function, AbsChar, AbstractString, Regex}
 
-fnd(::Type{Fwd}, pat::PatType, str::AbstractString) = fnd(Fwd, pat, str, 1)
-fnd(::Type{Rev}, pat::PatType, str::AbstractString) = fnd(Rev, pat, str, lastindex(str))
+find(::Type{Fwd}, pat::PatType, str::AbstractString) = find(Fwd, pat, str, 1)
+find(::Type{Rev}, pat::PatType, str::AbstractString) = find(Rev, pat, str, lastindex(str))
 
-fnd(pat::PatType, ::Type{D}, str::AbstractString) where {D<:Dir} = fnd(D, pat, str)
+find(pat::PatType, ::Type{D}, str::AbstractString) where {D<:Direction} = find(D, pat, str)
 
 # AbstractString implementations of the generic find interfaces
 
 # Defined with function first, for do syntax
-fnd(fun::Function, ::Type{D}, str::AbstractString, pos::Integer) where {D<:Dir} =
-    fnd(D(), fun, str, pos)
+find(fun::Function, ::Type{D}, str::AbstractString, pos::Integer) where {D<:Direction} =
+    find(D(), fun, str, pos)
 
 @inline function _srch_codeunit(::Fwd, beg::Ptr{T}, cu::T, pos, len) where {T<:CodeUnitTypes}
     if sizeof(Cwchar_t) == sizeof(T) || T == UInt8
@@ -196,11 +192,11 @@ function _srch_cp(::Rev, cus, str, cp, pos, len)
     0
 end
 
-fnd(::Type{D}, pred::P, str::AbstractString,
-    pos::Integer) where {P<:Fix2{Union{typeof(==),typeof(isequal)}, <:AbsChar}, D<:Dir} =
-    fnd(D, pred.x, str, pos)
+find(::Type{D}, pred::P, str::AbstractString,
+    pos::Integer) where {P<:Fix2{Union{typeof(==),typeof(isequal)}, <:AbsChar}, D<:Direction} =
+    find(D, pred.x, str, pos)
 
-function fnd(::Type{D}, ch::AbsChar, str::AbstractString, pos::Integer) where {D<:Dir}
+function find(::Type{D}, ch::AbsChar, str::AbstractString, pos::Integer) where {D<:Direction}
     if pos < 1
         @boundscheck (pos == 0 && isempty(str)) || boundserr(str, pos)
         return 0
@@ -213,7 +209,7 @@ function fnd(::Type{D}, ch::AbsChar, str::AbstractString, pos::Integer) where {D
     # Only check if CodeUnitMulti
     (cus = CodePointStyle(str)) === CodeUnitMulti() &&
         (@inbounds is_valid(str, pos) || index_error(str, pos))
-    #println("fnd(::$D, '$ch', \"$str\", $pos) => $(is_valid(eltype(str), ch))")
+    #println("find(::$D, '$ch', \"$str\", $pos) => $(is_valid(eltype(str), ch))")
     # Check here if ch is valid for the type of string
     is_valid(eltype(str), ch) ? _srch_cp(D(), cus, str, ch, pos, len) : 0
 end
@@ -305,7 +301,8 @@ end
 _srch_strings(::Fwd, ::Union{ByteCompare,WidenCompare}, str, needle, ch, nxtsub, pos, slen, tlen) =
     @preserve str needle _srch_str_bloom(str, _pnt(str), _pnt(needle), ch, pos, slen, tlen)
 
-function fnd(::Type{D}, needle::AbstractString, str::AbstractString, pos::Integer) where {D<:Dir}
+function find(::Type{D}, needle::AbstractString, str::AbstractString,
+              pos::Integer) where {D<:Direction}
     # Check for fast case of a single codeunit (should check for single character also)
     slen = ncodeunits(str)
     if slen == 0
@@ -331,20 +328,20 @@ function fnd(::Type{D}, needle::AbstractString, str::AbstractString, pos::Intege
     _srch_strings(D(), cmp, str, needle, ch, nxt, pos, slen, tlen)
 end
 
-@static if VERSION < v"0.7.0-DEV"
-    contains(hay::AbstractString, chr::AbsChar)    = first(fnd(Fwd, chr, hay)) != 0
-    contains(hay::AbstractString, pat::Regex)      = first(fnd(Fwd, pat, hay)) != 0
-    contains(hay::AbstractString, pat::Regex, pos) = first(fnd(Fwd, pat, hay, pos)) != 0
+@static if V6_COMPAT
+    contains(hay::AbstractString, chr::AbsChar)    = first(find(Fwd, chr, hay)) != 0
+    contains(hay::AbstractString, pat::Regex)      = first(find(Fwd, pat, hay)) != 0
+    contains(hay::AbstractString, pat::Regex, pos) = first(find(Fwd, pat, hay, pos)) != 0
 else
     # Avoid type piracy
-    contains(hay::Str, chr::Char)                  = first(fnd(Fwd, chr, hay)) != 0
-    contains(hay::Str, pat::Regex)                 = first(fnd(Fwd, pat, hay)) != 0
-    contains(hay::Str, pat::Regex, pos)            = first(fnd(Fwd, pat, hay, pos)) != 0
-    contains(hay::AbstractString, chr::CodePoint)  = first(fnd(Fwd, chr, hay)) != 0
+    contains(hay::Str, chr::Char)                  = first(find(Fwd, chr, hay)) != 0
+    contains(hay::Str, pat::Regex)                 = first(find(Fwd, pat, hay)) != 0
+    contains(hay::Str, pat::Regex, pos)            = first(find(Fwd, pat, hay, pos)) != 0
+    contains(hay::AbstractString, chr::CodePoint)  = first(find(Fwd, chr, hay)) != 0
 end
-contains(hay::Str, str::Str)            = first(fnd(Fwd, str, hay)) != 0
-contains(hay::Str, str::AbstractString) = first(fnd(Fwd, str, hay)) != 0
-contains(hay::AbstractString, str::Str) = first(fnd(Fwd, str, hay)) != 0
+contains(hay::Str, str::Str)            = first(find(Fwd, str, hay)) != 0
+contains(hay::Str, str::AbstractString) = first(find(Fwd, str, hay)) != 0
+contains(hay::AbstractString, str::Str) = first(find(Fwd, str, hay)) != 0
 
 in(chr::CodePoint, str::AbstractString) = contains(str, chr)
 in(chr::AbsChar,   str::Str)            = contains(str, chr)
