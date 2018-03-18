@@ -128,6 +128,8 @@ struct Chr{CS<:CharSet,T<:CodeUnitTypes} <: AbstractChar
     (::Type{Chr})(::Type{CS}, v::T) where {CS<:CharSet,T<:CodeUnitTypes} = new{CS,T}(v)
 end
 
+(::Type{<:Chr{CS,T}})(v::Number) where {CS<:CharSet,T<:CodeUnitTypes} = Chr(CS, T(v))
+
 # Handle change from endof -> lastindex
 @static if !isdefined(Base, :lastindex)
     lastindex(str::AbstractString) = Base.endof(str)

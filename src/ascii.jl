@@ -1,7 +1,8 @@
 #=
 ASCIIStr type
 
-Copyright 2017 Gandalf Software, Inc., Scott P. Jones, and other contributors to the Julia language
+Copyright 2017-2018 Gandalf Software, Inc., Scott P. Jones, and other contributors
+to the Julia language
 Licensed under MIT License, see LICENSE.md
 Based in part on code for ASCIIString that used to be in Julia
 =#
@@ -17,7 +18,7 @@ function _string(c)
     o = 1
     for s in c
         len = _len(s)
-        unsafe_copy!(v, o, _data(s), 1, len)
+        unsafe_copyto!(v, o, _data(s), 1, len)
         o += len
     end
     v
@@ -28,16 +29,17 @@ string(c::Str{ASCIICSE}...) = length(c) == 1 ? c[1] : Str(ASCIICSE, _string(c))
 ## transcoding to ASCII ##
 
 function convert(::Type{ASCIIStr}, str::AbstractString)
-    # Need to fix this to show where the non-ASCII character was found!
     isempty(str) && return empty_ascii
-    len = length(str)
-    buf, pnt = _allocate(UInt8, len)
-    @inbounds for ch in str
-        is_ascii(ch) || unierror(UTF_ERR_INVALID_ASCII, pnt - pointer(buf) + 1, ch)
-        set_codeunit!(pnt, ch%UInt8)
-        pnt += 1
+    @preserve str buf begin
+        len = length(str)
+        buf, pnt = _allocate(UInt8, len)
+        @inbounds for ch in str
+            is_ascii(ch) || unierror(UTF_ERR_INVALID_ASCII, pnt - pointer(buf) + 1, ch)
+            set_codeunit!(pnt, ch%UInt8)
+            pnt += 1
+        end
+        Str(ASCIICSE, buf)
     end
-    Str(ASCIICSE, buf)
 end
 
 convert(::Type{ASCIIStr}, str::T) where {T<:Union{LatinStr,UTF8Str}} =
@@ -47,16 +49,18 @@ convert(::Type{ASCIIStr}, dat::Vector{UInt8}) =
     is_ascii(dat) ? _convert(ASCIIStr, dat) : unierror(UTF_ERR_INVALID_ASCII)
 
 function convert(::Type{ASCIIStr}, str::String)
+    isempty(str) && return empty_ascii
     len, flags = unsafe_check_string(str, 1, sizeof(str))
     flags == 0 && return Str(ASCIICSE, str)
     (flags & ~UTF_LONG) == 0 || unierror(UTF_ERR_INVALID_ASCII)
-    # Handle any long encodings, such as \xc0\x80 for \0 (maybe that should only be for unsafe_str)
-    buf, pnt = _allocate(UInt8, len)
-    @inbounds for ch in str
-        set_codeunit!(pnt, ch%UInt8)
-        pnt += 1
+    @preserve str buf begin
+        buf, pnt = _allocate(UInt8, len)
+        @inbounds for ch in str
+            set_codeunit!(pnt, ch%UInt8)
+            pnt += 1
+        end
+        Str(ASCIICSE, buf)
     end
-    Str(ASCIICSE, buf)
 end
 
 # This should really use a keyword argument, and allow for the following possibilities:
@@ -85,7 +89,7 @@ function _convert_ascii(a, invlen, invdat)
             v[out] = ch
             out += 1
         else
-            unsafe_copy!(v, out, invdat, 1, invlen)
+            unsafe_copyto!(v, out, invdat, 1, invlen)
             out += invlen
         end
     end

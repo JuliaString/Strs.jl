@@ -495,28 +495,31 @@ check_string(dat; kwargs...) = unsafe_check_string(dat, 1, lastindex(dat); kwarg
 
 # Make sure that beginning and end positions are bounds checked
 function check_string(dat, startpos, endpos = lastindex(dat); kwargs...)
-    checkbounds(dat, startpos)
-    checkbounds(dat, endpos)
+    @boundscheck checkbounds(dat, startpos)
+    @boundscheck checkbounds(dat, endpos)
     endpos < startpos && argerror(startpos, endpos)
     unsafe_check_string(dat, startpos, endpos; kwargs...)
 end
 
 byte_string_classify(data::Vector{UInt8}) =
     ccall(:u8_isvalid, Int32, (Ptr{UInt8}, Int), data, length(data))
-byte_string_classify(s::ByteStr) = byte_string_classify(_data(s))
+byte_string_classify(s::ByteStr) = byte_string_classify(s.data)
     # 0: neither valid ASCII nor UTF-8
     # 1: valid ASCII
     # 2: valid UTF-8
 
-isvalid(::Type{ASCIIStr},  s::Vector{UInt8}) = byte_string_classify(s) == 1
-isvalid(::Type{UTF8Str},   s::Vector{UInt8}) = byte_string_classify(s) != 0
-isvalid(::Type{LatinStr},  s::Vector{UInt8}) = true
-isvalid(::Type{_LatinStr}, s::Vector{UInt8}) = true
+is_valid(::Type{ASCIIStr},  s::Vector{UInt8}) = byte_string_classify(s) == 1
+is_valid(::Type{UTF8Str},   s::Vector{UInt8}) = byte_string_classify(s) != 0
+is_valid(::Type{LatinStr},  s::Vector{UInt8}) = true
+is_valid(::Type{_LatinStr}, s::Vector{UInt8}) = true
 
-for sym in (:bin, :oct, :dec, :hex)
-    @eval import Base:$sym
-    @eval ($sym)(x::CodePoint, p::Int) = ($sym)(tobase(x), p, false)
-    @eval ($sym)(x::CodePoint)         = ($sym)(tobase(x), 1, false)
+# These are deprecated in v0.7
+@static if V6_COMPAT
+    for sym in (:bin, :oct, :dec, :hex)
+        @eval import Base:$sym
+        @eval ($sym)(x::CodePoint, p::Int) = ($sym)(tobase(x), p, false)
+        @eval ($sym)(x::CodePoint)         = ($sym)(tobase(x), 1, false)
+    end
 end
 
 function _cvtsize(::Type{T}, dat, len) where {T <: CodeUnitTypes}

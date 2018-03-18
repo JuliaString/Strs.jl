@@ -30,6 +30,12 @@ chrdiff(pnt::Ptr{T}, beg::Ptr{T}) where {T<:CodeUnitTypes} = Int(chroff(T, pnt -
 
 bytoff(pnt::Ptr{T}, off) where {T<:CodeUnitTypes} = pnt + bytoff(T, off)
 
+# Alternate way for Chr type
+tobase(ch::Chr) = ch.v
+codepoint(v::Chr) = ch.v
+basetype(::Type{<:Chr{CS,T}}) where {CS,T} = T
+charset(::Type{<:Chr{CS,T}}) where {CS,T} = CS
+
 """Default value for CodePoint types"""
 basetype(::Type{<:CodePoint}) = UInt8
 basetype(::Type{UCS2Chr})     = UInt16
@@ -60,12 +66,12 @@ typemax(::Type{UTF32Chr}) = reinterpret(UTF32Chr, 0x10ffff)
 
 eltype(::Type{<:Str{BinaryCSE}}) = UInt8
 
-eltype(::Type{<:Str{Text1CSE}})     = Text1Chr
-eltype(::Type{<:Str{Text2CSE}})     = Text2Chr
-eltype(::Type{<:Str{Text4CSE}})     = Text4Chr
-eltype(::Type{<:Str{ASCIICSE}})     = ASCIIChr
-eltype(::Type{<:Str{LatinCSE}})     = LatinChr
-eltype(::Type{<:Str{_LatinCSE}})    = _LatinChr
+eltype(::Type{<:Str{Text1CSE}})       = Text1Chr
+eltype(::Type{<:Str{Text2CSE}})       = Text2Chr
+eltype(::Type{<:Str{Text4CSE}})       = Text4Chr
+eltype(::Type{<:Str{ASCIICSE}})       = ASCIIChr
+eltype(::Type{<:Str{LatinCSE}})       = LatinChr
+eltype(::Type{<:Str{_LatinCSE}})      = _LatinChr
 eltype(::Type{<:Str{<:UCS2_CSEs}})    = UCS2Chr
 eltype(::Type{<:Str{<:Unicode_CSEs}}) = UTF32Chr
 
@@ -91,9 +97,9 @@ set_codeunit!(dat::String, ch) = set_codeunit!(dat, 1, ch)
 
 convert(::Type{T}, v::S) where {T<:Integer, S<:CodePoint} = convert(T, tobase(v))::T
 convert(::Type{T}, v::Signed) where {T<:CodePoint} =
-    (v >= 0 && isvalid(T, v%Unsigned)) ? convert(T, tobase(v)) : codepoint_error(T, v)
+    (v >= 0 && is_valid(T, v%Unsigned)) ? convert(T, tobase(v)) : codepoint_error(T, v)
 convert(::Type{T}, v::Unsigned) where {T<:CodePoint} =
-    isvalid(T, v) ? reinterpret(T, basetype(T)(v)) : codepoint_error(T, v)
+    is_valid(T, v) ? reinterpret(T, basetype(T)(v)) : codepoint_error(T, v)
 convert(::Type{Char}, v::T) where {T<:CodePoint} = convert(Char, tobase(v))
 convert(::Type{T}, v::Char) where {T<:CodePoint} = convert(T, tobase(v))::T
 
@@ -112,7 +118,7 @@ for nam in (:Text1, :Text2, :Text4, :ASCII, :Latin, :_Latin, :UCS2, :UTF32)
     @eval $sym(v::Number) = convert($sym, v)
 end
 
-eltype(::Type{<:CodePoint}) = CodePoint
+eltype(::Type{T}) where {T<:CodePoint} = T
 size(cp::CodePoint, dim) = convert(Int, dim) < 1 ? boundserr(cp, dim) : 1
 getindex(cp::CodePoint, i::Integer) = i == 1 ? cp : boundserr(cp, i)
 getindex(cp::CodePoint, I::Integer...) = all(x -> x == 1, I) ? cp : boundserr(cp, I)

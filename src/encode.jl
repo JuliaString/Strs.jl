@@ -30,21 +30,35 @@ function _encode_ascii_latin(pnt::Ptr{UInt8}, len)
     buf
 end
 
+@inline function safe_copy(::Type{Vector{T}}, ::Type{C}, str) where {T<:CodeUnitTypes,C<:CSE}
+    @preserve str buf begin
+        len, pnt = _lenpnt(str)
+        buf, out = _allocate(T, len)
+        _memcpy(out, pnt, len)
+        Str(C, buf)
+    end
+end
+
+@inline safe_copy(::Type{<:Str}, ::Type{C}, str) where {C<:CSE} = Str(C, str.data)
+@inline safe_copy(::Type{String}, ::Type{C}, str) where {C<:CSE} = Str(C, _data(str))
+
 function _str(str::T) where {T<:Union{Vector{UInt8}, BinaryStrings, String}}
     # handle zero length string quickly
     (siz = sizeof(str)) == 0 && return empty_ascii
-    pnt = _pnt(str)
-    len, flags, num4byte, num3byte, num2byte, latin1byte = unsafe_check_string(pnt, 1, siz)
-    if flags == 0
-        buf, out = _allocate(UInt8, len)
-        unsafe_copyto!(out, pnt, len)
-        Str(ASCIICSE, buf)
-    elseif num4byte != 0
-        Str(_UTF32CSE, _encode_utf32(pnt, len))
-    elseif num3byte + num2byte != 0
-        Str(_UCS2CSE, _encode_utf16(pnt, len))
-    else
-        Str(latin1byte == 0 ? ASCIICSE : _LatinCSE, _encode_ascii_latin(pnt, len))
+    @preserve str begin
+        pnt = _pnt(str)
+        len, flags, num4byte, num3byte, num2byte, latin1byte = unsafe_check_string(pnt, 1, siz)
+        if flags == 0
+            buf, out = _allocate(UInt8, len)
+            _memcpy(out, pnt, len)
+            Str(ASCIICSE, buf)
+        elseif num4byte != 0
+            Str(_UTF32CSE, _encode_utf32(pnt, len))
+        elseif num3byte + num2byte != 0
+            Str(_UCS2CSE, _encode_utf16(pnt, len))
+        else
+            Str(latin1byte == 0 ? ASCIICSE : _LatinCSE, _encode_ascii_latin(pnt, len))
+        end
     end
 end
 
@@ -106,23 +120,11 @@ function unsafe_str(str::T;
                             accept_long_char  = accept_long_char,
                             accept_invalids   = accept_invalids)
     if invalids != 0
-        if T == Vector{UInt8}
-            buf, out = _allocate(UInt8, siz)
-            unsafe_copyto!(out, 1, pnt, 1, siz)
-            Str(Text1CSE, buf)
-        else
-            Str(Text1CSE, _data(str))
-        end
+        safe_copy(T, Text1CSE, str)
     elseif flags == 0
         # Don't allow this to be aliased to a mutable Vector{UInt8}
-        if T == Vector{UInt8}
-            buf, out = _allocate(UInt8, siz)
-            unsafe_copyto!(out, 1, pnt, 1, siz)
-            Str(ASCIICSE, buf)
-        else
-            Str(ASCIICSE, _data(str))
-        end
-    elseif num4byte != 0
+        safe_copy(T, ASCIICSE, str)
+   elseif num4byte != 0
         Str(_UTF32CSE, _encode_utf32(pnt, len))
     elseif num2byte + num3byte != 0
         Str(_UCS2CSE, _encode_utf16(pnt, len))
@@ -148,7 +150,7 @@ function unsafe_str(str::T;
                             accept_long_char  = accept_long_char,
                             accept_invalids   = accept_invalids)
     if flags == 0
-        Str(ASCIICSE, unsafe_copyto!(_allocate(siz), 1, str, 1, siz))
+        Str(ASCIICSE, _cvtsize(UInt8, str, siz))
     elseif invalids
         if eltype(T) == Char
             buf, pnt = _allocate(UInt32, siz)

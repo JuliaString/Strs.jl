@@ -50,7 +50,7 @@ const V6_COMPAT = VERSION < v"0.7.0-DEV"
 # Convenience functions
 export to_ascii, utf8, utf16, utf32
 
-export str, unsafe_str, codepoints #, @str_str
+export str, unsafe_str, codepoints, @str_str, @prn_str
 
 export category_code, category_string, category_abbrev, is_mutable
 
@@ -72,10 +72,6 @@ export is_assigned, is_grapheme_break, is_grapheme_break!
 
 symstr(s...) = Symbol(string(s...))
 quotesym(s...) = Expr(:quote, symstr(s...))
-
-macro str_str(string)
-    :( unsafe_str($(esc(string))) )
-end
 
 using Base: @_inline_meta, @propagate_inbounds, @_propagate_inbounds_meta
 
@@ -209,6 +205,7 @@ include("legacy.jl")
 include("utf8case.jl")
 include("utf16case.jl")
 include("util.jl")
-include("io.jl") 
+include("io.jl")
+include("literals.jl")
 
 end # module Strs
