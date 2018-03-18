@@ -51,6 +51,23 @@ function _utf8_to_latin(pnt::Ptr{UInt8}, len)
     buf
 end
 
+function _latin_to_utf8(pnt::Ptr{UInt8}, len)
+    buf, out = _allocate(UInt8, len)
+    fin = out + len
+    while out < fin
+        ch = get_codeunit(pnt)
+        pnt += 1
+        if ch > 0x7f
+            set_codeunit!(out, 0xc0 | (ch >>> 6))
+            ch = 0x80 | (ch & 0x3f)
+            out += 1
+        end
+        set_codeunit!(out, ch)
+        out += 1
+    end
+    buf
+end
+
 function convert(::Type{LatinStr}, str::String)
     # handle zero length string quickly
     is_empty(str) && return empty_latin

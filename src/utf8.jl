@@ -104,21 +104,25 @@ end
 
 function _length(::CodeUnitMulti, str::Str{UTF8CSE})
     (siz = sizeof(str)) < 2 && return siz
-    pnt, fin = _calcpnt(str, siz)
-    cnt = siz
-    while (pnt += CHUNKSZ) <= fin
-        cnt -= _count_cont(unsafe_load(pnt))
+    @preserve str begin
+        pnt, fin = _calcpnt(str, siz)
+        cnt = siz
+        while (pnt += CHUNKSZ) <= fin
+            cnt -= _count_cont(unsafe_load(pnt))
+        end
+        pnt - CHUNKSZ == fin ? cnt : (cnt - _count_cont(unsafe_load(pnt) & _mask_bytes(siz)))
     end
-    pnt - CHUNKSZ == fin ? cnt : (cnt - _count_cont(unsafe_load(pnt) & _mask_bytes(siz)))
 end
 
 function is_ascii(str::Str{<:Union{UTF8CSE, LatinCSE, Binary_CSEs}})
     (siz = sizeof(str)) == 0 && return true
-    pnt, fin = _calcpnt(str, siz)
-    while (pnt += CHUNKSZ) <= fin
-        (unsafe_load(pnt) & hi_mask) == 0 || return false
+    @preserve str begin
+        pnt, fin = _calcpnt(str, siz)
+        while (pnt += CHUNKSZ) <= fin
+            (unsafe_load(pnt) & hi_mask) == 0 || return false
+        end
+        pnt - CHUNKSZ == fin || ((unsafe_load(pnt) & _mask_bytes(siz)) & hi_mask == 0)
     end
-    pnt - CHUNKSZ == fin || ((unsafe_load(pnt) & _mask_bytes(siz)) & hi_mask == 0)
 end
 
 _ascii_mask(::Type{UInt8})  = hi_mask
@@ -130,25 +134,27 @@ _latin_mask(::Type{UInt32}) = 0xffffff00_ffffff00
 
 function is_ascii(vec::Vector{T}) where {T<:CodeUnitTypes}
     (siz = sizeof(vec)) == 0 && return true
-    pnt = pointer(vec)
-    fin = pnt + siz
-    # Check first code units
-    while (reinterpret(UInt, pnt) & 3) != 0
-        unsafe_load(pnt) > 0x7f && return false
-        (pnt += sizeof(T)) < fin || return true
-    end
-    if (fin -= CHUNKSZ) - pnt >= 0
-        qpnt = reinterpret(Ptr{UInt64}, pnt)
-        while true
-            (unsafe_load(qpnt) & _ascii_mask(T)) == 0 || return false
-            (qpnt += CHUNKSZ) <= fin || break
+    @preserve vec begin
+        pnt = pointer(vec)
+        fin = pnt + siz
+        # Check first code units
+        while (reinterpret(UInt, pnt) & 3) != 0
+            unsafe_load(pnt) > 0x7f && return false
+            (pnt += sizeof(T)) < fin || return true
         end
-        qpnt - CHUNKSZ == fin && return true
-        pnt = reinterpret(Ptr{T}, qpnt)
-    end
-    while pnt < fin
-        unsafe_load(pnt) > 0x7f && return false
-        pnt += sizeof(T)
+        if (fin -= CHUNKSZ) - pnt >= 0
+            qpnt = reinterpret(Ptr{UInt64}, pnt)
+            while true
+                (unsafe_load(qpnt) & _ascii_mask(T)) == 0 || return false
+                (qpnt += CHUNKSZ) <= fin || break
+            end
+            qpnt - CHUNKSZ == fin && return true
+            pnt = reinterpret(Ptr{T}, qpnt)
+        end
+        while pnt < fin
+            unsafe_load(pnt) > 0x7f && return false
+            pnt += sizeof(T)
+        end
     end
     true
 end
@@ -159,11 +165,13 @@ _all_latin(val) = ((val & (val<<1) & (val<<2 | (val<<3) | (val<<4) | (val<<5))) 
 
 function is_latin(str::Str{<:Union{UTF8CSE, Binary_CSEs}})
     (siz = sizeof(str)) == 0 && return true
-    pnt, fin = _calcpnt(str, siz)
-    while (pnt += CHUNKSZ) <= fin
-        _all_latin(unsafe_load(pnt)) || return false
+    @preserve str begin
+        pnt, fin = _calcpnt(str, siz)
+        while (pnt += CHUNKSZ) <= fin
+            _all_latin(unsafe_load(pnt)) || return false
+        end
+        pnt - CHUNKSZ == fin || _all_latin(unsafe_load(pnt) & _mask_bytes(siz))
     end
-    pnt - CHUNKSZ == fin || _all_latin(unsafe_load(pnt) & _mask_bytes(siz))
 end
 
 # All 4 top bits must be 1 (i.e. 0xfx) for this to be non-BMP
@@ -171,11 +179,13 @@ _all_bmp(val) = ((val | (val<<1) | (val<<2) | (val<<3)) & hi_mask) == 0
 
 function is_bmp(str::Str{UTF8CSE})
     (siz = sizeof(str)) == 0 && return true
-    pnt, fin = _calcpnt(str, siz)
-    while (pnt += CHUNKSZ) <= fin
-        _all_bmp(unsafe_load(pnt)) || return false
+    @preserve str begin
+        pnt, fin = _calcpnt(str, siz)
+        while (pnt += CHUNKSZ) <= fin
+            _all_bmp(unsafe_load(pnt)) || return false
+        end
+        pnt - CHUNKSZ == fin && _all_bmp(unsafe_load(pnt) & _mask_bytes(siz))
     end
-    pnt - CHUNKSZ == fin && _all_bmp(unsafe_load(pnt) & _mask_bytes(siz))
 end
 
 is_unicode(str::Str{UTF8CSE}) = true
@@ -197,17 +207,18 @@ end
 @propagate_inbounds function _next(::CodeUnitMulti, T, str::Str{UTF8CSE}, pos::Integer)
     len = _len(str)
     @boundscheck 0 < pos <= len || boundserr(str, pos)
-    pnt = _pnt(str) + pos - 1
-    ch = get_codeunit(pnt)
-    if ch < 0x80
-        T(ch), pos + 1
-    # elseif ch < 0xc0 # This means an incorrect position was passed, next documents won't happen
-    elseif ch < 0xe0
-        T(get_utf8_2byte(pnt + 1, ch)), pos + 2
-    elseif ch < 0xf0
-        T(get_utf8_3byte(pnt + 2, ch)), pos + 3
-    else
-        T(get_utf8_4byte(pnt + 3, ch)), pos + 4
+    @preserve str begin
+        pnt = _pnt(str) + pos - 1
+        ch = get_codeunit(pnt)
+        if ch < 0x80
+            T(ch), pos + 1
+        elseif ch < 0xe0
+            T(get_utf8_2byte(pnt + 1, ch)), pos + 2
+        elseif ch < 0xf0
+            T(get_utf8_3byte(pnt + 2, ch)), pos + 3
+        else
+            T(get_utf8_4byte(pnt + 3, ch)), pos + 4
+        end
     end
 end
 
@@ -228,8 +239,10 @@ end
 @inline checkcont(pnt) = is_valid_continuation(get_codeunit(pnt))
 
 function _reverseind(::CodeUnitMulti, str::Str{UTF8CSE}, pos::Integer)
-    pnt = _pnt(str) + _len(str) + 1 - pos
-    pos - (checkcont(pnt) ? (checkcont(pnt - 1) ? (checkcont(pnt - 2) ? 3 : 2) : 1) : 0)
+    @preserve str begin
+        pnt = _pnt(str) + _len(str) + 1 - pos
+        pos - (checkcont(pnt) ? (checkcont(pnt - 1) ? (checkcont(pnt - 2) ? 3 : 2) : 1) : 0)
+    end
 end
 
 ## overload methods for efficiency ##
@@ -252,27 +265,33 @@ end
     pos == 0 && return 1
     numcu = _len(str)
     @boundscheck 1 <= pos <= numcu || boundserr(str, pos)
-    pnt = _pnt(str) + pos - 1
-    cu = get_codeunit(pnt)
-    pos + (cu < 0x80 ? 1
-           : (cu < 0xc0
-              ? (pos == numcu
-                ? 1 : (checkcont(pnt + 1) ? (2 + (pos < numcu - 1 && checkcont(pnt + 2))) : 1))
-              : ifelse(cu < 0xe0, 2, ifelse(cu < 0xf0, 3, 4))))
+    @preserve str begin
+        pnt = _pnt(str) + pos - 1
+        cu = get_codeunit(pnt)
+        pos + (cu < 0x80 ? 1
+               : (cu < 0xc0
+                  ? (pos == numcu ? 1
+                     : (checkcont(pnt + 1) ? (2 + (pos < numcu - 1 && checkcont(pnt + 2))) : 1))
+                  : ifelse(cu < 0xe0, 2, ifelse(cu < 0xf0, 3, 4))))
+    end
 end
 
 @propagate_inbounds function _prevind(T::CodeUnitMulti, str::Str{UTF8CSE}, pos::Integer)
     pos == 1 && return 0
-    numcu, pnt = _lenpnt(str)
-    pos == numcu + 1 && @inbounds return _thisind(T, str, numcu, pnt, numcu)
-    @boundscheck 1 < pos <= (numcu + 1) || boundserr(str, pos)
-    pnt += pos - 1
-    if checkcont(pnt)
-        pos - (checkcont(pnt - 1) ? (checkcont(pnt - 2) ? 3 : 2) : 1)
-    elseif pos == 2
-        1
-    else
-        pos - (checkcont(pnt - 1) ? (checkcont(pnt - 2) ? (checkcont(pnt - 3) ? 4 : 3) : 2) : 1)
+    @preserve str begin
+        numcu, pnt = _lenpnt(str)
+        pos == numcu + 1 && @inbounds return _thisind(T, str, numcu, pnt, numcu)
+        @boundscheck 1 < pos <= (numcu + 1) || boundserr(str, pos)
+        pnt += pos - 1
+        if checkcont(pnt)
+            pos - (checkcont(pnt - 1) ? (checkcont(pnt - 2) ? 3 : 2) : 1)
+        elseif pos == 2
+            1
+        else
+            pos - (checkcont(pnt - 1)
+                   ? (checkcont(pnt - 2) ? (checkcont(pnt - 3) ? 4 : 3) : 2)
+                   : 1)
+        end
     end
 end
 
@@ -281,14 +300,16 @@ end
     beg = first(rng)
     len = _len(str)
     @boundscheck 1 <= beg <= len || boundserr(str, beg)
-    pnt = _pnt(str)
-    ch = get_codeunit(pnt, beg)
-    is_valid_continuation(ch) && unierror(UTF_ERR_INVALID_INDEX, beg, ch)
-    lst = last(rng)
-    @boundscheck lst > len && boundserr(str, lst)
-    if lst != len
-        ch = get_codeunit(pnt, lst)
-        is_valid_continuation(ch) && unierror(UTF_ERR_INVALID_INDEX, lst, ch)
+    @preserve str begin
+        pnt = _pnt(str)
+        ch = get_codeunit(pnt, beg)
+        is_valid_continuation(ch) && unierror(UTF_ERR_INVALID_INDEX, beg, ch)
+        lst = last(rng)
+        @boundscheck lst > len && boundserr(str, lst)
+        if lst != len
+            ch = get_codeunit(pnt, lst)
+            is_valid_continuation(ch) && unierror(UTF_ERR_INVALID_INDEX, lst, ch)
+        end
     end
     SubString(str, beg, lst)
 end
@@ -413,7 +434,7 @@ function convert(::Type{UTF8Str}, str::String)
     # Copy, but eliminate over-long encodings and surrogate pairs
     # Speed this up if no surrogates, long encodings
     Str(UTF8CSE,
-        ((flags & (UTF_LONG | UTF_SURROGATE)) == 0
+        (flags & (UTF_LONG | UTF_SURROGATE) == 0
          ? str
          : _transcode_utf8(_pnt(str), len + latinbyte + num2byte + num3byte*2 + num4byte*3)))
 end
@@ -446,13 +467,13 @@ const WideCodeUnit = Union{UInt16, UInt32}
         pnt + 1
     # Handle 0x80-0x7ff
     elseif ch < 0x800
-        pnt = output_utf8_2byte!(pnt, ch)
+        output_utf8_2byte!(pnt, ch)
     # Handle 0x10000-0x10ffff
     elseif ch > 0xffff # this is only for T == UInt32, should not be generated for UInt16
-        pnt = output_utf8_4byte!(pnt, ch)
+        output_utf8_4byte!(pnt, ch)
     # Handle 0x800-0xd7ff, 0xe000-0xffff UCS-2 characters
     else
-        pnt = output_utf8_3byte!(pnt, ch)
+        output_utf8_3byte!(pnt, ch)
     end
 end
 

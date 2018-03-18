@@ -459,6 +459,20 @@ end
 count_chars(T, dat, len) = count_chars(T, codeunit(T), dat, 1, len)
 
 """
+Calculate the total number of bytes > 0x7f
+"""
+function count_latin(len, pnt::Ptr{UInt8})
+    # Todo: optimize this to work on chunks when pnt is aligned
+    cnt = 0
+    fin = pnt + len
+    while pnt < fin
+        cnt += (get_codeunit(pnt) > 0x7f)
+        pnt += 1
+    end
+    cnt
+end
+
+"""
 Validates and calculates number of characters in a UTF-8,UTF-16 or UTF-32 encoded vector/string
 
 This function checks the bounds of the start and end positions
