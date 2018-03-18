@@ -344,8 +344,10 @@ _len(s::QuadStr) = sizeof(s) >>> 2
 
 @inline _mask_bytes(n) = (1%UInt << ((n & (CHUNKSZ - 1)) << 3)) - 0x1
 
-Base.need_full_hex(c::CodePoint) = isxdigit(c)
+Base.need_full_hex(c::CodePoint) = is_hex_digit(c)
 Base.escape_nul(c::CodePoint) = ('0' <= c <= '7') ? "\\x00" : "\\0"
+
+# Support for SubString of Str
 
 Base.SubString(str::Str{C}) where {C<:SubSet_CSEs} =
     SubString(Str(basecse(C), str))
@@ -353,5 +355,14 @@ Base.SubString(str::Str{C}, off::Int) where {C<:SubSet_CSEs} =
     SubString(Str(basecse(C), str), off)
 Base.SubString(str::Str{C}, off::Int, fin::Int) where {C<:SubSet_CSEs} =
     SubString(Str(basecse(C), str), off, fin)
+
+# Todo: clean these up, avoid so many definitions
+_pnt(s::SubString{<:ByteStr}) = pointer(s)
+_pnt(s::SubString{<:WordStr}) = reinterpret(Ptr{UInt16}, pointer(s))
+_pnt(s::SubString{<:QuadStr}) = reinterpret(Ptr{UInt32}, pointer(s))
+
+_len(s::SubString{<:ByteStr}) = sizeof(s)
+_len(s::SubString{<:WordStr}) = sizeof(s) >>> 1
+_len(s::SubString{<:QuadStr}) = sizeof(s) >>> 2
 
 @static V6_COMPAT && (sizeof(s::SubString{<:Str}) = s.endof == 0 ? 0 : nextind(s, s.endof) - 1)

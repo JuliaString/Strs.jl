@@ -75,11 +75,11 @@ quotesym(s...) = Expr(:quote, symstr(s...))
 
 using Base: @_inline_meta, @propagate_inbounds, @_propagate_inbounds_meta
 
-import Base: containsnul, convert, getindex, length, map, pointer, collect, in,
+import Base: containsnul, convert, getindex, length, map, pointer, collect, in, hash,
              reverse, sizeof, string, unsafe_convert, unsafe_load, write,
              start, next, done, nextind, prevind, reverseind,
-             typemin, typemax, rem, size, ndims, first, last, eltype,
-             isless, ==, -, +, *, ^, cmp, promote_rule, one, repeat, filter,
+             typemin, typemax, rem, size, ndims, first, last, eltype, crc32c,
+             isless, isequal, ==, -, +, *, ^, cmp, promote_rule, one, repeat, filter,
              print, show, isimmutable, chop, chomp, replace, ascii, uppercase, lowercase,
              lstrip, rstrip, strip, lpad, rpad, split, rsplit
 
@@ -207,5 +207,6 @@ include("utf16case.jl")
 include("util.jl")
 include("io.jl")
 include("literals.jl")
+include("hash.jl")
 
 end # module Strs

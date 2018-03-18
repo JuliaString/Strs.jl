@@ -800,7 +800,7 @@ end
 function runcheckline(::Type{T}, lines, list) where {T}
     totresults = []
     for fun in list
-        push!(totresults, checkline(T, fun, lines))
+        push!(totresults, checkline(T === Integer ? typeof(fun(lines[1])) : T, fun, lines))
     end
     totresults
 end
@@ -942,7 +942,7 @@ function comparetestcu(lines, results, list, displist)
 end
 
 const testlist =
-    (((length, text_width), "length, text_width"),
+    (((length, text_width, hash), "length, text_width, hash"),
      ((is_ascii, is_valid), "is_ascii, is_valid"),
      ((lowercase, uppercase, reverse), "lowercase, uppercase, reverse"),
      ((is_ascii, is_valid, is_control, is_lowercase, is_uppercase, is_alpha,
@@ -978,7 +978,7 @@ function checktests(io = _stdout(); dir::Any=nothing)
         MT != UTF32Str && push!(list, MT)
         isdefined(Main, :UTF8String) && push!(list, UTF8String, UTF16String, UTF32String)
         enc = encode_lines(list, lines)
-        res = (runcheckline(Int, lines, testlist[1][1]),
+        res = (runcheckline(Integer, lines, testlist[1][1]),
                runcheckline(Bool, lines, testlist[2][1]),
                runcheckline(Any, lines, testlist[3][1]),
                runcheckchar(lines, testlist[4][1]),
