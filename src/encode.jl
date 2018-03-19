@@ -5,13 +5,10 @@ Copyright 2017 Gandalf Software, Inc., Scott P. Jones
 Licensed under MIT License, see LICENSE.md
 =#
 
-function _encode_ascii_latin(dat, len)
+function _encode_ascii_latin(str, len)
     buf, out = _allocate(UInt8, len)
-    fin = out + len
-    pos = 0
-    @inbounds while out < fin
-        ch8 = dat[pos += 1]
-        set_codeunit!(out, (ch8 <= 0x7f ? ch8 : (((ch8 & 3) << 6) | (dat[pos += 1] & 0x3f))))
+    @inbounds for ch in str
+        set_codeunit!(out, ch%UInt8)
         out += 1
     end
     buf
@@ -41,6 +38,21 @@ end
 
 @inline safe_copy(::Type{<:Str}, ::Type{C}, str) where {C<:CSE} = Str(C, str.data)
 @inline safe_copy(::Type{String}, ::Type{C}, str) where {C<:CSE} = Str(C, _data(str))
+
+function _str(str::AbstractString)
+    # handle zero length string quickly
+    isempty(str) && return empty_ascii
+    len, flags, num4byte, num3byte, num2byte, latin1byte = unsafe_check_string(str)
+    if flags == 0
+        Str(ASCIICSE, _encode_ascii_latin(str, len))
+    elseif num4byte != 0
+        Str(_UTF32CSE, _encode_utf32(str, len))
+    elseif num3byte + num2byte != 0
+        Str(_UCS2CSE, _encode_utf16(str, len))
+    else
+        Str(latin1byte == 0 ? ASCIICSE : _LatinCSE, _encode_ascii_latin(str, len))
+    end
+end
 
 function _str(str::T) where {T<:Union{Vector{UInt8}, BinaryStrings, String}}
     # handle zero length string quickly
@@ -104,12 +116,12 @@ function convert(::Type{UniStr}, str::T) where {T<:Str}
 end
 
 """Convert to a UniStr if valid Unicode, otherwise return a Text1Str"""
-function unsafe_str(str::T;
+function unsafe_str(str::Union{Vector{UInt8}, T, SubString{T}};
                     accept_long_null  = false,
                     accept_surrogates = false,
                     accept_long_char  = false,
                     accept_invalids   = true
-                    ) where {T <: Union{Vector{UInt8}, BinaryStr, Text1Str, String}}
+                    ) where {T <: Union{BinaryStr, Text1Str, String}}
     # handle zero length string quickly
     (siz = sizeof(str)) == 0 && return empty_ascii
     pnt = _pnt(str)
@@ -133,39 +145,35 @@ function unsafe_str(str::T;
     end
 end
 
-"""Convert to a UniStr if valid Unicode, otherwise return a Text2Str"""
+"""Convert to a UniStr if valid Unicode, otherwise return a Text1Str/Text2Str/Text4Str"""
 function unsafe_str(str::T;
                     accept_long_null  = false,
                     accept_surrogates = false,
                     accept_long_char  = false,
                     accept_invalids   = true
-                    ) where {T<:Union{AbstractString,AbstractVector{<:Union{Char,UInt16,UInt32}}}}
-    siz = length(str)
+                    ) where {T<:Union{AbstractString,SubString{<:AbstractString},
+                                      AbstractVector{<:Union{AbsChar,CodeUnitTypes}}}}
     # handle zero length string quickly
-    siz == 0 && return empty_ascii
+    is_empty(str) && return empty_ascii
     len, flags, num4byte, num3byte, num2byte, latin1, invalids =
-        unsafe_check_string(str, 1, siz;
+        unsafe_check_string(str;
                             accept_long_null  = accept_long_null,
                             accept_surrogates = accept_surrogates,
                             accept_long_char  = accept_long_char,
                             accept_invalids   = accept_invalids)
     if flags == 0
-        Str(ASCIICSE, _cvtsize(UInt8, str, siz))
+        Str(ASCIICSE, _cvtsize(UInt8, str, len))
     elseif invalids
-        if eltype(T) == Char
-            buf, pnt = _allocate(UInt32, siz)
-            @inbounds for (i, ch) in enumerate(str)
-                set_codeunit!(pnt, i, UInt32(ch))
-            end
-            Str(Text4CSE, buf)
-        else
-            buf, pnt = _allocate(eltype(T), siz)
-            @inbounds for ch in str
-                set_codeunit!(pnt, ch)
-                pnt += sizeof(T)
-            end
-            Str(T == UInt32 ? Text4CSE : Text2CSE, buf)
+        # Todo: Make sure this handles different sorts of SubStrings effectively
+        siz = sizeof(eltype(T))
+        C = siz == 4 ? Text4CSE : (siz == 2 ? Text2CSE : Text1CSE)
+        S = codeunit(C)
+        buf, pnt = _allocate(S, len)
+        @inbounds for ch in str
+            set_codeunit!(pnt, ch%S)
+            pnt += siz
         end
+        Str(C, buf)
     elseif num4byte != 0
         Str(_UTF32CSE, _encode_utf32(str, len))
     elseif num2byte + num3byte != 0
