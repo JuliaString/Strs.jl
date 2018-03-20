@@ -330,19 +330,21 @@ end
 
 _occurs_in(needle, hay) = first(find(Fwd, needle, hay)) != 0
 
-occurs_in(needle::AbstractString, hay::Str)       = _occurs_in(needle, hay)
-occurs_in(needle::Str, hay::AbstractString)       = _occurs_in(needle, hay)
-occurs_in(needle::Str, hay::Str)                  = _occurs_in(needle, hay)
-occurs_in(needle::Char, hay::Str)                 = _occurs_in(needle, hay)
-occurs_in(needle::Regex, hay::Str)                = _occurs_in(needle, hay)
-occurs_in(needle::CodePoint, hay::AbstractString) = _occurs_in(needle, hay)
-
 @static if V6_COMPAT
     Base.contains(hay::AbstractString, str::Str)     = _occurs_in(str, hay)
     Base.contains(hay::Str, str::AbstractString)     = _occurs_in(str, hay)
     Base.contains(hay::Str, str::Str)                = _occurs_in(str, hay)
     Base.contains(hay::AbstractString, chr::AbsChar) = _occurs_in(chr, hay)
     Base.contains(hay::AbstractString, pat::Regex)   = _occurs_in(pat, hay)
+    const occurs_in = _occurs_in
+else
+    # Avoid type piracy
+    occurs_in(needle::AbstractString, hay::Str)       = _occurs_in(needle, hay)
+    occurs_in(needle::Str, hay::AbstractString)       = _occurs_in(needle, hay)
+    occurs_in(needle::Str, hay::Str)                  = _occurs_in(needle, hay)
+    occurs_in(needle::Char, hay::Str)                 = _occurs_in(needle, hay)
+    occurs_in(needle::Regex, hay::Str)                = _occurs_in(needle, hay)
+    occurs_in(needle::CodePoint, hay::AbstractString) = _occurs_in(needle, hay)
 end
 
 in(chr::CodePoint, str::AbstractString) = _occurs_in(chr, str)
