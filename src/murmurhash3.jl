@@ -14,16 +14,6 @@ rotl(x::Unsigned, r) = (x << r) | (x >>> (sizeof(typeof(x))*8 - r))
 #-----------------------------------------------------------------------------
 # Finalization mix - force all bits of a hash block to avalanche
 
-function fmix(h::UInt32)
-    h = xor(h, h >>> 16)
-    h *= 0x85ebca6b
-    h = xor(h, h >>> 13)
-    h *= 0xc2b2ae35
-    xor(h, h >>> 16)
-end
-
-#----------
-
 function fmix(k::UInt64)
     k = xor(k, k >> 33)
     k *= 0xff51afd7ed558ccd
@@ -38,6 +28,9 @@ end
 
 mask_load(pnt, left) = unsafe_load(pnt) & ((1%UInt64 << ((left & 7) << 3)) - 0x1)
 
+const c1 = 0x87c37b91114253d5
+const c2 = 0x4cf5ad432745937f
+
 #-----------------------------------------------------------------------------
 
 function murmurhash128(len, pnt, seed::UInt32)
@@ -45,9 +38,6 @@ function murmurhash128(len, pnt, seed::UInt32)
 
     h1 = seed%UInt64
     h2 = seed%UInt64
-
-    c1 = 0x87c37b91114253d5
-    c2 = 0x4cf5ad432745937f
 
     #----------
     # body
