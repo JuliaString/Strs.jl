@@ -315,10 +315,10 @@ end
                 test3ch(Fwd, C, str, zip(('(',), (2,), (5,)))
                 test3ch(Rev, C, str, zip(('(',), (2,), (1,)))
             end
-            @testset "contains with a String and Char needle" begin
+            @testset "occurs_in with a String and Char needle" begin
                 str = T("foo")
-                @test contains(str, P("o"))
-                @test contains(str, cvtchar(C, 'o'))
+                @test occurs_in(P("o"), str)
+                @test occurs_in(cvtchar(C, 'o'), str)
             end
         end
     end

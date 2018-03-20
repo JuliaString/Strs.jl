@@ -84,9 +84,9 @@ import Base: containsnul, convert, getindex, length, map, pointer, collect, in, 
              lstrip, rstrip, strip, lpad, rpad, split, rsplit
 
 # Conditionally import names that are only in v0.6 or in master
-for sym in (:ind2chr, :chr2ind, :contains,
+for sym in (:ind2chr, :chr2ind,
             :codeunit, :codeunits, :ncodeunits,
-            :thisind, :firstindex, :lastindex, :isfound, :codepoint, :Fix2)
+            :thisind, :firstindex, :lastindex, :codepoint, :Fix2)
     if isdefined(Base, sym)
         @eval import Base: $sym
     else
@@ -99,6 +99,7 @@ end
 for (oldname, newname) in ((:textwidth,      :text_width),
                            (:lowercasefirst, :lowercase_first),
                            (:uppercasefirst, :uppercase_first),
+                           (:occursin,       :occurs_in),
                            (:startswith,     :starts_with),
                            (:endswith,       :ends_with))
     if isdefined(Base, oldname)

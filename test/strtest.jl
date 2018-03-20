@@ -174,7 +174,7 @@ function showchanges(m::Module, symtab, fun)
         push!(juliaval[val], fun(k))
     end
     for k in tab
-        contains(k, "{") && continue
+        occurs_in('{', k) && continue
         val = lookupname(def, k)
         haskey(tabval, val) || (tabval[val] = Set{String}())
         push!(tabval[val], k)

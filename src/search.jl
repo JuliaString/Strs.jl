@@ -328,23 +328,25 @@ function find(::Type{D}, needle::AbstractString, str::AbstractString,
     _srch_strings(D(), cmp, str, needle, ch, nxt, pos, slen, tlen)
 end
 
-@static if V6_COMPAT
-    contains(hay::AbstractString, chr::AbsChar)    = first(find(Fwd, chr, hay)) != 0
-    contains(hay::AbstractString, pat::Regex)      = first(find(Fwd, pat, hay)) != 0
-    contains(hay::AbstractString, pat::Regex, pos) = first(find(Fwd, pat, hay, pos)) != 0
-else
-    # Avoid type piracy
-    contains(hay::Str, chr::Char)                  = first(find(Fwd, chr, hay)) != 0
-    contains(hay::Str, pat::Regex)                 = first(find(Fwd, pat, hay)) != 0
-    contains(hay::Str, pat::Regex, pos)            = first(find(Fwd, pat, hay, pos)) != 0
-    contains(hay::AbstractString, chr::CodePoint)  = first(find(Fwd, chr, hay)) != 0
-end
-contains(hay::Str, str::Str)            = first(find(Fwd, str, hay)) != 0
-contains(hay::Str, str::AbstractString) = first(find(Fwd, str, hay)) != 0
-contains(hay::AbstractString, str::Str) = first(find(Fwd, str, hay)) != 0
+_occurs_in(needle, hay) = first(find(Fwd, needle, hay)) != 0
 
-in(chr::CodePoint, str::AbstractString) = contains(str, chr)
-in(chr::AbsChar,   str::Str)            = contains(str, chr)
-in(pat::Str, str::Str)                  = contains(str, pat)
-in(pat::Str, str::AbstractString)       = contains(str, pat)
-in(pat::AbstractString, str::Str)       = contains(str, pat)
+occurs_in(needle::AbstractString, hay::Str)       = _occurs_in(needle, hay)
+occurs_in(needle::Str, hay::AbstractString)       = _occurs_in(needle, hay)
+occurs_in(needle::Str, hay::Str)                  = _occurs_in(needle, hay)
+occurs_in(needle::Char, hay::Str)                 = _occurs_in(needle, hay)
+occurs_in(needle::Regex, hay::Str)                = _occurs_in(needle, hay)
+occurs_in(needle::CodePoint, hay::AbstractString) = _occurs_in(needle, hay)
+
+@static if V6_COMPAT
+    Base.contains(hay::AbstractString, str::Str)     = _occurs_in(str, hay)
+    Base.contains(hay::Str, str::AbstractString)     = _occurs_in(str, hay)
+    Base.contains(hay::Str, str::Str)                = _occurs_in(str, hay)
+    Base.contains(hay::AbstractString, chr::AbsChar) = _occurs_in(chr, hay)
+    Base.contains(hay::AbstractString, pat::Regex)   = _occurs_in(pat, hay)
+end
+
+in(chr::CodePoint, str::AbstractString) = _occurs_in(chr, str)
+in(chr::AbsChar,   str::Str)            = _occurs_in(chr, str)
+in(pat::Str, str::AbstractString)       = _occurs_in(pat, str)
+in(pat::AbstractString, str::Str)       = _occurs_in(pat, str)
+in(pat::Str, str::Str)                  = _occurs_in(pat, str)
