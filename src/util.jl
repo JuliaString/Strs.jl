@@ -143,7 +143,7 @@ rsplit(str::T, splitter; limit::Integer=0, keep::Bool=true) where {T<:Str} =
 rsplit(str::T, splitter::Union{Tuple{Vararg{<:AbstractChar}},
                                AbstractVector{<:AbstractChar},Set{<:AbstractChar}};
        limit::Integer=0, keep::Bool=true) where {T<:Str} =
-  _rsplit(str, occursin(splitter), limit, keep, T <: SubString ? T[] : SubString{T}[])
+  _rsplit(str, occurs_in(splitter), limit, keep, T <: SubString ? T[] : SubString{T}[])
 rsplit(str::T, splitter::AbstractChar;
        limit::Integer=0, keep::Bool=true) where {T<:Str} =
   _rsplit(str, ==(splitter), limit, keep, T <: SubString ? T[] : SubString{T}[])

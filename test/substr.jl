@@ -268,8 +268,8 @@ function teststr(T)
     end
 
     # issue #5870
-    V6_COMPAT || @test !contains(SubString(T(""),1,0), Regex(T("aa")))
-    V6_COMPAT || @test contains(SubString(T(""),1,0), Regex(T("")))
+    V6_COMPAT || @test !occurs_in(Regex(T("aa")), SubString(T(""),1,0))
+    V6_COMPAT || @test occurs_in(Regex(T("")), SubString(T(""),1,0))
 
     # isvalid, length, prevind, nextind for SubString{String}
     let s = T("lorem ipsum"),

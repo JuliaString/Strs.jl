@@ -73,9 +73,9 @@ function filter_lines(lines)
     # Eliminate initial lines, empty lines, trailing lines
     checkbeg = true
     for l in lines
-        if sizeof(l) > 41 && startswith(l, "***") && endswith(l, "***") &&
-            contains(l, " PROJECT GUTENBERG EBOOK") &&
-            contains(l, checkbeg ? "START OF TH" : "END OF TH")
+        if sizeof(l) > 41 && starts_with(l, "***") && ends_with(l, "***") &&
+            occurs_in(" PROJECT GUTENBERG EBOOK", l) &&
+            occurs_in(checkbeg ? "START OF TH" : "END OF TH", l)
             checkbeg || break # Found "end of"
             checkbeg = false
         else

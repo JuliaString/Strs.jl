@@ -52,7 +52,7 @@ target = """71.163.72.113 - - [30/Jul/2014:16:40:55 -0700] "GET emptymind.org/th
         end
 
         # see #10994, #11447: PCRE2 allows NUL chars in the pattern
-        @test contains(T("a\0b"), Regex(T("^a\0b\$")))
+        @test occurs_in(Regex(T("^a\0b\$")), T("a\0b"))
 
         # regex match / search string must be a String
         @test_throws ArgumentError match(r"test", GenericString("this is a test"))
