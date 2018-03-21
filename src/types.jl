@@ -238,6 +238,7 @@ end
 const Binary_CSEs   = Union{Text1CSE, BinaryCSE}
 const Raw_CSEs      = Union{Text1CSE, Text2CSE, Text4CSE}
 const Latin_CSEs    = Union{LatinCSE, _LatinCSE}
+const UTF8_CSEs     = Union{UTF8CSE,  UniPlusCSE}
 const UCS2_CSEs     = Union{UCS2CSE,  _UCS2CSE}
 const UTF32_CSEs    = Union{UTF32CSE, _UTF32CSE}
 const Unicode_CSEs  = Union{UTF8CSE, UTF16CSE, UTF32_CSEs}

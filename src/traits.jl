@@ -54,7 +54,7 @@ struct CodeUnitSingle <: CodePointStyle end
 struct CodeUnitMulti  <: CodePointStyle end
 
 CodePointStyle(::Type{<:CSE}) = CodeUnitSingle()
-CodePointStyle(::Type{<:Union{UTF8CSE,UTF16CSE}}) = CodeUnitMulti()
+CodePointStyle(::Type{<:Union{UTF8_CSEs,UTF16CSE}}) = CodeUnitMulti()
 
 CodePointStyle(::Type{T}) where {T<:AbstractString} = CodePointStyle(cse(T))
 
@@ -272,14 +272,14 @@ CompareStyle(::Type{UTF16CSE},    ::Type{UTF16CSE})    = UTF16Compare()
 CompareStyle(::Type{UTF16CSE},    ::Type{<:UCS2_CSEs}) = UTF16Compare()
 CompareStyle(::Type{<:UCS2_CSEs}, ::Type{UTF16CSE})    = UTF16Compare()
 
-CompareStyle(::Type{ASCIICSE}, ::Type{<:Union{Binary_CSEs,Latin_CSEs,UTF8CSE}}) =
+CompareStyle(::Type{ASCIICSE}, ::Type{<:Union{Binary_CSEs,Latin_CSEs,UTF8_CSEs}}) =
     ByteCompare()
 CompareStyle(::Type{ASCIICSE}, ::Type{<:Union{Word_CSEs,Quad_CSEs}}) =
     WidenCompare()
 
 CompareStyle(::Type{<:Latin_CSEs}, ::Type{<:Latin_CSEs}) =
     ByteCompare()
-CompareStyle(::Type{<:Latin_CSEs}, ::Type{UTF8CSE}) =
+CompareStyle(::Type{<:Latin_CSEs}, ::Type{UTF8_CSEs}) =
     ASCIICompare()
 CompareStyle(::Type{<:Latin_CSEs}, ::Type{<:Union{Word_CSEs,Quad_CSEs}}) =
     WidenCompare()
@@ -331,7 +331,7 @@ CanContain(::Type{<:Binary_CSEs}, ::Type{<:WordQuad_CSEs}) =
 
 CanContain(::Type{ASCIICSE}, ::Type{<:SubSet_CSEs}) =
     NoCompare()
-CanContain(::Type{ASCIICSE}, ::Type{<:Union{Binary_CSEs, LatinCSE, UTF8CSE}}) =
+CanContain(::Type{ASCIICSE}, ::Type{<:Union{Binary_CSEs, LatinCSE, UTF8_CSEs}}) =
     ByteCompare()
 CanContain(::Type{ASCIICSE}, ::Type{<:WordQuad_CSEs}) =
     WidenCompare()
@@ -340,14 +340,14 @@ CanContain(::Type{<:Latin_CSEs}, ::Type{<:Union{_UCS2CSE,_UTF32CSE}}) =
     NoCompare()
 CanContain(::Type{<:Latin_CSEs}, ::Type{<:Union{Binary_CSEs,ASCIICSE,Latin_CSEs}}) =
     ByteCompare()
-CanContain(::Type{<:Latin_CSEs}, ::Type{UTF8CSE}) =
+CanContain(::Type{<:Latin_CSEs}, ::Type{<:UTF8_CSEs}) =
     ASCIICompare()
 CanContain(::Type{<:Latin_CSEs}, ::Type{<:WordQuad_CSEs}) =
     WidenCompare()
 
-CanContain(::Type{UTF8CSE}, ::Type{<:Union{ASCIICSE,Binary_CSEs}}) =
+CanContain(::Type{<:UTF8_CSEs}, ::Type{<:Union{ASCIICSE,Binary_CSEs}}) =
     ByteCompare()
-CanContain(::Type{UTF8CSE}, ::Type{<:Latin_CSEs}) =
+CanContain(::Type{<:UTF8_CSEs}, ::Type{<:Latin_CSEs}) =
     ASCIICompare()
 
 CanContain(::Type{<:Union{Text2CSE,UCS2CSE}}, ::Type{_UTF32CSE}) =

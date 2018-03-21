@@ -228,7 +228,6 @@ end
                 #end
             end
 
-#=
             @testset "fnd(Rev, ==(chr),..." begin
                 test2ch(Rev, C, str,
                         zip(('z', '\0', '\u80', '∄', '∀', '∃', 'x', 'δ', 'ε'),
@@ -238,7 +237,6 @@ end
                             (1, 16, 13, 12, 42, 25, 32, 16, 53, 4), # first entry was 0, second 14
                             (1, 13, 13,  0, 26,  0, 17,  0,  5, 0))) # first entry was 0 -> 1
             end
-=#
 
             @testset "find 1-char string,..." begin
                 let pat = ( "z",  "∄", "∀",   "∃",   "x",   "ε"),
@@ -270,7 +268,6 @@ end
             end
 
             # issue #9365
-            #=
             @testset "issue #9365" begin
                 let ustr = (("éé", "ééé"),
                             ("€€", "€€€"),
@@ -287,7 +284,7 @@ end
                     end
                 end
             end
-            =#
+
             @testset "Regex" begin
                 let pats = (r"z", r"∄", r"∀", r"∃", r"x", r"ε"),
                     res  = (0:-1, 0:-1, 1:1, 13:13,26:26,  5:5)

@@ -42,11 +42,10 @@ function testuni(T)
         @test_throws BoundsError SubString(s1, 1, 4)
 
         # Substring provided with invalid start index throws BoundsError
-        if false # Todo: Fix these!
-            @test SubString(s2, 1, 1) == s1
-            @test SubString(s2, 1, 4) == s2
-            @test SubString(s2, 4, 4) == s1
-        end
+        @test SubString(s2, 1, 1) == s1
+        @test SubString(s2, 1, 4) == s2
+        @test SubString(s2, 4, 4) == s1
+
         @test_throws IndexError  SubString(s2, 1, 2)
         @test_throws IndexError  SubString(s2, 1, 5)
         @test_throws IndexError  SubString(s2, 2, 4)
@@ -85,10 +84,8 @@ function testuni(T)
     @test_throws BoundsError next(u, 7)
     @test_throws BoundsError getindex(u, 0)
     @test_throws BoundsError getindex(u, 7)
-    if false # !V6_COMPAT
-        @test_throws BoundsError getindex(u, 0, 1)
-        @test_throws BoundsError getindex(u, 7, 7)
-    end
+    @test_throws BoundsError getindex(u, 0:1)
+    @test_throws BoundsError getindex(u, 7:7)
     @test reverseind(u, 1) == 4
     @test_broken typeof(Base.cconvert(Ptr{Int8}, u)) == SubString{String}
     @test_broken Base.cconvert(Ptr{Int8}, u) == u
@@ -180,7 +177,7 @@ function testuni(T)
     @test length(SubString(s, 1, 7)) == length(s[1:7])
     @test length(SubString(s, 4, 11)) == length(s[4:11])
 
-if false # Todo: Fix reverseind!
+
     @testset "reverseind" for S in (T, SubString, GenericString)
         for prefix in ("", "abcd", "\U0001d6a4\U0001d4c1", "\U0001d6a4\U0001d4c1c",
                        " \U0001d6a4\U0001d4c1"),
@@ -201,7 +198,6 @@ if false # Todo: Fix reverseind!
             @test c == sb[reverseind(sb, ri)] == r[ri]
         end
     end
-end
 end
 
 function teststr(T)
@@ -232,27 +228,33 @@ function teststr(T)
     @test SubString(T("foobar"), big(1), big(3)) == "foo"
 
     # search and SubString (issue #5679)
-    str = T("Hello, world!")
-    u = SubString(str, 1, 5)
-    @test fnd(Rev, T("World"), u) == 0:-1
-    @test fnd(Rev, ==('z'), u) == 0
-    @test fnd(Rev, T("ll"), u) == 3:4
+    let str = T("Hello, world!"),
+        u = SubString(str, 1, 5)
+        @test fnd(Rev, T("World"), u) == 0:-1
+        @test fnd(Rev, ==('z'), u) == 0
+        @test fnd(Rev, T("ll"), u) == 3:4
+    end
 
     # SubString created from SubString
-    u = SubString(str, 2, 5)
-    for idx in 1:4
-        @test SubString(u, 2, idx) == u[2:idx]
-        @test SubString(u, 2:idx) == u[2:idx]
+    let str = T("Hello, world!"),
+        u = SubString(str, 2, 5)
+        for idx in 1:4
+            @test SubString(u, 2, idx) == u[2:idx]
+            @test SubString(u, 2:idx) == u[2:idx]
+        end
+        if !V6_COMPAT
+            @test_throws BoundsError SubString(u, 1, 10)
+            @test_throws BoundsError SubString(u, 1:10)
+            @test_throws BoundsError SubString(u, 20:30)
+            @test_throws BoundsError SubString(u, -1:10)
+        end
+        @test SubString(u, 20:15) == ""
+        @test SubString(u, -1, -10) == ""
+        @test SubString(SubString(T("123"), 1, 2), -10, -20) == ""
     end
-    if !V6_COMPAT
-    @test_throws BoundsError SubString(u, 1, 10)
-    @test_throws BoundsError SubString(u, 1:10)
-    @test_throws BoundsError SubString(u, 20:30)
-    @test_throws BoundsError SubString(u, -1:10)
-    end
-    @test SubString(u, 20:15) == ""
-    @test SubString(u, -1, -10) == ""
-    @test SubString(SubString(T("123"), 1, 2), -10, -20) == ""
+
+    # sizeof
+    @test sizeof(SubString("abc\u2222def",4,4)) == 3
 
     # issue #3710
     @test prevind(SubString(T("{var}"),2,4),4) == 3
@@ -293,14 +295,12 @@ function teststr(T)
         end
         for (ss, s) in sdict
             @test length(ss) == length(s)
-            if false # !V6_COMPAT
             for i in 0:ncodeunits(ss), j = 0:length(ss)+1
                 @test prevind(ss, i+1, j) == prevind(s, i+1, j)
                 @test nextind(ss, i, j) == nextind(s, i, j)
             end
             @test_throws BoundsError nextind(s, ncodeunits(ss)+1)
             @test_throws BoundsError nextind(ss, ncodeunits(ss)+1)
-            end
             if !V6_COMPAT
                 # @test_throws BoundsError prevind(s, 0)
                 @test_throws BoundsError prevind(ss, 0)
