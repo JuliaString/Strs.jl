@@ -59,16 +59,31 @@ utf8crc(str::Union{S,SubString{S}},
 
 # Support for higher performance hashing, while still compatible with hashed UTF8 String
 
-_memhash(siz, ptr, seed) =
-    ccall(Base.memhash, UInt, (Ptr{UInt8}, Csize_t, UInt32), ptr, siz, seed % UInt32)
+# Optimized code for hashing empty string
+_hash(seed)          = last(mmhash128(seed%UInt32)) + seed
+# Optimized for hashing a UTF-8 compatible aligned string
+_hash(str, seed)     = last(mmhash128(str, seed%UInt32)) + seed
+# For hashing generic abstract strings as if UTF-8 encoded
+_hash_abs(str, seed) = last(mmhash128_a(str, seed%UInt32)) + seed
 
-_hash(seed)           = last(mmhash_128(seed%UInt32)) + seed
-_hash(str, seed)      = last(mmhash_128(str, seed%UInt32)) + seed
-_hash(len, pnt, seed) = last(mmhash_128(len, pnt, seed%UInt32)) + seed
+hash(str::Union{S,SubString{S}}, seed::UInt) where {S<:Str} =
+    isempty(str) ? _hash(seed + Base.memhash_seed) : _hash_abs(str, seed + Base.memhash_seed)
+
+# Check for UTF-8 compatible (i.e. only ASCII)
+function hash(str::Union{S,SubString{S}}, seed::UInt) where {S<:Str{LatinCSE}}
+    seed += Base.memhash_seed
+    isempty(str) ? _hash(seed) : (is_ascii(str) ? _hash(str, seed) : _hash_abs(str, seed))
+end
+
+# Directly calculate hash for "compatible" types
+
+hash(str::Union{S,SubString{S}},
+     seed::UInt) where {S<:Str{<:Union{ASCIICSE,UTF8CSE,Binary_CSEs}}} =
+         isempty(str) ? _hash(seed + Base.memhash_seed) : _hash(str, seed + Base.memhash_seed)
 
 # Optimize conversion to ASCII or UTF8 to calculate compatible hash value
                           
-function hash(str::Union{S,SubString{S}}, seed::UInt) where {S<:Str}
+function cvthash(str::Union{S,SubString{S}}, seed::UInt) where {S<:Str}
     seed += Base.memhash_seed
     (len = _len(str)) == 0 && return _hash(seed)
     @preserve str begin
@@ -77,23 +92,21 @@ function hash(str::Union{S,SubString{S}}, seed::UInt) where {S<:Str}
         # could be UCS2, _UCS2, UTF32, _UTF32, Text2, Text4
         _hash((flags == 0
                ? _cvtsize(UInt8, pnt, len)
-               : _encode_utf8(pnt, len += latin1 + num2byte + num3byte*2 + num4byte*3)),
+               : _encode_utf8(pnt, len + latin1 + num2byte + num3byte*2 + num4byte*3)),
               seed)
     end
 end
 
-function hash(str::Union{S,SubString{S}}, seed::UInt) where {S<:Str{<:Latin_CSEs}}
+function cvthash(str::Union{S,SubString{S}}, seed::UInt) where {S<:Str{<:Latin_CSEs}}
     seed += Base.memhash_seed
     (len = _len(str)) == 0 && return _hash(seed)
     @preserve str begin
         pnt = _pnt(str)
-        ((cnt = count_latin(len, pnt)) != 0
-         ? _hash(_latin_to_utf8(pnt, len + cnt), seed)
-         : _hash(len, pnt, seed))
+        _hash((cnt = count_latin(len, pnt)) == 0 ? str : _latin_to_utf8(pnt, len + cnt), seed)
     end
 end
 
-function hash(str::Union{S,SubString{S}}, seed::UInt) where {S<:Str{UTF16CSE}}
+function cvthash(str::Union{S,SubString{S}}, seed::UInt) where {S<:Str{UTF16CSE}}
     seed += Base.memhash_seed
     (len = _len(str)) == 0 && return _hash(seed)
     @preserve str begin
@@ -101,13 +114,8 @@ function hash(str::Union{S,SubString{S}}, seed::UInt) where {S<:Str{UTF16CSE}}
         len, flags, num4byte, num3byte, num2byte, latin1 = count_chars(S, pnt, len)
         _hash((flags == 0
                ? _cvtsize(UInt8, pnt, len)
-               : _cvt_16_to_utf8(S, pnt, len += latin1 + num2byte + num3byte*2 + num4byte*3)),
+               : _cvt_16_to_utf8(S, pnt, len + latin1 + num2byte + num3byte*2 + num4byte*3)),
               seed)
     end
 end
 
-# Directly calculate hash for "compatible" types
-
-hash(str::Union{S,SubString{S}},
-     seed::UInt) where {S<:Str{<:Union{ASCIICSE,UTF8CSE,Text1CSE,BinaryCSE}}} =
-         isempty(str) ? _hash(seed + Base.memhash_seed) : _hash(str, seed + Base.memhash_seed)
