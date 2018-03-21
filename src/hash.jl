@@ -59,17 +59,18 @@ utf8crc(str::Union{S,SubString{S}},
 
 # Support for higher performance hashing, while still compatible with hashed UTF8 String
 
-_memhash(siz, ptr, seed) =
-    ccall(Base.memhash, UInt, (Ptr{UInt8}, Csize_t, UInt32), ptr, siz, seed % UInt32)
+# Optimized code for hashing empty string
+_hash(seed)          = last(mmhash128(seed%UInt32)) + seed
+# Optimized for hashing a UTF-8 compatible aligned string
+_hash(str, seed)     = last(mmhash128(str, seed%UInt32)) + seed
+# For hashing generic abstract strings as if UTF-8 encoded
+_hash_abs(str, seed) = last(mmhash128_a(str, seed%UInt32)) + seed
 
-_hash(seed)      = last(mmhash_128(seed%UInt32)) + seed
-_hash(str, seed) = last(mmhash_128(str, seed%UInt32)) + seed
-_hash_abs(str, seed) = last(_mmhash_128(str, seed%UInt32)) + seed
+hash(str::Union{S,SubString{S}}, seed::UInt) where {S<:Str} =
+    isempty(str) ? _hash(seed + Base.memhash_seed) : _hash_abs(str, seed + Base.memhash_seed)
 
-fsthash(str::Union{S,SubString{S}}, seed::UInt) where {S<:Str} =
-    isempty(str) ? _hash(seed) : _hash_abs(str, seed)
-
-function fsthash(str::Union{S,SubString{S}}, seed::UInt) where {S<:Str{<:Latin_CSEs}}
+# Check for UTF-8 compatible (i.e. only ASCII)
+function hash(str::Union{S,SubString{S}}, seed::UInt) where {S<:Str{LatinCSE}}
     seed += Base.memhash_seed
     isempty(str) ? _hash(seed) : (is_ascii(str) ? _hash(str, seed) : _hash_abs(str, seed))
 end
@@ -82,7 +83,7 @@ hash(str::Union{S,SubString{S}},
 
 # Optimize conversion to ASCII or UTF8 to calculate compatible hash value
                           
-function hash(str::Union{S,SubString{S}}, seed::UInt) where {S<:Str}
+function cvthash(str::Union{S,SubString{S}}, seed::UInt) where {S<:Str}
     seed += Base.memhash_seed
     (len = _len(str)) == 0 && return _hash(seed)
     @preserve str begin
@@ -96,7 +97,7 @@ function hash(str::Union{S,SubString{S}}, seed::UInt) where {S<:Str}
     end
 end
 
-function hash(str::Union{S,SubString{S}}, seed::UInt) where {S<:Str{<:Latin_CSEs}}
+function cvthash(str::Union{S,SubString{S}}, seed::UInt) where {S<:Str{<:Latin_CSEs}}
     seed += Base.memhash_seed
     (len = _len(str)) == 0 && return _hash(seed)
     @preserve str begin
@@ -105,7 +106,7 @@ function hash(str::Union{S,SubString{S}}, seed::UInt) where {S<:Str{<:Latin_CSEs
     end
 end
 
-function hash(str::Union{S,SubString{S}}, seed::UInt) where {S<:Str{UTF16CSE}}
+function cvthash(str::Union{S,SubString{S}}, seed::UInt) where {S<:Str{UTF16CSE}}
     seed += Base.memhash_seed
     (len = _len(str)) == 0 && return _hash(seed)
     @preserve str begin
