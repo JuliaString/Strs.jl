@@ -6,11 +6,6 @@ Licensed under MIT License, see LICENSE.md
 Based in part on julia/base/strings/search.jl
 =#
 
-abstract type FindOp end
-abstract type Direction <: FindOp end
-struct Fwd <: Direction end
-struct Rev <: Direction end
-
 """
     find(Fwd, pattern::Union{Regex,AbstractString}, string::AbstractString, start::Integer=1)
 

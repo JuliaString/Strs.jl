@@ -28,6 +28,77 @@ function _length(::CodeUnitMulti, str::T) where {T<:Str{UTF16CSE,Nothing}}
     end
 end
 
+function _length(::CodeUnitMulti, ::Type{UTF16CSE}, str, i::Int, j::Int)
+    # Count number of valid codepoints within the range of the codeunits at i:j
+    @preserve str begin
+        cnt = siz = j - i + 1
+        beg = _pnt(str)
+        align = reinterpret(UInt, beg)
+        pnt = reinterpret(Ptr{UInt64}, align & ~(CHUNKSZ-1))
+        align &= (CHUNKSZ-1)
+        siz -= ((8 - align)>>>1)
+        if align != 0
+            v = _get_masked(pnt) >>> (align*8)
+            # v has 1-7 bytes, (8-align)
+            # May be split into more than one word
+            if cnt < ((16 - align)>>>1)
+                cnt < ((8 - align)>>>1) ||
+                    (cnt -= _count_cont(v) ; v = _get_masked(pnt + CHUNKSZ))
+                return cnt - _count_cont(v & _mask_bytes(siz))
+            end
+        else
+            v = _get_masked(pnt)
+        end
+        fin = pnt + siz
+        while (pnt += CHUNKSZ) <= fin
+            cnt -= _count_cont(v)
+            v = _get_masked(pnt)
+        end
+        cnt -= _count_cont((pnt - CHUNKSZ == fin) ? v : (v & _mask_bytes(siz)))
+    end
+end
+
+function _nextind(::CodeUnitMulti, str::Union{T,SubString{T}},
+                  pos::Int, nchar::Int) where {T<:Str{UTF16CSE}}
+    nchar < 0 && ncharerr(nchar)
+    siz = ncodeunits(str)
+    @boundscheck 0 <= pos <= siz || boundserr(str, pos)
+    @preserve str begin
+        beg = _pnt(str)
+        pnt = bytoff(beg, pos - 1)
+        fin = bytoff(beg, siz)
+        cu = get_codeunit(pnt)
+        nchar == 0 && (is_surrogate_trail(cu) ? index_err(str, pos) : return pos)
+        is_surrogate_trail(cu) && (pnt += 2)
+        # pnt should now point to a valid start of a character
+        # This could be sped up, by looking at chunks, and if all ASCII (common case),
+        # simply move forward 8
+        while (nchar -= 1) > 0 && pnt < fin
+            pnt += ifelse(is_surrogate_lead(get_codeunit(pnt)), 4, 2)
+        end
+        chrdiff(pnt, beg)
+    end
+end
+
+function _prevind(::CodeUnitMulti, str::Union{T,SubString{T}},
+                  pos::Int, nchar::Int) where {T<:Str{UTF16CSE}}
+    nchar < 0 && ncharerr(nchar)
+    siz = ncodeunits(str)
+    @boundscheck 0 < pos <= siz+1 || boundserr(str, pos)
+    @preserve str begin
+        beg = _pnt(str)
+        pnt = bytoff(beg, pos - 1)
+        nchar == 0 && (is_surrogate_trail(get_codeunit(pnt)) ? index_err(str, pos) : return pos)
+        # This could be sped up, by looking at chunks, and if all ASCII (common case),
+        # simply move back 8
+        while pnt >= beg
+            pnt -= ifelse(is_surrogate_trail(get_codeunit(pnt)), 4, 2)
+            (nchar -= 1) > 0 || break
+        end
+        chrdiff(pnt + 2, beg)
+    end
+end
+
 function is_ascii(str::T) where {T<:Str{<:Union{Text2CSE, UCS2CSE, UTF16CSE},Nothing}}
     (siz = sizeof(str)) == 0 && return true
     @preserve str begin

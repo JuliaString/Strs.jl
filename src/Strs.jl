@@ -65,7 +65,6 @@ export BIG_ENDIAN, LITTLE_ENDIAN
 
 # From search.jl
 export found, find_result
-export FindOp, Direction, Fwd, Rev
 
 # From unicode.jl
 export is_assigned, is_grapheme_break, is_grapheme_break!
@@ -179,6 +178,22 @@ create_vector(T, len)  = @static V6_COMPAT ? Vector{T}(len) : Vector{T}(undef, l
 
 # Add new short name for deprecated hex function
 outhex(v, p=1) = @static V6_COMPAT ? hex(v,p) : string(v, base=16, pad=p)
+
+# Operations for find/search operations
+
+export FindOp, Direction, Fwd, Rev, First, Last, Next, Prev, Each, All
+
+abstract type FindOp end
+abstract type Direction <: FindOp end
+struct Fwd <: Direction end
+struct Rev <: Direction end
+
+struct First <: FindOp end
+struct Last <: FindOp end
+struct Next <: FindOp end
+struct Prev <: FindOp end
+struct Each <: FindOp end
+struct All <: FindOp end
 
 include("types.jl")
 include("chars.jl")

@@ -102,7 +102,7 @@ const hi_mask = 0x8080_8080_8080_8080
     count_ones(xor(((val << 1) | val), hi_mask) & hi_mask)
 end
 
-function _length(::CodeUnitMulti, str::Str{UTF8CSE})
+function _length(::CodeUnitMulti, ::Type{UTF8CSE}, str)
     (siz = sizeof(str)) < 2 && return siz
     @preserve str begin
         pnt, fin = _calcpnt(str, siz)
@@ -114,23 +114,32 @@ function _length(::CodeUnitMulti, str::Str{UTF8CSE})
     end
 end
 
-function _length(::CodeUnitMulti, str::Str{UTF8CSE}, i::Int, j::Int)
-    siz = ncodeunits(str)
-    @boundscheck begin
-        0 < i <= siz+1 || boundserr(str, i)
-        0 <= j <= siz  || boundserr(str, j)
-    end
-    j < i && return 0
+function _length(::CodeUnitMulti, ::Type{UTF8CSE}, str, i::Int, j::Int)
     # Count number of valid codepoints within the range of the codeunits at i:j
     @preserve str begin
+        cnt = siz = j - i + 1
         beg = _pnt(str)
-        pnt = beg + i - 1
-        fin = beg + j
-        cur = i - (checkcont(pnt) ? (checkcont(pnt - 1) ? (checkcont(pnt - 2) ? 3 : 2) : 1) : 0)
-        cnt = j - cur + (cur == i)
-        i < j || return cnt
-        pnt += i - 1
-        byt = get_codeunit(pnt)
+        align = reinterpret(UInt, beg)
+        pnt = reinterpret(Ptr{UInt64}, align & ~(CHUNKSZ-1))
+        align &= (CHUNKSZ-1)
+        siz -= (8 - align)
+        if align != 0
+            v = unsafe_load(pnt) >>> (align*8)
+            # v has 1-7 bytes, (8-align)
+            # May be split into more than one word
+            if cnt < (16 - align)
+                cnt < (8 - align) || (cnt -= _count_cont(v) ; v = unsafe_load(pnt + CHUNKSZ))
+                return cnt - _count_cont(v & _mask_bytes(siz))
+            end
+        else
+            v = unsafe_load(pnt)
+        end
+        fin = pnt + siz
+        while (pnt += CHUNKSZ) <= fin
+            cnt -= _count_cont(v)
+            v = unsafe_load(pnt)
+        end
+        cnt -= _count_cont((pnt - CHUNKSZ == fin) ? v : (v & _mask_bytes(siz)))
     end
 end
 
@@ -312,6 +321,48 @@ end
                    ? (checkcont(pnt - 2) ? (checkcont(pnt - 3) ? 4 : 3) : 2)
                    : 1)
         end
+    end
+end
+
+function _nextind(::CodeUnitMulti, str::Union{T,SubString{T}},
+                  pos::Int, nchar::Int) where {T<:Str{UTF8CSE}}
+    nchar < 0 && ncharerr(nchar)
+    siz = ncodeunits(str)
+    @boundscheck 0 <= pos <= siz || boundserr(str, pos)
+    @preserve str begin
+        beg = _pnt(str)
+        pnt = beg + pos - 1
+        fin = beg + siz
+        nchar == 0 && (checkcont(pnt) ? index_err(str, pos) : return pos)
+        cu = get_codeunit(pnt)
+        pnt += (cu < 0x80 ? 1
+                : (cu < 0xc0
+                   ? (pos == numcu ? 1
+                      : (checkcont(pnt + 1) ? (2 + (pos < numcu - 1 && checkcont(pnt + 2))) : 1))
+                   : ifelse(cu < 0xe0, 2, ifelse(cu < 0xf0, 3, 4))))
+        # pnt should now point to a valid start of a character
+        # This could be sped up, by looking at chunks, and if all ASCII (common case),
+        # simply move forward 8
+        while (nchar -= 1) > 0 && pnt < fin
+            pnt += utf_trail(get_codeunit(pnt)) + 1
+        end
+        pnt - beg
+    end
+end
+
+function _prevind(::CodeUnitMulti, str::Union{T,SubString{T}},
+                  pos::Int, nchar::Int) where {T<:Str{UTF8CSE}}
+    nchar < 0 && ncharerr(nchar)
+    siz = ncodeunits(str)
+    @boundscheck 0 < pos <= siz+1 || boundserr(str, pos)
+    @preserve str begin
+        beg = _pnt(str)
+        pnt = beg + pos
+        nchar == 0 && (checkcont(pnt-1) ? index_err(str, pos) : return pos)
+        # This could be sped up, by looking at chunks, and if all ASCII (common case),
+        # simply move back 8
+        while (pnt -= 1) >= beg && (nchar -= !checkcont(pnt)) > 0 ; end
+        pnt - beg
     end
 end
 

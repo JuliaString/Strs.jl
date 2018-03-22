@@ -8,14 +8,6 @@ Licensed under MIT License, see LICENSE.md
 Inspired by / derived from code in Julia
 =#
 
-# Todo: Need to optimize these to avoid doing array reinterpret
-#=
-getindex(s::T, r::Vector) where {T} = T(getindex(_data(s), r))
-getindex(s::T, r) where {T} = T(getindex(_data(s), r))
-getindex(s::T, rge{Int}) where {T} = T(getindex(_data(s), r))
-getindex(s::T, indx::AbstractVector{Int}) where {T} = T(_data(s)[indx])
-=#
-
 _lastindex(::CodeUnitSingle, str) = (@_inline_meta(); _len(str))
 
 @propagate_inbounds _getindex(::CodeUnitSingle, T, str, i::Int) =
@@ -34,18 +26,37 @@ _nextcp(::Type{T}, pnt) where {T} = _nextcpfun(CodePointStyle(T), T, pnt)
 @propagate_inbounds _getindex(::CodeUnitMulti, T, str, i::Int) =
     _next(CodeUnitMulti(), T, str, i)[1]
 
-_length(::CodeUnitSingle, str) = (@_inline_meta(); _len(str))
+@inline _length(::CodeUnitSingle, str) = ncodeunits(str)
+
+@propagate_inbounds _length(::CodeUnitMulti, str) =
+    (@_inline_meta(); _length(CodeUnitMulti(), cse(str), str))
+
+@inline _length(::CodeUnitSingle, C, str, i, j) = j - i + 1
+
+@inline _length(::CodeUnitMulti, ::Type{T}, str::SubString) where {T} =
+    _length(CodeUnitMulti(), T, str, 1, sizeof(str))
+
+@propagate_inbounds function _length(cs::CodePointStyle, str, i, j)
+    siz = ncodeunits(str)
+    @boundscheck begin
+        0 < i <= siz+1 || boundserr(str, i)
+        0 <= j <= siz  || boundserr(str, j)
+    end
+    j < i ? 0 : _length(cs, cse(str), str, i, j)
+end
 
 _thisind(::CodeUnitSingle, str, i) = Int(i)
 _thisind(::CodeUnitSingle, str, len, pnt, i) = Int(i)
 
 _prevind(::CodeUnitSingle, str, i) = Int(i) - 1
+
 @propagate_inbounds function _prevind(::CodeUnitSingle, str, i, nchar)
     @boundscheck nchar > 0 || ncharerr(nchar)
     Int(i) - nchar
 end
 
 _nextind(::CodeUnitSingle, str, i) = Int(i) + 1
+
 @propagate_inbounds function _nextind(::CodeUnitSingle, str, i, nchar)
     @boundscheck nchar > 0 || ncharerr(nchar)
     Int(i) + nchar
@@ -77,6 +88,8 @@ _index(cs::CodePointStyle, ::Rev, str, i, nchar) = _prevind(cs, str, i, nchar)
     (@_inline_meta(); R = eltype(T) ; _next(CodePointStyle(T), R, str, i)::Tuple{R,Int})
 @propagate_inbounds length(str::T) where {T<:Str} =
     (@_inline_meta(); _length(CodePointStyle(T), str))
+@propagate_inbounds length(str::T, i::Int, j::Int) where {T<:Str} =
+    (@_inline_meta(); _length(CodePointStyle(T), str, i, j))
 @propagate_inbounds thisind(str::T, i::Int) where {T<:Str} =
     (@_inline_meta(); _thisind(CodePointStyle(T), str, i))
 @propagate_inbounds prevind(str::T, i::Int) where {T<:Str} =
@@ -96,40 +109,28 @@ _index(cs::CodePointStyle, ::Rev, str, i, nchar) = _prevind(cs, str, i, nchar)
     (@_inline_meta(); _index(CodePointStyle(T), D(), str, i, nchar))
 
 # This is deprecated on v0.7, recommended change to length(str, 1, i)
-@propagate_inbounds ind2chr(str::T, i::Int) where {T<:Str} =
+@propagate_inbounds ind2chr(str::Union{T,SubString{T}}, i::Int) where {T<:Str} =
     _ind2chr(CodePointStyle(T), str, i)
 # This is deprecated on v0.7, recommended change to nextind(str, 0, i)
-@propagate_inbounds chr2ind(str::T, i::Int) where {T<:Str} =
+@propagate_inbounds chr2ind(str::Union{T,SubString{T}}, i::Int) where {T<:Str} =
     _chr2ind(CodePointStyle(T), str, i)
 
-@propagate_inbounds function is_valid(str::T, i::Integer) where {T<:Str}
+@propagate_inbounds function is_valid(str::Union{T,SubString{T}}, i::Integer) where {T<:Str}
     @_inline_meta()
-    @boundscheck 1 <= i <= _len(str) || return false
+    @boundscheck 1 <= i <= ncodeunits(str) || return false
     _isvalid_char_pos(CodePointStyle(T), str, i)
 end
 
 _isvalid_char_pos(::CodeUnitSingle, str, i) = true
 
-#=
-# Handle substrings of Str
+@propagate_inbounds length(str::SubString{T}) where {T<:Str} =
+    _length(CodePointStyle(T), str)
+@propagate_inbounds length(str::SubString{T}, i::Int, j::Int) where {T<:Str} =
+    (@_inline_meta(); _length(CodePointStyle(T), str, i, j))
 
-@propagate_inbounds length(str::S) where {S<:SubString{T}} where {T<:Str} =
-    _lastindex(CodePointStyle(T), str)
-
-is_valid(str::T, i::Integer) where {T<:SubString{<:Str}} =
-    (start(str) <= i <= _lastindex(CodePointStyle(T), str))
-
-@propagate_inbounds ind2chr(str::S, i::Integer) where {S<:SubString{T}} where {T<:Str} =
-    _ind2chr(CodePointStyle(T), str, i)
-@propagate_inbounds chr2ind(str::S, i::Integer) where {S<:SubString{T}} where {T<:Str} =
-    _chr2ind(CodePointStyle(T), str, i)
-@propagate_inbounds reverseind(str::S, i::Integer) where {S<:SubString{T}} where {T<:Str} =
-    _reverseind(CodePointStyle(T), str, i)
-=#
-
-@propagate_inbounds _reverseind(::CodeUnitSingle, str::T, i) where {T<:Str} =
-    (@_inline_meta(); _len(str) + 1 - i)
-@propagate_inbounds reverseind(str::T, i::Integer) where {T<:Str} =
+@propagate_inbounds _reverseind(::CodeUnitSingle, str::Union{T,SubString{T}}, i) where {T<:Str} =
+    (@_inline_meta(); ncodeunits(str) + 1 - i)
+@propagate_inbounds reverseind(str::Union{T,SubString{T}}, i::Integer) where {T<:Str} =
     _reverseind(CodePointStyle(T), str, i)
 
 @propagate_inbounds function _collectstr(::CodeUnitMulti, ::Type{S}, str::T) where {S,T<:Str}
@@ -236,4 +237,4 @@ function _reverse(::CodeUnitMulti, ::Type{C}, len, str) where {C<:CSE}
 end
 
 reverse(str::T) where {C<:CSE,T<:Union{Str{C},SubString{Str{C}}}} =
-    _reverse(CodePointStyle(str), C, _len(str), str)
+    _reverse(CodePointStyle(str), C, ncodeunits(str), str)
