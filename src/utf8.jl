@@ -114,6 +114,26 @@ function _length(::CodeUnitMulti, str::Str{UTF8CSE})
     end
 end
 
+function _length(::CodeUnitMulti, str::Str{UTF8CSE}, i::Int, j::Int)
+    siz = ncodeunits(str)
+    @boundscheck begin
+        0 < i <= siz+1 || boundserr(str, i)
+        0 <= j <= siz  || boundserr(str, j)
+    end
+    j < i && return 0
+    # Count number of valid codepoints within the range of the codeunits at i:j
+    @preserve str begin
+        beg = _pnt(str)
+        pnt = beg + i - 1
+        fin = beg + j
+        cur = i - (checkcont(pnt) ? (checkcont(pnt - 1) ? (checkcont(pnt - 2) ? 3 : 2) : 1) : 0)
+        cnt = j - cur + (cur == i)
+        i < j || return cnt
+        pnt += i - 1
+        byt = get_codeunit(pnt)
+    end
+end
+
 function is_ascii(str::Str{<:Union{UTF8CSE, LatinCSE, Binary_CSEs}})
     (siz = sizeof(str)) == 0 && return true
     @preserve str begin

@@ -62,6 +62,12 @@ end
     i
 end
 
+_index(cs::CodePointStyle, str, i)               = _thisind(cs, str, i)
+_index(cs::CodePointStyle, ::Fwd, str, i)        = _nextind(cs, str, i)
+_index(cs::CodePointStyle, ::Fwd, str, i, nchar) = _nextind(cs, str, i, nchar)
+_index(cs::CodePointStyle, ::Rev, str, i)        = _prevind(cs, str, i)
+_index(cs::CodePointStyle, ::Rev, str, i, nchar) = _prevind(cs, str, i, nchar)
+
 #  Call to specialized version via trait
 @propagate_inbounds lastindex(str::T) where {T<:Str} =
     (@_inline_meta(); _lastindex(CodePointStyle(T), str))
@@ -81,6 +87,13 @@ end
     (@_inline_meta(); _prevind(CodePointStyle(T), str, i, nchar))
 @propagate_inbounds nextind(str::T, i::Int, nchar::Int) where {T<:Str} =
     (@_inline_meta(); _nextind(CodePointStyle(T), str, i, nchar))
+
+@propagate_inbounds index(str::T, i::Int) where {T<:Str} =
+    (@_inline_meta(); _index(CodePointStyle(T), str, i))
+@propagate_inbounds index(::D, str::T, i::Int) where {T<:Str,D<:Direction} =
+    (@_inline_meta(); _index(CodePointStyle(T), D(), str, i))
+@propagate_inbounds index(::D, str::T, i::Int, nchar::Int) where {T<:Str,D<:Direction} =
+    (@_inline_meta(); _index(CodePointStyle(T), D(), str, i, nchar))
 
 # This is deprecated on v0.7, recommended change to length(str, 1, i)
 @propagate_inbounds ind2chr(str::T, i::Int) where {T<:Str} =

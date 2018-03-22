@@ -52,7 +52,7 @@ export to_ascii, utf8, utf16, utf32
 
 export str, unsafe_str, codepoints, @str_str, @prn_str
 
-export category_code, category_string, category_abbrev, is_mutable
+export category_code, category_string, category_abbrev, is_mutable, index
 
 # From types.jl
 export Str, Chr, UniStr, CSE, CodePoint, CharSet, Encoding, @cs_str, @enc_str, @cse

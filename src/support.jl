@@ -642,6 +642,13 @@ function _memcmp(apnt::Ptr{OthChr}, bpnt::Ptr{OthChr}, len)
     0
 end
 
+_memcmp(a::SubString{<:Union{String, ByteStr}}, b::SubString{<:Union{String, ByteStr}}, siz) =
+    _memcmp(pointer(a), pointer(b), siz)
+_memcmp(a::SubString{<:WordStr}, b::SubString{<:WordStr}, siz) =
+    _memcmp(pointer(a), pointer(b), siz)
+_memcmp(a::SubString{<:WordStr}, b::SubString{<:WordStr}, siz) = _memcmp(_pnt(a), _pnt(b), siz)
+_memcmp(a::SubString{<:QuadStr}, b::SubString{<:QuadStr}, siz) = _memcmp(_pnt(a), _pnt(b), siz)
+
 _memcmp(a::Union{String, ByteStr}, b::Union{String, ByteStr}, siz) = _memcmp(_pnt(a), _pnt(b), siz)
 _memcmp(a::WordStr, b::WordStr, siz) = _memcmp(_pnt(a), _pnt(b), siz)
 _memcmp(a::QuadStr, b::QuadStr, siz) = _memcmp(_pnt(a), _pnt(b), siz)
