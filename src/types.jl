@@ -323,7 +323,7 @@ _data(s::String)  = s
 _data(s::ByteStr) = @static V6_COMPAT ? Vector{UInt8}(s.data) : unsafe_wrap(Vector{UInt8}, s.data)
 
 """Pointer to codeunits of string"""
-_pnt(s::Union{String,Vector{UInt8}}) = pointer(s)
+_pnt(s)          = pointer(s)
 _pnt(s::ByteStr) = pointer(s.data)
 _pnt(s::WordStr) = reinterpret(Ptr{UInt16}, pointer(s.data))
 _pnt(s::QuadStr) = reinterpret(Ptr{UInt32}, pointer(s.data))
@@ -358,11 +358,9 @@ Base.SubString(str::Str{C}, off::Int, fin::Int) where {C<:SubSet_CSEs} =
     SubString(Str(basecse(C), str), off, fin)
 
 # Todo: clean these up, avoid so many definitions
-_pnt(s::SubString{<:ByteStr}) = pointer(s)
 _pnt(s::SubString{<:WordStr}) = reinterpret(Ptr{UInt16}, pointer(s))
 _pnt(s::SubString{<:QuadStr}) = reinterpret(Ptr{UInt32}, pointer(s))
 
-_len(s::SubString{<:ByteStr}) = sizeof(s)
 _len(s::SubString{<:WordStr}) = sizeof(s) >>> 1
 _len(s::SubString{<:QuadStr}) = sizeof(s) >>> 2
 

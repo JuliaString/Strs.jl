@@ -18,18 +18,19 @@ Licensed under MIT License, see LICENSE.md
 
 ## outputting Str strings and CodePoint characters ##
 
-write(io::IO, str::Str{<:CSE,Nothing}) = write(io, str.data)
 write(io::IO, ch::CodePoint) = write(io, tobase(ch))
 
 # Todo: handle substring of Str
+write(io::IO, str::MaybeSub{Str}) =
+    @preserve str unsafe_write(io, pointer(str), reinterpret(UInt, sizeof(str)))
 
 # optimized methods to avoid iterating over chars
-print(io::IO, str::Union{T,SubString{T}}) where {T<:Str{<:Union{ASCIICSE,UTF8CSE},Nothing}} =
+print(io::IO, str::MaybeSub{T}) where {T<:Str{<:Union{ASCIICSE,UTF8CSE},Nothing}} =
     (write(io, str); nothing)
 
 ## outputting Latin 1 strings ##
 
-function print(io::IO, str::LatinStrings)
+function print(io::IO, str::MaybeSub{<:LatinStrings})
     @preserve str begin
         pnt = _pnt(str)
         fin = pnt + sizeof(str)
@@ -59,7 +60,7 @@ write(io::IO, ch::LatinChars) = write(io, ch%UInt8)
 
 ## outputting UCS2 strings as UTF-8 ##
 
-function print(io::IO, str::UCS2Strings)
+function print(io::IO, str::MaybeSub{<:UCS2Strings})
     len, pnt = _lenpnt(str)
     fin = bytoff(pnt, len)
     while pnt < fin
@@ -71,7 +72,7 @@ end
 
 ## output UTF-16 string ##
 
-function print(io::IO, str::Str{UTF16CSE})
+function print(io::IO, str::MaybeSub{<:Str{UTF16CSE}})
     pnt = _lenpnt(str)
     siz = sizeof(str)
     # Skip and write out ASCII sequences together
@@ -95,7 +96,7 @@ end
 
 ## outputting UTF32 strings as UTF-8 ##
 
-function print(io::IO, str::UTF32Strings)
+function print(io::IO, str::MaybeSub{<:UTF32Strings})
     len, pnt = _lenpnt(str)
     fin = bytoff(pnt, len)
     while pnt < fin

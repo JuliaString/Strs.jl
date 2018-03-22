@@ -6,6 +6,8 @@ Licensed under MIT License, see LICENSE.md
 Based in part on code for UTF16String that used to be in Julia
 =#
 
+const MS_UTF16 = MaybeSub{<:Str{UTF16CSE}}
+
 const _trail_mask = 0xdc00_dc00_dc00_dc00
 const _hi_bit_16  = 0x8000_8000_8000_8000
 
@@ -15,7 +17,7 @@ const _hi_bit_16  = 0x8000_8000_8000_8000
 @inline get_utf16(ch) = (0xd7c0 + (ch >> 10))%UInt16, (0xdc00 + (ch & 0x3ff))%UInt16
 
 # These only work when no SubStr field
-function _length(::CodeUnitMulti, str::T) where {T<:Str{UTF16CSE,Nothing}}
+function _length(::CodeUnitMulti, ::Type{UTF16CSE}, str::Str)
     (siz = sizeof(str)) == 0 && return 0
     siz == 2 && return 1
     @preserve str begin
@@ -31,12 +33,12 @@ end
 function _length(::CodeUnitMulti, ::Type{UTF16CSE}, str, i::Int, j::Int)
     # Count number of valid codepoints within the range of the codeunits at i:j
     @preserve str begin
-        cnt = siz = j - i + 1
+        cnt = j - i + 1
         beg = _pnt(str)
         align = reinterpret(UInt, beg)
         pnt = reinterpret(Ptr{UInt64}, align & ~(CHUNKSZ-1))
         align &= (CHUNKSZ-1)
-        siz -= ((8 - align)>>>1)
+        siz = cnt<<1 - 8 - align
         if align != 0
             v = _get_masked(pnt) >>> (align*8)
             # v has 1-7 bytes, (8-align)
@@ -49,7 +51,7 @@ function _length(::CodeUnitMulti, ::Type{UTF16CSE}, str, i::Int, j::Int)
         else
             v = _get_masked(pnt)
         end
-        fin = pnt + siz
+        fin = pnt + cnt
         while (pnt += CHUNKSZ) <= fin
             cnt -= _count_cont(v)
             v = _get_masked(pnt)
@@ -58,8 +60,7 @@ function _length(::CodeUnitMulti, ::Type{UTF16CSE}, str, i::Int, j::Int)
     end
 end
 
-function _nextind(::CodeUnitMulti, str::Union{T,SubString{T}},
-                  pos::Int, nchar::Int) where {T<:Str{UTF16CSE}}
+function _nextind(::CodeUnitMulti, str::MS_UTF16, pos::Int, nchar::Int)
     nchar < 0 && ncharerr(nchar)
     siz = ncodeunits(str)
     @boundscheck 0 <= pos <= siz || boundserr(str, pos)
@@ -80,11 +81,9 @@ function _nextind(::CodeUnitMulti, str::Union{T,SubString{T}},
     end
 end
 
-function _prevind(::CodeUnitMulti, str::Union{T,SubString{T}},
-                  pos::Int, nchar::Int) where {T<:Str{UTF16CSE}}
+function _prevind(::CodeUnitMulti, str::MS_UTF16, pos::Int, nchar::Int)
     nchar < 0 && ncharerr(nchar)
-    siz = ncodeunits(str)
-    @boundscheck 0 < pos <= siz+1 || boundserr(str, pos)
+    @boundscheck 0 < pos <= ncodeunits(str)+1 || boundserr(str, pos)
     @preserve str begin
         beg = _pnt(str)
         pnt = bytoff(beg, pos - 1)
@@ -152,7 +151,7 @@ is_bmp(str::UCS2Strings) = true
     cnt
 end
 
-@inline lastindex(str::Str{<:UTF16CSE}) =
+@inline lastindex(str::Str{UTF16CSE}) =
     ((len = _len(str)) != 0
      ? (is_surrogate_codeunit(get_codeunit(_pnt(str), len)) ? len-1 : len) : 0)
 
@@ -165,7 +164,7 @@ function _nextcpfun(::CodeUnitMulti, ::Type{UTF16CSE}, pnt)
      : (ch%UInt32, pnt + 2))
 end
 
-@propagate_inbounds function _next(::CodeUnitMulti, T, str::Str{<:UTF16CSE}, pos::Int)
+@propagate_inbounds function _next(::CodeUnitMulti, T, str::MS_UTF16, pos::Int)
     @boundscheck pos <= _len(str) || boundserr(str, pos)
     pnt = _pnt(str) + (pos<<1)
     ch = get_codeunit(pnt - 2)
@@ -174,36 +173,30 @@ end
      : (T(ch), pos + 1))
 end
 
-@propagate_inbounds @inline function _thisind(::CodeUnitMulti, str::Str{UTF16CSE}, len, pnt, pos)
+@propagate_inbounds @inline function _thisind(::CodeUnitMulti, str::MS_UTF16, len, pnt, pos)
     @boundscheck 1 <= pos <= len || boundserr(str, pos)
     pos - is_surrogate_trail(get_codeunit(pnt, pos))
 end
 
-@propagate_inbounds @inline function _nextind(::CodeUnitMulti, str::Str{<:UTF16CSE}, pos::Int)
+@propagate_inbounds @inline function _nextind(::CodeUnitMulti, str::MS_UTF16, pos::Int)
     pos == 0 && return 1
     @boundscheck 1 <= pos <= _len(str) || boundserr(str, pos)
     pos + 1 + is_surrogate_lead(get_codeunit(_pnt(str), pos))
 end
 
-@propagate_inbounds @inline function _prevind(::CodeUnitMulti, str::Str{<:UTF16CSE}, pos::Int)
+@propagate_inbounds @inline function _prevind(::CodeUnitMulti, str::MS_UTF16, pos::Int)
     (pos -= 1) == 0 && return 0
     numcu = _len(str)
     @boundscheck 0 < pos <= numcu || boundserr(str, pos + 1)
     pos - is_surrogate_trail(get_codeunit(_pnt(str), pos))
 end
 
-# Todo: _prevind with nchar argument
-@propagate_inbounds function _nextind(::CodeUnitMulti, str::Str{<:UTF16CSE}, pos::Int, cnt::Int)
-    cnt < 0 && neginderr(str, cnt)
-    @boundscheck 0 <= pos <= _len(str) || boundserr(str, pos)
-    cnt == 0 && return thisind(str, pos) == pos ? pos : unierror("Invalid position", str, pos)
-    pos + cnt + is_surrogate_lead(get_codeunit(_pnt(str), pos + cnt))
-end
-
-function reverseind(str::Str{<:UTF16CSE}, i::Integer)
-    len, pnt = _lenpnt(str)
-    j = len - i
-    is_surrogate_trail(get_codeunit(pnt, j)) ? j - 1 : j
+function reverseind(str::MS_UTF16, i::Integer)
+    @preserve str begin
+        len, pnt = _lenpnt(str)
+        j = len - i
+        is_surrogate_trail(get_codeunit(pnt, j)) ? j - 1 : j
+    end
 end
 
 function _reverse(::CodeUnitMulti, ::Type{UTF16CSE}, len, pnt::Ptr{T}) where {T<:CodeUnitTypes}
@@ -218,7 +211,7 @@ function _reverse(::CodeUnitMulti, ::Type{UTF16CSE}, len, pnt::Ptr{T}) where {T<
     Str(UTF16CSE, buf)
 end
 
-@inline _isvalid_char_pos(::CodeUnitMulti, str::Str{<:UTF16CSE}, pos::Integer) =
+@inline _isvalid_char_pos(::CodeUnitMulti, ::Type{UTF16CSE}, str, pos::Integer) =
     !is_surrogate_trail(get_codeunit(_pnt(str), pos))
 
 function is_valid(::Type{<:UCS2Strings}, data::AbstractArray{UInt16})
@@ -353,13 +346,16 @@ function convert(::Type{<:Str{UTF16CSE}}, str::String)
     Str(UTF16CSE, flags == 0 ? _cvtsize(UInt16, str, len) : _encode_utf16(str, len + num4byte))
 end
 
-function convert(::Type{<:Str{UTF16CSE}}, str::Str{UTF8CSE})
+function convert(::Type{<:Str{UTF16CSE}}, str::MS_UTF8)
     # handle zero length string quickly
     is_empty(str) && return empty_utf16
-    pnt = _pnt(str)
-    len, flags, num4byte = count_chars(UTF8Str, pnt, _len(str))
-    # Optimize case where no characters > 0x7f
-    Str(UTF16CSE, flags == 0 ? _cvtsize(UInt16, pnt, len) : _encode_utf16(pnt, len + num4byte))
+    @preserve str begin
+        pnt = _pnt(str)
+        len, flags, num4byte = count_chars(UTF8Str, pnt, _len(str))
+        # Optimize case where no characters > 0x7f
+        Str(UTF16CSE,
+            flags == 0 ? _cvtsize(UInt16, pnt, len) : _encode_utf16(pnt, len + num4byte))
+    end
 end
 
 """
@@ -463,11 +459,10 @@ function convert(::Type{Vector{UInt16}}, str::WordStr)
 end
 
 # Todo: Some of these need to be fixed to account for SubStr, when that is added
-convert(::Type{T},  str::S) where {T<:UCS2Strings, S<:UCS2Strings} = str
-#convert(::Type{UTF16Str}, str::UTF16Str) = str
+convert(::Type{T},  str::MaybeSub{S}) where {T<:UCS2Strings, S<:UCS2Strings} = str
 convert(::Type{UTF16Str}, str::UCS2Strings) = Str(UTF16CSE, str.data)
 
-unsafe_convert(::Type{Ptr{UInt16}}, s::Str{UTF16CSE}) = _pnt(s)
+unsafe_convert(::Type{Ptr{UInt16}}, s::MS_UTF16) = _pnt(s)
 
 function convert(::Type{UTF16Str}, dat::AbstractVector{UInt16})
     is_empty(dat) && return empty_utf16
@@ -482,10 +477,13 @@ _convert(pnt::Ptr{T}, len, T1) where {T<:Union{UInt16,UInt16_U,UInt16_S,UInt16_U
      : (ch == 0xfeff ? _convert(pnt + 2, len - 1) : _convert(pnt, len)))
 
 function _convert(pnt::Ptr{T}, len) where {T}
-    buf, out = _allocate(basetype(T), len)
-    @inbounds for i in 1:len
-        set_codeunit!(out, i, unsafe_load(pnt))
+    BT = basetype(T)
+    buf, out = _allocate(BT, len)
+    fin = bytoff(out, len)
+    while out < fin
+        set_codeunit!(out, get_codeunit(pnt))
         pnt += sizeof(T)
+        out += sizeof(BT)
     end
     buf, out
 end

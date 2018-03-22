@@ -17,9 +17,9 @@ function testuni(T)
     @test sizeof(str2) == 2 * sizeof(str)
 
     for i1 = 1:length(str2)
-        if !isvalid(str2, i1); continue; end
+        if !is_valid(str2, i1); continue; end
         for i2 = i1:length(str2)
-            if !isvalid(str2, i2); continue; end
+            if !is_valid(str2, i2); continue; end
             @test length(str2[i1:i2]) == length(str2plain[i1:i2])
             @test str2[i1:i2] == str2plain[i1:i2]
         end
@@ -104,7 +104,7 @@ function testuni(T)
 
     # proper nextind/prevind/thisind for SubString{String}
     let rng = MersenneTwister(1),
-        strs = ["∀∃∀" * String(rand(rng, UInt8, 40)) * "∀∃∀", String(rand(rng, UInt8, 50))]
+        strs = ["∀∃∀" * String(rand(rng, Char, 40)) * "∀∃∀", String(rand(rng, Char, 50))]
         for sa in strs
             try
                 s = T(sa)
@@ -120,30 +120,24 @@ function testuni(T)
                     ss = SubString(s, a, b)
                     s2 = s[a:b]
                     @test ncodeunits(ss) == ncodeunits(s2)
-                    if !V6_COMPAT
-                    for i in 0:ncodeunits(ss)+1
+                    for i in 1:ncodeunits(ss)
                         @test thisind(ss, i) == thisind(s2, i)
-                    end
                     end
                     for i in 0:ncodeunits(ss)
                         @test nextind(ss, i) == nextind(s2, i)
-                        if !V6_COMPAT
                         for j in 0:ncodeunits(ss)+5
-                            if j > 0 || isvalid(ss, i)
+                            if j > 0 || is_valid(ss, i)
                                 @test nextind(ss, i, j) == nextind(s2, i, j)
                             end
                         end
-                        end
                     end
-                    if !V6_COMPAT
                     for i in 1:ncodeunits(ss)+1
                         @test prevind(ss, i) == prevind(s2, i)
                         for j in 0:ncodeunits(ss)+5
-                            if j > 0 || isvalid(ss, i)
+                            if j > 0 || is_valid(ss, i)
                                 @test prevind(ss, i, j) == prevind(s2, i, j)
                             end
                         end
-                    end
                     end
                     b = nextind(s, b)
                 end
@@ -151,14 +145,14 @@ function testuni(T)
         end
     end
 
-    # for isvalid(SubString{String})
+    # for is_valid(SubString{String})
     s = T("Σx + βz - 2")
     for i in -1:ncodeunits(s)+2
         if checkbounds(Bool, s, i)
-            if isvalid(s, i)
+            if is_valid(s, i)
                 ss = SubString(s, 1, i)
                 for j = 1:ncodeunits(ss)
-                    @test isvalid(ss, j) == isvalid(s, j)
+                    @test is_valid(ss, j) == is_valid(s, j)
                 end
             else
                 V6_COMPAT || @test_throws IndexError SubString(s, 1, i)
@@ -273,7 +267,7 @@ function teststr(T)
     V6_COMPAT || @test !occurs_in(Regex(T("aa")), SubString(T(""),1,0))
     V6_COMPAT || @test occurs_in(Regex(T("")), SubString(T(""),1,0))
 
-    # isvalid, length, prevind, nextind for SubString{String}
+    # is_valid, length, prevind, nextind for SubString{String}
     let s = T("lorem ipsum"),
         sdict = Dict(SubString(s, 1, 11)  => T("lorem ipsum"),
                      SubString(s, 1, 6)   => T("lorem "),
@@ -285,26 +279,33 @@ function teststr(T)
         for (ss, s) in sdict
             @test ncodeunits(ss) == ncodeunits(s)
             for i in -2:13
-                @test isvalid(ss, i) == isvalid(s, i)
+                @test is_valid(ss, i) == is_valid(s, i)
             end
-            if !V6_COMPAT
             for i in 1:ncodeunits(ss), j = i-1:ncodeunits(ss)
                 @test length(ss, i, j) == length(s, i, j)
             end
-            end
         end
         for (ss, s) in sdict
+            siz = ncodeunits(ss)
+            len = length(ss)
             @test length(ss) == length(s)
-            for i in 0:ncodeunits(ss), j = 0:length(ss)+1
+            for i in 0:siz, j = 1:len+1
                 @test prevind(ss, i+1, j) == prevind(s, i+1, j)
                 @test nextind(ss, i, j) == nextind(s, i, j)
             end
+            for i in 1:siz
+                @test prevind(ss, i, 0) == prevind(s, i, 0)
+                @test nextind(ss, i, 0) == nextind(s, i, 0)
+            end
+            @test_throws BoundsError prevind(ss, ncodeunits(ss)+1, 0)
+            @test_throws BoundsError prevind(s, ncodeunits(ss)+1, 0)
+            @test_throws BoundsError nextind(ss, 0, 0)
+            @test_throws BoundsError nextind(s, 0, 0)
+            println("$(typeof(ss))(\"$ss\")")
             @test_throws BoundsError nextind(s, ncodeunits(ss)+1)
             @test_throws BoundsError nextind(ss, ncodeunits(ss)+1)
-            if !V6_COMPAT
-                # @test_throws BoundsError prevind(s, 0)
-                @test_throws BoundsError prevind(ss, 0)
-            end
+            @test_throws BoundsError prevind(s, 0)
+            @test_throws BoundsError prevind(ss, 0)
         end
     end
 
@@ -315,6 +316,7 @@ function teststr(T)
     @test_throws BoundsError length(ss, 1, -1)
     @test_throws BoundsError length(ss, 1, 6)
     @test_throws BoundsError length(ss, 1, 10)
+    println("$(typeof(ss))(\"$ss\")")
     @test_throws BoundsError prevind(ss, 0, 1)
     @test prevind(ss, 1, 1) == 0
     @test prevind(ss, 6, 1) == 5

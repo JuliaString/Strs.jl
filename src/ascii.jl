@@ -9,22 +9,25 @@ Based in part on code for ASCIIString that used to be in Julia
 
 ## overload methods for efficiency ##
 
-function _string(c)
+function _string(coll)
     n = 0
-    for s in c
-        n += _len(s)
+    for str in coll
+        n += _len(str)
     end
-    v = _allocate(n)
-    o = 1
-    for s in c
-        len = _len(s)
-        unsafe_copyto!(v, o, _data(s), 1, len)
-        o += len
+    buf, out = _allocate(UInt8, n)
+    for str in coll
+        @preserve str begin
+            len, pnt = _lenpnt(str)
+            unsafe_copyto!(out, pnt, len)
+            out += len
+        end
     end
-    v
+    buf
 end
 
-string(c::Str{ASCIICSE}...) = length(c) == 1 ? c[1] : Str(ASCIICSE, _string(c))
+const _ASCIIStr = Union{Str{ASCIICSE}, SubString{<:Str{ASCIICSE}}}
+
+string(c::_ASCIIStr...) = length(c) == 1 ? c[1] : Str(ASCIICSE, _string(c))
 
 ## transcoding to ASCII ##
 

@@ -10,6 +10,8 @@ Based in part on code for UTF8String that used to be in Julia
 
 # UTF-8 support functions
 
+const MS_UTF8 = MaybeSub{<:Str{UTF8CSE}}
+
 # Get rest of character ch from 2-byte UTF-8 sequence at pnt - 1
 @inline get_utf8_2byte(pnt, ch) =
     (((ch & 0x3f)%UInt16 << 6) | (get_codeunit(pnt) & 0x3f))
@@ -70,12 +72,14 @@ end
 
 utf_trail(c::UInt8) = (0xe5000000 >>> ((c & 0xf0) >> 3)) & 0x3
 
-function lastindex(str::Str{UTF8CSE})
+function lastindex(str::MS_UTF8)
     (len = _len(str)) == 0 && return len
-    beg = _pnt(str)
-    pnt = beg + len
-    while is_valid_continuation(get_codeunit(pnt -= 1)) ; end
-    Int(pnt + 1 - beg)
+    @preserve str begin
+        beg = _pnt(str)
+        pnt = beg + len
+        while is_valid_continuation(get_codeunit(pnt -= 1)) ; end
+        Int(pnt + 1 - beg)
+    end
 end
 
 #=
@@ -102,7 +106,7 @@ const hi_mask = 0x8080_8080_8080_8080
     count_ones(xor(((val << 1) | val), hi_mask) & hi_mask)
 end
 
-function _length(::CodeUnitMulti, ::Type{UTF8CSE}, str)
+function _length(::CodeUnitMulti, ::Type{UTF8CSE}, str::Str)
     (siz = sizeof(str)) < 2 && return siz
     @preserve str begin
         pnt, fin = _calcpnt(str, siz)
@@ -110,19 +114,19 @@ function _length(::CodeUnitMulti, ::Type{UTF8CSE}, str)
         while (pnt += CHUNKSZ) <= fin
             cnt -= _count_cont(unsafe_load(pnt))
         end
-        pnt - CHUNKSZ == fin ? cnt : (cnt - _count_cont(unsafe_load(pnt) & _mask_bytes(siz)))
+        siz & (CHUNKSZ-1) == 0 ? cnt : (cnt - _count_cont(unsafe_load(pnt) & _mask_bytes(siz)))
     end
 end
 
 function _length(::CodeUnitMulti, ::Type{UTF8CSE}, str, i::Int, j::Int)
     # Count number of valid codepoints within the range of the codeunits at i:j
     @preserve str begin
-        cnt = siz = j - i + 1
+        cnt = j - i + 1
         beg = _pnt(str)
         align = reinterpret(UInt, beg)
         pnt = reinterpret(Ptr{UInt64}, align & ~(CHUNKSZ-1))
         align &= (CHUNKSZ-1)
-        siz -= (8 - align)
+        siz = cnt - align
         if align != 0
             v = unsafe_load(pnt) >>> (align*8)
             # v has 1-7 bytes, (8-align)
@@ -134,12 +138,12 @@ function _length(::CodeUnitMulti, ::Type{UTF8CSE}, str, i::Int, j::Int)
         else
             v = unsafe_load(pnt)
         end
-        fin = pnt + siz
-        while (pnt += CHUNKSZ) <= fin
+        fin = pnt + cnt
+        while (pnt += CHUNKSZ) < fin
             cnt -= _count_cont(v)
             v = unsafe_load(pnt)
         end
-        cnt -= _count_cont((pnt - CHUNKSZ == fin) ? v : (v & _mask_bytes(siz)))
+        cnt -= _count_cont(siz & (CHUNKSZ-1) == 0 ? v : (v & _mask_bytes(siz)))
     end
 end
 
@@ -233,7 +237,8 @@ function _nextcpfun(::CodeUnitMulti, ::Type{UTF8CSE}, pnt)
 end
 
 # Gets next codepoint
-@propagate_inbounds function _next(::CodeUnitMulti, T, str::Str{UTF8CSE}, pos::Integer)
+@propagate_inbounds function _next(::CodeUnitMulti, ::Type{T},
+                                   str::MS_UTF8, pos::Int) where {T<:CodePoint}
     len = _len(str)
     @boundscheck 0 < pos <= len || boundserr(str, pos)
     @preserve str begin
@@ -267,30 +272,30 @@ end
 
 @inline checkcont(pnt) = is_valid_continuation(get_codeunit(pnt))
 
-function _reverseind(::CodeUnitMulti, str::Str{UTF8CSE}, pos::Integer)
+function _reverseind(::CodeUnitMulti, str::MS_UTF8, pos::Integer)
     @preserve str begin
         pnt = _pnt(str) + _len(str) + 1 - pos
-        pos - (checkcont(pnt) ? (checkcont(pnt - 1) ? (checkcont(pnt - 2) ? 3 : 2) : 1) : 0)
+        pos - (checkcont(pnt) ? (checkcont(pnt - 1) ? checkcont(pnt - 2) + 2 : 1) : 0)
     end
 end
 
 ## overload methods for efficiency ##
 
-@inline _isvalid_char_pos(::CodeUnitMulti, str::Str{UTF8CSE}, pos::Integer) =
-    !is_valid_continuation(get_codeunit(_pnt(str), pos))
+@inline _isvalid_char_pos(::CodeUnitMulti, ::Type{UTF8CSE}, str, pos::Integer) =
+    !is_valid_continuation(get_codeunit(_pnt(str) + pos - 1))
 
 @inline function _thisind_utf8(str, len, pnt, pos::Int)
     @boundscheck 0 < pos <= len || boundserr(str, pos)
     pnt += pos - 1
-    pos - (checkcont(pnt) ? (checkcont(pnt - 1) ? (checkcont(pnt - 2) ? 3 : 2) : 1) : 0)
+    pos - (checkcont(pnt) ? (checkcont(pnt - 1) ? checkcont(pnt - 2) + 2 : 1) : 0)
 end
 
-@propagate_inbounds _thisind(::CodeUnitMulti, str::Str{UTF8CSE}, len, pnt, pos::Integer) =
+@propagate_inbounds _thisind(::CodeUnitMulti, str::MS_UTF8, len, pnt, pos::Integer) =
     _thisind_utf8(str, len, pnt, Int(pos))
 @propagate_inbounds _thisind(::CodeUnitMulti, str::String, len, pnt, pos::Integer) =
     _thisind_utf8(str, len, pnt, Int(pos))
 
-@propagate_inbounds function _nextind(T::CodeUnitMulti, str::Str{UTF8CSE}, pos::Integer)
+@propagate_inbounds function _nextind(::CodeUnitMulti, str::MS_UTF8, pos::Integer)
     pos == 0 && return 1
     numcu = _len(str)
     @boundscheck 1 <= pos <= numcu || boundserr(str, pos)
@@ -305,27 +310,25 @@ end
     end
 end
 
-@propagate_inbounds function _prevind(T::CodeUnitMulti, str::Str{UTF8CSE}, pos::Integer)
-    pos == 1 && return 0
+@propagate_inbounds function _prevind(::CodeUnitMulti, str::MS_UTF8, pos::Integer)
+    (pos -= 1) == 0 && return 0
     @preserve str begin
         numcu, pnt = _lenpnt(str)
-        pos == numcu + 1 && @inbounds return _thisind(T, str, numcu, pnt, numcu)
-        @boundscheck 1 < pos <= (numcu + 1) || boundserr(str, pos)
-        pnt += pos - 1
+        pnt += pos
+        pos == numcu &&
+            return pos - (checkcont(pnt-1) ? (checkcont(pnt-2) ? checkcont(pnt-3) + 2 : 1) : 0)
+        @boundscheck 0 < pos < numcu || boundserr(str, pos+1)
         if checkcont(pnt)
-            pos - (checkcont(pnt - 1) ? (checkcont(pnt - 2) ? 3 : 2) : 1)
-        elseif pos == 2
-            1
+            pos - (checkcont(pnt - 1) ? checkcont(pnt - 2) + 1 : 0)
+        elseif pos != 1
+            pos - (checkcont(pnt - 1) ? (checkcont(pnt - 2) ? checkcont(pnt - 3) + 2 : 1) : 0)
         else
-            pos - (checkcont(pnt - 1)
-                   ? (checkcont(pnt - 2) ? (checkcont(pnt - 3) ? 4 : 3) : 2)
-                   : 1)
+            1
         end
     end
 end
 
-function _nextind(::CodeUnitMulti, str::Union{T,SubString{T}},
-                  pos::Int, nchar::Int) where {T<:Str{UTF8CSE}}
+@propagate_inbounds function _nextind(::CodeUnitMulti, str::MS_UTF8, pos::Int, nchar::Int)
     nchar < 0 && ncharerr(nchar)
     siz = ncodeunits(str)
     @boundscheck 0 <= pos <= siz || boundserr(str, pos)
@@ -337,8 +340,8 @@ function _nextind(::CodeUnitMulti, str::Union{T,SubString{T}},
         cu = get_codeunit(pnt)
         pnt += (cu < 0x80 ? 1
                 : (cu < 0xc0
-                   ? (pos == numcu ? 1
-                      : (checkcont(pnt + 1) ? (2 + (pos < numcu - 1 && checkcont(pnt + 2))) : 1))
+                   ? (pos == siz ? 1
+                      : (checkcont(pnt + 1) ? (2 + (pos < siz - 1 && checkcont(pnt + 2))) : 1))
                    : ifelse(cu < 0xe0, 2, ifelse(cu < 0xf0, 3, 4))))
         # pnt should now point to a valid start of a character
         # This could be sped up, by looking at chunks, and if all ASCII (common case),
@@ -346,15 +349,13 @@ function _nextind(::CodeUnitMulti, str::Union{T,SubString{T}},
         while (nchar -= 1) > 0 && pnt < fin
             pnt += utf_trail(get_codeunit(pnt)) + 1
         end
-        pnt - beg
+        Int(pnt - beg)
     end
 end
 
-function _prevind(::CodeUnitMulti, str::Union{T,SubString{T}},
-                  pos::Int, nchar::Int) where {T<:Str{UTF8CSE}}
+@propagate_inbounds function _prevind(::CodeUnitMulti, str::MS_UTF8, pos::Int, nchar::Int)
     nchar < 0 && ncharerr(nchar)
-    siz = ncodeunits(str)
-    @boundscheck 0 < pos <= siz+1 || boundserr(str, pos)
+    @boundscheck 0 < pos <= ncodeunits(str)+1 || boundserr(str, pos)
     @preserve str begin
         beg = _pnt(str)
         pnt = beg + pos
@@ -362,11 +363,11 @@ function _prevind(::CodeUnitMulti, str::Union{T,SubString{T}},
         # This could be sped up, by looking at chunks, and if all ASCII (common case),
         # simply move back 8
         while (pnt -= 1) >= beg && (nchar -= !checkcont(pnt)) > 0 ; end
-        pnt - beg
+        Int(pnt - beg + 1)
     end
 end
 
-@propagate_inbounds function getindex(str::Str{UTF8CSE}, rng::UnitRange{Int})
+@propagate_inbounds function getindex(str::MS_UTF8, rng::UnitRange{Int})
     isempty(rng) && return SubString(empty_utf8, 1, 0)
     beg = first(rng)
     len = _len(str)
@@ -385,7 +386,9 @@ end
     SubString(str, beg, lst)
 end
 
-const _ByteStr = Union{Str{ASCIICSE}, Str{UTF8CSE}, String}
+const _ByteStr = Union{Str{ASCIICSE}, SubString{<:Str{ASCIICSE}},
+                       Str{UTF8CSE},  SubString{<:Str{UTF8CSE}},
+                       String}
 
 string(c::_ByteStr...) = length(c) == 1 ? c[1]::UTF8Str : UTF8Str(_string(c))
     # ^^ at least one must be UTF-8 or the ASCII-only method would get called

@@ -8,6 +8,8 @@ Licensed under MIT License, see LICENSE.md
 Inspired by / derived from code in Julia
 =#
 
+const MaybeSub{T} = Union{T, SubString{T}} where {T<:Str}
+
 _lastindex(::CodeUnitSingle, str) = (@_inline_meta(); _len(str))
 
 @propagate_inbounds _getindex(::CodeUnitSingle, T, str, i::Int) =
@@ -45,21 +47,44 @@ _nextcp(::Type{T}, pnt) where {T} = _nextcpfun(CodePointStyle(T), T, pnt)
     j < i ? 0 : _length(cs, cse(str), str, i, j)
 end
 
-_thisind(::CodeUnitSingle, str, i) = Int(i)
-_thisind(::CodeUnitSingle, str, len, pnt, i) = Int(i)
+@inline _thisind(::CodeUnitSingle, str, len, pnt, i) = Int(i)
 
-_prevind(::CodeUnitSingle, str, i) = Int(i) - 1
-
-@propagate_inbounds function _prevind(::CodeUnitSingle, str, i, nchar)
-    @boundscheck nchar > 0 || ncharerr(nchar)
-    Int(i) - nchar
+@propagate_inbounds function _thisind(::CodeUnitMulti, str, i)
+    @_inline_meta()
+    len = _len(str)
+    @boundscheck 0 <= i <= len || boundserr(str, i)
+    _thisind(CodeUnitMulti(), str, len, _pnt(str), i)
 end
 
-_nextind(::CodeUnitSingle, str, i) = Int(i) + 1
+@propagate_inbounds function _thisind(::CodeUnitSingle, str, i)
+    @_inline_meta()
+    @boundscheck 0 <= i <= ncodeunits(str) || boundserr(str, i)
+    Int(i)
+end
+@propagate_inbounds function _prevind(::CodeUnitSingle, str, i)
+    @_inline_meta()
+    @boundscheck 0 < i <= ncodeunits(str)+1 || boundserr(str, i)
+    Int(i) - 1
+end
+
+@propagate_inbounds function _prevind(::CodeUnitSingle, str, i, nchar)
+    @_inline_meta()
+    nchar <= 0 && (nchar < 0 ? ncharerr(nchar) : return _thisind(CodeUnitSingle(), str, i))
+    @boundscheck 0 < i <= ncodeunits(str)+1 || boundserr(str, i)
+    max(Int(i) - nchar, 0)
+end
+
+@propagate_inbounds function _nextind(::CodeUnitSingle, str, i)
+    @_inline_meta()
+    @boundscheck 0 <= i <= ncodeunits(str) || boundserr(str, i)
+    Int(i) + 1
+end
 
 @propagate_inbounds function _nextind(::CodeUnitSingle, str, i, nchar)
-    @boundscheck nchar > 0 || ncharerr(nchar)
-    Int(i) + nchar
+    @_inline_meta()
+    nchar <= 0 && (nchar < 0 ? ncharerr(nchar) : return _thisind(CodeUnitSingle(), str, i))
+    @boundscheck 0 <= i <= ncodeunits(str) || boundserr(str, i)
+    min(Int(i) + nchar, ncodeunits(str)+1)
 end
 
 @propagate_inbounds function _ind2chr(::CodeUnitSingle, str, i)
@@ -80,60 +105,58 @@ _index(cs::CodePointStyle, ::Rev, str, i)        = _prevind(cs, str, i)
 _index(cs::CodePointStyle, ::Rev, str, i, nchar) = _prevind(cs, str, i, nchar)
 
 #  Call to specialized version via trait
-@propagate_inbounds lastindex(str::T) where {T<:Str} =
+@propagate_inbounds lastindex(str::MaybeSub{T}) where {T<:Str} =
     (@_inline_meta(); _lastindex(CodePointStyle(T), str))
-@propagate_inbounds getindex(str::T, i::Int) where {T<:Str} =
+@propagate_inbounds getindex(str::MaybeSub{T}, i::Int) where {T<:Str} =
     (@_inline_meta(); R = eltype(T) ; _getindex(CodePointStyle(T), R, str, i)::R)
 @propagate_inbounds next(str::T, i::Int) where {T<:Str} =
     (@_inline_meta(); R = eltype(T) ; _next(CodePointStyle(T), R, str, i)::Tuple{R,Int})
-@propagate_inbounds length(str::T) where {T<:Str} =
+@propagate_inbounds next(str::SubString{T}, i::Int) where {T<:Str} =
+    (@_inline_meta(); R = eltype(T) ; _next(CodePointStyle(T), R, str, i)::Tuple{R,Int})
+@propagate_inbounds length(str::MaybeSub{T}) where {T<:Str} =
     (@_inline_meta(); _length(CodePointStyle(T), str))
-@propagate_inbounds length(str::T, i::Int, j::Int) where {T<:Str} =
+@propagate_inbounds length(str::MaybeSub{T}, i::Int, j::Int) where {T<:Str} =
     (@_inline_meta(); _length(CodePointStyle(T), str, i, j))
-@propagate_inbounds thisind(str::T, i::Int) where {T<:Str} =
+@propagate_inbounds thisind(str::MaybeSub{T}, i::Int) where {T<:Str} =
     (@_inline_meta(); _thisind(CodePointStyle(T), str, i))
-@propagate_inbounds prevind(str::T, i::Int) where {T<:Str} =
+@propagate_inbounds prevind(str::MaybeSub{T}, i::Int) where {T<:Str} =
     (@_inline_meta(); _prevind(CodePointStyle(T), str, i))
-@propagate_inbounds nextind(str::T, i::Int) where {T<:Str} =
+@propagate_inbounds nextind(str::MaybeSub{T}, i::Int) where {T<:Str} =
     (@_inline_meta(); _nextind(CodePointStyle(T), str, i))
-@propagate_inbounds prevind(str::T, i::Int, nchar::Int) where {T<:Str} =
+@propagate_inbounds prevind(str::MaybeSub{T}, i::Int, nchar::Int) where {T<:Str} =
     (@_inline_meta(); _prevind(CodePointStyle(T), str, i, nchar))
-@propagate_inbounds nextind(str::T, i::Int, nchar::Int) where {T<:Str} =
+@propagate_inbounds nextind(str::MaybeSub{T}, i::Int, nchar::Int) where {T<:Str} =
     (@_inline_meta(); _nextind(CodePointStyle(T), str, i, nchar))
 
-@propagate_inbounds index(str::T, i::Int) where {T<:Str} =
+@propagate_inbounds index(str::MaybeSub{T}, i::Int) where {T<:Str} =
     (@_inline_meta(); _index(CodePointStyle(T), str, i))
-@propagate_inbounds index(::D, str::T, i::Int) where {T<:Str,D<:Direction} =
+@propagate_inbounds index(::D, str::MaybeSub{T}, i::Int) where {T<:Str,D<:Direction} =
     (@_inline_meta(); _index(CodePointStyle(T), D(), str, i))
-@propagate_inbounds index(::D, str::T, i::Int, nchar::Int) where {T<:Str,D<:Direction} =
+@propagate_inbounds index(::D, str::MaybeSub{T}, i::Int, nchar::Int) where {T<:Str,D<:Direction} =
     (@_inline_meta(); _index(CodePointStyle(T), D(), str, i, nchar))
 
 # This is deprecated on v0.7, recommended change to length(str, 1, i)
-@propagate_inbounds ind2chr(str::Union{T,SubString{T}}, i::Int) where {T<:Str} =
+@propagate_inbounds ind2chr(str::MaybeSub{T}, i::Int) where {T<:Str} =
     _ind2chr(CodePointStyle(T), str, i)
 # This is deprecated on v0.7, recommended change to nextind(str, 0, i)
-@propagate_inbounds chr2ind(str::Union{T,SubString{T}}, i::Int) where {T<:Str} =
+@propagate_inbounds chr2ind(str::MaybeSub{T}, i::Int) where {T<:Str} =
     _chr2ind(CodePointStyle(T), str, i)
 
-@propagate_inbounds function is_valid(str::Union{T,SubString{T}}, i::Integer) where {T<:Str}
+@propagate_inbounds function is_valid(str::MaybeSub{T}, i::Integer) where {T<:Str}
     @_inline_meta()
     @boundscheck 1 <= i <= ncodeunits(str) || return false
-    _isvalid_char_pos(CodePointStyle(T), str, i)
+    _isvalid_char_pos(CodePointStyle(T), cse(T), str, i)
 end
 
-_isvalid_char_pos(::CodeUnitSingle, str, i) = true
+_isvalid_char_pos(::CodeUnitSingle, C, str, i) = true
 
-@propagate_inbounds length(str::SubString{T}) where {T<:Str} =
-    _length(CodePointStyle(T), str)
-@propagate_inbounds length(str::SubString{T}, i::Int, j::Int) where {T<:Str} =
-    (@_inline_meta(); _length(CodePointStyle(T), str, i, j))
-
-@propagate_inbounds _reverseind(::CodeUnitSingle, str::Union{T,SubString{T}}, i) where {T<:Str} =
+@propagate_inbounds _reverseind(::CodeUnitSingle, str::MaybeSub{T}, i) where {T<:Str} =
     (@_inline_meta(); ncodeunits(str) + 1 - i)
-@propagate_inbounds reverseind(str::Union{T,SubString{T}}, i::Integer) where {T<:Str} =
+@propagate_inbounds reverseind(str::MaybeSub{T}, i::Integer) where {T<:Str} =
     _reverseind(CodePointStyle(T), str, i)
 
-@propagate_inbounds function _collectstr(::CodeUnitMulti, ::Type{S}, str::T) where {S,T<:Str}
+@propagate_inbounds function _collectstr(::CodeUnitMulti, ::Type{S},
+                                         str::MaybeSub{T}) where {S,T<:Str}
     len = _length(CodeUnitMulti(), str)
     vec = create_vector(S, len)
     pos = 1
@@ -143,7 +166,8 @@ _isvalid_char_pos(::CodeUnitSingle, str, i) = true
     vec
 end
 
-@propagate_inbounds function _collectstr(::CodeUnitSingle, ::Type{S}, str::T) where {S,T<:Str}
+@propagate_inbounds function _collectstr(::CodeUnitSingle, ::Type{S},
+                                         str::MaybeSub{T}) where {S,T<:Str}
     len, pnt = _lenpnt(str)
     vec = create_vector(S, len)
     cpt = eltype(T)
@@ -157,8 +181,8 @@ end
     vec
 end
 
-@propagate_inbounds collect(str::T) where {T<:Str} =
-    _collectstr(CodePointStyle(T), eltype(T), str)
+@propagate_inbounds collect(str::MaybeSub{T}) where {T<:Str} =
+    @preserve str _collectstr(CodePointStyle(T), eltype(T), str)
 
 # An optimization here would be to check just if they are the same type, but
 # rather if they are the same size with a compatible encoding, i.e. like
@@ -198,15 +222,6 @@ convert(::Type{T}, ch::Signed) where {T<:Str} = ch < 0 ? ncharerr(ch) : convert(
 Str(str::SubString{<:Str{C}}) where {C<:Byte_CSEs} =
     Str(C, unsafe_string(pointer(str.string, str.offset+1), str.ncodeunits))
 
-#=
-function cmp(a::SubString{String}, b::SubString{String})
-    na = sizeof(a)
-    nb = sizeof(b)
-    c = ccall(:memcmp, Int32, (Ptr{UInt8}, Ptr{UInt8}, UInt),
-              pointer(a), pointer(b), min(na, nb))
-    return c < 0 ? -1 : c > 0 ? +1 : cmp(na, nb)
-end
-=#
 # don't make unnecessary copies when passing substrings to C functions
 cconvert(::Type{Ptr{UInt8}}, str::SubString{<:ByteStr}) = str
 cconvert(::Type{Ptr{Int8}},  str::SubString{<:ByteStr}) = str
@@ -236,5 +251,5 @@ function _reverse(::CodeUnitMulti, ::Type{C}, len, str) where {C<:CSE}
     @preserve str _reverse(CodeUnitMulti(), C, len, _pnt(str))
 end
 
-reverse(str::T) where {C<:CSE,T<:Union{Str{C},SubString{Str{C}}}} =
-    _reverse(CodePointStyle(str), C, ncodeunits(str), str)
+reverse(str::MaybeSub{T}) where {C<:CSE,T<:Str{C}} =
+    _reverse(CodePointStyle(T), C, ncodeunits(str), str)

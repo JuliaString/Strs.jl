@@ -71,7 +71,7 @@ const UTF_ERR_NORMALIZE         = " is not one of :NFC, :NFD, :NFKC, :NFKD"
 @noinline unierror(err, v)       = unierror(string(":", v, err))
 @noinline nulerr()               = unierror("cannot convert NULL to string")
 @noinline neginderr(s, n)        = unierror("Index ($n) must be non negative")
-@noinline ncharerr(n)            = unierror(string("nchar (", n, ") must be greater than 0"))
+@noinline ncharerr(n)            = unierror(string("nchar (", n, ") must be not be negative"))
 @noinline codepoint_error(T, v)  = unierror(string("Invalid CodePoint: ", T, " 0x", outhex(v)))
 @noinline argerror(startpos, endpos) =
     unierror(string("End position ", endpos, " is less than start position (", startpos, ")"))
@@ -642,16 +642,21 @@ function _memcmp(apnt::Ptr{OthChr}, bpnt::Ptr{OthChr}, len)
     0
 end
 
+# These should probably be handled by traits, or dispatched by getting the codeunit type for each
+_memcmp(a::Union{String, ByteStr},
+        b::Union{String, ByteStr, SubString{String}, SubString{<:ByteStr}}, siz) =
+    _memcmp(_pnt(a), _pnt(b), siz)
+_memcmp(a::SubString{<:Union{String, ByteStr}}, b::Union{String, ByteStr}, siz) =
+    _memcmp(_pnt(a), _pnt(b), siz)
 _memcmp(a::SubString{<:Union{String, ByteStr}}, b::SubString{<:Union{String, ByteStr}}, siz) =
-    _memcmp(pointer(a), pointer(b), siz)
-_memcmp(a::SubString{<:WordStr}, b::SubString{<:WordStr}, siz) =
-    _memcmp(pointer(a), pointer(b), siz)
+    _memcmp(_pnt(a), _pnt(b), siz)
+
+_memcmp(a::WordStr, b::MaybeSub{<:WordStr}, siz) = _memcmp(_pnt(a), _pnt(b), siz)
+_memcmp(a::QuadStr, b::MaybeSub{<:QuadStr}, siz) = _memcmp(_pnt(a), _pnt(b), siz)
+_memcmp(a::SubString{<:WordStr}, b::WordStr, siz) = _memcmp(_pnt(a), _pnt(b), siz)
+_memcmp(a::SubString{<:QuadStr}, b::QuadStr, siz) = _memcmp(_pnt(a), _pnt(b), siz)
 _memcmp(a::SubString{<:WordStr}, b::SubString{<:WordStr}, siz) = _memcmp(_pnt(a), _pnt(b), siz)
 _memcmp(a::SubString{<:QuadStr}, b::SubString{<:QuadStr}, siz) = _memcmp(_pnt(a), _pnt(b), siz)
-
-_memcmp(a::Union{String, ByteStr}, b::Union{String, ByteStr}, siz) = _memcmp(_pnt(a), _pnt(b), siz)
-_memcmp(a::WordStr, b::WordStr, siz) = _memcmp(_pnt(a), _pnt(b), siz)
-_memcmp(a::QuadStr, b::QuadStr, siz) = _memcmp(_pnt(a), _pnt(b), siz)
 
 _memcpy(dst::Ptr{UInt8}, src::Ptr, siz) =
     ccall(:memcpy, Ptr{UInt8}, (Ptr{Cvoid}, Ptr{Cvoid}, UInt), dst, src, siz)
