@@ -141,7 +141,7 @@ match(re::Regex, str::Str{_LatinCSE}, idx::Integer, add_opts::UInt32=UInt32(0)) 
 
 const StrOrSubStr{T} = Union{T,SubString{<:T}}
 
-function _fnd(::Type{C}, re, str, idx) where {C}
+function _find(::Type{C}, re, str, idx) where {C}
     if idx > ncodeunits(str)
         @boundscheck boundserr(str, idx)
         return _not_found
@@ -151,15 +151,15 @@ function _fnd(::Type{C}, re, str, idx) where {C}
      ? ((Int(re.ovec[1])+1):prevind(str,Int(re.ovec[2])+1)) : _not_found)
 end
 
-fnd(::Type{Fwd}, re::Regex, str::StrOrSubStr{AbstractString}, idx::Integer) =
+find(::Type{Fwd}, re::Regex, str::StrOrSubStr{AbstractString}, idx::Integer) =
     throw(ArgumentError("regex search is only available for the String or Str types with " *
                         "codeunit == UInt8, or substrings of those types, use UTF8Str to convert"))
 
-fnd(::Type{Fwd}, re::Regex, str::StrOrSubStr{Str{C}}, idx::Integer) where {C<:Regex_CSEs} =
-    _fnd(C, re, str, idx)
-fnd(::Type{Fwd}, re::Regex, str::StrOrSubStr{Str{C}}, idx::Integer) where {C<:UTF8CSE} =
-    _fnd(C, re, str, idx)
-fnd(::Type{Fwd}, re::Regex, str::StrOrSubStr{Str{C}}, idx::Integer) where {C<:_LatinCSE} =
-    _fnd(LatinCSE, re, str, idx)
-fnd(::Type{Fwd}, re::Regex, str::StrOrSubStr{String}, idx::Integer) =
-    _fnd(String, re, str, idx)
+find(::Type{Fwd}, re::Regex, str::StrOrSubStr{Str{C}}, idx::Integer) where {C<:Regex_CSEs} =
+    _find(C, re, str, idx)
+find(::Type{Fwd}, re::Regex, str::StrOrSubStr{Str{C}}, idx::Integer) where {C<:UTF8CSE} =
+    _find(C, re, str, idx)
+find(::Type{Fwd}, re::Regex, str::StrOrSubStr{Str{C}}, idx::Integer) where {C<:_LatinCSE} =
+    _find(LatinCSE, re, str, idx)
+find(::Type{Fwd}, re::Regex, str::StrOrSubStr{String}, idx::Integer) =
+    _find(String, re, str, idx)

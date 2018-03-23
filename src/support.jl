@@ -522,10 +522,11 @@ byte_string_classify(s::ByteStr) = byte_string_classify(s.data)
     # 1: valid ASCII
     # 2: valid UTF-8
 
-is_valid(::Type{ASCIIStr},  s::Vector{UInt8}) = byte_string_classify(s) == 1
+is_valid(::Type{ASCIIStr},  s::Vector{UInt8}) = is_ascii(s)
 is_valid(::Type{UTF8Str},   s::Vector{UInt8}) = byte_string_classify(s) != 0
-is_valid(::Type{LatinStr},  s::Vector{UInt8}) = true
-is_valid(::Type{_LatinStr}, s::Vector{UInt8}) = true
+is_valid(::Type{<:Str{LatinCSE}},  s::Vector{UInt8}) = true
+# This should be optimized, stop at first character > 0x7f
+is_valid(::Type{<:Str{_LatinCSE}}, s::Vector{UInt8}) = !is_ascii(s)
 
 function _cvtsize(::Type{T}, dat, len) where {T <: CodeUnitTypes}
     buf, pnt = _allocate(T, len)
@@ -544,7 +545,7 @@ end
 (*)(s1::Union{C1, S1}, ss::Union{C2, S2}...) where {C1<:CodePoint,C2<:CodePoint,S1<:Str,S2<:Str} =
     string(s1, ss...)
 
-thisind(s::Str, i::Integer) = thisind(s, Int(i))
+thisind(str::MaybeSub{<:Str}, i::Integer) = thisind(str, Int(i))
 
 # Todo: fix this to correctly write out characters using the encoding of S
 function filter(f, s::T) where {T<:Str}

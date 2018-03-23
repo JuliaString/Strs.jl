@@ -171,7 +171,7 @@ function is_ascii(vec::Vector{T}) where {T<:CodeUnitTypes}
         pnt = pointer(vec)
         fin = pnt + siz
         # Check first code units
-        while (reinterpret(UInt, pnt) & 3) != 0
+        while (reinterpret(UInt, pnt) & (CHUNKSZ-1)) != 0
             unsafe_load(pnt) > 0x7f && return false
             (pnt += sizeof(T)) < fin || return true
         end
@@ -338,7 +338,7 @@ end
         beg = _pnt(str)
         pnt = beg + pos - 1
         fin = beg + siz
-        nchar == 0 && (checkcont(pnt) ? index_err(str, pos) : return pos)
+        nchar == 0 && (checkcont(pnt) ? index_error(str, pos) : return pos)
         cu = get_codeunit(pnt)
         pnt += (cu < 0x80 ? 1
                 : (cu < 0xc0
@@ -361,7 +361,7 @@ end
     @preserve str begin
         beg = _pnt(str)
         pnt = beg + pos
-        nchar == 0 && (checkcont(pnt-1) ? index_err(str, pos) : return pos)
+        nchar == 0 && (checkcont(pnt-1) ? index_error(str, pos) : return pos)
         # This could be sped up, by looking at chunks, and if all ASCII (common case),
         # simply move back 8
         while (pnt -= 1) >= beg && (nchar -= !checkcont(pnt)) > 0 ; end

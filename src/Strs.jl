@@ -160,21 +160,17 @@ const unimod = @static isdefined(Base, :UTF8proc) ? :UTF8proc : :Unicode
 const is_grapheme_break  = isgraphemebreak
 const is_grapheme_break! = isgraphemebreak!
 
-@static V6_COMPAT || import Base.GC: @preserve
-@static V6_COMPAT && include("compat.jl")
-@static isdefined(Base, :codeunits) || include("codeunits.jl")
-@static isdefined(Base, :Fix2)      || include("fix2.jl")
-
 # Work around deprecation on v0.7
 @static if V6_COMPAT
     import Base: find
+    include("compat.jl")
+    include("codeunits.jl")
+    include("fix2.jl")
 else
+    import Base.GC: @preserve
     import Base: findall
     const find = findall
-    #function find end
 end
-export fnd
-const fnd = find
 
 # Handle changes in array allocation
 create_vector(T, len)  = @static V6_COMPAT ? Vector{T}(len) : Vector{T}(undef, len)

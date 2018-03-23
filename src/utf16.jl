@@ -69,7 +69,7 @@ function _nextind(::CodeUnitMulti, str::MS_UTF16, pos::Int, nchar::Int)
         pnt = bytoff(beg, pos - 1)
         fin = bytoff(beg, siz)
         cu = get_codeunit(pnt)
-        nchar == 0 && (is_surrogate_trail(cu) ? index_err(str, pos) : return pos)
+        nchar == 0 && (is_surrogate_trail(cu) ? index_error(str, pos) : return pos)
         is_surrogate_trail(cu) && (pnt += 2)
         # pnt should now point to a valid start of a character
         # This could be sped up, by looking at chunks, and if all ASCII (common case),
@@ -87,7 +87,7 @@ function _prevind(::CodeUnitMulti, str::MS_UTF16, pos::Int, nchar::Int)
     @preserve str begin
         beg = _pnt(str)
         pnt = bytoff(beg, pos - 1)
-        nchar == 0 && (is_surrogate_trail(get_codeunit(pnt)) ? index_err(str, pos) : return pos)
+        nchar == 0 && (is_surrogate_trail(get_codeunit(pnt)) ? index_error(str, pos) : return pos)
         # This could be sped up, by looking at chunks, and if all ASCII (common case),
         # simply move back 8
         while pnt >= beg
