@@ -71,11 +71,11 @@ const UTF_ERR_NORMALIZE         = " is not one of :NFC, :NFD, :NFKC, :NFKD"
 @noinline unierror(err, v)       = unierror(string(":", v, err))
 @noinline nulerr()               = unierror("cannot convert NULL to string")
 @noinline neginderr(s, n)        = unierror("Index ($n) must be non negative")
-@noinline ncharerr(n)            = unierror(string("nchar (", n, ") must be not be negative"))
 @noinline codepoint_error(T, v)  = unierror(string("Invalid CodePoint: ", T, " 0x", outhex(v)))
 @noinline argerror(startpos, endpos) =
     unierror(string("End position ", endpos, " is less than start position (", startpos, ")"))
 @noinline repeaterr(cnt) = throw(ArgumentError("repeat count $cnt must be >= 0"))
+@noinline ncharerr(n) = throw(ArgumentError(string("nchar (", n, ") must be not be negative")))
 
 @static isdefined(Base, :string_index_err) && (const index_error = Base.string_index_err)
 
@@ -515,6 +515,8 @@ function check_string(dat, startpos, endpos = lastindex(dat); kwargs...)
     unsafe_check_string(dat, startpos, endpos; kwargs...)
 end
 
+byte_string_classify(data) =
+    ccall(:u8_isvalid, Int32, (Ptr{UInt8}, Int), data, length(data))
 byte_string_classify(data::Vector{UInt8}) =
     ccall(:u8_isvalid, Int32, (Ptr{UInt8}, Int), data, length(data))
 byte_string_classify(s::ByteStr) = byte_string_classify(s.data)
@@ -528,16 +530,27 @@ is_valid(::Type{<:Str{LatinCSE}},  s::Vector{UInt8}) = true
 # This should be optimized, stop at first character > 0x7f
 is_valid(::Type{<:Str{_LatinCSE}}, s::Vector{UInt8}) = !is_ascii(s)
 
+is_valid(::Type{UniStr}, s::String) = isvalid(s)
+is_valid(::Type{<:Str{C}}, s::String) where {C<:Union{UTF8CSE,UTF16CSE,UTF32CSE}} = isvalid(s)
+is_valid(::Type{<:Str{ASCIICSE}}, s::String) = is_ascii(s)
+is_valid(::Type{<:Str{UCS2CSE}}, s::String)  = is_bmp(s)
+is_valid(::Type{<:Str{LatinCSE}}, s::String) = is_latin(s)
+
 function _cvtsize(::Type{T}, dat, len) where {T <: CodeUnitTypes}
     buf, pnt = _allocate(T, len)
-    @inbounds for i = 1:len ; set_codeunit!(pnt, i, get_codeunit(dat, i)) ; end
+    fin = bytoff(pnt, len)
+    while pnt < fin
+        @inbounds set_codeunit!(pnt, get_codeunit(dat, i))
+        pnt += sizeof(T)
+        i += 1
+    end
     buf
 end
 
 # Function barrier here, to allow specialization
 function _copy!(out, pnt::Ptr{T}, len) where {T}
     @inbounds for i in 1:len
-        set_codeunit!(out, i, unsafe_load(pnt))
+        set_codeunit!(out, i, get_codeunit(pnt))
         pnt += sizeof(T)
     end
 end
@@ -562,7 +575,7 @@ end
 # I've implemented those
 
 first(str::Str, n::Integer) = str[1:min(end, nextind(str, 0, n))]
-last(str::Str, n::Integer) = str[max(1, prevind(str, ncodeunits(str)+1, n)):end]
+last(str::Str, n::Integer)  = str[max(1, prevind(str, ncodeunits(str)+1, n)):end]
 
 const Chrs = @static V6_COMPAT ? Union{Char,AbstractChar} : CodePoint
 

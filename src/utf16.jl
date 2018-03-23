@@ -157,6 +157,18 @@ end
 
 get_supplementary(lead::Unsigned, trail::Unsigned) = (UInt32(lead-0xd7f7)<<10 + trail)
 
+@propagate_inbounds function _getindex(::CodeUnitMulti, T, str::MS_UTF16, pos::Int)
+    @boundscheck pos <= _len(str) || boundserr(str, pos)
+    @preserve str begin
+        pnt = _pnt(str) + (pos<<1)
+        ch = get_codeunit(pnt - 2)
+        is_surrogate_trail(ch) && index_error(str, pos)
+        (is_surrogate_lead(ch)
+         ? (T(get_supplementary(ch, get_codeunit(pnt))), pos + 2)
+         : (T(ch), pos + 1))
+    end
+end
+
 function _nextcpfun(::CodeUnitMulti, ::Type{UTF16CSE}, pnt)
     ch = get_codeunit(pnt)
     (is_surrogate_lead(ch)
@@ -166,11 +178,13 @@ end
 
 @propagate_inbounds function _next(::CodeUnitMulti, T, str::MS_UTF16, pos::Int)
     @boundscheck pos <= _len(str) || boundserr(str, pos)
-    pnt = _pnt(str) + (pos<<1)
-    ch = get_codeunit(pnt - 2)
-    (is_surrogate_lead(ch)
-     ? (T(get_supplementary(ch, get_codeunit(pnt))), pos + 2)
-     : (T(ch), pos + 1))
+    @preserve str begin
+        pnt = _pnt(str) + (pos<<1)
+        ch = get_codeunit(pnt - 2)
+        (is_surrogate_lead(ch)
+         ? (T(get_supplementary(ch, get_codeunit(pnt))), pos + 2)
+         : (T(ch), pos + 1))
+    end
 end
 
 @propagate_inbounds @inline function _thisind(::CodeUnitMulti, str::MS_UTF16, len, pnt, pos)
@@ -181,14 +195,14 @@ end
 @propagate_inbounds @inline function _nextind(::CodeUnitMulti, str::MS_UTF16, pos::Int)
     pos == 0 && return 1
     @boundscheck 1 <= pos <= _len(str) || boundserr(str, pos)
-    pos + 1 + is_surrogate_lead(get_codeunit(_pnt(str), pos))
+    @preserve str pos + 1 + is_surrogate_lead(get_codeunit(_pnt(str), pos))
 end
 
 @propagate_inbounds @inline function _prevind(::CodeUnitMulti, str::MS_UTF16, pos::Int)
     (pos -= 1) == 0 && return 0
     numcu = _len(str)
     @boundscheck 0 < pos <= numcu || boundserr(str, pos + 1)
-    pos - is_surrogate_trail(get_codeunit(_pnt(str), pos))
+    @preserve str pos - is_surrogate_trail(get_codeunit(_pnt(str), pos))
 end
 
 function reverseind(str::MS_UTF16, i::Integer)
@@ -212,7 +226,7 @@ function _reverse(::CodeUnitMulti, ::Type{UTF16CSE}, len, pnt::Ptr{T}) where {T<
 end
 
 @inline _isvalid_char_pos(::CodeUnitMulti, ::Type{UTF16CSE}, str, pos::Integer) =
-    !is_surrogate_trail(get_codeunit(_pnt(str), pos))
+    @preserve str !is_surrogate_trail(get_codeunit(_pnt(str), pos))
 
 function is_valid(::Type{<:UCS2Strings}, data::AbstractArray{UInt16})
     @inbounds for ch in data
@@ -287,7 +301,7 @@ function convert(::Type{<:Str{C}}, str::Str{UTF16CSE}) where {C<:UCS2_CSEs}
     (siz = sizeof(str)) == 0 && return empty_str(C)
     # Check if conversion is valid
     is_bmp(str) || unierror(UTF_ERR_INVALID_UCS2)
-    Str(C, _cvtsize(UInt16, _pnt(str), len))
+    @preserve str Str(C, _cvtsize(UInt16, _pnt(str), len))
 end
 
 function is_valid(::Type{<:Str{UTF16CSE}}, data::AbstractArray{UInt16})
@@ -398,8 +412,8 @@ function _encode_utf16(pnt::Ptr{UInt8}, len)
     buf
 end
 
-_encode_utf16(dat::Vector{UInt8}, len) = _encode_utf16(pointer(dat), len)
-_encode_utf16(str::String, len)        = _encode_utf16(_pnt(str), len)
+_encode_utf16(dat::Vector{UInt8}, len) = @preserve dat _encode_utf16(pointer(dat), len)
+_encode_utf16(str::String, len)        = @preserve str _encode_utf16(_pnt(str), len)
 
 @inline _cvt_16_to_utf8(::Type{<:Str{UTF16CSE}}, pnt, len) = _transcode_utf8(pnt, len)
 @inline _cvt_16_to_utf8(::Type{<:UCS2Strings}, pnt, len)   = _encode_utf8(pnt, len)
@@ -408,12 +422,15 @@ _encode_utf16(str::String, len)        = _encode_utf16(_pnt(str), len)
 function _cvt_utf8(::Type{T}, str::S) where {T<:Union{String, Str{UTF8CSE}}, S}
     # handle zero length string quickly
     (len = _len(str)) == 0 && return empty_str(T)
-    # get number of bytes to allocate (use faster count for validated strings)
-    pnt = _pnt(str)
-    len, flags, num4byte, num3byte, num2byte, latin1 = count_chars(S, pnt, len)
-    Str(cse(T), (flags == 0
-                 ? _cvtsize(UInt8, pnt, len)
-                 : _cvt_16_to_utf8(S, pnt, len + latin1 + num2byte + num3byte*2 + num4byte*3)))
+    @preserve str begin
+        # get number of bytes to allocate (use faster count for validated strings)
+        pnt = _pnt(str)
+        len, flags, num4byte, num3byte, num2byte, latin1 = count_chars(S, pnt, len)
+        Str(cse(T),
+            (flags == 0
+             ? _cvtsize(UInt8, pnt, len)
+             : _cvt_16_to_utf8(S, pnt, len + latin1 + num2byte + num3byte*2 + num4byte*3)))
+    end
 end
 
 # Split this way to avoid ambiguity errors

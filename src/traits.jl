@@ -210,7 +210,7 @@ is_valid(::Type{T}, v::Signed) where {T<:CodePoint} =
 is_valid(::Type{Char}, ch::Union{Text1Chr, ASCIIChr, LatinChars, UCS2Chr, UTF32Chr}) = true
 is_valid(::Type{Char}, ch::Text2Chr) = is_bmp(ch)
 is_valid(::Type{Char}, ch::Text4Chr) = is_unicode(ch)
-is_valid(::Type{T},    ch::Char) where {T<:CodePoint} = is_valid(T, ch%UInt32)
+is_valid(::Type{T},    ch::Char) where {T<:CodePoint} = Base.isvalid(ch) && is_valid(T, ch%UInt32)
 
 # For now, there is only support for immutable `Str`s, when mutable `Str`s are added.
 

@@ -273,26 +273,19 @@ basecse(::Type{_UTF32CSE}) = UTF32CSE
 const AbsChar = @static isdefined(Base, :AbstractChar) ? AbstractChar : Union{Char, CodePoint}
 
 ## Get the character set / encoding used by a string type
-cse(::Type{<:AbstractString}) = UTF8CSE # Default unless overridden
-cse(::Type{String}) = UniPlusCSE         # allows invalid sequences
+cse(::Type{<:AbstractString}) = UniPlusCSE     # allows invalid sequences
 cse(::Type{<:SubString{T}}) where {T} = cse(T)
 cse(::Type{<:SubString{<:Str{C}}}) where {C<:SubSet_CSEs} = basecse(C)
 cse(::Type{<:Str{C}}) where {C<:CSE} = C
 cse(str::AbstractString) = cse(typeof(str))
 
-charset(::Type{<:AbstractString}) = UTF32CharSet # Default unless overridden
-charset(::Type{String}) = UniPlusCharSet # allows invalid sequences
-charset(::Type{<:SubString{T}}) where {T} = charset(T)
-charset(::Type{<:SubString{<:Str{C}}}) where {C<:SubSet_CSEs} = charset(basecse(C))
+charset(::Type{T}) where {T<:AbstractString} = charset(cse(T)) # Default unless overridden
 charset(::Type{C}) where {CS,C<:CSE{CS}} = CS
-charset(::Type{<:Str{C}}) where {C} = charset(C)
-charset(str::AbstractString) = charset(typeof(str))
+charset(str::AbstractString) = charset(cse(str))
 
-encoding(::Type{<:AbstractString}) = UTF8Encoding # Julia likes to think of this as the default
-encoding(::Type{<:SubString{T}}) where {T} = encoding(T)
+encoding(::Type{T}) where {T<:AbstractString} = encoding(cse(T)) # Default unless overridden
 encoding(::Type{C}) where {CS,E,C<:CSE{CS,E}} = E
-encoding(::Type{<:Str{C}}) where {C} = encoding(C)
-encoding(str::AbstractString) = encoding(typeof(str))
+encoding(str::AbstractString) = encoding(cse(str))
 
 promote_rule(::Type{T}, ::Type{T}) where {T<:CodePoint} = T
 promote_rule(::Type{Text2Chr}, ::Type{Text1Chr}) = Text2Chr

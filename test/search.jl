@@ -13,42 +13,42 @@ const u8map = [1, 4, 5, 7, 8, 9, 10, 11, 12, 13, 16, 17, 19, 20, 21, 22, 23, 24,
 function test2(dir, P, str, list)
     for (p, res) in list
         pat = typeof(p) == Regex ? p : P(p)
-        (r = fnd(dir, pat, str)) == res ||
-            println("fnd($dir, $(typeof(pat)):\"$pat\", $(typeof(str)):\"$str\") => $r != $res")
-        @test fnd(dir, pat, str) == res
+        (r = find(dir, pat, str)) == res ||
+            println("find($dir, $(typeof(pat)):\"$pat\", $(typeof(str)):\"$str\") => $r != $res")
+        @test find(dir, pat, str) == res
     end
 end
 
 function test3(dir, P, str, list)
     for (p, beg, res) in list
         pat = typeof(p) == Regex ? p : P(p)
-        (r = fnd(dir, pat, str, beg)) == res ||
-            println("fnd($dir, $(typeof(pat)):\"$pat\", $(typeof(str)):\"$str\", $beg) => $r != $res")
-        @test fnd(dir, pat, str, beg) == res
+        (r = find(dir, pat, str, beg)) == res ||
+            println("find($dir, $(typeof(pat)):\"$pat\", $(typeof(str)):\"$str\", $beg) => $r != $res")
+        @test find(dir, pat, str, beg) == res
     end
 end
 
 function test2ch(dir, C, str, list)
     for (p, res) in list
         pat = cvtchar(C, p)
-        (r = fnd(dir, pat, str)) == res ||
-            println("fnd($dir, $(typeof(p)):\"$pat\"), $(typeof(str)):\"$str\") => $r != $res")
-        (r = fnd(dir, ==(pat), str)) == res ||
-            println("fnd($dir, ==($(typeof(pat)):\"$pat\"), $(typeof(str)):\"$str\") => $r != $res")
-        @test fnd(dir, pat, str) == res
-        @test fnd(dir, ==(pat), str) == res
+        (r = find(dir, pat, str)) == res ||
+            println("find($dir, $(typeof(p)):\"$pat\"), $(typeof(str)):\"$str\") => $r != $res")
+        (r = find(dir, ==(pat), str)) == res ||
+            println("find($dir, ==($(typeof(pat)):\"$pat\"), $(typeof(str)):\"$str\") => $r != $res")
+        @test find(dir, pat, str) == res
+        @test find(dir, ==(pat), str) == res
     end
 end
 
 function test3ch(dir, C, str, list)
     for (p, beg, res) in list
         pat = cvtchar(C, p)
-        (r = fnd(dir, pat, str, beg)) == res ||
-            println("fnd($dir, $(typeof(pat)):'$pat', $(typeof(str)):\"$str\", $beg) => $r != $res")
-        (r = fnd(dir, ==(pat), str, beg)) == res ||
-            println("fnd($dir, ==($(typeof(pat)):'$pat'), $(typeof(str)):\"$str\", $beg) => $r != $res")
-        @test fnd(dir, pat, str, beg) == res
-        @test fnd(dir, ==(pat), str, beg) == res
+        (r = find(dir, pat, str, beg)) == res ||
+            println("find($dir, $(typeof(pat)):'$pat', $(typeof(str)):\"$str\", $beg) => $r != $res")
+        (r = find(dir, ==(pat), str, beg)) == res ||
+            println("find($dir, ==($(typeof(pat)):'$pat'), $(typeof(str)):\"$str\", $beg) => $r != $res")
+        @test find(dir, pat, str, beg) == res
+        @test find(dir, ==(pat), str, beg) == res
     end
 end
 
@@ -62,14 +62,14 @@ end
             empty_pred = in(C[])
             @testset "BoundsError" begin
                 for ind in (0, lst, lst+1), dir in (Fwd, Rev)
-                    @test_throws BoundsError fnd(dir, SubString(P(""),1,1), str, ind)
-                    @test_throws BoundsError fnd(dir, ==(cvtchar(C,'a')), str, ind)
-                    @test_throws BoundsError fnd(dir, ==(cvtchar(C,'∀')), str, ind)
-                    @test_throws BoundsError fnd(dir, ==(cvtchar(C,'ε')), str, ind)
-                    @test_throws BoundsError fnd(dir, empty_pred, str, ind)
+                    @test_throws BoundsError find(dir, SubString(P(""),1,1), str, ind)
+                    @test_throws BoundsError find(dir, ==(cvtchar(C,'a')), str, ind)
+                    @test_throws BoundsError find(dir, ==(cvtchar(C,'∀')), str, ind)
+                    @test_throws BoundsError find(dir, ==(cvtchar(C,'ε')), str, ind)
+                    @test_throws BoundsError find(dir, empty_pred, str, ind)
                 end
             end
-            @testset "fnd(Fwd, ==(ch)...)" begin
+            @testset "find(Fwd, ==(ch)...)" begin
                 let pats = ('x', '\0', '\u80', '∀', 'H', 'l', ',', '\n'),
                     res  = (0,   0,    0,      0,   1,   3,   6,   14)
                     test2ch(Fwd, C, str, zip(pats, res))
@@ -80,7 +80,7 @@ end
                     test3ch(Fwd,  C, str, zip(pats, pos, res))
                 end
             end
-            @testset "fnd(Rev, ==(ch)...)" begin
+            @testset "find(Rev, ==(ch)...)" begin
                 let pats = ('x', '\0', '\u80', '∀', 'H', 'l', ',', '\n'),
                     res  = (0, 0, 0, 0, 1, 11, 6, 14)
                     test2ch(Rev,  C, str, zip(pats, res))
@@ -136,14 +136,14 @@ end
             @testset "find empty string,..." begin
                 i = 1
                 while i <= ncodeunits(str)
-                    @test fnd(Fwd, emptyP, str, i) == i:i-1
-                    @test fnd(Rev, emptyP, str, i) == i:i-1
+                    @test find(Fwd, emptyP, str, i) == i:i-1
+                    @test find(Rev, emptyP, str, i) == i:i-1
                     i = nextind(str, i)
                 end
             end
 
-            @test fnd(Fwd, emptyP, emptyT) == 1:0
-            @test fnd(Rev, emptyP, emptyT) == 1:0
+            @test find(Fwd, emptyP, emptyT) == 1:0
+            @test find(Rev, emptyP, emptyT) == 1:0
 
             @testset "Regex" begin
                 # string forward search with a single-char regex
@@ -158,9 +158,9 @@ end
                 end
                 i = 1
                 while i <= ncodeunits(str)
-                    @test fnd(Fwd, r"."s, str, i) == i:i
+                    @test find(Fwd, r"."s, str, i) == i:i
                     # string forward search with a zero-char regex
-                    @test fnd(Fwd, r"", str, i) == i:i-1
+                    @test find(Fwd, r"", str, i) == i:i-1
                     i = nextind(str, i)
                 end
                 let pats = (r"xx", r"fo", r"oo", r"o,", r",b", r"az"),
@@ -185,33 +185,33 @@ end
             C = eltype(P)
             @testset "BoundsError" begin
                 for ch = ('z', '∀', 'ε', 'a'), ind = (0, lst, lst+1)
-                    @test_throws BoundsError fnd(Fwd, cvtchar(C, ch), str, ind)
+                    @test_throws BoundsError find(Fwd, cvtchar(C, ch), str, ind)
                 end
             end
             @testset "Index Error" begin
-                @test_throws IndexError fnd(Fwd, cvtchar(C, '∀'), str, 2)
-                @test_throws IndexError fnd(Fwd, cvtchar(C, '∃'), str, 15)
-                @test_throws IndexError fnd(Fwd, cvtchar(C, 'δ'), str, 18)
+                @test_throws IndexError find(Fwd, cvtchar(C, '∀'), str, 2)
+                @test_throws IndexError find(Fwd, cvtchar(C, '∃'), str, 15)
+                @test_throws IndexError find(Fwd, cvtchar(C, 'δ'), str, 18)
             end
 
-            @testset "fnd(Fwd, ==(chr),..." begin
+            @testset "find(Fwd, ==(chr),..." begin
                 test2ch(Fwd, C, str,
                         (('z', 0), ('\0', 0), ('\u80', 0), ('∄', 0), ('∀', 1),
                          ('∃', 13), ('x', 26), ('δ', 17), ('ε', 5)))
                 test3ch(Fwd, C, str,
                         (('∀', 4, 0), ('∃', 16, 0), ('x', 27, 43), ('x', 44, 0)))
 
-                @test fnd(Fwd, cvtchar(C, 'δ'), str, nextind(str, 17)) == 33
-                @test fnd(Fwd, cvtchar(C, 'δ'), str, nextind(str, 33)) == 0
-                @test fnd(Fwd, cvtchar(C, 'ε'), str, nextind(str,  5)) == 54
+                @test find(Fwd, cvtchar(C, 'δ'), str, nextind(str, 17)) == 33
+                @test find(Fwd, cvtchar(C, 'δ'), str, nextind(str, 33)) == 0
+                @test find(Fwd, cvtchar(C, 'ε'), str, nextind(str,  5)) == 54
                 # These give BoundsError now
-                #@test fnd(Fwd, 'ε', str, nextind(str, 54)) == 0
+                #@test find(Fwd, 'ε', str, nextind(str, 54)) == 0
                 #for ch in ('ε', 'a')
-                #   @test fnd(Fwd, ==(ch), str, lst) == 0
+                #   @test find(Fwd, ==(ch), str, lst) == 0
                 #end
             end
 
-            @testset "fnd(Rev, ==(chr),..." begin
+            @testset "find(Rev, ==(chr),..." begin
                 test2ch(Rev, C, str,
                         zip(('z', '\0', '\u80', '∄', '∀', '∃', 'x', 'δ', 'ε'),
                             (  0,    0,      0,   0,   1,  13,  43,  33,  54)))
@@ -244,8 +244,8 @@ end
             @testset "find empty string,..." begin
                 i = 1
                 while i <= ncodeunits(str)
-                    @test fnd(Fwd, empty, str, i) == i:i-1
-                    @test fnd(Rev, empty, str, i) == i:i-1
+                    @test find(Fwd, empty, str, i) == i:i-1
+                    @test find(Rev, empty, str, i) == i:i-1
                     i = nextind(str, i)
                 end
             end
@@ -260,10 +260,10 @@ end
                     for (s, resf, resl) in zip(ustr, fwd, rev)
                         a = P(first(s))
                         b = T(last(s))
-                        @test fnd(Fwd, a, b) == resf
-                        @test fnd(Fwd, a, a) == resf
-                        @test fnd(Rev, a, b) == resl
-                        @test fnd(Rev, a, a) == resf
+                        @test find(Fwd, a, b) == resf
+                        @test find(Fwd, a, a) == resf
+                        @test find(Rev, a, b) == resl
+                        @test find(Rev, a, a) == resf
                     end
                 end
             end
@@ -278,13 +278,13 @@ end
                     res  = (0:-1, 0:-1,43:43, 0:-1,54:54,54:54)  # was 0:-1 for last
                     test3(Fwd, P, str, zip(pats, pos, res))
                 end
-                @test fnd(Fwd, r"∀", str)    == fnd(Fwd, r"\u2200", str)
-                @test fnd(Fwd, r"∀", str, 4) == fnd(Fwd, r"\u2200", str, 4)
+                @test find(Fwd, r"∀", str)    == find(Fwd, r"\u2200", str)
+                @test find(Fwd, r"∀", str, 4) == find(Fwd, r"\u2200", str, 4)
                 i = 1
                 while i <= ncodeunits(str)
-                    @test fnd(Fwd, r"."s, str, i) == i:i
+                    @test find(Fwd, r"."s, str, i) == i:i
                     # string forward search with a zero-char regex
-                    @test fnd(Fwd, r"", str, i) == i:i-1
+                    @test find(Fwd, r"", str, i) == i:i-1
                     i = nextind(str, i)
                 end
             end

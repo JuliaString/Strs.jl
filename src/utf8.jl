@@ -223,6 +223,11 @@ end
 
 is_unicode(str::Str{UTF8CSE}) = true
 
+function is_unicode(str::String)
+    len, flags = unsafe_check_string(str; accept_invalids = true)
+    
+end
+
 function _nextcpfun(::CodeUnitMulti, ::Type{UTF8CSE}, pnt)
     ch = get_codeunit(pnt)
     if ch < 0x80
@@ -236,6 +241,9 @@ function _nextcpfun(::CodeUnitMulti, ::Type{UTF8CSE}, pnt)
     end
 end
 
+_getindex(::CodeUnitMulti, ::Type{CP}, str::MS_UTF8, pos::Int) where {CP<:CodePoint} =
+    _next(CodeUnitMulti(), CP, str, pos)[1]
+
 # Gets next codepoint
 @propagate_inbounds function _next(::CodeUnitMulti, ::Type{T},
                                    str::MS_UTF8, pos::Int) where {T<:CodePoint}
@@ -246,6 +254,8 @@ end
         ch = get_codeunit(pnt)
         if ch < 0x80
             T(ch), pos + 1
+        elseif ch < 0xc0
+            index_error(str, pos)
         elseif ch < 0xe0
             T(get_utf8_2byte(pnt + 1, ch)), pos + 2
         elseif ch < 0xf0
@@ -333,12 +343,12 @@ end
     siz = ncodeunits(str)
     @boundscheck 0 <= pos <= siz || boundserr(str, pos)
     siz == 0 && return ifelse(nchar == 0, 0, 1)
-    pos == 0 && (pos = 1)
     @preserve str begin
         beg = _pnt(str)
         pnt = beg + pos - 1
         fin = beg + siz
-        nchar == 0 && (checkcont(pnt) ? index_error(str, pos) : return pos)
+        nchar == 0 && (pos != 0 && checkcont(pnt) ? index_error(str, pos) : return pos)
+        pos == 0 && (pos = 1; nchar -= 1; pnt += 1)
         cu = get_codeunit(pnt)
         pnt += (cu < 0x80 ? 1
                 : (cu < 0xc0
@@ -351,7 +361,7 @@ end
         while (nchar -= 1) > 0 && pnt < fin
             pnt += utf_trail(get_codeunit(pnt)) + 1
         end
-        Int(pnt - beg)
+        Int(pnt - beg + 1)
     end
 end
 
@@ -382,6 +392,7 @@ end
         @boundscheck lst > len && boundserr(str, lst)
         if lst != len
             ch = get_codeunit(pnt, lst)
+            println("getindex($(typeof(str))(\"$str\", $rng) => 0x$(outhex(ch))")
             is_valid_continuation(ch) && unierror(UTF_ERR_INVALID_INDEX, lst, ch)
         end
     end

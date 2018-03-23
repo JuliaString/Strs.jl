@@ -24,7 +24,7 @@ _nextcpfun(::CodeUnitSingle, ::Type{S}, pnt::Ptr{T}) where {S,T<:CodeUnitTypes} 
 _nextcp(::Type{T}, pnt) where {T} = _nextcpfun(CodePointStyle(T), T, pnt)
 
 @propagate_inbounds _getindex(::CodeUnitMulti, T, str, i::Int) =
-    _next(CodeUnitMulti(), T, str, i)[1]
+    _getindex(CodeUnitMulti(), T, str, i)
 
 @inline _length(::CodeUnitSingle, str) = ncodeunits(str)
 

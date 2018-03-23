@@ -12,11 +12,11 @@ Licensed under MIT License, see LICENSE.md
 @static if VERSION < v"0.7.0-DEV"
     import Base: is_assigned_char, normalize_string
     Base.is_assigned_char(ch::CodePoint) = is_assigned(ch)
-    Base.normalize_string(str::Str, opt) = normalize(str, opt)
+    Base.normalize_string(str::Str, opt::Symbol) = normalize(str, opt)
     Base.strwidth(str::Str) = text_width(str)
     Base.charwidth(ch::CodePoint) = text_width(ch)
 else
-    Base.Unicode.normalize(str::Str, opt) = normalize(str, opt)
+    Base.Unicode.normalize(str::Str, opt::Symbol) = normalize(str, opt)
     Base.Unicode.isassigned(ch::CodePoint) = is_assigned(ch)
     is_graphic(ch::Char) = is_graphic(codepoint(ch))
     is_alphanumeric(ch::Char) = is_alphanumeric(codepoint(ch))
