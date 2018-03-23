@@ -221,6 +221,9 @@ end
 empty_str(::Type{<:Str{C}}) where {C<:CSE} = empty_str(C)
 empty_str(::Type{String}) = empty_string
 
+typemin(::Type{T}) where {T<:Str} = empty_str(T)
+typemin(::T) where {T<:Str} = empty_str(T)
+
 """Union type for fast dispatching"""
 const UniStr = Union{ASCIIStr, _LatinStr, _UCS2Str, _UTF32Str}
 show(io::IO, ::Type{UniStr}) = print(io, :UniStr)

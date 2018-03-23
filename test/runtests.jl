@@ -1,9 +1,9 @@
 # This file includes code that was formerly a part of Julia.
-# License is MIT: http://julialang.org/license
+# License is MIT: LICENSE.md
 
 const V6_COMPAT = VERSION < v"0.7.0-DEV"
 
-@static V6_COMPAT ? (using Base.Test) : (using Test)
+@static V6_COMPAT ? (using Base.Test) : (using Test, Random, Unicode)
 
 using Strs
 import Strs: check_string, UTF_ERR_SHORT, UnicodeError, codepoint_adj, codepoint_rng
@@ -13,6 +13,23 @@ randchar(::Type{T}) where {T} = codepoint_adj(T, rand(codepoint_rng(T)))
 
 const IndexError = isdefined(Base, :StringIndexError) ? StringIndexError : UnicodeError
 
+# Should test GenericString also, once overthing else is working
+const UnicodeStringTypes = (String, UTF8Str, )
+    # (String, UTF16Str, UTF32Str, UniStr, UTF8Str)
+    # (String, UTF8Str)
+const ASCIIStringTypes = (String, UTF8Str, ASCIIStr, LatinStr)
+    #    (UnicodeStringTypes..., ASCIIStr, LatinStr, UCS2Str)
+
+function cvtchar(T, ch)
+    try 
+        T(ch)
+    catch
+        Text4Chr(ch)
+    end
+end
+
+#@testset "Basic operations"  begin include("basic.jl") end
+include("basic.jl")
 include("basics.jl")
 include("types.jl")
 
@@ -25,47 +42,49 @@ include("types.jl")
 @testset "Pointer functions" begin include("pointer.jl") end
 @testset "Search functions"  begin include("search.jl")  end
 @testset "SubStrings"        begin include("substr.jl")  end
+@testset "Utility functions" begin include("util.jl")    end
+@testset "IO functions"      begin include("io.jl")      end
 
 include("regex.jl")
 
 @testset "Unicode Strings" begin
-# Unicode errors
-let io = IOBuffer()
-    show(io, UnicodeError(UTF_ERR_SHORT, 1, 10))
-    check = "UnicodeError: invalid UTF-8 sequence starting at index 1 (0xa) missing one or more continuation bytes"
-    @test String(take!(io)) == check
-end
+    # Unicode errors
+    let io = IOBuffer()
+        show(io, UnicodeError(UTF_ERR_SHORT, 1, 10))
+        check = "UnicodeError: invalid UTF-8 sequence starting at index 1 (0xa) missing one or more continuation bytes"
+        @test String(take!(io)) == check
+    end
 end
 
 @testset "CESU-8 sequences" begin
-## UTF-8 tests
+    ## UTF-8 tests
 
-# Test for CESU-8 sequences
-let ch = 0x10000
-    for hichar = 0xd800:0xdbff, lochar = 0xdc00:0xdfff
-        seq = string(Char(hichar), Char(lochar))
-        # Normal conversion throws an error
-        @test_throws UnicodeError utf8(seq)
-        # Unsafe conversions return invalid strings as Text*Str
-        @test typeof(unsafe_str(seq)) == Text1Str
-        # With accept_surrogates flag, return converted to valid string (_UTF32Str)
-        @test unsafe_str(seq;accept_surrogates=true)[1]%UInt == ch
-        ch += 1
+    # Test for CESU-8 sequences
+    let ch = 0x10000
+        for hichar = 0xd800:0xdbff, lochar = 0xdc00:0xdfff
+            seq = string(Char(hichar), Char(lochar))
+            # Normal conversion throws an error
+            @test_throws UnicodeError utf8(seq)
+            # Unsafe conversions return invalid strings as Text*Str
+            @test typeof(unsafe_str(seq)) == Text1Str
+            # With accept_surrogates flag, return converted to valid string (_UTF32Str)
+            @test unsafe_str(seq;accept_surrogates=true)[1]%UInt == ch
+            ch += 1
+        end
     end
-end
 
 end
 
 @testset "Reverse of UTF8" begin
-# Reverse of UTF8Str
-@test reverse(UTF8Str("")) == ""
-@test reverse(UTF8Str("a")) == "a"
-@test reverse(UTF8Str("abc")) == "cba"
-@test reverse(UTF8Str("xyz\uff\u800\uffff\U10ffff")) == "\U10ffff\uffff\u800\uffzyx"
-for binstr in ([0xc1], [0xd0], [0xe0], [0xed, 0x80], [0xf0], [0xf0, 0x80], [0xf0, 0x80, 0x80])
-    str = vcat(codeunits("xyz"), binstr)
-    @test_throws UnicodeError reverse(UTF8Str(str))
-end
+    # Reverse of UTF8Str
+    @test reverse(UTF8Str("")) == ""
+    @test reverse(UTF8Str("a")) == "a"
+    @test reverse(UTF8Str("abc")) == "cba"
+    @test reverse(UTF8Str("xyz\uff\u800\uffff\U10ffff")) == "\U10ffff\uffff\u800\uffzyx"
+    for binstr in ([0xc1], [0xd0], [0xe0], [0xed, 0x80], [0xf0], [0xf0, 0x80], [0xf0, 0x80, 0x80])
+        str = vcat(codeunits("xyz"), binstr)
+        @test_throws UnicodeError reverse(UTF8Str(str))
+    end
 end
 
 # Specifically check UTF-8 string whose lead byte is same as a surrogate

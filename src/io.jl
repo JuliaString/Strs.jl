@@ -20,8 +20,7 @@ Licensed under MIT License, see LICENSE.md
 
 write(io::IO, ch::CodePoint) = write(io, tobase(ch))
 
-# Todo: handle substring of Str
-write(io::IO, str::MaybeSub{Str}) =
+write(io::IO, str::MaybeSub{T}) where {C<:CSE,T<:Str{C,Nothing}} =
     @preserve str unsafe_write(io, pointer(str), reinterpret(UInt, sizeof(str)))
 
 # optimized methods to avoid iterating over chars

@@ -10,23 +10,6 @@ const u8map = [1, 4, 5, 7, 8, 9, 10, 11, 12, 13, 16, 17, 19, 20, 21, 22, 23, 24,
                25, 26, 27, 28, 29, 30, 31, 32, 33, 35, 36, 39, 40, 41, 42, 43, 44,
                45, 46, 47, 48, 49, 50, 51, 52, 53, 54]
 
-# Should test GenericString also, once overthing else is working
-const UnicodeStringTypes =
-    # (String, UTF16Str, UTF32Str, UniStr, UTF8Str)
-    # (String, UTF8Str)
-    (String, UTF8Str, )
-const ASCIIStringTypes =
-    (String, UTF8Str, ASCIIStr, LatinStr)
-    #    (UnicodeStringTypes..., ASCIIStr, LatinStr, UCS2Str)
-
-function cvtchar(T, ch)
-    try 
-        T(ch)
-    catch
-        Text4Chr(ch)
-    end
-end
-
 function test2(dir, P, str, list)
     for (p, res) in list
         pat = typeof(p) == Regex ? p : P(p)

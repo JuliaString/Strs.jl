@@ -6,8 +6,6 @@ Licensed under MIT License, see LICENSE.md
 Based initially on julia/test/strings/types.jl
 =#
 
-@static V6_COMPAT || (using Random)
-
 function testuni(T)
     str = T(u8str)
     str2 = str^2
@@ -297,11 +295,11 @@ function teststr(T)
                 @test prevind(ss, i, 0) == prevind(s, i, 0)
                 @test nextind(ss, i, 0) == nextind(s, i, 0)
             end
+            println("$(typeof(ss))(\"$ss\")")
             @test_throws BoundsError prevind(ss, ncodeunits(ss)+1, 0)
             @test_throws BoundsError prevind(s, ncodeunits(ss)+1, 0)
             @test_throws BoundsError nextind(ss, 0, 0)
             @test_throws BoundsError nextind(s, 0, 0)
-            println("$(typeof(ss))(\"$ss\")")
             @test_throws BoundsError nextind(s, ncodeunits(ss)+1)
             @test_throws BoundsError nextind(ss, ncodeunits(ss)+1)
             @test_throws BoundsError prevind(s, 0)
