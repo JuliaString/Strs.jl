@@ -8,8 +8,6 @@ Licensed under MIT License, see LICENSE.md
 Inspired by / derived from code in Julia
 =#
 
-const MaybeSub{T} = Union{T, SubString{T}} where {T<:Str}
-
 _lastindex(::CodeUnitSingle, str) = (@_inline_meta(); _len(str))
 
 @propagate_inbounds _getindex(::CodeUnitSingle, T, str, i::Int) =

@@ -8,7 +8,7 @@ Licensed under MIT License, see LICENSE.md
 function _srch_cp(::Fwd, ::CodeUnitMulti, str::Str{UTF16CSE}, cp::AbsChar, pos, len)
     @preserve str begin
         beg = _pnt(str)
-        (ch = tobase(cp)) <= 0x0ffff && return _srch_codeunit(Fwd(), beg, ch%UInt16, pos, len)
+        (ch = codepoint(cp)) <= 0x0ffff && return _srch_codeunit(Fwd(), beg, ch%UInt16, pos, len)
         pnt = bytoff(beg, pos)
         fin = bytoff(beg, len)
         lead, trail = get_utf16(ch)
@@ -27,7 +27,7 @@ end
 function _srch_cp(::Rev, ::CodeUnitMulti, str::Str{UTF16CSE}, cp::AbsChar, pos, len)
     @preserve str begin
         beg = _pnt(str)
-        (ch = tobase(cp)) <= 0x0ffff && _srch_codeunit(Rev(), beg, ch%UInt16, pos)
+        (ch = codepoint(cp)) <= 0x0ffff && _srch_codeunit(Rev(), beg, ch%UInt16, pos)
         pnt = bytoff(beg, pos)
         lead, trail = get_utf16(ch)
         beg += sizeof(UInt16) # Need to have room for lead

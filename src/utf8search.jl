@@ -6,7 +6,7 @@ Licensed under MIT License, see LICENSE.md
 =#
 function _srch_cp(::Fwd, ::CodeUnitMulti, str::Str{UTF8CSE}, cp::AbsChar, pos, len)
     @preserve str begin
-        (ch = tobase(cp)) < 0x80 && return _srch_codeunit(Fwd(), _pnt(str), ch%UInt8, pos, len)
+        (ch = codepoint(cp)) < 0x80 && return _srch_codeunit(Fwd(), _pnt(str), ch%UInt8, pos, len)
         beg = _pnt(str)
         pnt = beg + pos - 1
         fin = beg + len
@@ -34,7 +34,7 @@ end
 
 function _srch_cp(::Rev, ::CodeUnitMulti, str::Str{UTF8CSE}, cp::AbsChar, pos, len)
     @preserve str begin
-        (ch = tobase(cp)) < 0x80 && return _srch_codeunit(Rev(), _pnt(str), ch%UInt8, pos)
+        (ch = codepoint(cp)) < 0x80 && return _srch_codeunit(Rev(), _pnt(str), ch%UInt8, pos)
         init = beg = _pnt(str)
         @inbounds pnt = beg + nextind(str, pos)
         if ch <= 0x7ff

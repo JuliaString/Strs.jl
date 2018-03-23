@@ -13,12 +13,12 @@ Licensed under MIT License, see LICENSE.md
 
 @inline _write_utf32(io, ch) = ch <= 0xffff ? _write_ucs2(io, ch) : _write_utf8_4(io, ch)
 
-@inline print(io::IO, ch::UCS2Chr)  = _write_ucs2(io, tobase(ch))
-@inline print(io::IO, ch::UTF32Chr) = _write_utf32(io, tobase(ch))
+@inline print(io::IO, ch::UCS2Chr)  = _write_ucs2(io, codepoint(ch))
+@inline print(io::IO, ch::UTF32Chr) = _write_utf32(io, codepoint(ch))
 
 ## outputting Str strings and CodePoint characters ##
 
-write(io::IO, ch::CodePoint) = write(io, tobase(ch))
+write(io::IO, ch::CodePoint) = write(io, codepoint(ch))
 
 write(io::IO, str::MaybeSub{T}) where {C<:CSE,T<:Str{C,Nothing}} =
     @preserve str unsafe_write(io, pointer(str), reinterpret(UInt, sizeof(str)))

@@ -31,8 +31,7 @@ chrdiff(pnt::Ptr{T}, beg::Ptr{T}) where {T<:CodeUnitTypes} = Int(chroff(T, pnt -
 bytoff(pnt::Ptr{T}, off) where {T<:CodeUnitTypes} = pnt + bytoff(T, off)
 
 # Alternate way for Chr type
-tobase(ch::Chr) = ch.v
-codepoint(v::Chr) = ch.v
+codepoint(ch::Chr) = ch.v
 basetype(::Type{<:Chr{CS,T}}) where {CS,T} = T
 charset(::Type{<:Chr{CS,T}}) where {CS,T} = CS
 
@@ -95,13 +94,13 @@ set_codeunit!(pnt::Ptr{<:CodeUnitTypes}, ch) = unsafe_store!(pnt, ch)
 set_codeunit!(dat::AbstractVector{<:CodeUnitTypes}, ch) = (dat[1] = ch)
 set_codeunit!(dat::String, ch) = set_codeunit!(dat, 1, ch)
 
-convert(::Type{T}, v::S) where {T<:Integer, S<:CodePoint} = convert(T, tobase(v))::T
+convert(::Type{T}, v::S) where {T<:Integer, S<:CodePoint} = convert(T, codepoint(v))::T
 convert(::Type{T}, v::Signed) where {T<:CodePoint} =
-    (v >= 0 && is_valid(T, v%Unsigned)) ? convert(T, tobase(v)) : codepoint_error(T, v)
+    (v >= 0 && is_valid(T, v%Unsigned)) ? convert(T, v%Unsigned) : codepoint_error(T, v)
 convert(::Type{T}, v::Unsigned) where {T<:CodePoint} =
     is_valid(T, v) ? reinterpret(T, basetype(T)(v)) : codepoint_error(T, v)
-convert(::Type{Char}, v::T) where {T<:CodePoint} = convert(Char, tobase(v))
-convert(::Type{T}, v::Char) where {T<:CodePoint} = convert(T, tobase(v))::T
+convert(::Type{Char}, v::T) where {T<:CodePoint} = convert(Char, codepoint(v))
+convert(::Type{T}, v::Char) where {T<:CodePoint} = convert(T, codepoint(v))::T
 
 rem(x::S, ::Type{T}) where {S<:CodePoint, T<:Number}    = rem(reinterpret(basetype(S), x), T)
 rem(x::S, ::Type{T}) where {S<:Number, T<:CodePoint}    = reinterpret(T, x%basetype(T))
@@ -109,9 +108,9 @@ rem(x::S, ::Type{T}) where {S<:CodePoint, T<:CodePoint} = reinterpret(T, x%baset
 rem(x::S, ::Type{Char}) where {S<:CodePoint} = Char(x%basetype(S))
 rem(x::Char, ::Type{T}) where {T<:CodePoint} = x%UInt32%T
 
-(::Type{S})(v::T) where {S<:Union{UInt32, Int, UInt}, T<:CodePoint} = tobase(v)%S
-(::Type{Char})(v::CodePoint) = Char(tobase(v))
-(::Type{T})(v::Char) where {T<:CodePoint} = T(tobase(v))
+(::Type{S})(v::T) where {S<:Union{UInt32, Int, UInt}, T<:CodePoint} = codepoint(v)%S
+(::Type{Char})(v::CodePoint) = Char(codepoint(v))
+(::Type{T})(v::Char) where {T<:CodePoint} = T(codepoint(v))
 
 for nam in (:Text1, :Text2, :Text4, :ASCII, :Latin, :_Latin, :UCS2, :UTF32)
     sym = Symbol(string(nam, "Chr"))
@@ -154,13 +153,13 @@ codepoint_rng(::Type{Text4Chr}) = 0%UInt32:typemax(UInt32)
 codepoint_adj(::Type{T}, ch) where {T} = ifelse(ch < 0xd800, ch, ch+0x800)%T
 codepoint_adj(::Type{T}, ch) where {T<:Union{Text2Chr,Text4Chr}} = ch%T
 
-==(x::CodePoint, y::AbsChar)   = tobase(x) == tobase(y)
-==(x::AbsChar,   y::CodePoint) = tobase(x) == tobase(y)
-==(x::CodePoint, y::CodePoint) = tobase(x) == tobase(y)
+==(x::CodePoint, y::AbsChar)   = codepoint(x) == codepoint(y)
+==(x::AbsChar,   y::CodePoint) = codepoint(x) == codepoint(y)
+==(x::CodePoint, y::CodePoint) = codepoint(x) == codepoint(y)
 
-isless(x::CodePoint, y::AbsChar)   = tobase(x) < tobase(y)
-isless(x::AbsChar,   y::CodePoint) = tobase(x) < tobase(y)
-isless(x::CodePoint, y::CodePoint) = tobase(x) < tobase(y)
+isless(x::CodePoint, y::AbsChar)   = codepoint(x) < codepoint(y)
+isless(x::AbsChar,   y::CodePoint) = codepoint(x) < codepoint(y)
+isless(x::CodePoint, y::CodePoint) = codepoint(x) < codepoint(y)
 
 # This is so that the hash is compatible with isless, but it's very inefficient
 Base.hash(x::CodePoint, h::UInt) = hash(Char(x), h)

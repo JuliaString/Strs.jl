@@ -123,6 +123,8 @@ end
 (::Type{Str})(::Type{C}, v::String) where {C<:CSE} = Str(C, v, nothing, nothing, nothing)
 (::Type{Str})(::Type{C}, v::Str) where {C<:CSE} = Str(C, v.data, nothing, nothing, nothing)
 
+const MaybeSub{T} = Union{T, SubString{T}} where {T<:Str}
+
 struct Chr{CS<:CharSet,T<:CodeUnitTypes} <: AbstractChar
     v::T
     (::Type{Chr})(::Type{CS}, v::T) where {CS<:CharSet,T<:CodeUnitTypes} = new{CS,T}(v)
@@ -167,8 +169,6 @@ charset(::Type{Char})      = UniPlusCharSet # Char instead of "UniPlusChr"
 charset(::Type{_LatinChr}) = LatinSubSet    # LatinSubSet instead of "_LatinCharSet"
 
 export BinaryCharSet, UniPlusCharSet
-
-const CodePointTypes = Union{CodeUnitTypes, CodePoint}
 
 const LatinChars   = Union{LatinChr, _LatinChr}
 const ByteChars    = Union{ASCIIChr, LatinChr, _LatinChr, Text1Chr}

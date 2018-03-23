@@ -12,15 +12,15 @@ _lowercase(ch) = is_latin(ch) ? _lowercase_l(ch) : _lowercase_u(ch)
 _uppercase(ch) = is_latin(ch) ? _uppercase_l(ch) : _uppercase_u(ch)
 _titlecase(ch) = is_latin(ch) ? _uppercase_l(ch) : _titlecase_u(ch)
 
-lowercase(ch::T) where {T<:CodePointTypes} = T(_lowercase(tobase(ch)))
-uppercase(ch::T) where {T<:CodePointTypes} = T(_uppercase(tobase(ch)))
-titlecase(ch::T) where {T<:CodePointTypes} = T(_titlecase(tobase(ch)))
+lowercase(ch::T) where {T<:CodePoint} = T(_lowercase(codepoint(ch)))
+uppercase(ch::T) where {T<:CodePoint} = T(_uppercase(codepoint(ch)))
+titlecase(ch::T) where {T<:CodePoint} = T(_titlecase(codepoint(ch)))
 
-lowercase(ch::ASCIIChr) = ifelse(isupper(ch), ASCIIChr(ch + 0x20), ch)
-uppercase(ch::ASCIIChr) = ifelse(islower(ch), ASCIIChr(ch - 0x20), ch)
+lowercase(ch::ASCIIChr) = ifelse(_isupper_a(ch), ASCIIChr(ch + 0x20), ch)
+uppercase(ch::ASCIIChr) = ifelse(_islower_a(ch), ASCIIChr(ch - 0x20), ch)
 titlecase(ch::ASCIIChr) = uppercase(ch)
 
-function uppercase_first(str::Union{S,SubString{S}}) where {C<:ASCIICSE,S<:Str{C}}
+function uppercase_first(str::MaybeSub{S}) where {C<:ASCIICSE,S<:Str{C}}
     (len = _len(str)) == 0 && return str
     @preserve str begin
         pnt = _pnt(str)
@@ -33,7 +33,7 @@ function uppercase_first(str::Union{S,SubString{S}}) where {C<:ASCIICSE,S<:Str{C
     end
 end
 
-function lowercase_first(str::Union{S,SubString{S}}) where {C<:ASCIICSE,S<:Str{C}}
+function lowercase_first(str::MaybeSub{S}) where {C<:ASCIICSE,S<:Str{C}}
     (len = _len(str)) == 0 && return str
     @preserve str begin
         pnt = _pnt(str)
@@ -85,7 +85,7 @@ function _upper(::Type{C}, beg::Ptr{UInt8}, off, len) where {C<:LatinCSE}
     Str(C, buf)
 end
 
-function uppercase(str::Union{S,SubString{S}}) where {C<:ASCIICSE,S<:Str{C}}
+function uppercase(str::MaybeSub{S}) where {C<:ASCIICSE,S<:Str{C}}
     (len = _len(str)) == 0 && return str
     @preserve str begin
         pnt = beg = _pnt(str)
@@ -98,7 +98,7 @@ function uppercase(str::Union{S,SubString{S}}) where {C<:ASCIICSE,S<:Str{C}}
     str
 end
 
-function lowercase(str::Union{S,SubString{S}}) where {C<:ASCIICSE,S<:Str{C}}
+function lowercase(str::MaybeSub{S}) where {C<:ASCIICSE,S<:Str{C}}
     (len = _len(str)) == 0 && return str
     @preserve str begin
         pnt = beg = _pnt(str)
@@ -111,7 +111,7 @@ function lowercase(str::Union{S,SubString{S}}) where {C<:ASCIICSE,S<:Str{C}}
     str
 end
 
-function uppercase_first(str::Union{S,SubString{S}}) where {C<:LatinCSE,S<:Str{C}}
+function uppercase_first(str::MaybeSub{S}) where {C<:LatinCSE,S<:Str{C}}
     (len = _len(str)) == 0 && return str
     @preserve str begin
         pnt = _pnt(str)
@@ -125,7 +125,7 @@ function uppercase_first(str::Union{S,SubString{S}}) where {C<:LatinCSE,S<:Str{C
 end
 
 # Special handling for characters that can't map into Latin1
-function uppercase_first(str::Union{S,SubString{S}}) where {C<:_LatinCSE,S<:Str{C}}
+function uppercase_first(str::MaybeSub{S}) where {C<:_LatinCSE,S<:Str{C}}
     (len = _len(str)) == 0 && return str
     @preserve str begin
         pnt = _pnt(str)
@@ -149,7 +149,7 @@ function uppercase_first(str::Union{S,SubString{S}}) where {C<:_LatinCSE,S<:Str{
     end
 end
 
-function lowercase_first(str::Union{S,SubString{S}}) where {C<:Latin_CSEs,S<:Str{C}}
+function lowercase_first(str::MaybeSub{S}) where {C<:Latin_CSEs,S<:Str{C}}
     (len = _len(str)) == 0 && return str
     @preserve str begin
         pnt = _pnt(str)
@@ -162,13 +162,13 @@ function lowercase_first(str::Union{S,SubString{S}}) where {C<:Latin_CSEs,S<:Str
     end
 end
 
-lowercase(ch::T) where {T<:LatinChars} = T(_lowercase_l(tobase(ch)))
-uppercase(ch::LatinChr) = LatinChr(_uppercase_l(tobase(ch)))
+lowercase(ch::T) where {T<:LatinChars} = T(_lowercase_l(codepoint(ch)))
+uppercase(ch::LatinChr) = LatinChr(_uppercase_l(codepoint(ch)))
 
 # Special handling for case where this is just an optimization of the first 256 bytes of Unicode,
 # and not the 8-bit ISO 8859-1 character set
 function uppercase(ch::_LatinChr)
-    cb = tobase(ch)
+    cb = codepoint(ch)
     _can_upper(cb) && return _LatinChr(cb - 0x20)
     # We don't uppercase 0xdf, the ß character
     cb == 0xb5 ? UCS2Chr(0x39c) : (cb == 0xff ? UCS2Chr(0x178) : ch)
@@ -226,7 +226,7 @@ function _widenupper(beg::Ptr{UInt8}, off, len)
     Str(_UCS2CSE, buf)
 end
 
-function uppercase(str::Union{S,SubString{S}}) where {C<:LatinCSE,S<:Str{C}}
+function uppercase(str::MaybeSub{S}) where {C<:LatinCSE,S<:Str{C}}
     (len = _len(str)) == 0 && return str
     @preserve str begin
         pnt = beg = _pnt(str)
@@ -239,7 +239,7 @@ function uppercase(str::Union{S,SubString{S}}) where {C<:LatinCSE,S<:Str{C}}
     str
 end
 
-function uppercase(str::Union{S,SubString{S}}) where {C<:_LatinCSE,S<:Str{C}}
+function uppercase(str::MaybeSub{S}) where {C<:_LatinCSE,S<:Str{C}}
     (len = _len(str)) == 0 && return str
     @preserve str begin
         pnt = beg = _pnt(str)
@@ -267,7 +267,7 @@ function _lower(::Type{C}, beg::Ptr{UInt8}, off, len) where {C<:Latin_CSEs}
     Str(C, buf)
 end
 
-function lowercase(str::Union{S,SubString{S}}) where {C<:Latin_CSEs,S<:Str{C}}
+function lowercase(str::MaybeSub{S}) where {C<:Latin_CSEs,S<:Str{C}}
     (len = _len(str)) == 0 && return str
     @preserve str begin
         pnt = beg = _pnt(str)
@@ -341,7 +341,7 @@ function _lower(::Type{C}, beg, off, len) where {C<:Union{UCS2CSE,UTF32_CSEs}}
     Str(C, buf)
 end
 
-function lowercase(str::Union{S,SubString{S}}) where {C<:Union{UCS2_CSEs,UTF32_CSEs},S<:Str{C}}
+function lowercase(str::MaybeSub{S}) where {C<:Union{UCS2_CSEs,UTF32_CSEs},S<:Str{C}}
     @preserve str begin
         CU = codeunit(C)
         pnt = beg = _pnt(str)
@@ -378,7 +378,7 @@ function _upper(::Type{C}, beg, off, len) where {C<:Union{UCS2_CSEs,UTF32_CSEs}}
     Str(C, buf)
 end
 
-function uppercase(str::Union{S,SubString{S}}) where {C<:Union{UCS2_CSEs,UTF32_CSEs},S<:Str{C}}
+function uppercase(str::MaybeSub{S}) where {C<:Union{UCS2_CSEs,UTF32_CSEs},S<:Str{C}}
     @preserve str begin
         CU = codeunit(C)
         pnt = beg = _pnt(str)

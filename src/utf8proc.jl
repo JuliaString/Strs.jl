@@ -185,15 +185,18 @@ normalize(str::Str, nf::Symbol) =
 
 # iterators for grapheme segmentation
 
-is_grapheme_break(c1::CodePointTypes, c2::CodePointTypes) =
+is_grapheme_break(c1::CodeUnitTypes, c2::CodeUnitTypes) =
     !(c1 <= 0x10ffff && c2 <= 0x10ffff) ||
     ccall(:utf8proc_grapheme_break, Bool, (UInt32, UInt32), c1, c2)
 
 # Stateful grapheme break required by Unicode-9 rules: the string
 # must be processed in sequence, with state initialized to Ref{Int32}(0).
 # Requires utf8proc v2.0 or later.
-is_grapheme_break!(state::Ref{Int32}, c1::CodePointTypes, c2::CodePointTypes) =
+is_grapheme_break!(state::Ref{Int32}, c1::CodeUnitTypes, c2::CodeUnitTypes) =
     ((c1 <= 0x10ffff && c2 <= 0x10ffff)
      ? ccall(:utf8proc_grapheme_break_stateful, Bool, (UInt32, UInt32, Ref{Int32}), c1, c2, state)
      : (state[] = 0; true))
 
+is_grapheme_break(c1::CodePoint, c2::CodePoint) = is_grapheme_break(codepoint(c1), codepoint(c2))
+is_grapheme_break(state::Ref{UInt32}, c1::CodePoint, c2::CodePoint) =
+    is_grapheme_break(state, codepoint(c1), codepoint(c2))
