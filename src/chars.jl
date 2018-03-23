@@ -46,16 +46,7 @@ basetype(::Type{Char})        = UInt32
 
 basetype(::Type{T}) where {T<:CodeUnitTypes} = T
 
-@static if V6_COMPAT
-    tobase(v::Char) = v%UInt32
-else
-    tobase(v::AbstractChar) = codepoint(v)
-end
-
-tobase(v::T) where {T<:CodePoint} = reinterpret(basetype(T), v)
-tobase(v::T) where {T<:CodeUnitTypes} = v
-
-codepoint(v::T) where {T<:CodePoint} = tobase(v)
+codepoint(v::T) where {T<:CodePoint} = reinterpret(basetype(T), v)
 
 typemin(::Type{T}) where {T<:CodePoint} = reinterpret(T, typemin(basetype(T)))
 typemax(::Type{T}) where {T<:CodePoint} = reinterpret(T, typemax(basetype(T)))
@@ -121,28 +112,6 @@ eltype(::Type{T}) where {T<:CodePoint} = T
 size(cp::CodePoint, dim) = convert(Int, dim) < 1 ? boundserr(cp, dim) : 1
 getindex(cp::CodePoint, i::Integer) = i == 1 ? cp : boundserr(cp, i)
 getindex(cp::CodePoint, I::Integer...) = all(x -> x == 1, I) ? cp : boundserr(cp, I)
-
-@static if !isdefined(Base, :AbstractChar)
-    size(cp::CodePoint) = ()
-    ndims(cp::CodePoint) = 0
-    ndims(::Type{<:CodePoint}) = 0
-    length(cp::CodePoint) = 1
-    lastindex(cp::CodePoint) = 1
-    getindex(cp::CodePoint) = cp
-    first(cp::CodePoint) = cp
-    last(cp::CodePoint) = cp
-    start(cp::CodePoint) = false
-    next(cp::CodePoint, state) = (cp, true)
-    done(cp::CodePoint, state) = state
-    isempty(cp::CodePoint) = false
-    in(x::CodePoint, y::CodePoint) = x == y
-    -(x::CodePoint, y::CodePoint) = Int(x) - Int(y)
-    -(x::CodePoint, y::Integer) = CodePoint((Int32(x) - Int32(y))%UInt32)
-    +(x::CodePoint, y::Integer) = CodePoint((Int32(x) + Int32(y))%UInt32)
-    +(x::Integer, y::CodePoint) = y + x
-    show(io::IO, cp::CodePoint)  = show(io, Char(cp))
-    print(io::IO, cp::CodePoint) = print(io, Char(cp))
-end
 
 _uni_rng(m) = 0x00000:ifelse(m < 0xd800, m, m-0x800)
 codepoint_rng(::Type{T}) where {T<:CodePoint} = _uni_rng(typemax(T)%UInt32)

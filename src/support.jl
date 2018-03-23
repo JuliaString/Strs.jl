@@ -527,15 +527,6 @@ is_valid(::Type{UTF8Str},   s::Vector{UInt8}) = byte_string_classify(s) != 0
 is_valid(::Type{LatinStr},  s::Vector{UInt8}) = true
 is_valid(::Type{_LatinStr}, s::Vector{UInt8}) = true
 
-# These are deprecated in v0.7
-@static if V6_COMPAT
-    for sym in (:bin, :oct, :dec, :hex)
-        @eval import Base:$sym
-        @eval ($sym)(x::CodePoint, p::Int) = ($sym)(tobase(x), p, false)
-        @eval ($sym)(x::CodePoint)         = ($sym)(tobase(x), 1, false)
-    end
-end
-
 function _cvtsize(::Type{T}, dat, len) where {T <: CodeUnitTypes}
     buf, pnt = _allocate(T, len)
     @inbounds for i = 1:len ; set_codeunit!(pnt, i, get_codeunit(dat, i)) ; end
@@ -555,36 +546,30 @@ end
 
 thisind(s::Str, i::Integer) = thisind(s, Int(i))
 
+# Todo: fix this to correctly write out characters using the encoding of S
 function filter(f, s::T) where {T<:Str}
     out = IOBuffer(StringVector(lastindex(s)), true, true)
     truncate(out, 0)
     for c in codepoints(s)
+        # These characters should be written out using the CSE of T, not as characters
         f(c) && write(out, c)
     end
-    T(take!(out))
+    Str(C, take!(out))
 end
 
 # These should be optimized based on the traits, and return internal substrings, once
 # I've implemented those
 
 first(str::Str, n::Integer) = str[1:min(end, nextind(str, 0, n))]
-last(str::Str, n::Integer) = str[max(1, prevind(str, ncodeunits(s)+1, n)):end]
+last(str::Str, n::Integer) = str[max(1, prevind(str, ncodeunits(str)+1, n)):end]
 
 const Chrs = @static V6_COMPAT ? Union{Char,AbstractChar} : CodePoint
 
-@static if V6_COMPAT
-    function repeat(ch::Char, cnt::Integer)
-        cnt > 1 && return String(_repeat(CodeUnitMulti(), UTF8CSE, ch%UInt32, cnt))
-        cnt < 0 && repeaterr(cnt)
-        cnt == 0 ? empty_string : string(Char(ch%UInt32))
-    end
-end
-
 function repeat(ch::CP, cnt::Integer) where {CP <: Chrs}
     C = codepoint_cse(CP)
-    cnt > 1 && return Str(C, _repeat(CodePointStyle(C), C, tobase(ch), cnt))
+    cnt > 1 && return Str(C, _repeat(CodePointStyle(C), C, codepoint(ch), cnt))
     cnt < 0 && repeaterr(cnt)
-    cnt == 0 ? empty_str(C) : _convert(C, tobase(ch))
+    cnt == 0 ? empty_str(C) : _convert(C, codepoint(ch))
 end
 
 (^)(ch::CP, cnt::Integer) where {CP <: Chrs} = repeat(ch, cnt)

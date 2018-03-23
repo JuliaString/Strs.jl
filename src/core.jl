@@ -68,7 +68,6 @@ end
 
 @propagate_inbounds function _prevind(::CodeUnitSingle, str, i, nchar)
     @_inline_meta()
-    #nchar <= 0 && (nchar < 0 ? ncharerr(nchar) : return _thisind(CodeUnitSingle(), str, i))
     nchar < 0 && ncharerr(nchar)
     @boundscheck 0 < i <= ncodeunits(str)+1 || boundserr(str, i)
     max(Int(i) - nchar, 0)
@@ -82,7 +81,6 @@ end
 
 @propagate_inbounds function _nextind(::CodeUnitSingle, str, i, nchar)
     @_inline_meta()
-    #nchar <= 0 && (nchar < 0 ? ncharerr(nchar) : return _thisind(CodeUnitSingle(), str, i))
     nchar < 0 && ncharerr(nchar)
     @boundscheck 0 <= i <= ncodeunits(str) || boundserr(str, i)
     min(Int(i) + nchar, ncodeunits(str)+1)

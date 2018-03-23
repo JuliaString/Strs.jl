@@ -332,6 +332,8 @@ end
     nchar < 0 && ncharerr(nchar)
     siz = ncodeunits(str)
     @boundscheck 0 <= pos <= siz || boundserr(str, pos)
+    siz == 0 && return ifelse(nchar == 0, 0, 1)
+    pos == 0 && (pos = 1)
     @preserve str begin
         beg = _pnt(str)
         pnt = beg + pos - 1

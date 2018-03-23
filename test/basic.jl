@@ -697,7 +697,8 @@ end
     @test first(s, 3) == "∀ϵ≠"
     @test first(s, 4) == "∀ϵ≠0"
     @test first(s, length(s)) == s
-    @test first(s, length(s)+1) == s
+    # This only works for String, Str does not allow out of range # of characters
+    ST === String && @test first(s, length(s)+1) == s
     @test_throws ArgumentError last(s, -1)
     @test last(s, 0) == ""
     @test last(s, 1) == "0"
@@ -705,13 +706,7 @@ end
     @test last(s, 3) == "²>0"
     @test last(s, 4) == "ϵ²>0"
     @test last(s, length(s)) == s
-    @test last(s, length(s)+1) == s
-end
-
-@testset "invalid code point" begin
-    s = ST([0x61, 0xba, 0x41])
-    @test !isvalid(s)
-    @test s[2] == reinterpret(Char, UInt32(0xba) << 24)
+    ST === String && @test last(s, length(s)+1) == s
 end
 
 @testset "ncodeunits" begin
@@ -842,7 +837,7 @@ for ST in (Text1Str, )
     @testset "Binary String Tests: $ST" begin testbin(ST) end
 end
 
-# This only works for String
+# These only work for String
 @testset "issue #6027 - make symbol with invalid char" begin
     sym = Symbol(Char(0xdcdb))
     @test string(sym) == string(Char(0xdcdb))
@@ -850,4 +845,10 @@ end
     @test Meta.lower(Main, sym) === sym
     res = string(Meta.parse(string(Char(0xdcdb)," = 1"),1,raise=false)[1])
     @test res == """\$(Expr(:error, "invalid character \\\"\\udcdb\\\"\"))"""
+end
+
+@testset "invalid code point" begin
+    s = [0x61, 0xba, 0x41]
+    @test !is_valid(s)
+    @test s[2] == reinterpret(Char, UInt32(0xba) << 24)
 end

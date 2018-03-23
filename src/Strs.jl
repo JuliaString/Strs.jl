@@ -85,7 +85,7 @@ import Base: containsnul, convert, getindex, length, map, pointer, collect, in, 
 # Conditionally import names that are only in v0.6 or in master
 for sym in (:ind2chr, :chr2ind,
             :codeunit, :codeunits, :ncodeunits,
-            :thisind, :firstindex, :lastindex, :codepoint, :Fix2)
+            :thisind, :firstindex, :lastindex, :codepoint, :Fix2, :unsafe_crc32c)
     if isdefined(Base, sym)
         @eval import Base: $sym
     else
@@ -136,6 +136,9 @@ else
     const is_lowercase = islowercase
     const is_uppercase = isuppercase
 end
+
+export utf8crc
+const utf8crc = @static V6_COMPAT ? Base.crc32c : Base._crc32c
 
 # Possibly import `is` functions, rename to start with `is_`
 

@@ -366,5 +366,3 @@ _pnt(s::SubString{<:QuadStr}) = reinterpret(Ptr{UInt32}, pointer(s))
 
 _len(s::SubString{<:WordStr}) = sizeof(s) >>> 1
 _len(s::SubString{<:QuadStr}) = sizeof(s) >>> 2
-
-@static V6_COMPAT && (sizeof(s::SubString{<:Str}) = s.endof == 0 ? 0 : nextind(s, s.endof) - 1)
