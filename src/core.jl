@@ -52,15 +52,16 @@ end
 @propagate_inbounds function _thisind(::CodeUnitMulti, str, i)
     @_inline_meta()
     len = _len(str)
-    @boundscheck 0 <= i <= len || boundserr(str, i)
+    @boundscheck 0 < i <= len || boundserr(str, i)
     _thisind(CodeUnitMulti(), str, len, _pnt(str), i)
 end
 
 @propagate_inbounds function _thisind(::CodeUnitSingle, str, i)
     @_inline_meta()
-    @boundscheck 0 <= i <= ncodeunits(str) || boundserr(str, i)
+    @boundscheck 0 < i <= ncodeunits(str) || boundserr(str, i)
     Int(i)
 end
+
 @propagate_inbounds function _prevind(::CodeUnitSingle, str, i)
     @_inline_meta()
     @boundscheck 0 < i <= ncodeunits(str)+1 || boundserr(str, i)
@@ -69,7 +70,8 @@ end
 
 @propagate_inbounds function _prevind(::CodeUnitSingle, str, i, nchar)
     @_inline_meta()
-    nchar <= 0 && (nchar < 0 ? ncharerr(nchar) : return _thisind(CodeUnitSingle(), str, i))
+    #nchar <= 0 && (nchar < 0 ? ncharerr(nchar) : return _thisind(CodeUnitSingle(), str, i))
+    nchar < 0 && ncharerr(nchar)
     @boundscheck 0 < i <= ncodeunits(str)+1 || boundserr(str, i)
     max(Int(i) - nchar, 0)
 end
@@ -82,7 +84,8 @@ end
 
 @propagate_inbounds function _nextind(::CodeUnitSingle, str, i, nchar)
     @_inline_meta()
-    nchar <= 0 && (nchar < 0 ? ncharerr(nchar) : return _thisind(CodeUnitSingle(), str, i))
+    #nchar <= 0 && (nchar < 0 ? ncharerr(nchar) : return _thisind(CodeUnitSingle(), str, i))
+    nchar < 0 && ncharerr(nchar)
     @boundscheck 0 <= i <= ncodeunits(str) || boundserr(str, i)
     min(Int(i) + nchar, ncodeunits(str)+1)
 end
