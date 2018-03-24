@@ -108,23 +108,25 @@ end
 utf8proc_error(result) =
     error(unsafe_string(ccall(:utf8proc_errmsg, Cstring, (Cssize_t,), result)))
 
-function utf8proc_map(::Type{T}, str, options::Integer) where {T<:Str}
+function utf8proc_map(::Type{T}, str::MaybeSub{T}, options::Integer) where {T<:Str}
     nwords = ccall(:utf8proc_decompose, Int, (Ptr{UInt8}, Int, Ptr{UInt8}, Int, Cint),
                    str, sizeof(str), C_NULL, 0, options)
     nwords < 0 && utf8proc_error(nwords)
-    buffer = _allocate(nwords*4)
+    buffer = Base.StringVector(nwords*4)
     nwords = ccall(:utf8proc_decompose, Int, (Ptr{UInt8}, Int, Ptr{UInt8}, Int, Cint),
                    str, sizeof(str), buffer, nwords, options)
     nwords < 0 && utf8proc_error(nwords)
     nbytes = ccall(:utf8proc_reencode, Int, (Ptr{UInt8}, Int, Cint), buffer, nwords, options)
     nbytes < 0 && utf8proc_error(nbytes)
-    T(resize!(buffer, nbytes))
+    Str(cse(T), String(resize!(buffer, nbytes)))
 end
 
 utf8proc_charwidth(ch) = Int(ccall(:utf8proc_charwidth, Cint, (UInt32,), ch))
 
-utf8proc_map(str::T, options::Integer) where {T<:Str} = utf8proc_map(T, UTF8Str(str), options)
-utf8proc_map(str::Str{UTF8CSE}, options::Integer) = utf8proc_map(UTF8Str, str, options)
+utf8proc_map(str::MaybeSub{T}, options::Integer) where {T<:Str} =
+    utf8proc_map(T, convert(UTF8Str, str), options)
+utf8proc_map(str::MaybeSub{<:Str{UTF8CSE}}, options::Integer) =
+    utf8proc_map(UTF8Str, str, options)
 
 @inline utf8proc_cat(ch) = ccall(:utf8proc_category, Cint, (UInt32,), ch)
 @inline utf8proc_cat_abbr(ch) =

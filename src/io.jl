@@ -11,10 +11,11 @@ Licensed under MIT License, see LICENSE.md
 @inline _write_ucs2(io, ch) =
     ch <= 0x7f ? write(io, ch%UInt8) : ch <= 0x7ff ? _write_utf8_2(io, ch) : _write_utf8_3(io, ch)
 
-@inline _write_utf32(io, ch) = ch <= 0xffff ? _write_ucs2(io, ch) : _write_utf8_4(io, ch)
+@inline write_utf8(io, ch) = ch <= 0xffff ? _write_ucs2(io, ch) : _write_utf8_4(io, ch)
+@inline write_utf16(io, ch) = ch <= 0xffff ? write(io, ch%UInt16) : write(io, get_utf16(ch)...)
 
 @inline print(io::IO, ch::UCS2Chr)  = _write_ucs2(io, codepoint(ch))
-@inline print(io::IO, ch::UTF32Chr) = _write_utf32(io, codepoint(ch))
+@inline print(io::IO, ch::UTF32Chr) = write_utf8(io, codepoint(ch))
 
 ## outputting Str strings and CodePoint characters ##
 
@@ -99,7 +100,7 @@ function print(io::IO, str::MaybeSub{<:UTF32Strings})
     len, pnt = _lenpnt(str)
     fin = bytoff(pnt, len)
     while pnt < fin
-        _write_utf32(io, get_codeunit(pnt))
+        write_utf8(io, get_codeunit(pnt))
         pnt += 4
     end
     nothing

@@ -554,7 +554,8 @@ end
 
 function _map(::Type{C}, ::Type{T}, fun, len, str) where {C<:CSE, T<:Str}
     pnt = _pnt(str)
-    buf, out = _allocate(UInt16, len)
+    buf = StringVector(len * sizeof(UInt16))
+    beg = out = reinterpret(Ptr{UInt16}, pointer(buf))
     surrflag = false
     fin = pnt + sizeof(str)
     outend = out + sizeof(str)
@@ -578,17 +579,18 @@ function _map(::Type{C}, ::Type{T}, fun, len, str) where {C<:CSE, T<:Str}
         end
         pnt += 2
     end
-    out < outend && resize!(buf, out - pointer(buf))
+    out < outend && resize!(buf, chrdiff(UInt16, out - beg))
+    s = String(buf)
     if !surrflag
-        Str(C, buf)
+        Str(C, s)
     elseif T == _UCS2Str
         # Convert to 32-bit, to keep result in UniStr type union
         # TODO: check this
-        convert(_UTF32Str, Str(UTF16CSE, buf))
+        convert(_UTF32Str, Str(UTF16CSE, s))
     else
-        Str(UTF16CSE, buf)
+        Str(UTF16CSE, s)
     end
 end
 
-map(fun, str::T) where {C<:Union{UCS2CSE, UTF16CSE},T<:Str{C}} =
+map(fun, str::T) where {C<:Union{UCS2_CSEs, UTF16CSE},T<:Str{C}} =
     (len = _len(str)) == 0 ? empty_str(T) : @preserve str _map(C, T, fun, len, str)

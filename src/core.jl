@@ -180,6 +180,20 @@ end
     vec
 end
 
+function map(fun, str::MaybeSub{T}) where {C<:CSE, T<:Str{C}}
+    out = IOBuffer(sizehint=sizeof(str))
+    CP = eltype(T)
+    for ch in str
+        retc = fun(ch)
+        isa(retc, AbstractChar) || throw(ArgumentError(
+            "map($fun, str::AbstractString) requires $fun to return AbstractChar; " *
+            "try map($fun, collect(str)) or a comprehension instead"))
+        is_valid(CP, retc) || codepoint_error(CP, retc)
+        write(C, out, retc)
+    end
+    Str{C}(String(take!(out)))
+end
+
 @propagate_inbounds collect(str::MaybeSub{T}) where {T<:Str} =
     @preserve str _collectstr(CodePointStyle(T), eltype(T), str)
 

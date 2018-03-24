@@ -560,15 +560,17 @@ end
 
 thisind(str::MaybeSub{<:Str}, i::Integer) = thisind(str, Int(i))
 
-# Todo: fix this to correctly write out characters using the encoding of S
-function filter(f, s::T) where {T<:Str}
-    out = IOBuffer(StringVector(lastindex(s)), true, true)
+@inline write(::Type{<:CSE}, io, ch)    = write(io, codepoint(ch))
+@inline write(::Type{UTF8CSE}, io, ch)  = write_utf8(io, codepoint(ch))
+@inline write(::Type{UTF16CSE}, io, ch) = write_utf16(io, codepoint(ch))
+
+function filter(fun, str::MaybeSub{T}) where {C<:CSE,T<:Str{C}}
+    out = IOBuffer(StringVector(lastindex(str)), true, true)
     truncate(out, 0)
-    for c in codepoints(s)
-        # These characters should be written out using the CSE of T, not as characters
-        f(c) && write(out, c)
+    for ch in codepoints(str)
+        fun(ch) && write(C, out, ch)
     end
-    Str(C, take!(out))
+    Str{C}(String(take!(out)))
 end
 
 # Todo: These should be optimized based on the traits, and return internal substrings, once
