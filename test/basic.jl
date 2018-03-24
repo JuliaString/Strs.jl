@@ -349,7 +349,7 @@ end
               Float64, Float32]
         @test tryparse(T, ST("1\0")) === nothing
     end
-    let s = normalize(ST("tést"), :NFKC)
+    let s = Unicode.normalize(ST("tést"), :NFKC)
         @test unsafe_string(Base.unsafe_convert(Cstring, Base.cconvert(Cstring, s))) == s
         @test unsafe_string(Base.unsafe_convert(Cstring, Symbol(s))) == s
     end

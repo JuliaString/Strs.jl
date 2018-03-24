@@ -122,24 +122,6 @@ for (oldn, newn) in ((:xdigit, :hex_digit),
     @eval export $newname
 end
 
-# Handle renames where function was deprecated
-
-export is_alphanumeric, is_graphic, is_lowercase, is_uppercase
-@static if V6_COMPAT
-    import Base: isalnum, isgraph, islower, isupper
-    const is_alphanumeric = isalnum
-    const is_graphic      = isgraph
-    const is_lowercase    = islower
-    const is_uppercase    = isupper
-else
-    import Base: islowercase, isuppercase
-    const is_lowercase = islowercase
-    const is_uppercase = isuppercase
-end
-
-export utf8crc
-const utf8crc = @static V6_COMPAT ? Base.crc32c : Base._crc32c
-
 # Possibly import `is` functions, rename to start with `is_`
 
 for nam in (:ascii, :digit, :space, :alpha, :numeric, :valid, :defined, :empty)
@@ -151,32 +133,39 @@ for nam in (:ascii, :digit, :space, :alpha, :numeric, :valid, :defined, :empty)
     @eval export $newname
 end
 
-# Location of isgraphemebreak moved from Base.UTF8proc to Base.Unicode,
-# import and add new names with underscores
+# Handle renames where function was deprecated
 
-const unimod = @static isdefined(Base, :UTF8proc) ? :UTF8proc : :Unicode
+export utf8crc, is_alphanumeric, is_graphic, is_lowercase, is_uppercase
 
-@eval import Base.$unimod: isgraphemebreak, isgraphemebreak!, graphemes
-const is_grapheme_break  = isgraphemebreak
-const is_grapheme_break! = isgraphemebreak!
-
-# Work around deprecation on v0.7
 @static if V6_COMPAT
-    import Base: find
     include("compat.jl")
-    include("codeunits.jl")
-    include("fix2.jl")
 else
     import Base.GC: @preserve
+
+    # Work around deprecation on v0.7
     import Base: findall
     const find = findall
+
+    # Handle changes in array allocation
+    create_vector(T, len)  = Vector{T}(undef, len)
+
+    # Add new short name for deprecated hex function
+    outhex(v, p=1) = string(v, base=16, pad=p)
+
+    const utf8crc = Base._crc32c
+
+    import Base: islowercase, isuppercase
+    const is_lowercase = islowercase
+    const is_uppercase = isuppercase
+
+    # Location of isgraphemebreak moved from Base.UTF8proc to Base.Unicode,
+    # import and add new names with underscores
+
+    import Base.Unicode: isgraphemebreak, isgraphemebreak!, graphemes
 end
 
-# Handle changes in array allocation
-create_vector(T, len)  = @static V6_COMPAT ? Vector{T}(len) : Vector{T}(undef, len)
-
-# Add new short name for deprecated hex function
-outhex(v, p=1) = @static V6_COMPAT ? hex(v,p) : string(v, base=16, pad=p)
+const is_grapheme_break  = isgraphemebreak
+const is_grapheme_break! = isgraphemebreak!
 
 # Operations for find/search operations
 

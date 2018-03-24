@@ -17,7 +17,7 @@ module Literals end
 #export @f_str, @F_str, @sinterpolate, @pr_str, @PR_str, @pr, @PR
 #export s_unescape_string, s_escape_string, s_print_unescaped, s_print_escaped
 
-@static if VERSION < v"0.7.0-DEV"
+@static if V6_COMPAT
     const _parse = parse
     const _ParseError = ParseError
     _sprint(f, s) = sprint(endof(s), f, s)

@@ -5,26 +5,22 @@ Copyright 2017-2018 Gandalf Software, Inc., Scott P. Jones,
 Licensed under MIT License, see LICENSE.md
 =#
 
-@static isdefined(Base, :textwidth) || (text_width(str::AbstractString) = strwidth(str))
-@static isdefined(Base, :textwidth) || (text_width(ch::Char) = charwidth(ch))
-
 # Recommended by deprecate
-@static if VERSION < v"0.7.0-DEV"
-    import Base: is_assigned_char, normalize_string
+@static if V6_COMPAT
+    text_width(str::AbstractString) = strwidth(str)
+    text_width(ch::Char) = charwidth(ch)
+
+    import Base: is_assigned_char, normalize_string, isnumber
     Base.is_assigned_char(ch::CodePoint) = is_assigned(ch)
     Base.normalize_string(str::Str, opt::Symbol) = normalize(str, opt)
     Base.strwidth(str::Str) = text_width(str)
     Base.charwidth(ch::CodePoint) = text_width(ch)
+    isnumber(val::CodePoint) = is_numeric(val)
 else
     Base.Unicode.normalize(str::Str, opt::Symbol) = normalize(str, opt)
     Base.Unicode.isassigned(ch::CodePoint) = is_assigned(ch)
     is_graphic(ch::Char) = is_graphic(codepoint(ch))
     is_alphanumeric(ch::Char) = is_alphanumeric(codepoint(ch))
-end
-
-@static if isdefined(Base, :isnumber)
-    import Base: isnumber
-    isnumber(val::CodePoint) = is_numeric(val)
 end
 
 ############################################################################

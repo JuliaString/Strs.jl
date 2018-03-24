@@ -571,7 +571,7 @@ function filter(f, s::T) where {T<:Str}
     Str(C, take!(out))
 end
 
-# These should be optimized based on the traits, and return internal substrings, once
+# Todo: These should be optimized based on the traits, and return internal substrings, once
 # I've implemented those
 
 first(str::Str, n::Integer) = str[1:min(end, nextind(str, 0, n))]
