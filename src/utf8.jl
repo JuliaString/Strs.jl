@@ -12,9 +12,11 @@ Based in part on code for UTF8String that used to be in Julia
 
 const MS_UTF8 = MaybeSub{<:Str{UTF8CSE}}
 
+@inline checkcont(pnt) = is_valid_continuation(get_codeunit(pnt))
+
 # Get rest of character ch from 2-byte UTF-8 sequence at pnt - 1
 @inline get_utf8_2byte(pnt, ch) =
-    (((ch & 0x3f)%UInt16 << 6) | (get_codeunit(pnt) & 0x3f))
+    (((ch & 0x1f)%UInt16 << 6) | (get_codeunit(pnt) & 0x3f))
 
 # Get rest of character ch from 3-byte UTF-8 sequence at pnt - 2
 @inline get_utf8_3byte(pnt, ch) =
@@ -73,12 +75,10 @@ end
 utf_trail(c::UInt8) = (0xe5000000 >>> ((c & 0xf0) >> 3)) & 0x3
 
 function lastindex(str::MS_UTF8)
-    (len = _len(str)) == 0 && return len
+    (len = _len(str)) > 1 || return len
     @preserve str begin
-        beg = _pnt(str)
-        pnt = beg + len
-        while is_valid_continuation(get_codeunit(pnt -= 1)) ; end
-        Int(pnt + 1 - beg)
+        pnt = _pnt(str) + len - 1
+        len - (checkcont(pnt) ? (checkcont(pnt - 1) ? checkcont(pnt - 2) + 2 : 1) : 0)
     end
 end
 
@@ -221,11 +221,74 @@ function is_bmp(str::Str{UTF8CSE})
     end
 end
 
-is_unicode(str::Str{UTF8CSE}) = true
+is_unicode(str::MaybeSub{<:Str{UTF8CSE}}) = true
 
-function is_unicode(str::String)
-    len, flags = unsafe_check_string(str; accept_invalids = true)
-    
+is_unicode(str::String) = @preserve str _check_utf8_al(_len(str), _pnt(str)) >= 0
+is_unicode(str::SubString{String}) = @preserve str _check_utf8(_len(str), _pnt(str)) >= 0
+
+"""
+Return index of first invalid codeunit (negative),
+0 if all ASCII, or index of first non-ASCII codeunit
+"""
+check_utf8(str) = @preserve str _check_utf8(_len(str), _pnt(str))
+
+@inline _check_utf8(len, pnt)    = _check_utf8(pnt, pnt, pnt + len)
+@inline _check_utf8_al(len, pnt) = _check_utf8(pnt, pnt, pnt + len)
+
+function _check_utf8_rest(pnt, fin, ch)
+    while true
+        # Check UTF-8 encoding
+        if ch < 0xc2
+            # Found continuation character or invalid 0xc0/0xc1 
+            break
+        elseif ch < 0xe0
+            # 2-byte UTF-8 sequence (i.e. characters 0x80-0x7ff)
+            pnt < fin || break
+            is_valid_continuation(get_codeunit(pnt)) || break
+            pnt += 1
+        elseif ch < 0xf0
+            # 3-byte UTF-8 sequence (i.e. characters 0x800-0xffff)
+            pnt + 1 < fin || break
+            b2 = get_codeunit(pnt)     ; is_valid_continuation(b2) || break
+            b3 = get_codeunit(pnt + 1) ; is_valid_continuation(b3) || break
+            wrd = ((ch & 0x0f)%UInt32 << 12) | ((b2 & 0x3f)%UInt32 << 6) | (b3 & 0x3f)
+            # check for surrogate pairs, make sure correct
+            (wrd < 0x0800 || is_surrogate_codeunit(wrd)) && break
+            pnt += 2
+        elseif ch < 0xf5
+            # 4-byte UTF-8 sequence (i.e. characters > 0xffff)
+            pnt + 2 < fin || break
+            b2 = get_codeunit(pnt)     ; is_valid_continuation(b2) || break
+            b3 = get_codeunit(pnt + 1) ; is_valid_continuation(b3) || break
+            b4 = get_codeunit(pnt + 2) ; is_valid_continuation(b4) || break
+            (((ch & 0x07)%UInt32 << 18) | ((b2 & 0x3f)%UInt32 << 12) |
+             ((b3 & 0x3f)%UInt32 << 6) | (b4 & 0x3f)) - 0x10000 < 0x100000 ||
+             break
+            pnt += 3
+        else
+            break
+        end
+        # Skip ascii characters as fast as possible
+        while true
+            pnt < fin || return C_NULL
+            ch = get_codeunit(pnt)
+            pnt += 1
+            ch < 0x7f || break
+        end
+    end
+    pnt
+end
+
+function _check_utf8(beg, pnt, fin)
+    while pnt < fin
+        ch = get_codeunit(pnt)
+        pnt += 1
+        if ch > 0x7f
+            nxt = _check_utf8_rest(pnt, fin, ch)
+            return nxt == C_NULL ? Int(pnt - beg) : -Int(nxt - beg)
+        end
+    end
+    0
 end
 
 function _nextcpfun(::CodeUnitMulti, ::Type{UTF8CSE}, pnt)
@@ -240,9 +303,6 @@ function _nextcpfun(::CodeUnitMulti, ::Type{UTF8CSE}, pnt)
         get_utf8_4byte(pnt + 3, ch), pnt + 4
     end
 end
-
-_getindex(::CodeUnitMulti, ::Type{CP}, str::MS_UTF8, pos::Int) where {CP<:CodePoint} =
-    _next(CodeUnitMulti(), CP, str, pos)[1]
 
 # Gets next codepoint
 @propagate_inbounds function _next(::CodeUnitMulti, ::Type{T},
@@ -279,8 +339,6 @@ end
     (ch > 0x7f
      ? (ch > 0x7ff ? (ch > 0xffff ? ((ch>>18) | 0xf0) : ((ch>>12) | 0xe0)) : ((ch>>6) | 0xc0))
      : ch)%UInt8
-
-@inline checkcont(pnt) = is_valid_continuation(get_codeunit(pnt))
 
 function _reverseind(::CodeUnitMulti, str::MS_UTF8, pos::Integer)
     @preserve str begin
@@ -342,19 +400,28 @@ end
     nchar < 0 && ncharerr(nchar)
     siz = ncodeunits(str)
     @boundscheck 0 <= pos <= siz || boundserr(str, pos)
-    siz == 0 && return ifelse(nchar == 0, 0, 1)
+    siz == 0 && return Int(nchar != 0)
     @preserve str begin
         beg = _pnt(str)
-        pnt = beg + pos - 1
+        # Get starting position
+        if pos == 0
+            nchar <= 1 && return nchar
+            pnt = beg + utf_trail(get_codeunit(beg)) + 1
+            nchar -= 1
+        else
+            pnt = beg + pos - 1
+            nchar == 0 && (checkcont(pnt) ? index_error(str, pos) : return pos)
+            cu = get_codeunit(pnt)
+            if !is_valid_continuation(cu)
+                pnt += utf_trail(cu) + 1
+            elseif pos == siz
+                # At end of string already
+                return siz + 1
+            else
+                pnt += checkcont(pnt + 1) ? checkcont(pnt + 2) + 2 : 1
+            end
+        end
         fin = beg + siz
-        nchar == 0 && (pos != 0 && checkcont(pnt) ? index_error(str, pos) : return pos)
-        pos == 0 && (pos = 1; nchar -= 1; pnt += 1)
-        cu = get_codeunit(pnt)
-        pnt += (cu < 0x80 ? 1
-                : (cu < 0xc0
-                   ? (pos == siz ? 1
-                      : (checkcont(pnt + 1) ? (2 + (pos < siz - 1 && checkcont(pnt + 2))) : 1))
-                   : ifelse(cu < 0xe0, 2, ifelse(cu < 0xf0, 3, 4))))
         # pnt should now point to a valid start of a character
         # This could be sped up, by looking at chunks, and if all ASCII (common case),
         # simply move forward 8
@@ -367,14 +434,24 @@ end
 
 @propagate_inbounds function _prevind(::CodeUnitMulti, str::MS_UTF8, pos::Int, nchar::Int)
     nchar < 0 && ncharerr(nchar)
-    @boundscheck 0 < pos <= ncodeunits(str)+1 || boundserr(str, pos)
+    numcu = ncodeunits(str)
+    @boundscheck 0 < pos <= numcu+1 || boundserr(str, pos)
+    numcu == 0 && return Int(nchar == 0)
     @preserve str begin
         beg = _pnt(str)
+        if pos > numcu
+            (nchar -= 1) < 0 && return pos
+            pos = numcu
+        elseif nchar == 0
+            checkcont(beg + pos - 1) ? index_error(str, pos) : return pos
+        end
         pnt = beg + pos
-        nchar == 0 && (checkcont(pnt-1) ? index_error(str, pos) : return pos)
         # This could be sped up, by looking at chunks, and if all ASCII (common case),
         # simply move back 8
-        while (pnt -= 1) >= beg && (nchar -= !checkcont(pnt)) > 0 ; end
+        while nchar >= 0
+            (pnt -= 1) < beg && return 0
+            nchar -= !checkcont(pnt)
+        end
         Int(pnt - beg + 1)
     end
 end
@@ -392,7 +469,6 @@ end
         @boundscheck lst > len && boundserr(str, lst)
         if lst != len
             ch = get_codeunit(pnt, lst)
-            println("getindex($(typeof(str))(\"$str\", $rng) => 0x$(outhex(ch))")
             is_valid_continuation(ch) && unierror(UTF_ERR_INVALID_INDEX, lst, ch)
         end
     end

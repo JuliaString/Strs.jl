@@ -61,11 +61,13 @@ write(io::IO, ch::LatinChars) = write(io, ch%UInt8)
 ## outputting UCS2 strings as UTF-8 ##
 
 function print(io::IO, str::MaybeSub{<:UCS2Strings})
-    len, pnt = _lenpnt(str)
-    fin = bytoff(pnt, len)
-    while pnt < fin
-        _write_ucs2(io, get_codeunit(pnt))
-        pnt += 2
+    @preserve str begin
+        len, pnt = _lenpnt(str)
+        fin = bytoff(pnt, len)
+        while pnt < fin
+            _write_ucs2(io, get_codeunit(pnt))
+            pnt += 2
+        end
     end
     nothing
 end
@@ -73,23 +75,24 @@ end
 ## output UTF-16 string ##
 
 function print(io::IO, str::MaybeSub{<:Str{UTF16CSE}})
-    pnt = _lenpnt(str)
-    siz = sizeof(str)
-    # Skip and write out ASCII sequences together
-    fin = pnt + siz
-    while pnt < fin
-        ch = get_codeunit(pnt)
-        # Handle 0x80-0x7ff
-        if ch <= 0x7f
-            write(io, ch%UInt8)
-        elseif ch <= 0x7ff
-            _write_utf8_2(io, ch)
-        elseif is_surrogate_lead(ch)
-            _write_utf8_4(io, get_supplementary(ch, get_codeunit(pnt += 2)))
-        else
-            _write_utf8_3(io, ch)
+    @preserve str begin
+        siz, pnt = _lenpnt(str)
+        # Skip and write out ASCII sequences together
+        fin = pnt + siz
+        while pnt < fin
+            ch = get_codeunit(pnt)
+            # Handle 0x80-0x7ff
+            if ch <= 0x7f
+                write(io, ch%UInt8)
+            elseif ch <= 0x7ff
+                _write_utf8_2(io, ch)
+            elseif is_surrogate_lead(ch)
+                _write_utf8_4(io, get_supplementary(ch, get_codeunit(pnt += 2)))
+            else
+                _write_utf8_3(io, ch)
+            end
+            pnt += 2
         end
-        pnt += 2
     end
     nothing
 end
@@ -97,11 +100,13 @@ end
 ## outputting UTF32 strings as UTF-8 ##
 
 function print(io::IO, str::MaybeSub{<:UTF32Strings})
-    len, pnt = _lenpnt(str)
-    fin = bytoff(pnt, len)
-    while pnt < fin
-        write_utf8(io, get_codeunit(pnt))
-        pnt += 4
+    @preserve str begin
+        len, pnt = _lenpnt(str)
+        fin = bytoff(pnt, len)
+        while pnt < fin
+            write_utf8(io, get_codeunit(pnt))
+            pnt += 4
+        end
     end
     nothing
 end

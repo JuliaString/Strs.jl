@@ -530,19 +530,17 @@ is_valid(::Type{<:Str{LatinCSE}},  s::Vector{UInt8}) = true
 # This should be optimized, stop at first character > 0x7f
 is_valid(::Type{<:Str{_LatinCSE}}, s::Vector{UInt8}) = !is_ascii(s)
 
-is_valid(::Type{UniStr}, s::String) = isvalid(s)
-is_valid(::Type{<:Str{C}}, s::String) where {C<:Union{UTF8CSE,UTF16CSE,UTF32CSE}} = isvalid(s)
+is_valid(::Type{UniStr}, s::String) = is_unicode(s)
+is_valid(::Type{<:Str{C}}, s::String) where {C<:Union{UTF8CSE,UTF16CSE,UTF32CSE}} = is_unicode(s)
 is_valid(::Type{<:Str{ASCIICSE}}, s::String) = is_ascii(s)
 is_valid(::Type{<:Str{UCS2CSE}}, s::String)  = is_bmp(s)
 is_valid(::Type{<:Str{LatinCSE}}, s::String) = is_latin(s)
 
 function _cvtsize(::Type{T}, dat, len) where {T <: CodeUnitTypes}
     buf, pnt = _allocate(T, len)
-    fin = bytoff(pnt, len)
-    while pnt < fin
-        @inbounds set_codeunit!(pnt, get_codeunit(dat, i))
+    @inbounds for i = 1:len
+        set_codeunit!(pnt, get_codeunit(dat, i))
         pnt += sizeof(T)
-        i += 1
     end
     buf
 end

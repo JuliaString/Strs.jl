@@ -23,8 +23,8 @@ _nextcpfun(::CodeUnitSingle, ::Type{S}, pnt::Ptr{T}) where {S,T<:CodeUnitTypes} 
     get_codeunit(pnt), pnt + sizeof(T)
 _nextcp(::Type{T}, pnt) where {T} = _nextcpfun(CodePointStyle(T), T, pnt)
 
-@propagate_inbounds _getindex(::CodeUnitMulti, T, str, i::Int) =
-    _getindex(CodeUnitMulti(), T, str, i)
+@propagate_inbounds _getindex(::CodeUnitMulti, T, str, pos::Int) =
+    first(_next(CodeUnitMulti(), T, str, pos))
 
 @inline _length(::CodeUnitSingle, str) = ncodeunits(str)
 

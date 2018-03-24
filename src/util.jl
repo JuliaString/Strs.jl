@@ -177,6 +177,8 @@ replace(str::Str, pat_repl::Pair{<:Union{Tuple{Vararg{<:AbstractChar}},
         count::Integer=typemax(Int)) =
     replace(str, in(first(pat_repl)) => last(pat_repl), count=count)
 
+# Todo: this is using print, but it should be changed to make sure that everything is done via
+# writes (i.e. no translation to UTF-8)
 function replace(str::Str, pat_repl::Pair; count::Integer=typemax(Int))
     pattern, repl = pat_repl
     count == 0 && return str
@@ -185,7 +187,7 @@ function replace(str::Str, pat_repl::Pair; count::Integer=typemax(Int))
     i = 1
     e = lastindex(str)
     r = find(Fwd, pattern, str)
-    print("find(Fwd, \"$pattern\", \"str\") => $r")
+    #print("find(Fwd, \"$pattern\", \"str\") => $r")
     (j = first(r)) == 0 && return str
     # Just return the string if not found
 
@@ -194,7 +196,7 @@ function replace(str::Str, pat_repl::Pair; count::Integer=typemax(Int))
         k = last(r)
         if i == 1 || i <= k
             print(out, SubString(str, i, thisind(str, j)))
-            println("$i $k $(pointer(str, i)), $(j-i)")
+            #println("$i $k $(pointer(str, i)), $(j-i)")
             #unsafe_write(out, pointer(str, i), UInt(j-i))
             _replace(out, repl, str, r, pattern)
         end
@@ -206,7 +208,7 @@ function replace(str::Str, pat_repl::Pair; count::Integer=typemax(Int))
             i = k = nextind(str, k)
         end
         r = find(Fwd, pattern, str, k)
-        println("find(Fwd, \"$pattern\", \"str\", $k) => $r, i=$i, j=$j, n=$n")
+        #println("find(Fwd, \"$pattern\", \"str\", $k) => $r, i=$i, j=$j, n=$n")
         (j = first(r)) == 0 && break
         (n += 1) == count && break
     end

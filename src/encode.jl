@@ -102,7 +102,12 @@ function convert(::Type{<:Str}, str::AbstractString)
     len, flags = unsafe_check_string(str)
     _str_encode(str, len, flags)
 end
-convert(::Type{<:Str}, str::String) = _str(str)
+#convert(::Type{<:Str{Text1CSE}}, str::String) =
+#    Str{Text1CSE,Nothing,Nothing,Nothing}(str,nothing,nothing,nothing)
+
+# This needs to be optimized
+convert(::Type{T},  str::String) where {C<:CSE,T<:Str{C}} =
+    convert(T, unsafe_str(str))
 
 convert(::Type{UniStr}, str::AbstractString) = _str(str)
 convert(::Type{UniStr}, str::String)         = _str(str)

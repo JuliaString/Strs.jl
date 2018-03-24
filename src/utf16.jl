@@ -157,18 +157,6 @@ end
 
 get_supplementary(lead::Unsigned, trail::Unsigned) = (UInt32(lead-0xd7f7)<<10 + trail)
 
-@propagate_inbounds function _getindex(::CodeUnitMulti, T, str::MS_UTF16, pos::Int)
-    @boundscheck pos <= _len(str) || boundserr(str, pos)
-    @preserve str begin
-        pnt = _pnt(str) + (pos<<1)
-        ch = get_codeunit(pnt - 2)
-        is_surrogate_trail(ch) && index_error(str, pos)
-        (is_surrogate_lead(ch)
-         ? (T(get_supplementary(ch, get_codeunit(pnt))), pos + 2)
-         : (T(ch), pos + 1))
-    end
-end
-
 function _nextcpfun(::CodeUnitMulti, ::Type{UTF16CSE}, pnt)
     ch = get_codeunit(pnt)
     (is_surrogate_lead(ch)
@@ -179,7 +167,7 @@ end
 @propagate_inbounds function _next(::CodeUnitMulti, T, str::MS_UTF16, pos::Int)
     @boundscheck pos <= _len(str) || boundserr(str, pos)
     @preserve str begin
-        pnt = _pnt(str) + (pos<<1)
+        pnt = bytoff(_pnt(str), pos<<1)
         ch = get_codeunit(pnt - 2)
         (is_surrogate_lead(ch)
          ? (T(get_supplementary(ch, get_codeunit(pnt))), pos + 2)

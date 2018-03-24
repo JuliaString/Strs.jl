@@ -1,5 +1,83 @@
 # This file is based on a file (julia/test/basic.jl) which is a part of Julia
+# Further modifications and additions: Scott P. Jones & Stefan Schelm
 # License is MIT: LICENSE.md
+
+test_string_length = 1:256
+
+const AllCharTypes = (ASCIIChr, LatinChr, UCS2Chr, UTF32Chr)
+
+compat_types = Dict(ASCIIStr => (ASCIIChr, ),
+                    LatinStr => (ASCIIChr, LatinChr),
+                    UCS2Str => (ASCIIChr, LatinChr, UCS2Chr))
+
+const charsets =
+    (:Binary,  # really, no character set at all, not text
+     :ASCII,   # (7-bit subset of Unicode)
+     :Latin,   # ISO-8859-1 (8-bit subset of Unicode)
+     :UCS2,    # BMP (16-bit subset of Unicode)
+     :UTF32,   # corresponding to codepoints (0-0xd7ff, 0xe000-0x10fff)
+     :UniPlus, # valid Unicode, plus unknown characters (for String)
+     :Text1,   # Unknown character set, 1 byte
+     :Text2,   # Unknown character set, 2 byte
+     :Text4)   # Unknown character set, 4 byte
+
+for T in (String, UTF8Str, UTF16Str, UTF32Str)
+    compat_types[T] = AllCharTypes
+end
+
+string_types = keys(compat_types)
+
+##  create type specific test strings
+test_strings_base = Dict()
+for T in AllCharTypes
+    test_strings_base[T] = [String(rand(T, len)) for len in test_string_length]
+end
+
+@testset "constructors" begin
+    for (ST, type_list) in compat_types, CT in type_list, test_string in test_strings_base[CT]
+        @eval @test convert($ST, $test_string) == $test_string
+    end
+end
+
+@testset "empty strings" begin
+    for ST in keys(compat_types)
+        @eval @test is_empty(convert($ST, ""))
+    end
+end
+
+@testset "{starts,ends}_with" begin
+    for (ST, type_list) in compat_types, CT in type_list, test_string in test_strings_base[CT]
+        converted_string = convert(ST, test_string)
+        try
+            @eval @test starts_with($converted_string, $(test_string[1]))
+            #starts_with(converted_string, test_string[1]) ||
+            # println("starts_with($converted_string, $(test_string[1])): $ST, $CT")
+            @eval @test ends_with($converted_string, $(test_string[end]))
+            #ends_with(converted_string, test_string[end]) ||
+            #println("ends_with($converted_string, $(test_string[end])): $ST, $CT")
+        catch ex
+            println("Error: $converted_string, $(test_string[end]): $ST, $CT")
+            println(sprint(showerror, ex, catch_backtrace()))
+        end
+        ##   TODO needs test which would run in case the start and end chars are the same
+        if test_string[1] != test_string[end]
+            @eval @test !starts_with($converted_string, $(test_string[end]))
+            @eval @test !ends_with($converted_string, $(test_string[1]))
+        end
+    end
+end
+
+@testset "CharSet" begin
+    for CT in charsets
+        @test "$(typeof(CharSet(CT)))" == "CharSet{$(CT)}"
+    end
+end
+
+@testset "Encoding" begin
+    for CT in charsets
+        @test "$(typeof(Encoding(CT)))" == "Encoding{$(CT)}"
+    end
+end
 
 codegen_egal_of_strings(x, y) = (x===y, x!==y)
 
@@ -37,7 +115,7 @@ function testbasic(::Type{ST}, ::Type{C}) where {ST, C}
     v = [0x61,0x62,0x63,0x21]
     @test ST(v) == abce_str # && isempty(v)
     ST === String && @test isempty(v)
-    if IS_WORKING # Need to add constructor with range
+    if ST === String # IS_WORKING # Need to add constructor with range
         @test ST(0x61:0x63) == abc_str
     end
 
@@ -60,14 +138,14 @@ function testbasic(::Type{ST}, ::Type{C}) where {ST, C}
     @test typemin(abc_str) === ST("")
     @test abc_str === abc_str
     @test ab_str  !== abc_str
-    if IS_WORKING
+    if ST === String # IS_WORKING
         @test string(ab_str, c_chr) === abc_str
         @test string() === ""
         @test codegen_egal_of_strings(string(ab_str, c_chr), abc_str) === (true, false)
     end
     let strs = [emptystr, a_str, ST("a b c"), ST("до свидания")]
         for x in strs, y in strs
-            @test (x === y) == (objectid(x) == objectid(y))
+            @eval @test (x === y  #= $x === $y =#) == (objectid(x) == objectid(y))
         end
     end
 end
@@ -148,28 +226,18 @@ end
     ST === String && @test nextind(hello1, 0, 10) == 10
     @test_throws BoundsError length(hello2, 1, 10) == 9
     ST == String && @test nextind(ST("hellø"), 0, 10) == 11
-    @test_throws BoundsError checkbounds(hello1, 0)
-    @test_throws BoundsError checkbounds(hello1, 6)
-    @test_throws BoundsError checkbounds(hello1, 0:3)
-    @test_throws BoundsError checkbounds(hello1, 4:6)
-    @test_throws BoundsError checkbounds(hello1, [0:3;])
-    @test_throws BoundsError checkbounds(hello1, [4:6;])
-    @test checkbounds(hello1, 1) === nothing
-    @test checkbounds(hello1, 5) === nothing
-    @test checkbounds(hello1, 1:3) === nothing
-    @test checkbounds(hello1, 3:5) === nothing
-    @test checkbounds(hello1, [1:3;]) === nothing
-    @test checkbounds(hello1, [3:5;]) === nothing
-    @test checkbounds(Bool, hello1, 0) === false
-    @test checkbounds(Bool, hello1, 1) === true
-    @test checkbounds(Bool, hello1, 5) === true
-    @test checkbounds(Bool, hello1, 6) === false
-    @test checkbounds(Bool, hello1, 0:5) === false
-    @test checkbounds(Bool, hello1, 1:6) === false
-    @test checkbounds(Bool, hello1, 1:5) === true
-    @test checkbounds(Bool, hello1, [0:5;]) === false
-    @test checkbounds(Bool, hello1, [1:6;]) === false
-    @test checkbounds(Bool, hello1, [1:5;]) === true
+    for ind in (0, 6, 0:3, 4:6, [0:3;], [4:6;])
+        @eval @test_throws BoundsError checkbounds(hello1, $ind)
+    end
+    for ind in (1, 5, 1:3, 3:5, [1:3;], [3:5;])
+        @eval @test checkbounds(hello1, $ind) === nothing
+    end
+    f = false
+    t = true
+    for (ind, p) in ((0, f), (1, t), (5, t), (6, f), (0:5, f), (1:6, f),
+                     (1:5, t), ([0:5;], f), ([1:6;], f), ([1:5;], t))
+        @eval @test checkbounds(Bool, hello1, $ind) === $p
+    end
 end
 
     @testset "issue #15624 (indexing with out of bounds empty range)" begin
@@ -823,8 +891,9 @@ function testbin(::Type{ST}) where {ST}
                 (("\xf0", 2), ("\xf0z", 2), ("\xf0\x9f", 3), ("\xf0\x9fz", 3),
                  ("\xf0\x9f\x98", 4), ("\xf0\x9f\x98z", 4), ("\xf0\x9f\x98\x84", 5),
                  ("\xf0\x9f\x98\x84z", 5))),
-        s in lst
+        (s, r) in lst
         st = ST(s)
+        ST == String || (r = 2)
         @eval @test next($st, 1)[2] == $r
         @eval @test nextind($st, 1) == $r
     end
@@ -834,7 +903,7 @@ for ST in UnicodeStringTypes
     C = eltype(ST)
     @testset "Basic String Tests: $ST, $C" begin testbasic(ST, C) end
 end
-for ST in (Text1Str, )
+for ST in (BinaryStr, Text1Str, String)
     @testset "Binary String Tests: $ST" begin testbin(ST) end
 end
 
@@ -842,14 +911,14 @@ end
 @testset "issue #6027 - make symbol with invalid char" begin
     sym = Symbol(Char(0xdcdb))
     @test string(sym) == string(Char(0xdcdb))
-    @test sym == string(Char(0xdcdb))
+    @test String(sym) == string(Char(0xdcdb))
     @test Meta.lower(Main, sym) === sym
     res = string(Meta.parse(string(Char(0xdcdb)," = 1"),1,raise=false)[1])
     @test res == """\$(Expr(:error, "invalid character \\\"\\udcdb\\\"\"))"""
 end
 
 @testset "invalid code point" begin
-    s = [0x61, 0xba, 0x41]
+    s = String([0x61, 0xba, 0x41])
     @test !is_valid(s)
     @test s[2] == reinterpret(Char, UInt32(0xba) << 24)
 end
@@ -861,6 +930,86 @@ end
         push!(v, UInt8('x'))
         @test s == "abc"
     end
+
+end
 end
 
+@testset "Unicode Strings" begin
+    # Unicode errors
+    let io = IOBuffer()
+        show(io, UnicodeError(UTF_ERR_SHORT, 1, 10))
+        check = "UnicodeError: invalid UTF-8 sequence starting at index 1 (0xa) missing one or more continuation bytes"
+        @test String(take!(io)) == check
+    end
+end
 
+@testset "CESU-8 sequences" begin
+    ## UTF-8 tests
+
+    # Test for CESU-8 sequences
+    let ch = 0x10000
+        for hichar = 0xd800:0xdbff, lochar = 0xdc00:0xdfff
+            seq = string(Char(hichar), Char(lochar))
+            # Normal conversion throws an error
+            @test_throws UnicodeError utf8(seq)
+            # Unsafe conversions return invalid strings as Text*Str
+            @test typeof(unsafe_str(seq)) == Text1Str
+            # With accept_surrogates flag, return converted to valid string (_UTF32Str)
+            @test unsafe_str(seq;accept_surrogates=true)[1]%UInt == ch
+            ch += 1
+        end
+    end
+
+end
+
+@testset "Reverse of UTF8" begin
+    # Reverse of UTF8Str
+    @test reverse(UTF8Str("")) == ""
+    @test reverse(UTF8Str("a")) == "a"
+    @test reverse(UTF8Str("abc")) == "cba"
+    @test reverse(UTF8Str("xyz\uff\u800\uffff\U10ffff")) == "\U10ffff\uffff\u800\uffzyx"
+    for binstr in ([0xc1], [0xd0], [0xe0], [0xed, 0x80], [0xf0], [0xf0, 0x80], [0xf0, 0x80, 0x80])
+        str = vcat(codeunits("xyz"), binstr)
+        @test_throws UnicodeError reverse(UTF8Str(str))
+    end
+end
+
+# Specifically check UTF-8 string whose lead byte is same as a surrogate
+@test convert(UTF8Str, [0xed, 0x9f, 0xbf]) == "\ud7ff"
+
+# issue #8
+@test !isempty(methods(string, Tuple{Char}))
+
+@testset "Issue 12268" begin
+# 12268
+for (fun, S, T) in ((utf16, UInt16, UTF16Str), (utf32, UInt32, UTF32Str))
+    # AbstractString
+    str = "abcd\0\uff\u7ff\u7fff\U7ffff"
+    tst = SubString(convert(T,str),4)
+    cmp = Char['d','\0','\uff','\u7ff','\u7fff','\U7ffff']
+    cmp32 = UInt32['d','\0','\uff','\u7ff','\u7fff','\U7ffff']
+    cmp16 = UInt16[0x0064,0x0000,0x00ff,0x07ff,0x7fff,0xd9bf,0xdfff]
+    x = fun(tst)
+    cmpx = (S == UInt16 ? cmp16 : cmp32)
+    @test typeof(tst) == SubString{T}
+    @test convert(T, tst) == str[4:end]
+    for (i, ch) in enumerate(cmp)
+        @test ch == x[i]
+    end
+    # Vector{T} / Array{T}
+    @test convert(Vector{S}, x) == cmpx
+    #@test convert(Array{S}, x) == cmpx
+    # Embedded nul checking
+    @test Base.containsnul(x)
+    @test Base.containsnul(tst)
+    # map
+    #@test_throws UnicodeError map(islower, x)
+    #@test_throws ArgumentError map(islower, tst)
+    # SubArray conversion
+    subarr = view(cmp, 1:6)
+    @test convert(T, subarr) == str[4:end]
+end
+end
+
+@test isvalid(UTF32Str, Char['d','\uff','\u7ff','\u7fff','\U7ffff'])
+@test reverse(utf32("abcd \uff\u7ff\u7fff\U7ffff")) == utf32("\U7ffff\u7fff\u7ff\uff dcba")
