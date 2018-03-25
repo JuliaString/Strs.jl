@@ -6,8 +6,6 @@ Licensed under MIT License, see LICENSE.md
 Based in part on code for UTF16String that used to be in Julia
 =#
 
-const MS_UTF16 = MaybeSub{<:Str{UTF16CSE}}
-
 const _trail_mask = 0xdc00_dc00_dc00_dc00
 const _hi_bit_16  = 0x8000_8000_8000_8000
 
@@ -20,8 +18,8 @@ const _hi_bit_16  = 0x8000_8000_8000_8000
 function _length(::CodeUnitMulti, ::Type{UTF16CSE}, str::Str)
     (siz = sizeof(str)) == 0 && return 0
     siz == 2 && return 1
+    cnt = chroff(UInt16, siz)
     @preserve str begin
-        cnt = chroff(UInt16, siz)
         pnt, fin = _calcpnt(str, siz)
         while (pnt += CHUNKSZ) <= fin
             cnt -= count_ones(_get_masked(pnt))
@@ -98,7 +96,7 @@ function _prevind(::CodeUnitMulti, str::MS_UTF16, pos::Int, nchar::Int)
     end
 end
 
-function is_ascii(str::T) where {T<:Str{<:Union{Text2CSE, UCS2CSE, UTF16CSE},Nothing}}
+function is_ascii(str::MaybeSub{<:Str{Union{Text2CSE, UCS2CSE, UTF16CSE}}})
     (siz = sizeof(str)) == 0 && return true
     @preserve str begin
         siz < CHUNKSZ &&
@@ -111,7 +109,7 @@ function is_ascii(str::T) where {T<:Str{<:Union{Text2CSE, UCS2CSE, UTF16CSE},Not
     end
 end
 
-function is_latin(str::T) where {T<:Str{<:Union{Text2CSE, UCS2CSE, UTF16CSE},Nothing}}
+function is_latin(str::MaybeSub{<:Str{Union{Text2CSE, UCS2CSE, UTF16CSE}}})
     (siz = sizeof(str)) == 0 && return true
     @preserve str begin
         siz < CHUNKSZ &&
@@ -125,7 +123,7 @@ function is_latin(str::T) where {T<:Str{<:Union{Text2CSE, UCS2CSE, UTF16CSE},Not
 end
 
 # Check for any surrogate characters
-function is_bmp(str::T) where {T<:Str{UTF16CSE,Nothing}}
+function is_bmp(str::MS_UTF16)
     (siz = sizeof(str)) == 0 && return true
     @preserve str begin
         siz < CHUNKSZ && return (_get_masked(_pnt64(str)) & _mask_bytes(siz)) == 0
@@ -140,18 +138,22 @@ end
 
 is_ascii(str::Str{_UCS2CSE}) = false
 is_latin(str::Str{_UCS2CSE}) = false
-is_bmp(str::UCS2Strings) = true
+is_ascii(str::SubString{<:Str{_UCS2CSE}}) = is_ascii(Str{UCS2CSE}(str.data))
+is_latin(str::SubString{<:Str{_UCS2CSE}}) = is_latin(Str{UCS2CSE}(str.data))
+is_bmp(str::MaybeSub{<:UCS2Strings}) = true
 
 # Speed this up accessing 64 bits at a time
 @propagate_inbounds function _cnt_non_bmp(len, pnt::Ptr{UInt16})
     cnt = 0
-    @inbounds for i = 1:len
-        cnt += is_surrogate_lead(get_codeunit(pnt, i))
+    fin = bytoff(pnt, len)
+    while pnt < fin
+        cnt += is_surrogate_lead(get_codeunit(pnt))
+        pnt += 2
     end
     cnt
 end
 
-@inline lastindex(str::Str{UTF16CSE}) =
+@inline _lastindex(::CodeUnitMulti, str::MS_UTF16) =
     ((len = _len(str)) != 0
      ? (is_surrogate_codeunit(get_codeunit(_pnt(str), len)) ? len-1 : len) : 0)
 
@@ -167,7 +169,7 @@ end
 @propagate_inbounds function _next(::CodeUnitMulti, T, str::MS_UTF16, pos::Int)
     @boundscheck pos <= _len(str) || boundserr(str, pos)
     @preserve str begin
-        pnt = bytoff(_pnt(str), pos<<1)
+        pnt = bytoff(_pnt(str), pos)
         ch = get_codeunit(pnt - 2)
         (is_surrogate_lead(ch)
          ? (T(get_supplementary(ch, get_codeunit(pnt))), pos + 2)
@@ -175,10 +177,8 @@ end
     end
 end
 
-@propagate_inbounds @inline function _thisind(::CodeUnitMulti, str::MS_UTF16, len, pnt, pos)
-    @boundscheck 1 <= pos <= len || boundserr(str, pos)
-    pos - is_surrogate_trail(get_codeunit(pnt, pos))
-end
+@inline _thisind(::CodeUnitMulti, str::MS_UTF16, len, pnt, pos) =
+    Int(pos) - is_surrogate_trail(get_codeunit(pnt, pos))
 
 @propagate_inbounds @inline function _nextind(::CodeUnitMulti, str::MS_UTF16, pos::Int)
     pos == 0 && return 1
@@ -191,14 +191,6 @@ end
     numcu = _len(str)
     @boundscheck 0 < pos <= numcu || boundserr(str, pos + 1)
     @preserve str pos - is_surrogate_trail(get_codeunit(_pnt(str), pos))
-end
-
-function reverseind(str::MS_UTF16, i::Integer)
-    @preserve str begin
-        len, pnt = _lenpnt(str)
-        j = len - i
-        is_surrogate_trail(get_codeunit(pnt, j)) ? j - 1 : j
-    end
 end
 
 function _reverse(::CodeUnitMulti, ::Type{UTF16CSE}, len, pnt::Ptr{T}) where {T<:CodeUnitTypes}
@@ -224,9 +216,10 @@ function is_valid(::Type{<:UCS2Strings}, data::AbstractArray{UInt16})
 end
 
 function is_valid(::Type{<:UCS2Strings}, pnt::Ptr{UInt16}, len)
-    pos = 0
-    @inbounds while (pos += 1) < len # check for surrogates
-        is_surrogate_codeunit(get_codeunit(pnt, pos)) && return false
+    fin = bytoff(pnt, len)
+    while pnt < fin # check for surrogates
+        is_surrogate_codeunit(get_codeunit(pnt)) && return false
+        pnt += 2
     end
     true
 end
@@ -280,10 +273,11 @@ function convert(::Type{<:Str{C}}, str::String) where {C<:UCS2_CSEs}
 end
 
 # handle zero length string quickly, just widen these
-convert(::Type{<:Str{C}}, str::Str{<:Union{ASCIICSE, Latin_CSEs}}) where {C<:UCS2_CSEs} =
+convert(::Type{<:Str{C}},
+        str::MaybeSub{<:Str{Union{ASCIICSE, Latin_CSEs}}}) where {C<:UCS2_CSEs} =
     (siz = sizeof(str)) == 0 ? empty_str(C) : Str(C, _cvtsize(UInt16, _pnt(str), siz))
 
-function convert(::Type{<:Str{C}}, str::Str{UTF16CSE}) where {C<:UCS2_CSEs}
+function convert(::Type{<:Str{C}}, str::MS_UTF16) where {C<:UCS2_CSEs}
     # Might want to have an invalids_as argument
     # handle zero length string quickly
     (siz = sizeof(str)) == 0 && return empty_str(C)
@@ -329,12 +323,14 @@ function convert(::Type{<:Str{UTF16CSE}}, str::AbstractString)
         c = ch%UInt32
         if c > 0x0ffff
             # output surrogate pair
-            set_codeunit!(pnt, (0xd7c0 + (c >>> 10))%UInt16)
+            w1, w2 = get_utf16(c)
+            set_codeunit!(pnt, w1)
+            set_codeunit!(pnt+2, w2)
+            pnt += 4
+        else
+            set_codeunit!(pnt, c%UInt16)
             pnt += 2
-            c = 0xdc00 + (c & 0x3ff)
         end
-        set_codeunit!(pnt, c%UInt16)
-        pnt += 2
     end
     Str(UTF16CSE, buf)
 end
@@ -389,9 +385,9 @@ function _encode_utf16(pnt::Ptr{UInt8}, len)
         else
             ch32 = get_utf8_4byte(pnt += 3, ch)
             # output surrogate pair
-            set_codeunit!(out, (0xd7c0 + (ch32 >>> 10))%UInt16)
+            w1, ch = get_utf16(ch32)
+            set_codeunit!(out, w1)
             out += 2
-            ch = (0xdc00 + (ch32 & 0x3ff))%UInt16
         end
         set_codeunit!(out, ch)
         out += 2
@@ -422,8 +418,10 @@ function _cvt_utf8(::Type{T}, str::S) where {T<:Union{String, Str{UTF8CSE}}, S}
 end
 
 # Split this way to avoid ambiguity errors
-convert(::Type{String},  str::Str{<:Union{Wide_CSEs,Text2CSE,Text4CSE}}) = _cvt_utf8(String, str)
-convert(::Type{UTF8Str}, str::Str{<:Union{Wide_CSEs,Text2CSE,Text4CSE}}) = _cvt_utf8(UTF8Str, str)
+convert(::Type{String},  str::MaybeSub{<:Str{Union{Wide_CSEs,Text2CSE,Text4CSE}}}) =
+    _cvt_utf8(String, str)
+convert(::Type{UTF8Str}, str::MaybeSub{<:Str{Union{Wide_CSEs,Text2CSE,Text4CSE}}}) =
+    _cvt_utf8(UTF8Str, str)
 
 """
 Converts an already validated UTF-32 encoded vector of `UInt32` to a `UTF16Str`
@@ -445,12 +443,14 @@ function _encode_utf16(dat::Ptr{UInt32}, len)
         dat += 4
         if ch > 0x0ffff
             # Output surrogate pair for 0x10000-0x10ffff
-            set_codeunit!(pnt, (0xd7c0 + (ch >>> 10))%UInt16)
+            w1, w2 = get_utf16(ch)
+            set_codeunit!(pnt,   w1)
+            set_codeunit!(pnt+2, w2)
+            pnt += 4
+        else
+            set_codeunit!(pnt, ch%UInt16)
             pnt += 2
-            ch = 0xdc00 + (ch & 0x3ff)
         end
-        set_codeunit!(pnt, ch%UInt16)
-        pnt += 2
     end
     buf
 end
@@ -465,7 +465,7 @@ end
 
 # Todo: Some of these need to be fixed to account for SubStr, when that is added
 convert(::Type{T},  str::MaybeSub{S}) where {T<:UCS2Strings, S<:UCS2Strings} = str
-convert(::Type{UTF16Str}, str::UCS2Strings) = Str(UTF16CSE, str.data)
+convert(::Type{UTF16Str}, str::MaybeSub{<:UCS2Strings}) = Str(UTF16CSE, str.data)
 
 unsafe_convert(::Type{Ptr{UInt16}}, s::MS_UTF16) = _pnt(s)
 
@@ -515,8 +515,8 @@ end
     if uc <= 0x0ffff
         push!(rst, uc%UInt16)
     else
-        push!(rst, (0xd7c0 + (uc >> 10))%UInt16)
-        push!(rst, (0xdc00 + (uc & 0x3ff))%UInt16)
+        w1, w2 = get_utf16(uc)
+        push!(rst, w1, w2)
     end
 end
 
@@ -529,7 +529,7 @@ function _maprest(fun, str, len, pnt, fin, buf, out, uc)
         # check for surrogate pair
         is_surrogate_lead(ch) &&
             (ch = get_supplementary(ch, get_codeunit(pnt += 2)))
-        pushchar!(rst, check_valid(UInt32(fun(ch)), (pnt - pointer(str))>>>1))
+        pushchar!(rst, check_valid(UInt32(fun(ch%UTF32Chr)), chrdiff(pnt, pointer(str))))
         pnt += 2
     end
     # We now have a vector to add to the end of buf
@@ -542,7 +542,7 @@ end
 
 function _map(::Type{C}, ::Type{T}, fun, len, str) where {C<:CSE, T<:Str}
     pnt = _pnt(str)
-    buf = StringVector(len * sizeof(UInt16))
+    buf = Base.StringVector(len * sizeof(UInt16))
     beg = out = reinterpret(Ptr{UInt16}, pointer(buf))
     surrflag = false
     fin = pnt + sizeof(str)
@@ -553,15 +553,16 @@ function _map(::Type{C}, ::Type{T}, fun, len, str) where {C<:CSE, T<:Str}
         T == UTF16Str && is_surrogate_lead(ch) &&
             (ch = get_supplementary(ch, get_codeunit(pnt += 2)))
         # Note: no checking for invalid here, UTF16Str is always valid
-        uc = check_valid(UInt32(fun(ch)), (pnt - pointer(str))>>>1)
+        uc = check_valid(UInt32(fun(ch%UTF32Chr)), chrdiff(pnt, pointer(str)))
         if uc < 0x10000
             out < outend || return _maprest(fun, str, len, buf, pnt, fin, out, uc)
             set_codeunit!(out, uc%UInt16)
             out += 2
         else
             out + 2 < outend || return _maprest(fun, str, len, buf, pnt, fin, out, uc)
-            set_codeunit!(out,     (0xd7c0 + (uc >> 10))%UInt16)
-            set_codeunit!(out + 2, (0xdc00 + (uc & 0x3ff))%UInt16)
+            w1, w2 = get_utf16(uc)
+            set_codeunit!(out, w1)
+            set_codeunit!(out + 2, w2)
             surrflag = true
             out += 4
         end
@@ -580,5 +581,5 @@ function _map(::Type{C}, ::Type{T}, fun, len, str) where {C<:CSE, T<:Str}
     end
 end
 
-map(fun, str::T) where {C<:Union{UCS2_CSEs, UTF16CSE},T<:Str{C}} =
+map(fun, str::MaybeSub{T}) where {C<:Union{UCS2_CSEs, UTF16CSE},T<:Str{C}} =
     (len = _len(str)) == 0 ? empty_str(T) : @preserve str _map(C, T, fun, len, str)

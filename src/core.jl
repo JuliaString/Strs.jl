@@ -8,10 +8,13 @@ Licensed under MIT License, see LICENSE.md
 Inspired by / derived from code in Julia
 =#
 
-_lastindex(::CodeUnitSingle, str) = (@_inline_meta(); _len(str))
+_lastindex(::CodeUnitSingle, str) = (@_inline_meta(); ncodeunits(str))
 
-@propagate_inbounds _getindex(::CodeUnitSingle, T, str, i::Int) =
-    (@_inline_meta(); T(get_codeunit(_pnt(str), _ind2chr(CodeUnitSingle(), str, i))))
+@propagate_inbounds function _getindex(::CodeUnitSingle, T, str, pos::Int)
+    @_inline_meta()
+    @boundscheck checkbounds(str, pos)
+    T(get_codeunit(_pnt(str), pos))
+end
 
 @propagate_inbounds function _next(::CodeUnitSingle, T, str, pos)
     @_inline_meta()
@@ -37,27 +40,26 @@ _nextcp(::Type{T}, pnt) where {T} = _nextcpfun(CodePointStyle(T), T, pnt)
     _length(CodeUnitMulti(), T, str, 1, sizeof(str))
 
 @propagate_inbounds function _length(cs::CodePointStyle, str, i, j)
-    siz = ncodeunits(str)
     @boundscheck begin
-        0 < i <= siz+1 || boundserr(str, i)
-        0 <= j <= siz  || boundserr(str, j)
+        # I think the bounds of these should be 1:siz
+        lim = ncodeunits(str)+1
+        0 <  i <= lim || boundserr(str, i)
+        0 <= j <  lim || boundserr(str, j)
     end
     j < i ? 0 : _length(cs, cse(str), str, i, j)
 end
 
-@inline _thisind(::CodeUnitSingle, str, len, pnt, i) = Int(i)
+@inline _thisind(::CodeUnitSingle, str, len, pnt, pos) = Int(pos)
 
-@propagate_inbounds function _thisind(::CodeUnitMulti, str, i)
+@propagate_inbounds function _thisind(cs::CS, str, pos) where {CS<:CodePointStyle}
     @_inline_meta()
-    len = _len(str)
-    @boundscheck 0 < i <= len || boundserr(str, i)
-    _thisind(CodeUnitMulti(), str, len, _pnt(str), i)
-end
-
-@propagate_inbounds function _thisind(::CodeUnitSingle, str, i)
-    @_inline_meta()
-    @boundscheck 0 < i <= ncodeunits(str) || boundserr(str, i)
-    Int(i)
+    # I do think thisind should not return anything outside of the valid range
+    # but for now, to make it compatible with the current String API, do this:
+    pos == 0 && return 0
+    len = ncodeunits(str)
+    pos == len + 1 && return pos
+    @boundscheck 0 < pos <= len || boundserr(str, pos)
+    @preserve str _thisind(cs, str, len, _pnt(str), pos)
 end
 
 @propagate_inbounds function _prevind(::CodeUnitSingle, str, i)
@@ -84,17 +86,6 @@ end
     nchar < 0 && ncharerr(nchar)
     @boundscheck 0 <= i <= ncodeunits(str) || boundserr(str, i)
     min(Int(i) + nchar, ncodeunits(str)+1)
-end
-
-@propagate_inbounds function _ind2chr(::CodeUnitSingle, str, i)
-    @_inline_meta()
-    @boundscheck checkbounds(str, i)
-    i
-end
-@propagate_inbounds function _chr2ind(::CodeUnitSingle, str, i)
-    @_inline_meta()
-    @boundscheck checkbounds(str, i)
-    i
 end
 
 _index(cs::CodePointStyle, str, i)               = _thisind(cs, str, i)
@@ -134,12 +125,24 @@ _index(cs::CodePointStyle, ::Rev, str, i, nchar) = _prevind(cs, str, i, nchar)
 @propagate_inbounds index(::D, str::MaybeSub{T}, i::Int, nchar::Int) where {T<:Str,D<:Direction} =
     (@_inline_meta(); _index(CodePointStyle(T), D(), str, i, nchar))
 
-# This is deprecated on v0.7, recommended change to length(str, 1, i)
-@propagate_inbounds ind2chr(str::MaybeSub{T}, i::Int) where {T<:Str} =
-    _ind2chr(CodePointStyle(T), str, i)
-# This is deprecated on v0.7, recommended change to nextind(str, 0, i)
-@propagate_inbounds chr2ind(str::MaybeSub{T}, i::Int) where {T<:Str} =
-    _chr2ind(CodePointStyle(T), str, i)
+@static if V6_COMPAT
+    @propagate_inbounds function _ind2chr(::CodeUnitSingle, str, i)
+        @_inline_meta()
+        @boundscheck checkbounds(str, i)
+        i
+    end
+    @propagate_inbounds function _chr2ind(::CodeUnitSingle, str, i)
+        @_inline_meta()
+        @boundscheck checkbounds(str, i)
+        i
+    end
+    # This is deprecated on v0.7, recommended change to length(str, 1, i)
+    @propagate_inbounds ind2chr(str::MaybeSub{T}, i::Int) where {T<:Str} =
+        _ind2chr(CodePointStyle(T), str, i)
+    # This is deprecated on v0.7, recommended change to nextind(str, 0, i)
+    @propagate_inbounds chr2ind(str::MaybeSub{T}, i::Int) where {T<:Str} =
+        _chr2ind(CodePointStyle(T), str, i)
+end
 
 @propagate_inbounds function is_valid(str::MaybeSub{T}, i::Integer) where {T<:Str}
     @_inline_meta()
@@ -148,11 +151,6 @@ _index(cs::CodePointStyle, ::Rev, str, i, nchar) = _prevind(cs, str, i, nchar)
 end
 
 _isvalid_char_pos(::CodeUnitSingle, C, str, i) = true
-
-@propagate_inbounds _reverseind(::CodeUnitSingle, str::MaybeSub{T}, i) where {T<:Str} =
-    (@_inline_meta(); ncodeunits(str) + 1 - i)
-@propagate_inbounds reverseind(str::MaybeSub{T}, i::Integer) where {T<:Str} =
-    _reverseind(CodePointStyle(T), str, i)
 
 @propagate_inbounds function _collectstr(::CodeUnitMulti, ::Type{S},
                                          str::MaybeSub{T}) where {S,T<:Str}

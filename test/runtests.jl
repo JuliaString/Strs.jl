@@ -8,9 +8,6 @@ const V6_COMPAT = VERSION < v"0.7.0-DEV"
 using Strs
 import Strs: check_string, UTF_ERR_SHORT, UnicodeError, codepoint_adj, codepoint_rng
 
-# Function to help generating strings for tests
-randchar(::Type{T}) where {T} = codepoint_adj(T, rand(codepoint_rng(T)))
-
 const IndexError = isdefined(Base, :StringIndexError) ? StringIndexError : UnicodeError
 
 # Should test GenericString also, once overthing else is working

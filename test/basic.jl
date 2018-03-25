@@ -34,8 +34,8 @@ for T in AllCharTypes
 end
 
 @testset "constructors" begin
-    for (ST, type_list) in compat_types, CT in type_list, test_string in test_strings_base[CT]
-        @eval @test convert($ST, $test_string) == $test_string
+    for (ST, type_list) in compat_types, CT in type_list, str in test_strings_base[CT]
+        @eval @test convert($ST, $str) == $str
     end
 end
 
@@ -46,23 +46,28 @@ end
 end
 
 @testset "{starts,ends}_with" begin
-    for (ST, type_list) in compat_types, CT in type_list, test_string in test_strings_base[CT]
-        converted_string = convert(ST, test_string)
+    for (ST, type_list) in compat_types, CT in type_list, str in test_strings_base[CT]
+        cvtstr = convert(ST, str)
+        beg = lst = CT(' ')
+        bty = lty = CT
+        bch = lch = 0%UInt32
         try
-            @eval @test starts_with($converted_string, $(test_string[1]))
-            #starts_with(converted_string, test_string[1]) ||
-            # println("starts_with($converted_string, $(test_string[1])): $ST, $CT")
-            @eval @test ends_with($converted_string, $(test_string[end]))
-            #ends_with(converted_string, test_string[end]) ||
-            #println("ends_with($converted_string, $(test_string[end])): $ST, $CT")
+            beg = str[1]   ; bty = typeof(beg) ; bch = beg%UInt32
+            lst = str[end] ; lty = typeof(lst) ; lch = lst%UInt32
+            @eval @test starts_with($cvtstr, $beg)
+            starts_with(cvtstr, beg) ||
+                println("starts_with($cvtstr, $beg): $ST, $CT, $bty, $bch")
+            @eval @test ends_with($cvtstr, $lst)
+            ends_with(cvtstr, lst) ||
+                println("ends_with($cvtstr, $lst): $ST, $CT, $lty, $lch")
         catch ex
-            println("Error: $converted_string, $(test_string[end]): $ST, $CT")
+            println("Error: $cvtstr, $beg, $lst: $ST, $CT, $bty, $bch, $lty, $lch")
             println(sprint(showerror, ex, catch_backtrace()))
         end
         ##   TODO needs test which would run in case the start and end chars are the same
-        if test_string[1] != test_string[end]
-            @eval @test !starts_with($converted_string, $(test_string[end]))
-            @eval @test !ends_with($converted_string, $(test_string[1]))
+        if beg != lst
+            @eval @test !starts_with($cvtstr, $lst)
+            @eval @test !ends_with($cvtstr, $beg)
         end
     end
 end
@@ -145,7 +150,7 @@ function testbasic(::Type{ST}, ::Type{C}) where {ST, C}
     end
     let strs = [emptystr, a_str, ST("a b c"), ST("до свидания")]
         for x in strs, y in strs
-            @eval @test (x === y  #= $x === $y =#) == (objectid(x) == objectid(y))
+            @eval @test ($x === $y) == (objectid($x) == objectid($y))
         end
     end
 end
@@ -227,16 +232,16 @@ end
     @test_throws BoundsError length(hello2, 1, 10) == 9
     ST == String && @test nextind(ST("hellø"), 0, 10) == 11
     for ind in (0, 6, 0:3, 4:6, [0:3;], [4:6;])
-        @eval @test_throws BoundsError checkbounds(hello1, $ind)
+        @eval @test_throws BoundsError checkbounds($hello1, $ind)
     end
     for ind in (1, 5, 1:3, 3:5, [1:3;], [3:5;])
-        @eval @test checkbounds(hello1, $ind) === nothing
+        @eval @test checkbounds($hello1, $ind) === nothing
     end
     f = false
     t = true
     for (ind, p) in ((0, f), (1, t), (5, t), (6, f), (0:5, f), (1:6, f),
                      (1:5, t), ([0:5;], f), ([1:6;], f), ([1:5;], t))
-        @eval @test checkbounds(Bool, hello1, $ind) === $p
+        @eval @test checkbounds(Bool, $hello1, $ind) === $p
     end
 end
 
@@ -672,13 +677,8 @@ end
     let strs = Any[ST(""), s"", SubString(ST("123"), 2, 1), SubString(s"123", 2, 1)]
         for s in strs
             @test_throws BoundsError thisind(s, -1)
-            if typeof(s) <: Str || typeof(s) <: SubString{<:Str}
-                @test_throws BoundsError thisind(s, 0)
-                @test_throws BoundsError thisind(s, 1)
-            else
-                @test thisind(s, 0) == 0
-                @test thisind(s, 1) == 1
-            end
+            @test thisind(s, 0) == 0  # would prefer that this threw a BoundsError
+            @test thisind(s, 1) == 1  # would prefer that this threw a BoundsError
             @test_throws BoundsError thisind(s, 2)
         end
     end
@@ -931,7 +931,6 @@ end
         @test s == "abc"
     end
 
-end
 end
 
 @testset "Unicode Strings" begin

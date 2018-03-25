@@ -15,11 +15,13 @@ function testuni(T)
     @test sizeof(str2) == 2 * sizeof(str)
 
     for i1 = 1:length(str2)
-        if !is_valid(str2, i1); continue; end
-        for i2 = i1:length(str2)
-            if !is_valid(str2, i2); continue; end
-            @test length(str2[i1:i2]) == length(str2plain[i1:i2])
-            @test str2[i1:i2] == str2plain[i1:i2]
+        if is_valid(str2, i1)
+            for i2 = i1:length(str2)
+                if is_valid(str2, i2)
+                    @eval @test length($str2[$i1:$i2]) == length($str2plain[$i1:$i2])
+                    @eval @test $str2[$i1:$i2] == $str2plain[$i1:$i2]
+                end
+            end
         end
     end
 
@@ -75,7 +77,7 @@ function testuni(T)
     @test length(u) == 2
     b = IOBuffer()
     write(b, u)
-    @test_broken String(take!(b)) == "\u2200\u2222"
+    @test String(take!(b)) == "\u2200\u2222"
 
     V6_COMPAT || @test_throws IndexError SubString(str, 4, 5)
     @test_throws BoundsError next(u, 0)
@@ -86,7 +88,7 @@ function testuni(T)
     @test_throws BoundsError getindex(u, 7:7)
     @test reverseind(u, 1) == 4
     @test_broken typeof(Base.cconvert(Ptr{Int8}, u)) == SubString{String}
-    @test_broken Base.cconvert(Ptr{Int8}, u) == u
+    @test Base.cconvert(Ptr{Int8}, u) == u
 
 
     str = T("føøbar")
@@ -179,14 +181,14 @@ function testuni(T)
 
             s = convert(S, string(prefix, c, suffix))
             r = reverse(s)
-            ri = find(Fwd, ==(c), r)
+            ri = fnd(Fwd, ==(c), r)
             @test c == s[reverseind(s, ri)] == r[ri]
             s = convert(S, string(prefix, prefix, c, suffix, suffix))
             pre = convert(S, prefix)
             sb = SubString(s, nextind(pre, lastindex(pre)),
                            lastindex(convert(S, string(prefix, prefix, c, suffix))))
             r = reverse(sb)
-            ri = find(Fwd, ==(c), r)
+            ri = fnd(Fwd, ==(c), r)
             @test c == sb[reverseind(sb, ri)] == r[ri]
         end
     end
@@ -222,9 +224,9 @@ function teststr(T)
     # search and SubString (issue #5679)
     let str = T("Hello, world!"),
         u = SubString(str, 1, 5)
-        @test find(Rev, T("World"), u) == 0:-1
-        @test find(Rev, ==('z'), u) == 0
-        @test find(Rev, T("ll"), u) == 3:4
+        @test fnd(Rev, T("World"), u) == 0:-1
+        @test fnd(Rev, ==('z'), u) == 0
+        @test fnd(Rev, T("ll"), u) == 3:4
     end
 
     # SubString created from SubString
@@ -284,6 +286,16 @@ function teststr(T)
             end
         end
         for (ss, s) in sdict
+            @test length(ss) == length(s)
+            for i in 0:ncodeunits(ss), j = 0:length(ss)+1
+                @test prevind(ss, i+1, j) == prevind(s, i+1, j)
+                @test nextind(ss, i, j) == nextind(s, i, j)
+            end
+            @test_throws BoundsError prevind(s, 0)
+            @test_throws BoundsError prevind(ss, 0)
+            @test_throws BoundsError nextind(s, ncodeunits(ss)+1)
+            @test_throws BoundsError nextind(ss, ncodeunits(ss)+1)
+            #=
             siz = ncodeunits(ss)
             len = length(ss)
             @test length(ss) == length(s)
@@ -296,14 +308,15 @@ function teststr(T)
                 @test nextind(ss, i, 0) == nextind(s, i, 0)
             end
             println("$(typeof(ss))(\"$ss\")")
-            @test_throws BoundsError prevind(ss, ncodeunits(ss)+1, 0)
-            @test_throws BoundsError prevind(s, ncodeunits(ss)+1, 0)
-            @test_throws BoundsError nextind(ss, 0, 0)
-            @test_throws BoundsError nextind(s, 0, 0)
-            @test_throws BoundsError nextind(s, ncodeunits(ss)+1)
-            @test_throws BoundsError nextind(ss, ncodeunits(ss)+1)
-            @test_throws BoundsError prevind(s, 0)
-            @test_throws BoundsError prevind(ss, 0)
+            @eval @test_throws BoundsError prevind($ss, $siz+1, 0)
+            @eval @test_throws BoundsError prevind($s, $siz+1, 0)
+            @eval @test_throws BoundsError nextind($ss, 0, 0)
+            @eval @test_throws BoundsError nextind($s, 0, 0)
+            @eval @test_throws BoundsError nextind($s, $siz+1)
+            @eval @test_throws BoundsError nextind($ss, $siz+1)
+            @eval @test_throws BoundsError prevind($s, 0)
+            @eval @test_throws BoundsError prevind($ss, 0)
+            =#
         end
     end
 

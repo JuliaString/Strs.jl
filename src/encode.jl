@@ -75,12 +75,14 @@ function _str(str::T) where {T<:Union{Vector{UInt8}, BinaryStrings, String}}
 end
 
 function _str_cpy(::Type{T}, str, len) where {T}
-    buf, pnt = _allocate(T, len)
-    @inbounds for ch in str
-        set_codeunit!(pnt, ch%T)
-        pnt += sizeof(T)
+    @preserve str begin
+        buf, pnt = _allocate(T, len)
+        @inbounds for ch in str
+            set_codeunit!(pnt, ch%T)
+            pnt += sizeof(T)
+        end
+        buf
     end
-    buf
 end
 
 """Encode as a possibly smaller type"""

@@ -122,6 +122,10 @@ codepoint_rng(::Type{Text4Chr}) = 0%UInt32:typemax(UInt32)
 codepoint_adj(::Type{T}, ch) where {T} = ifelse(ch < 0xd800, ch, ch+0x800)%T
 codepoint_adj(::Type{T}, ch) where {T<:Union{Text2Chr,Text4Chr}} = ch%T
 
+# returns a random valid Unicode scalar value in the correct range for the type of character
+Random.rand(r::Random.AbstractRNG, ::Random.SamplerType{T}) where {T<:CodePoint} =
+    codepoint_adj(T, rand(r, codepoint_rng(T)))
+
 ==(x::CodePoint, y::AbsChar)   = codepoint(x) == codepoint(y)
 ==(x::AbsChar,   y::CodePoint) = codepoint(x) == codepoint(y)
 ==(x::CodePoint, y::CodePoint) = codepoint(x) == codepoint(y)

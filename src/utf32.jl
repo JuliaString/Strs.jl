@@ -8,7 +8,7 @@ Based in part on code for UTF32String that used to be in Julia
 
 # UTF-32 basic functions
 
-function is_ascii(str::Str{UTF32CSE})
+function is_ascii(str::MS_UTF32)
     (siz = sizeof(str)) == 0 && return true
     @preserve str begin
         pnt, fin = _calcpnt(str, siz)
@@ -19,7 +19,7 @@ function is_ascii(str::Str{UTF32CSE})
     end
 end
 
-function is_latin(str::Str{UTF32CSE})
+function is_latin(str::MS_UTF32)
     (siz = sizeof(str)) == 0 && return true
     @preserve str begin
         pnt, fin = _calcpnt(str, siz)
@@ -31,7 +31,7 @@ function is_latin(str::Str{UTF32CSE})
 end
 
 const _bmp_mask_32   = 0xffff0000_ffff0000
-function is_bmp(str::Str{UTF32CSE})
+function is_bmp(str::MS_UTF32)
     (siz = sizeof(str)) == 0 && return true
     @preserve str begin
         pnt, fin = _calcpnt(str, siz)
@@ -42,12 +42,12 @@ function is_bmp(str::Str{UTF32CSE})
     end
 end
 
-is_unicode(str::Str{UTF32CSE})  = true
+is_unicode(str::MS_UTF32)  = true
 
-is_ascii(str::Str{_UTF32CSE})   = false
-is_latin(str::Str{_UTF32CSE})   = false
-is_bmp(str::Str{_UTF32CSE})     = false
-is_unicode(str::Str{_UTF32CSE}) = true
+is_ascii(str::MS_SubUTF32)   = false
+is_latin(str::MS_SubUTF32)   = false
+is_bmp(str::MS_SubUTF32)     = false
+is_unicode(str::MS_SubUTF32) = true
 
 
 # Speed this up by accessing 64 bits or more at a time
@@ -86,9 +86,8 @@ function convert(::Type{<:Str{UTF32CSE}}, str::String)
     # Validate UTF-8 encoding, and get number of words to create
     len, flags = unsafe_check_string(str, 1, len)
     # Optimize case where no characters > 0x7f, no invalid
-    @preserve str begin
-        Str(UTF32CSE, flags == 0 ? _cvtsize(UInt32, str, len) : _encode_utf32(_pnt(str), len))
-    end
+    Str(UTF32CSE,
+        @preserve str flags == 0 ? _cvtsize(UInt32, _pnt(str), len) : _encode_utf32(_pnt(str), len))
 end
 
 @inline function get_cp(pnt)
@@ -162,40 +161,36 @@ function _transcode_utf16_to_utf32(pnt, len)
 end
 
 # This can rely on the fact that a UTF8Str is always valid
-function convert(::Type{<:Str{UTF32CSE}}, str::Str{UTF8CSE})
+function convert(::Type{<:Str{UTF32CSE}}, str::MS_UTF8)
     # handle zero length string quickly
     (len = _len(str)) == 0 && return empty_str(UTF32CSE)
     cnt = _length(CodeUnitMulti(), str)
     # Optimize case where no characters > 0x7f, otherwise has multi-byte UTF-8 sequences
-    @preserve str begin
-        Str(UTF32CSE,
-            (cnt == len
-             ? _cvtsize(UInt32, _pnt(str), cnt)
-             : _transcode_utf8_to_utf32(_pnt(str), cnt)))
-    end
+    Str(UTF32CSE, @preserve str (cnt == len
+                                 ? _cvtsize(UInt32, _pnt(str), cnt)
+                                 : _transcode_utf8_to_utf32(_pnt(str), cnt)))
 end
 
 # This can rely on the fact that an ASCIIStr, LatinStr, UCS2Str is always valid
-convert(::Type{<:Str{UTF32CSE}}, str::Str{<:Union{ASCIICSE,Latin_CSEs,UCS2_CSEs}}) =
+convert(::Type{<:Str{UTF32CSE}},
+        str::MaybeSub{Str{C}}) where {C<:Union{ASCIICSE,Latin_CSEs,UCS2_CSEs}} =
     ((siz = sizeof(str)) == 0
      ? empty_str(UTF32CSE)
      : @preserve str Str(UTF32CSE, _cvtsize(UInt32, _pnt(str), siz)))
 
 # This can rely on the fact that a UTF16Str is always valid
-function convert(::Type{<:Str{UTF32CSE}}, str::Str{UTF16CSE})
+function convert(::Type{<:Str{UTF32CSE}}, str::MS_UTF16)
     # handle zero length string quickly
     (len = _len(str)) == 0 && return empty_utf32
     # Get number of characters to create
     cnt = _length(CodeUnitMulti(), str)
     # No surrogate pairs, do optimized copy
-    @preserve str begin
-        Str(UTF32CSE, cnt == len
-            ? _cvtsize(UInt32, _pnt(str), cnt)
-            : _transcode_utf16_to_utf32(_pnt(str), cnt))
-    end
+    Str(UTF32CSE, @preserve str (cnt == len
+                                 ? _cvtsize(UInt32, _pnt(str), cnt)
+                                 : _transcode_utf16_to_utf32(_pnt(str), cnt)))
 end
 
-function convert(::Type{<:Str{UTF16CSE}}, str::Str{<:UTF32_CSEs})
+function convert(::Type{<:Str{UTF16CSE}}, str::MaybeSub{Str{<:UTF32_CSEs}})
     # handle zero length string quickly
     (len = _len(str)) == 0 && return empty_utf16
     # get number of words to allocate
@@ -208,7 +203,7 @@ function convert(::Type{<:Str{UTF16CSE}}, str::Str{<:UTF32_CSEs})
     end
 end
 
-function convert(::Type{<:Str{C}}, str::Str{<:UTF32_CSEs}) where {C<:UCS2_CSEs}
+function convert(::Type{<:Str{C}}, str::MaybeSub{Str{<:UTF32_CSEs}}) where {C<:UCS2_CSEs}
     # Might want to have an invalids_as argument
     # handle zero length string quickly
     (len = _len(str)) == 0 && return empty_str(UCS2CSE)
@@ -239,7 +234,7 @@ convert(::Type{T}, v::AbstractVector{<:UniRawChar}) where {T<:AbstractString} =
     convert(T, convert(UTF32Str, v))
 
 # To do, make this more generic, add a function that can create a vector & fill it from an Str
-function convert(::Type{Vector{UInt32}}, str::QuadStr)
+function convert(::Type{Vector{UInt32}}, str::MaybeSub{<:QuadStr})
     len = _len(str)
     vec = create_vector(UInt32, len)
     @preserve str _memcpy(pointer(vec), _pnt(str), len)
@@ -247,7 +242,7 @@ function convert(::Type{Vector{UInt32}}, str::QuadStr)
 end
 
 # I don't think this will work for Char anymore, broken by #24999
-unsafe_convert(::Type{Ptr{T}}, str::Str{<:Quad_CSEs}) where {T<:UniRawChar} =
+unsafe_convert(::Type{Ptr{T}}, str::MaybeSub{Str{<:Quad_CSEs}}) where {T<:UniRawChar} =
     @preserve str convert(Ptr{T}, _pnt(str))
 
 # Should check for 0xxxxxfeff and 0xfffexxxx as well, might be 16-bit encoded
@@ -285,9 +280,9 @@ function is_valid(::Type{<:UTF32Strings}, str::Vector{<:UniRawChar})
     true
 end
 
-is_valid(str::Vector{Char}) = is_valid(UTF32Str, str)
+is_valid(vec::Vector{Char}) = is_unicode(vec)
 
-function map(fun, str::Str{UTF32CSE})
+function map(fun, str::MS_UTF32)
     @preserve str buf begin
         len, pnt = _lenpnt(str)
         buf, out = _allocate(UInt32, len)
@@ -302,7 +297,7 @@ function map(fun, str::Str{UTF32CSE})
 end
 
 # Make sure the result actually still has at least one character > 0xffff
-function map(fun, str::Str{_UTF32CSE})
+function map(fun, str::MS_SubUTF32)
     @preserve str buf begin
         len, pnt = _lenpnt(str)
         fin = bytoff(pnt, len)

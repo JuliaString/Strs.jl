@@ -725,17 +725,19 @@ _repeat(::CodeUnitMulti, ::Type{UTF16CSE}, ch, cnt) =
 function repeat(str::T, cnt::Integer) where {C<:CSE,T<:Str{C}}
     cnt < 2 && return cnt == 1 ? str : (cnt == 0 ? empty_str(C) : repeaterr(cnt))
     CU = codeunit(T)
-    len, pnt = _lenpnt(str)
-    totlen = len * cnt
-    buf, out = _allocate(CU, totlen)
-    if len == 1 # common case: repeating a single codeunit string
-        _memset(out, get_codeunit(pnt), cnt)
-    else
-        fin = bytoff(out, totlen)
-        siz = bytoff(CU, len)
-        while out < fin
-            _memcpy(out, pnt, len)
-            out += siz
+    @preserve str begin
+        len, pnt = _lenpnt(str)
+        totlen = len * cnt
+        buf, out = _allocate(CU, totlen)
+        if len == 1 # common case: repeating a single codeunit string
+            _memset(out, get_codeunit(pnt), cnt)
+        else
+            fin = bytoff(out, totlen)
+            siz = bytoff(CU, len)
+            while out < fin
+                _memcpy(out, pnt, len)
+                out += siz
+            end
         end
     end
     Str(C, buf)
@@ -750,23 +752,27 @@ containsnul(str::ByteStr) = containsnul(unsafe_convert(Ptr{Cchar}, str), sizeof(
 # Check 4 characters at a time
 function containsnul(str::WordStr)
     (siz = sizeof(str)) == 0 && return true
-    pnt, fin = _calcpnt(str, siz)
-    while (pnt += CHUNKSZ) <= fin
-        ((v = unsafe_load(pnt))%UInt16 == 0 || (v>>>16)%UInt16 == 0 ||
-         (v>>>32)%UInt16 == 0 || (v>>>48) == 0) && return true
+    @preserve str begin
+        pnt, fin = _calcpnt(str, siz)
+        while (pnt += CHUNKSZ) <= fin
+            ((v = unsafe_load(pnt))%UInt16 == 0 || (v>>>16)%UInt16 == 0 ||
+             (v>>>32)%UInt16 == 0 || (v>>>48) == 0) && return true
+        end
+        pnt - CHUNKSZ != fin &&
+            ((v = (unsafe_load(pnt) | ~_mask_bytes(siz)))%UInt16 == 0 ||
+             (v>>>16)%UInt16 == 0 || (v>>>32)%UInt16 == 0)
     end
-    pnt - CHUNKSZ != fin &&
-        ((v = (unsafe_load(pnt) | ~_mask_bytes(siz)))%UInt16 == 0 ||
-         (v>>>16)%UInt16 == 0 || (v>>>32)%UInt16 == 0)
 end
 
 function containsnul(str::QuadStr)
     (siz = sizeof(str)) == 0 && return true
-    pnt, fin = _calcpnt(str, siz)
-    while (pnt += CHUNKSZ) <= fin
-        ((v = unsafe_load(pnt))%UInt32 == 0 || (v>>>32) == 0) && return true
+    @preserve str begin
+        pnt, fin = _calcpnt(str, siz)
+        while (pnt += CHUNKSZ) <= fin
+            ((v = unsafe_load(pnt))%UInt32 == 0 || (v>>>32) == 0) && return true
+        end
+        pnt - CHUNKSZ != fin && unsafe_load(reinterpret(Ptr{UInt32}, pnt)) == 0x00000
     end
-    pnt - CHUNKSZ != fin && unsafe_load(reinterpret(Ptr{UInt32}, pnt)) == 0x00000
 end
 
 # pointer conversions of ASCII/UTF8/UTF16/UTF32 strings:
