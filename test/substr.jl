@@ -166,12 +166,13 @@ function testuni(T)
 
     # length(SubString{String}) performance specialization
     s = T("|η(α)-ϕ(κ)| < ε")
-    @test length(SubString(s, 1, 0)) == length(s[1:0])
-    @test length(SubString(s, 4, 4)) == length(s[4:4])
-    @test length(SubString(s, 1, 7)) == length(s[1:7])
+    @test length(SubString(s, 1, 0))  == length(s[1:0])
+    @test length(SubString(s, 4, 4))  == length(s[4:4])
+    @test length(SubString(s, 1, 7))  == length(s[1:7])
     @test length(SubString(s, 4, 11)) == length(s[4:11])
 
 
+    if false
     @testset "reverseind" for S in (T, SubString, GenericString)
         for prefix in ("", "abcd", "\U0001d6a4\U0001d4c1", "\U0001d6a4\U0001d4c1c",
                        " \U0001d6a4\U0001d4c1"),
@@ -179,18 +180,19 @@ function testuni(T)
                        " \U0001d4c1β\U0001d6a4"),
             c in ('X', 'δ', '\U0001d6a5')
 
-            s = convert(S, string(prefix, c, suffix))
+            s = convert(S, T(string(prefix, c, suffix)))
             r = reverse(s)
             ri = fnd(Fwd, ==(c), r)
             @test c == s[reverseind(s, ri)] == r[ri]
-            s = convert(S, string(prefix, prefix, c, suffix, suffix))
-            pre = convert(S, prefix)
+            s = convert(S, T(string(prefix, prefix, c, suffix, suffix)))
+            pre = convert(S, T(prefix))
             sb = SubString(s, nextind(pre, lastindex(pre)),
-                           lastindex(convert(S, string(prefix, prefix, c, suffix))))
+                           lastindex(convert(S, T(string(prefix, prefix, c, suffix)))))
             r = reverse(sb)
             ri = fnd(Fwd, ==(c), r)
             @test c == sb[reverseind(sb, ri)] == r[ri]
         end
+    end
     end
 end
 
@@ -295,39 +297,15 @@ function teststr(T)
             @test_throws BoundsError prevind(ss, 0)
             @test_throws BoundsError nextind(s, ncodeunits(ss)+1)
             @test_throws BoundsError nextind(ss, ncodeunits(ss)+1)
-            #=
-            siz = ncodeunits(ss)
-            len = length(ss)
-            @test length(ss) == length(s)
-            for i in 0:siz, j = 1:len+1
-                @test prevind(ss, i+1, j) == prevind(s, i+1, j)
-                @test nextind(ss, i, j) == nextind(s, i, j)
-            end
-            for i in 1:siz
-                @test prevind(ss, i, 0) == prevind(s, i, 0)
-                @test nextind(ss, i, 0) == nextind(s, i, 0)
-            end
-            println("$(typeof(ss))(\"$ss\")")
-            @eval @test_throws BoundsError prevind($ss, $siz+1, 0)
-            @eval @test_throws BoundsError prevind($s, $siz+1, 0)
-            @eval @test_throws BoundsError nextind($ss, 0, 0)
-            @eval @test_throws BoundsError nextind($s, 0, 0)
-            @eval @test_throws BoundsError nextind($s, $siz+1)
-            @eval @test_throws BoundsError nextind($ss, $siz+1)
-            @eval @test_throws BoundsError prevind($s, 0)
-            @eval @test_throws BoundsError prevind($ss, 0)
-            =#
         end
     end
 
     ss = SubString(T("hello"), 1, 5)
-    ### Todo: Add support for 3 argument length, prevind, nextind
-    if !V6_COMPAT
     @test length(ss, 1, 0) == 0
     @test_throws BoundsError length(ss, 1, -1)
     @test_throws BoundsError length(ss, 1, 6)
     @test_throws BoundsError length(ss, 1, 10)
-    println("$(typeof(ss))(\"$ss\")")
+    #println("$(typeof(ss))(\"$ss\")")
     @test_throws BoundsError prevind(ss, 0, 1)
     @test prevind(ss, 1, 1) == 0
     @test prevind(ss, 6, 1) == 5
@@ -347,7 +325,6 @@ function teststr(T)
             @test reverseind(s, 0) == 1
             @test reverseind(s, 1) == 0
         end
-    end
     end
 
     ## Cstring tests ##

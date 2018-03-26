@@ -104,50 +104,33 @@ xor 80 then << 1 then |
 
 const hi_mask = 0x8080_8080_8080_8080
 
-@inline function _count_cont(v)
-    val = xor(v, hi_mask)
-    count_ones(xor(((val << 1) | val), hi_mask) & hi_mask)
+@inline _count_cont(v) = (v = xor(v, hi_mask); count_ones(xor(((v << 1) | v), hi_mask) & hi_mask))
+@inline msk_lead(v) = (v = xor(v, hi_mask); xor(xor(((v << 1) | v), hi_mask) & hi_mask, hi_mask))
+
+@inline function _align_len_utf8(pnt, cnt, v)
+    len = 0
+    fin = pnt + cnt
+    v = msk_lead(v)
+    while (pnt += CHUNKSZ) < fin
+        len += count_ones(v)
+        v = msk_lead(unsafe_load(pnt))
+    end
+    len + count_ones(cnt & (CHUNKSZ-1) == 0 ? v : (v & _mask_bytes(cnt)))
 end
 
-function _length(::CodeUnitMulti, ::Type{UTF8CSE}, str::Str)
-    (siz = sizeof(str)) < 2 && return siz
-    @preserve str begin
-        pnt, fin = _calcpnt(str, siz)
-        cnt = siz
-        while (pnt += CHUNKSZ) <= fin
-            cnt -= _count_cont(unsafe_load(pnt))
-        end
-        siz & (CHUNKSZ-1) == 0 ? cnt : (cnt - _count_cont(unsafe_load(pnt) & _mask_bytes(siz)))
-    end
-end
+_length_al(::CodeUnitMulti, ::Type{UTF8CSE}, beg::Ptr{UInt8}, cnt::Int) =
+    (pnt = reinterpret(Ptr{UInt64}, beg); _align_len_utf8(pnt, cnt, unsafe_load(pnt)))
 
-function _length(::CodeUnitMulti, ::Type{UTF8CSE}, str, i::Int, j::Int)
-    # Count number of valid codepoints within the range of the codeunits at i:j
-    @preserve str begin
-        cnt = j - i + 1
-        beg = _pnt(str)
-        align = reinterpret(UInt, beg)
-        pnt = reinterpret(Ptr{UInt64}, align & ~(CHUNKSZ-1))
-        align &= (CHUNKSZ-1)
-        siz = cnt - align
-        if align != 0
-            v = unsafe_load(pnt) >>> (align*8)
-            # v has 1-7 bytes, (8-align)
-            # May be split into more than one word
-            if cnt < (16 - align)
-                cnt < (8 - align) || (cnt -= _count_cont(v) ; v = unsafe_load(pnt + CHUNKSZ))
-                return cnt - _count_cont(v & _mask_bytes(siz))
-            end
-        else
-            v = unsafe_load(pnt)
-        end
-        fin = pnt + cnt
-        while (pnt += CHUNKSZ) < fin
-            cnt -= _count_cont(v)
-            v = unsafe_load(pnt)
-        end
-        cnt -= _count_cont(siz & (CHUNKSZ-1) == 0 ? v : (v & _mask_bytes(siz)))
+function _length(::CodeUnitMulti, ::Type{UTF8CSE}, beg::Ptr{UInt8}, cnt::Int)
+    align = reinterpret(UInt, beg)
+    pnt = reinterpret(Ptr{UInt64}, align & ~(CHUNKSZ-1))
+    v = unsafe_load(pnt)
+    if (align &= (CHUNKSZ-1)) != 0
+        msk = _mask_bytes(align)
+        v = (v & ~msk) | (msk & hi_mask)
+        cnt += align
     end
+    _align_len_utf8(pnt, cnt, v)
 end
 
 function is_ascii(str::MaybeSub{<:Str{Union{UTF8CSE, LatinCSE, Binary_CSEs}}})
@@ -202,6 +185,7 @@ _all_latin(val) = ((val & (val<<1) & (val<<2 | (val<<3) | (val<<4) | (val<<5))) 
 function is_latin(str::MaybeSub{<:Str{Union{UTF8CSE, Binary_CSEs}}})
     (siz = sizeof(str)) == 0 && return true
     @preserve str begin
+        # Todo: make work on ARM32
         pnt, fin = _calcpnt(str, siz)
         while (pnt += CHUNKSZ) <= fin
             _all_latin(unsafe_load(pnt)) || return false
@@ -216,6 +200,7 @@ _all_bmp(val) = ((val | (val<<1) | (val<<2) | (val<<3)) & hi_mask) == 0
 function is_bmp(str::MS_UTF8)
     (siz = sizeof(str)) == 0 && return true
     @preserve str begin
+        # Todo: make work on ARM32
         pnt, fin = _calcpnt(str, siz)
         while (pnt += CHUNKSZ) <= fin
             _all_bmp(unsafe_load(pnt)) || return false

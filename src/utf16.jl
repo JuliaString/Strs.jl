@@ -1,9 +1,10 @@
 #=
 UTF16Str and UCS2Str types (UTF-16 encoding and pure BMP UCS-2)
 
-Copyright 2017 Gandalf Software, Inc., Scott P. Jones, and other contributors to the Julia language
+Copyright 2017-2018 Gandalf Software, Inc., Scott P. Jones,
+and other contributors to the Julia language
 Licensed under MIT License, see LICENSE.md
-Based in part on code for UTF16String that used to be in Julia
+Based in (small) part on code for UTF16String that used to be in Julia
 =#
 
 const _trail_mask = 0xdc00_dc00_dc00_dc00
@@ -11,51 +12,33 @@ const _hi_bit_16  = 0x8000_8000_8000_8000
 
 @inline _mask_surr(v)  = xor((v | v<<1 | v<<2 | v<<3 | v<<4 | v<<5) & _hi_bit_16, _hi_bit_16)
 @inline _get_masked(qpnt) = _mask_surr(xor(unsafe_load(qpnt), _trail_mask))
+@inline _get_lead(qpnt) = xor(_get_masked(qpnt), _hi_bit_16)
 
 @inline get_utf16(ch) = (0xd7c0 + (ch >> 10))%UInt16, (0xdc00 + (ch & 0x3ff))%UInt16
 
-# These only work when no SubStr field
-function _length(::CodeUnitMulti, ::Type{UTF16CSE}, str::Str)
-    (siz = sizeof(str)) == 0 && return 0
-    siz == 2 && return 1
-    cnt = chroff(UInt16, siz)
-    @preserve str begin
-        pnt, fin = _calcpnt(str, siz)
-        while (pnt += CHUNKSZ) <= fin
-            cnt -= count_ones(_get_masked(pnt))
-        end
-        pnt - CHUNKSZ == fin ? cnt : (cnt - count_ones(_get_masked(pnt) & _mask_bytes(siz)))
+@inline function _align_len_utf16(pnt, cnt, v)
+    len = 0
+    fin = pnt + cnt<<1
+    while (pnt += CHUNKSZ) < fin
+        len += count_ones(v)
+        v = _get_lead(pnt)
     end
+    len + count_ones((cnt & (CHUNKSZ-1)) == 0 ? v : (v & _mask_bytes(cnt)))
 end
 
-function _length(::CodeUnitMulti, ::Type{UTF16CSE}, str, i::Int, j::Int)
-    # Count number of valid codepoints within the range of the codeunits at i:j
-    @preserve str begin
-        cnt = j - i + 1
-        beg = _pnt(str)
-        align = reinterpret(UInt, beg)
-        pnt = reinterpret(Ptr{UInt64}, align & ~(CHUNKSZ-1))
-        align &= (CHUNKSZ-1)
-        siz = cnt<<1 - 8 - align
-        if align != 0
-            v = _get_masked(pnt) >>> (align*8)
-            # v has 1-7 bytes, (8-align)
-            # May be split into more than one word
-            if cnt < ((16 - align)>>>1)
-                cnt < ((8 - align)>>>1) ||
-                    (cnt -= _count_cont(v) ; v = _get_masked(pnt + CHUNKSZ))
-                return cnt - _count_cont(v & _mask_bytes(siz))
-            end
-        else
-            v = _get_masked(pnt)
-        end
-        fin = pnt + cnt
-        while (pnt += CHUNKSZ) <= fin
-            cnt -= _count_cont(v)
-            v = _get_masked(pnt)
-        end
-        cnt -= _count_cont((pnt - CHUNKSZ == fin) ? v : (v & _mask_bytes(siz)))
+_length_al(::CodeUnitMulti, ::Type{UTF16CSE}, beg::Ptr{UInt16}, cnt::Int) =
+    (pnt = reinterpret(Ptr{UInt64}, beg); _align_len_utf16(pnt, cnt, _get_lead(pnt)))
+
+function _length(::CodeUnitMulti, ::Type{UTF16CSE}, beg::Ptr{UInt16}, cnt::Int)
+    align = reinterpret(UInt, beg)
+    pnt = reinterpret(Ptr{UInt64}, align & ~(CHUNKSZ-1))
+    v = _get_lead(pnt)
+    if (align &= (CHUNKSZ-1)) != 0
+        msk = _mask_bytes(align)
+        v = (v & ~msk) | (msk & _trail_mask)
+        cnt += (align>>>1)
     end
+    _align_len_utf16(pnt, cnt, v)
 end
 
 function _nextind(::CodeUnitMulti, str::MS_UTF16, pos::Int, nchar::Int)
@@ -63,6 +46,7 @@ function _nextind(::CodeUnitMulti, str::MS_UTF16, pos::Int, nchar::Int)
     siz = ncodeunits(str)
     @boundscheck 0 <= pos <= siz || boundserr(str, pos)
     @preserve str begin
+        # Todo: handle unaligned for ARM32
         beg = _pnt(str)
         pnt = bytoff(beg, pos - 1)
         fin = bytoff(beg, siz)
@@ -83,6 +67,7 @@ function _prevind(::CodeUnitMulti, str::MS_UTF16, pos::Int, nchar::Int)
     nchar < 0 && ncharerr(nchar)
     @boundscheck 0 < pos <= ncodeunits(str)+1 || boundserr(str, pos)
     @preserve str begin
+        # Todo: handle unaligned for ARM32
         beg = _pnt(str)
         pnt = bytoff(beg, pos - 1)
         nchar == 0 && (is_surrogate_trail(get_codeunit(pnt)) ? index_error(str, pos) : return pos)
@@ -99,6 +84,7 @@ end
 function is_ascii(str::MaybeSub{<:Str{Union{Text2CSE, UCS2CSE, UTF16CSE}}})
     (siz = sizeof(str)) == 0 && return true
     @preserve str begin
+        # Todo: handle unaligned for ARM32
         siz < CHUNKSZ &&
             return ((unsafe_load(_pnt64(str)) & _mask_bytes(siz)) & _ascii_mask(UInt16)) == 0
         pnt, fin = _calcpnt(str, siz)
@@ -111,6 +97,7 @@ end
 
 function is_latin(str::MaybeSub{<:Str{Union{Text2CSE, UCS2CSE, UTF16CSE}}})
     (siz = sizeof(str)) == 0 && return true
+    # Todo: handle unaligned for ARM32
     @preserve str begin
         siz < CHUNKSZ &&
             return ((unsafe_load(_pnt64(str)) & _mask_bytes(siz)) & _latin_mask(UInt16)) == 0
@@ -125,6 +112,7 @@ end
 # Check for any surrogate characters
 function is_bmp(str::MS_UTF16)
     (siz = sizeof(str)) == 0 && return true
+    # Todo: handle unaligned for ARM32
     @preserve str begin
         siz < CHUNKSZ && return (_get_masked(_pnt64(str)) & _mask_bytes(siz)) == 0
 
@@ -287,32 +275,30 @@ function convert(::Type{<:Str{C}}, str::MS_UTF16) where {C<:UCS2_CSEs}
 end
 
 function is_valid(::Type{<:Str{UTF16CSE}}, data::AbstractArray{UInt16})
+    (len = length(data) - 1) < 0 && return true
     pos = 0
-    len = length(data)
-    @inbounds while (pos += 1) < len # check for unpaired surrogates
-        ch = data[pos]
-        (is_surrogate_codeunit(ch) &&
-         is_surrogate_lead(ch) &&
-         is_surrogate_trail(data[pos += 1])) || return false
+    @inbounds while pos < len # check for unpaired surrogates
+        ch = data[pos += 1]
+        is_surrogate_codeunit(ch) && is_surrogate_lead(ch) &&
+            is_surrogate_trail(data[pos += 1]) ||
+            return false
     end
-    pos > len || !is_surrogate_codeunit(data[pos])
+    @inbounds return pos > len || !is_surrogate_codeunit(get_codeunit(data[pos + 1]))
 end
 
 # This can be sped up, to check 4 words at a time, only checking for unpaired
 # or out of order surrogates when one is found in the UInt64
-function is_valid(::Type{<:Str{UTF16CSE}}, data::Ptr{UInt16}, len)
-    i = 1
-    @inbounds while i < len # check for unpaired surrogates
-        ch = get_codeunit(data, i)
-        if !is_surrogate_codeunit(ch)
-            i += 1
-        elseif is_surrogate_lead(ch) && is_surrogate_trail(get_codeunit(data, i+1))
-            i += 2
-        else
+function is_valid(::Type{<:Str{UTF16CSE}}, pnt::Ptr{UInt16}, len)
+    len == 0 && return true
+    fin = bytoff(pnt, len - 1)
+    while pnt < fin # check for unpaired surrogates
+        ch = get_codeunit(pnt)
+        is_surrogate_codeunit(ch) && is_surrogate_lead(ch) &&
+            is_surrogate_trail(get_codeunit(pnt += 2)) ||
             return false
-        end
+        pnt += 2
     end
-    i > len || !is_surrogate_codeunit(get_codeunit(data, i))
+    pnt > fin || !is_surrogate_codeunit(get_codeunit(pnt))
 end
 
 function convert(::Type{<:Str{UTF16CSE}}, str::AbstractString)
@@ -501,14 +487,16 @@ function convert(::Type{UTF16Str}, bytes::AbstractArray{UInt8})
     len = length(bytes)
     isodd(len) && unierror(UTF_ERR_ODD_BYTES_16, len, 0)
     len >>>= 1
-    pnt = pointer(bytes)
-    if isodd(reinterpret(UInt, pnt))
-        buf, out = _convert(reinterpret(Ptr{UInt16_U}, pnt), len, swappedtype(UInt16_U))
-    else
-        buf, out = _convert(reinterpret(Ptr{UInt16}, pnt), len, swappedtype(UInt16))
+    @preserve bytes begin
+        pnt = pointer(bytes)
+        if isodd(reinterpret(UInt, pnt))
+            buf, out = _convert(reinterpret(Ptr{UInt16_U}, pnt), len, swappedtype(UInt16_U))
+        else
+            buf, out = _convert(reinterpret(Ptr{UInt16}, pnt), len, swappedtype(UInt16))
+        end
+        is_valid(UTF16Str, out, len) || unierror(UTF_ERR_INVALID, 0, 0)
+        Str(UTF16CSE, buf)
     end
-    is_valid(UTF16Str, out, len) || unierror(UTF_ERR_INVALID, 0, 0)
-    Str(UTF16CSE, buf)
 end
 
 @inline function pushchar!(rst, uc)

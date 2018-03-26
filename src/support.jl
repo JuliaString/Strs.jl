@@ -74,8 +74,10 @@ const UTF_ERR_NORMALIZE         = " is not one of :NFC, :NFD, :NFKC, :NFKD"
 @noinline codepoint_error(T, v)  = unierror(string("Invalid CodePoint: ", T, " 0x", outhex(v)))
 @noinline argerror(startpos, endpos) =
     unierror(string("End position ", endpos, " is less than start position (", startpos, ")"))
+
+@noinline ascii_err()    = throw(ArgumentError("Not a valid ASCII string"))
+@noinline ncharerr(n)    = throw(ArgumentError(string("nchar (", n, ") must be not be negative")))
 @noinline repeaterr(cnt) = throw(ArgumentError("repeat count $cnt must be >= 0"))
-@noinline ncharerr(n) = throw(ArgumentError(string("nchar (", n, ") must be not be negative")))
 
 @static isdefined(Base, :string_index_err) && (const index_error = Base.string_index_err)
 

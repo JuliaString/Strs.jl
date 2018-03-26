@@ -61,13 +61,15 @@ end
             lst = nextind(str, lastindex(str))
             empty_pred = in(C[])
             @testset "BoundsError" begin
-                for ind in (0, lst, lst+1), dir in (Fwd, Rev)
-                    @test_throws BoundsError fnd(dir, SubString(P(""),1,1), str, ind)
-                    @test_throws BoundsError fnd(dir, ==(cvtchar(C,'a')), str, ind)
-                    @test_throws BoundsError fnd(dir, ==(cvtchar(C,'∀')), str, ind)
-                    @test_throws BoundsError fnd(dir, ==(cvtchar(C,'ε')), str, ind)
-                    @test_throws BoundsError fnd(dir, empty_pred, str, ind)
+                for ind in (0, lst+1)
+                    @eval @test_throws BoundsError fnd(Fwd, SubString($P(""),1,1), $str, $ind)
+                    @eval @test_throws BoundsError fnd(Rev, SubString($P(""),1,1), $str, $ind)
+                    @eval @test_throws BoundsError fnd(Fwd, ==(cvtchar($C,'a')), $str, $ind)
+                    @eval @test_throws BoundsError fnd(Fwd, ==(cvtchar($C,'∀')), $str, $ind)
+                    @eval @test_throws BoundsError fnd(Fwd, ==(cvtchar($C,'ε')), $str, $ind)
                 end
+                @eval @test_throws BoundsError fnd(Fwd, $empty_pred, $str, $(lst+1))
+                @eval @test_throws BoundsError fnd(Rev, $empty_pred, $str, $(lst+1))
             end
             @testset "fnd(Fwd, ==(ch)...)" begin
                 let pats = ('x', '\0', '\u80', '∀', 'H', 'l', ',', '\n'),
@@ -184,7 +186,7 @@ end
             lst = nextind(str, lastindex(str))
             C = eltype(P)
             @testset "BoundsError" begin
-                for ch = ('z', '∀', 'ε', 'a'), ind = (0, lst, lst+1)
+                for ch = ('z', '∀', 'ε', 'a'), ind = (0, lst+1)
                     @test_throws BoundsError fnd(Fwd, cvtchar(C, ch), str, ind)
                 end
             end
@@ -204,11 +206,11 @@ end
                 @test fnd(Fwd, cvtchar(C, 'δ'), str, nextind(str, 17)) == 33
                 @test fnd(Fwd, cvtchar(C, 'δ'), str, nextind(str, 33)) == 0
                 @test fnd(Fwd, cvtchar(C, 'ε'), str, nextind(str,  5)) == 54
-                # These give BoundsError now
-                #@test fnd(Fwd, 'ε', str, nextind(str, 54)) == 0
-                #for ch in ('ε', 'a')
-                #   @test fnd(Fwd, ==(ch), str, lst) == 0
-                #end
+                # I think these should give BoundsError
+                @test fnd(Fwd, 'ε', str, nextind(str, 54)) == 0
+                for ch in ('ε', 'a')
+                   @test fnd(Fwd, ==(ch), str, lst) == 0
+                end
             end
 
             @testset "fnd(Rev, ==(chr),..." begin

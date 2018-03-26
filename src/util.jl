@@ -29,11 +29,12 @@ ends_with(str::AbstractString, chars::Chars) = !is_empty(str) && last(str) in ch
 
 end # if false
 
-starts_with(a::Str{C}, b::Str{C}) where {C<:CSE} =
-    (len = _len(b)) <= _len(a) && _memcmp(_pnt(a), _pnt(b), len) == 0
+starts_with(a::MaybeSub{<:Str{C}}, b::MaybeSub{<:Str{C}}) where {C<:CSE} =
+    (len = _len(b)) <= _len(a) && (@preserve a b _memcmp(_pnt(a), _pnt(b), len)) == 0
 
-ends_with(a::Str{C}, b::Str{C}) where {C<:CSE} =
-    (lenb = _len(b)) <= (lena = _len(a)) && _memcmp(_pnt(a) + lena - lenb, _pnt(b), lenb) == 0
+ends_with(a::MaybeSub{<:Str{C}}, b::MaybeSub{<:Str{C}}) where {C<:CSE} =
+    (lenb = _len(b)) <= (lena = _len(a)) &&
+    (@preserve a b _memcmp(_pnt(a) + lena - lenb, _pnt(b), lenb)) == 0
 
 @static if false
 function chop(s::AbstractString; head::Integer = 0, tail::Integer = 1)
@@ -41,11 +42,13 @@ function chop(s::AbstractString; head::Integer = 0, tail::Integer = 1)
 end
 end # if false
 
-function chomp(str::Str)
-    len, pnt = _lenpnt(str)
-    SubStr(str, 1,
-           ((len <= 0 || get_codeunit(pnt + len - 1) != 0x0a)
-            ? len : (len - 1 + (len < 2 || get_codeunit(pnt + len - 2) != 0x0d))))
+function chomp(str::MaybeSub{<:Str})
+    (len = ncodeunits(str)) != 0 && @preserve str begin
+        pnt = pointer(str)
+        get_codeunit(pnt, len) == 0xa &&
+            (len -= (len > 1 && get_codeunit(pnt, len - 1) == 0x0d) + 1)
+    end
+    SubString(str, 1, thisind(str, len))
 end
 
 @static if false
@@ -77,11 +80,11 @@ function _lpad(cnt, pad, str)
     cnt, rem = divrem(cnt, length(pad))
     rem == 0 ? string(pad^cnt, str) : string(pad^cnt, first(pad, rem), str)
 end
-lpad(str::Str, cnt::Integer, pad::AbstractString) =
+lpad(str::MaybeSub{<:Str}, cnt::Integer, pad::AbstractString) =
     (cnt -= length(str)) <= 0 ? str : _lpad(cnt, pad, str)
 lpad(ch::CodePoint, cnt::Integer, pad::AbstractString) =
     cnt < 1 ? string(ch) : _lpad(cnt, pad, ch)
-lpad(str::Str, cnt::Integer, pad::AbsChar=' ') =
+lpad(str::MaybeSub{<:Str}, cnt::Integer, pad::AbsChar=' ') =
     (len = length(str)) > cnt ? str : string(pad^cnt, str)
 lpad(ch::CodePoint, cnt::Integer, pad::AbstractChar=' ') =
     cnt < 1 ? string(ch) : string(pad^cnt, ch)
@@ -90,28 +93,29 @@ function _rpad(cnt, pad, str)
     cnt, rem = divrem(cnt, length(pad))
     rem == 0 ? string(str, pad^cnt) : string(str, pad^cnt, first(pad, rem))
 end
-rpad(str::Str, cnt::Integer, pad::AbstractString) =
+rpad(str::MaybeSub{<:Str}, cnt::Integer, pad::AbstractString) =
     (cnt -= length(str)) <= 0 ? str : _rpad(cnt, pad, str)
 rpad(ch::CodePoint, cnt::Integer, pad::AbstractString) =
     cnt < 1 ? string(ch) : _rpad(cnt, pad, ch)
-rpad(str::Str, cnt::Integer, pad::AbsChar=' ') =
+rpad(str::MaybeSub{<:Str}, cnt::Integer, pad::AbsChar=' ') =
     (len = length(str)) > cnt ? str : string(pad^cnt, str)
 rpad(ch::CodePoint, cnt::Integer, pad::AbsChar=' ') =
     cnt < 1 ? string(ch) : string(ch, pad^cnt)
 
-split(str::T, splitter;
-      limit::Integer=0, keep::Bool=true) where {T<:Str} =
-    _split(str, splitter, limit, keep, T <: SubString ? T[] : SubString{T}[])
-split(str::T, splitter::Union{Tuple{Vararg{<:AbstractChar}},
-                              AbstractVector{<:AbstractChar},
-                              Set{<:AbstractChar}};
-      limit::Integer=0, keep::Bool=true) where {T<:Str} =
-    _split(str, in(splitter), limit, keep, T <: SubString ? T[] : SubString{T}[])
-split(str::T, splitter::AbstractChar;
-      limit::Integer=0, keep::Bool=true) where {T<:Str} =
-    _split(str, ==(splitter), limit, keep, T <: SubString ? T[] : SubString{T}[])
+const SetOfChars = Union{Tuple{Vararg{<:AbstractChar}},
+                         AbstractVector{<:AbstractChar},
+                         Set{<:AbstractChar}}
 
-function _split(str::T, splitter, limit::Integer, keep_empty::Bool, strs::Array) where {T<:Str}
+split(str::MaybeSub{T}, splitter; limit::Integer=0, keep::Bool=true) where {T<:Str} =
+    _split(str, splitter, limit, keep, SubString{T}[])
+split(str::MaybeSub{T}, splitter::SetOfChars; limit::Integer=0, keep::Bool=true) where {T<:Str} =
+    _split(str, in(splitter), limit, keep, SubString{T}[])
+split(str::MaybeSub{T}, splitter::AbstractChar;
+      limit::Integer=0, keep::Bool=true) where {T<:Str} =
+          _split(str, ==(splitter), limit, keep, SubString{T}[])
+
+function _split(str::MaybeSub{T}, splitter, limit::Integer, keep_empty::Bool,
+                strs::Array) where {T<:Str}
     i = 1
     n = lastindex(str)
     r = find(Fwd, splitter, str)
@@ -136,17 +140,15 @@ function _split(str::T, splitter, limit::Integer, keep_empty::Bool, strs::Array)
 end
 
 # a bit oddball, but standard behavior in Perl, Ruby & Python:
-split(str::Str) = split(str, _default_delims; limit=0, keep=false)
+split(str::MaybeSub{<:Str}) = split(str, _default_delims; limit=0, keep=false)
 
-rsplit(str::T, splitter; limit::Integer=0, keep::Bool=true) where {T<:Str} =
-    _rsplit(str, splitter, limit, keep, T <: SubString ? T[] : SubString{T}[])
-rsplit(str::T, splitter::Union{Tuple{Vararg{<:AbstractChar}},
-                               AbstractVector{<:AbstractChar},Set{<:AbstractChar}};
+rsplit(str::MaybeSub{T}, splitter; limit::Integer=0, keep::Bool=true) where {T<:Str} =
+    _rsplit(str, splitter, limit, keep, SubString{T}[])
+rsplit(str::MaybeSub{T}, splitter::SetOfChars; limit::Integer=0, keep::Bool=true) where {T<:Str} =
+  _rsplit(str, occurs_in(splitter), limit, keep, SubString{T}[])
+rsplit(str::MaybeSub{T}, splitter::AbstractChar;
        limit::Integer=0, keep::Bool=true) where {T<:Str} =
-  _rsplit(str, occurs_in(splitter), limit, keep, T <: SubString ? T[] : SubString{T}[])
-rsplit(str::T, splitter::AbstractChar;
-       limit::Integer=0, keep::Bool=true) where {T<:Str} =
-  _rsplit(str, ==(splitter), limit, keep, T <: SubString ? T[] : SubString{T}[])
+           _rsplit(str, ==(splitter), limit, keep, SubString{T}[])
 
 function _rsplit(str::Str, splitter, limit::Integer, keep_empty::Bool, strs::Array)
     n = lastindex(str)
@@ -169,25 +171,23 @@ _replace(io, repl::Function, str, r, pattern) =
 _replace(io, repl::Function, str, r, pattern::Function) =
     print(io, repl(str[first(r)]))
 
-replace(str::Str, pat_repl::Pair{<:AbstractChar}; count::Integer=typemax(Int)) =
+replace(str::MaybeSub{<:Str}, pat_repl::Pair{<:AbstractChar}; count::Integer=typemax(Int)) =
     replace(str, ==(first(pat_repl)) => last(pat_repl); count=count)
-
-replace(str::Str, pat_repl::Pair{<:Union{Tuple{Vararg{<:AbstractChar}},
-                                         AbstractVector{<:AbstractChar},Set{<:AbstractChar}}};
-        count::Integer=typemax(Int)) =
+replace(str::MaybeSub{<:Str}, pat_repl::Pair{<:SetOfChars}; count::Integer=typemax(Int)) =
     replace(str, in(first(pat_repl)) => last(pat_repl), count=count)
 
 # Todo: this is using print, but it should be changed to make sure that everything is done via
 # writes (i.e. no translation to UTF-8)
-function replace(str::Str, pat_repl::Pair; count::Integer=typemax(Int))
+function replace(str::MaybeSub{<:Str}, pat_repl::Pair; count::Integer=typemax(Int))
     pattern, repl = pat_repl
     count == 0 && return str
     count < 0 && throw(DomainError(count, "`count` must be non-negative."))
     n = 1
     i = 1
     e = lastindex(str)
+    print("find(Fwd, \"$pattern\", \"$str\")")
     r = find(Fwd, pattern, str)
-    #print("find(Fwd, \"$pattern\", \"str\") => $r")
+    println(" => $r")
     (j = first(r)) == 0 && return str
     # Just return the string if not found
 
@@ -195,8 +195,8 @@ function replace(str::Str, pat_repl::Pair; count::Integer=typemax(Int))
     while true
         k = last(r)
         if i == 1 || i <= k
-            print(out, SubString(str, i, thisind(str, j)))
-            #println("$i $k $(pointer(str, i)), $(j-i)")
+            print(out, SubString(str, i, thisind(str, j-1)))
+            println("$i $k $(pointer(str, i)), $(j-i)")
             #unsafe_write(out, pointer(str, i), UInt(j-i))
             _replace(out, repl, str, r, pattern)
         end
@@ -207,20 +207,12 @@ function replace(str::Str, pat_repl::Pair; count::Integer=typemax(Int))
         else
             i = k = nextind(str, k)
         end
+        print("find(Fwd, \"$pattern\", \"$str\", $k)")
         r = find(Fwd, pattern, str, k)
-        #println("find(Fwd, \"$pattern\", \"str\", $k) => $r, i=$i, j=$j, n=$n")
+        println(" => $r, i=$i, j=$j, n=$n")
         (j = first(r)) == 0 && break
         (n += 1) == count && break
     end
     print(out, SubString(str, i))
     Str(cse(str), String(take!(out)))
 end
-
-# TODO: allow transform as the first argument to replace?
-
-ascii_err() = throw(ArgumentError("Not a valid ASCII string"))
-ascii(str::Union{T,SubString{T}}) where {T<:Str{CSE}} =
-    is_ascii(str) ? ASCIIStr(str) : ascii_err()
-ascii(str::Union{T,SubString{T}}) where {T<:Str{SubSet_CSEs}} = ascii_err()
-ascii(str::Union{T,SubString{T}}) where {T<:Str{ASCIICSE}} = str
-

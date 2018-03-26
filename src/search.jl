@@ -109,15 +109,25 @@ end
     pos
 end
 
-function find(::Type{D}, fun::Function, str::AbstractString, pos::Integer) where {D<:Direction}
-    if pos < 1 || pos > ncodeunits(str)
-        @boundscheck boundserr(str, pos)
+function find(::Type{Fwd}, fun::Function, str::AbstractString, pos::Integer)
+    pos < 1 && (@boundscheck boundserr(str, pos); return 0)
+    if pos > (len = ncodeunits(str))
+        @boundscheck pos > len+1 && boundserr(str, pos)
         return 0
     end
     @inbounds is_valid(str, pos) || index_error(str, pos)
-    _srch_pred(D(), fun, str, pos)
+    _srch_pred(Fwd(), fun, str, pos)
 end
 
+function find(::Type{Rev}, fun::Function, str::AbstractString, pos::Integer)
+    pos < 0 && (@boundscheck boundserr(str, pos); return 0)
+    if pos > (len = ncodeunits(str))
+        @boundscheck pos > len+1 && boundserr(str, pos)
+        return 0
+    end
+    @inbounds is_valid(str, pos) || index_error(str, pos)
+    _srch_pred(Rev(), fun, str, pos)
+end
 const PatType = Union{Function, AbsChar, AbstractString, Regex}
 
 find(::Type{Fwd}, pat::PatType, str::AbstractString) = find(Fwd, pat, str, 1)

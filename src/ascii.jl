@@ -25,46 +25,59 @@ function _string(coll)
     buf
 end
 
-const _ASCIIStr = Union{Str{ASCIICSE}, SubString{<:Str{ASCIICSE}}}
-
-string(c::_ASCIIStr...) = length(c) == 1 ? c[1] : Str(ASCIICSE, _string(c))
+string(c::MaybeSub{<:Str{ASCIICSE}}...) = length(c) == 1 ? c[1] : Str(ASCIICSE, _string(c))
 
 ## transcoding to ASCII ##
 
 function convert(::Type{ASCIIStr}, str::AbstractString)
     isempty(str) && return empty_ascii
-    @preserve str buf begin
-        len = length(str)
-        buf, pnt = _allocate(UInt8, len)
-        @inbounds for ch in str
-            is_ascii(ch) || unierror(UTF_ERR_INVALID_ASCII, pnt - pointer(buf) + 1, ch)
-            set_codeunit!(pnt, ch%UInt8)
-            pnt += 1
-        end
+    len = length(str)
+    buf, pnt = _allocate(UInt8, len)
+    @inbounds for ch in str
+        is_ascii(ch) || unierror(UTF_ERR_INVALID_ASCII, pnt - pointer(buf) + 1, ch)
+        set_codeunit!(pnt, ch%UInt8)
+        pnt += 1
+    end
+    Str(ASCIICSE, buf)
+end
+
+convert(::Type{ASCIIStr}, str::Str{<:SubSet_CSEs}) = unierror(UTF_ERR_INVALID_ASCII)
+
+convert(::Type{ASCIIStr}, str::Str{<:Union{Text1CSE,BinaryCSE,LatinCSE,UTF8CSE}}) =
+    (is_empty(str) ? empty_ascii
+     : is_ascii(str) ? Str(ASCIICSE, str.data) : unierror(UTF_ERR_INVALID_ASCII))
+
+function convert(::Type{ASCIIStr}, dat::Vector{UInt8})
+    is_empty(dat) && return empty_ascii
+    is_ascii(dat) || unierror(UTF_ERR_INVALID_ASCII)
+    siz = sizeof(dat)
+    buf = _allocate(siz)
+    @preserve dat unsafe_copyto!(pointer(buf), pointer(dat), siz)
+    Str(ASCIICSE, buf)
+end
+
+function convert(::Type{ASCIIStr}, str::SubString{T}) where
+    {T<:Union{String, Str{<:Union{Binary_CSEs,LatinCSE,UTF8CSE}}}}
+    is_empty(str) && return empty_ascii
+    is_ascii(str) || unierror(UTF_ERR_INVALID_ASCII)
+    @preserve str begin
+        len, pnt = _lenpnt(str)
+        buf, out = _allocate(UInt8, len)
+        unsafe_copyto!(out, pnt, len)
         Str(ASCIICSE, buf)
     end
 end
 
-convert(::Type{ASCIIStr}, str::T) where {T<:Union{LatinStr,UTF8Str}} =
-    is_ascii(str) ? _convert(ASCIIStr, str.data) : unierror(UTF_ERR_INVALID_ASCII)
+convert(::Type{ASCIIStr}, str::String) =
+    (isempty(str) ? empty_ascii
+     : is_ascii(str) ? Str(ASCIICSE, str) : unierror(UTF_ERR_INVALID_ASCII))
 
-convert(::Type{ASCIIStr}, dat::Vector{UInt8}) =
-    is_ascii(dat) ? _convert(ASCIIStr, dat) : unierror(UTF_ERR_INVALID_ASCII)
 
-function convert(::Type{ASCIIStr}, str::String)
-    isempty(str) && return empty_ascii
-    len, flags = unsafe_check_string(str, 1, sizeof(str))
-    flags == 0 && return Str(ASCIICSE, str)
-    (flags & ~UTF_LONG) == 0 || unierror(UTF_ERR_INVALID_ASCII)
-    @preserve str buf begin
-        buf, pnt = _allocate(UInt8, len)
-        @inbounds for ch in str
-            set_codeunit!(pnt, ch%UInt8)
-            pnt += 1
-        end
-        Str(ASCIICSE, buf)
-    end
-end
+# TODO: allow transform as the first argument to replace?
+
+ascii(str::MaybeSub{<:Str}) = is_ascii(str) ? convert(ASCIIStr, str).data : ascii_err()
+ascii(str::MaybeSub{<:Str{<:SubSet_CSEs}}) = ascii_err()
+ascii(str::ASCIIStr) = str.data
 
 # This should really use a keyword argument, and allow for the following possibilities:
 # 1) use default substitution character \u{1a} for ASCII/Latin1 (SUB) or \u{fffd} for Unicode
