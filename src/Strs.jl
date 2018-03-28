@@ -2,7 +2,8 @@ __precompile__(true)
 """
 Strs package
 
-Copyright 2017 Gandalf Software, Inc., Scott P. Jones, and other contributors to the Julia language
+Copyright 2017-2018 Gandalf Software, Inc., Scott P. Jones,
+and other contributors to the Julia language
 Licensed under MIT License, see LICENSE.md
 Based partly on code in LegacyStrings that used to be part of Julia
 """
@@ -52,20 +53,20 @@ representation, to store the following information:
 NotValidated, Invalid, NoASCII, Latin, BMP, UTF32, Hash present, Short
 
 2 bits: 00 -> Valid, 01 -> Invalid, 1x -> NotValidated
-1 bit:  0  -> All ASCII, 1 -> some non-ascii
-1 bit:  0  -> No Latin1, 1 -> some Latin1
-1 bit:  0  -> ByteWise,  1 -> WordWise
+1 bit:  0  -> Some ASCII, 1 -> no ASCII (bit flipped from others so that 0 -> ASCIIStr)
+1 bit:  0  -> No Latin1,  1 -> some Latin1
+1 bit:  0  -> ByteWise,   1 -> WordWise
 1 bit:  0/1 Hash present
 1 bit:  0/1 Short
 
 Extra byte for wordwise:
-1 bit:  0   -> No BMP,    1 -> some BMP
+1 bit:  0  -> No BMP,   1 -> some BMP
 1 bit:  0  -> All BMP,   1 -> some non-BMP
 
 So: ASCIIStr would be: Valid, All ASCII, ... i.e. 0 + short/hash bits
-    _LatinStr would be: Valid, non-ascii, 1 Latin1, no bmp, no non-bmp
-    _UCS2Str  would be: Valid, non-ascii, maybe Latin1, some bmp, no non-bmp
-    _UTF32Str would be: Valid, non-ascii, maybe Latin1, maybe BMP, some non-bmp
+    _LatinStr would be: Valid, maybe no ascii, Latin1, no bmp, no non-bmp
+    _UCS2Str  would be: Valid, maybe no ascii, maybe Latin1, some bmp, no non-bmp
+    _UTF32Str would be: Valid, maybe no ascii, maybe Latin1, maybe BMP, some non-bmp
 =#
 
 const V6_COMPAT = VERSION < v"0.7.0-DEV"

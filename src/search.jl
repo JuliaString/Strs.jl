@@ -7,12 +7,12 @@ Based in part on julia/base/strings/search.jl
 =#
 
 """
-    find(Fwd, pattern::Union{Regex,AbstractString}, string::AbstractString, start::Integer=1)
+    find(Fwd, pattern, string::AbstractString, start::Integer)
 
 Find the next occurrence of `pattern` in `string` starting at position `start`.
-`pattern` can be either a string, or a regular expression, in which case `string`
-must be of type `String`, `ASCIIStr`, `UTF8Str` (or a `SubString` of one of those types)
-dir can be either Fwd or Rev
+`pattern` can be either a string, character, function, or regular expression
+(in which case `string` must be of type `String`, or a `Str` type whose codeunit size is == 1,
+or a `SubString` of one of those types)
 
 The return value is a range of indexes where the matching sequence is found, such that
 `s[find(Fwd, x, s, i)] == x`:
@@ -41,12 +41,40 @@ julia> find(Fwd, "Julia", "JuliaLang")
 find(::Type{Fwd}, pat, str, pos)
 
 """
-    find(Rev, pattern::AbstractString, string::AbstractString, start::Integer=lastindex(string))
+    find(First, pattern, string::AbstractString)
+
+Find the first occurrence of `pattern` in `string` starting at position `start`.
+`pattern` can be either a string, character, function, or regular expression
+(in which case `string` must be of type `String`, or a `Str` type whose codeunit size is == 1,
+or a `SubString` of one of those types)
+
+The return value is a range of indexes where the matching sequence is found, such that
+`s[find(Fwd, x, s, i)] == x`
+
+`find(Fwd, "substring", string, i)` = `start:end` such that
+`string[start:end] == "substring"`, or `0:-1` if unmatched.
+
+# Examples
+```jldoctest
+julia> find(First, "z", "Hello to the world")
+0:-1
+
+julia> find(First, "z", "Hello to the world")
+0:-1
+
+julia> find(First, "Julia", "JuliaLang")
+1:5
+```
+"""
+find(::Type{First}, pat, str)
+
+"""
+    find(Rev, pattern::AbstractString, string::AbstractString, start::Integer)
 
 Find the previous occurrence of `pattern` in `string` starting at position `start`.
 
 The return value is a range of indexes where the matching sequence is found, such that
-`s[find(Rev, x, s, i)] == x`:
+`s[find(Rev, x, s, i)] == x`
 
 `find(Rev, "substring", string, i)` = `start:end` such that
 `string[start:end] == "substring"`, or `0:-1` if unmatched.
@@ -61,15 +89,31 @@ julia> find(Rev, "o", "Hello to the world", 18)
 
 julia> find(Rev, "Julia", "JuliaLang", 6)
 1:5
-
-julia> find(Rev, "o", "Hello to the world")
-15:15
-
-julia> find(Rev, "Julia", "JuliaLang")
-1:5
 ```
 """
 find(::Type{Rev}, pat, str, pos)
+
+"""
+    find(Last, pattern::AbstractString, string::AbstractString)
+
+Find the previous occurrence of `pattern` in `string`
+
+The return value is a range of indexes where the matching sequence is found, such that
+`s[find(First, x, s)] == x`
+
+`find(First, "substring", string, i)` = `start:end` such that
+`string[start:end] == "substring"`, or `0:-1` if unmatched.
+
+# Examples
+```jldoctest
+julia> find(Last, "o", "Hello to the world")
+15:15
+
+julia> find(Last, "Julia", "JuliaLang")
+1:5
+```
+"""
+find(::Type{Last}, pat, str)
 
 const _not_found = 0:-1
 
@@ -78,17 +122,105 @@ find_result(::Type{<:AbstractString}, v) = v
 
 @static if !V6_COMPAT
 
-nothing_sentinel(i) = i == 0 ? nothing : i
+nothing_sentinel(i) = first(i) == 0 ? nothing : i
+Base.findfirst(a, b::Str)   = nothing_sentinel(find(First, a, b))
+Base.findlast(a, b::Str)    = nothing_sentinel(find(Last, a, b))
 Base.findnext(a, b::Str, i) = nothing_sentinel(find(Fwd, a, b, i))
-Base.findfirst(a, b::Str)   = nothing_sentinel(find(Fwd, a, b))
 Base.findprev(a, b::Str, i) = nothing_sentinel(find(Rev, a, b, i))
-Base.findlast(a, b::Str)    = nothing_sentinel(find(Rev, a, b))
+Base.findfirst(a::Str, b::AbstractString)   = nothing_sentinel(find(First, a, b))
+Base.findlast(a::Str, b::AbstractString)    = nothing_sentinel(find(Last, a, b))
 Base.findnext(a::Str, b::AbstractString, i) = nothing_sentinel(find(Fwd, a, b, i))
-Base.findfirst(a::Str, b::AbstractString)   = nothing_sentinel(find(Fwd, a, b))
 Base.findprev(a::Str, b::AbstractString, i) = nothing_sentinel(find(Rev, a, b, i))
-Base.findlast(a::Str, b::AbstractString)    = nothing_sentinel(find(Rev, a, b))
 
 end
+
+function find(::Type{D}, fun::Function, str::AbstractString, pos::Integer) where {D<:Direction}
+    pos < Int(D===Fwd) && (@boundscheck boundserr(str, pos); return 0)
+    if pos > (len = ncodeunits(str))
+        @boundscheck pos > len+1 && boundserr(str, pos)
+        return 0
+    end
+    @inbounds is_valid(str, pos) || index_error(str, pos)
+    _srch_pred(D(), fun, str, pos)
+end
+
+find(::Type{First}, fun::Function, str::AbstractString) =
+    _srch_pred(Fwd(), fun, str, 1)
+find(::Type{Last},  fun::Function, str::AbstractString) =
+    _srch_pred(Rev(), fun, str, lastindex(str))
+
+find(::Type{Next}, pat, str::AbstractString, pos) = find(Fwd, pat, str, pos)
+find(::Type{Prev}, pat, str::AbstractString, pos) = find(Rev, pat, str, pos)
+
+# Invert order of function and findop, to allow use of do blocks
+find(pat::Function, ::Type{D}, str::AbstractString) where {D<:FindOp} = find(D, pat, str)
+find(pat::Function, ::Type{D}, str::AbstractString, pos) where {D<:FindOp} = find(D, pat, str, pos)
+
+find(::Type{D}, pred::P, str::AbstractString,
+    pos::Integer) where {P<:Fix2{Union{typeof(==),typeof(isequal)}, <:AbsChar}, D<:Direction} =
+    find(D, pred.x, str, pos)
+
+function find(::Type{D}, ch::AbsChar, str::AbstractString, pos::Integer) where {D<:Direction}
+    pos < Int(D===Fwd) && (@boundscheck boundserr(str, pos); return 0)
+    if pos > (len = ncodeunits(str))
+        @boundscheck pos > len+1 && boundserr(str, pos)
+        return 0
+    end
+    # Only check if CodeUnitMulti
+    (cus = CodePointStyle(str)) === CodeUnitMulti() &&
+        (@inbounds is_valid(str, pos) || index_error(str, pos))
+    # Check here if ch is valid for the type of string
+    is_valid(eltype(str), ch) ? _srch_cp(D(), cus, str, ch, pos, len) : 0
+end
+
+_get_dir(::Type{First}) = Fwd()
+_get_dir(::Type{Last})  = Rev()
+
+find(::Type{D}, ch::AbsChar, str::AbstractString) where {D<:Union{First,Last}} =
+    ((len = ncodeunits(str)) == 0 || !is_valid(eltype(str), ch) ? 0
+     : _srch_cp(_get_dir(D), CodePointStyle(str), str, ch,
+                D === First ? 1 : lastindex(str), len))
+
+function find(::Type{D}, needle::AbstractString, str::AbstractString,
+              pos::Integer) where {D<:Direction}
+    # Check for fast case of a single codeunit (should check for single character also)
+    if (slen = ncodeunits(str)) == 0
+        # Special case for empty string
+        @boundscheck pos == 1 || pos == 0 || boundserr(str, pos)
+        return ifelse(isempty(needle), 1:0, _not_found)
+    end
+    pos < 1 && (@boundscheck boundserr(str, pos) ; return _not_found)
+    pos > slen && (@boundscheck pos > slen + 1 && boundserr(str, pos) ; return _not_found)
+    @inbounds is_valid(str, pos) || index_error(str, pos)
+    (tlen = ncodeunits(needle)) == 0 && return pos:pos-1
+    (cmp = CanContain(str, needle)) === NoCompare() && return _not_found
+    @inbounds ch, nxt = next(needle, 1)
+    is_valid(eltype(str), ch) || return _not_found
+    # Check if single character
+    if nxt > tlen
+        pos = _srch_cp(D(), CodePointStyle(str), str, ch, pos, slen)
+        return pos == 0 ? _not_found : (pos:pos)
+    end
+    _srch_strings(D(), cmp, str, needle, ch, nxt, pos, slen, tlen)
+end
+
+function find(::Type{T}, needle::AbstractString, str::AbstractString) where {T<:Union{First,Last}}
+    # Check for fast case of a single codeunit (should check for single character also)
+    (slen = ncodeunits(str)) == 0 && return ifelse(isempty(needle), 1:0, _not_found)
+    pos = T === First ? 1 : thisind(str, slen)
+    (tlen = ncodeunits(needle)) == 0 && return pos:(pos-1)
+    (cmp = CanContain(str, needle)) === NoCompare() && return _not_found
+    @inbounds ch, nxt = next(needle, 1)
+    is_valid(eltype(str), ch) || return _not_found
+    # Check if single character
+    if nxt > tlen
+        pos = _srch_cp(_get_dir(T), CodePointStyle(str), str, ch, pos, slen)
+        return pos:(pos - (pos == 0))
+    end
+    _srch_strings(_get_dir(T), cmp, str, needle, ch, nxt, pos, slen, tlen)
+end
+
+## Lower level search functions
 
 @inline function _srch_pred(::Fwd, testf, str, pos)
     len = ncodeunits(str)
@@ -109,37 +241,7 @@ end
     pos
 end
 
-function find(::Type{Fwd}, fun::Function, str::AbstractString, pos::Integer)
-    pos < 1 && (@boundscheck boundserr(str, pos); return 0)
-    if pos > (len = ncodeunits(str))
-        @boundscheck pos > len+1 && boundserr(str, pos)
-        return 0
-    end
-    @inbounds is_valid(str, pos) || index_error(str, pos)
-    _srch_pred(Fwd(), fun, str, pos)
-end
-
-function find(::Type{Rev}, fun::Function, str::AbstractString, pos::Integer)
-    pos < 0 && (@boundscheck boundserr(str, pos); return 0)
-    if pos > (len = ncodeunits(str))
-        @boundscheck pos > len+1 && boundserr(str, pos)
-        return 0
-    end
-    @inbounds is_valid(str, pos) || index_error(str, pos)
-    _srch_pred(Rev(), fun, str, pos)
-end
-const PatType = Union{Function, AbsChar, AbstractString, Regex}
-
-find(::Type{Fwd}, pat::PatType, str::AbstractString) = find(Fwd, pat, str, 1)
-find(::Type{Rev}, pat::PatType, str::AbstractString) = find(Rev, pat, str, lastindex(str))
-
-find(pat::PatType, ::Type{D}, str::AbstractString) where {D<:Direction} = find(D, pat, str)
-
 # AbstractString implementations of the generic find interfaces
-
-# Defined with function first, for do syntax
-find(fun::Function, ::Type{D}, str::AbstractString, pos::Integer) where {D<:Direction} =
-    find(D(), fun, str, pos)
 
 @inline function _srch_codeunit(::Fwd, beg::Ptr{T}, cu::T, pos, len) where {T<:CodeUnitTypes}
     if sizeof(Cwchar_t) == sizeof(T) || T == UInt8
@@ -187,36 +289,11 @@ function _srch_cp(::Fwd, cus, str, cp, pos, len)
 end
 
 function _srch_cp(::Rev, cus, str, cp, pos, len)
-    #print("_srch_cp(::Rev, $cus, \"$str\", '$(Char(cp))', $pos, $len)")
     @inbounds while pos > 0
-        #print("\n\tpos=$pos, $(str[pos])")
         str[pos] == cp && return pos
         pos = prevind(str, pos)
     end
-    #println(" => 0")
     0
-end
-
-find(::Type{D}, pred::P, str::AbstractString,
-    pos::Integer) where {P<:Fix2{Union{typeof(==),typeof(isequal)}, <:AbsChar}, D<:Direction} =
-    find(D, pred.x, str, pos)
-
-function find(::Type{D}, ch::AbsChar, str::AbstractString, pos::Integer) where {D<:Direction}
-    if pos < 1
-        @boundscheck (pos == 0 && isempty(str)) || boundserr(str, pos)
-        return 0
-    end
-    len = ncodeunits(str)
-    if pos > len
-        @boundscheck (len == 0 && pos == 1) || boundserr(str, pos)
-        return 0
-    end
-    # Only check if CodeUnitMulti
-    (cus = CodePointStyle(str)) === CodeUnitMulti() &&
-        (@inbounds is_valid(str, pos) || index_error(str, pos))
-    #println("find(::$D, '$ch', \"$str\", $pos) => $(is_valid(eltype(str), ch))")
-    # Check here if ch is valid for the type of string
-    is_valid(eltype(str), ch) ? _srch_cp(D(), cus, str, ch, pos, len) : 0
 end
 
 # Substring searching
@@ -306,34 +383,7 @@ end
 _srch_strings(::Fwd, ::Union{ByteCompare,WidenCompare}, str, needle, ch, nxtsub, pos, slen, tlen) =
     @preserve str needle _srch_str_bloom(str, _pnt(str), _pnt(needle), ch, pos, slen, tlen)
 
-function find(::Type{D}, needle::AbstractString, str::AbstractString,
-              pos::Integer) where {D<:Direction}
-    # Check for fast case of a single codeunit (should check for single character also)
-    slen = ncodeunits(str)
-    if slen == 0
-        # Special case for empty string
-        @boundscheck pos == 1 || pos == 0 || boundserr(str, pos)
-        return ifelse(isempty(needle), 1:0, _not_found)
-    end
-    if !(1 <= pos <= slen)
-        @boundscheck boundserr(str, pos)
-        return _not_found
-    end
-    @inbounds is_valid(str, pos) || index_error(str, pos)
-    tlen = ncodeunits(needle)
-    tlen == 0 && return pos:pos-1
-    (cmp = CanContain(str, needle)) === NoCompare() && return _not_found
-    @inbounds ch, nxt = next(needle, 1)
-    is_valid(eltype(str), ch) || return _not_found
-    # Check if single character
-    if nxt > tlen
-        pos = _srch_cp(D(), CodePointStyle(str), str, ch, pos, slen)
-        return pos == 0 ? _not_found : (pos:pos)
-    end
-    _srch_strings(D(), cmp, str, needle, ch, nxt, pos, slen, tlen)
-end
-
-_occurs_in(needle, hay) = first(find(Fwd, needle, hay)) != 0
+_occurs_in(needle, hay) = first(find(First, needle, hay)) != 0
 
 # Avoid type piracy
 occurs_in(needle::AbstractString, hay::Str)       = _occurs_in(needle, hay)

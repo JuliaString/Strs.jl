@@ -2,14 +2,10 @@
 # Copyright 2017 Scott P. Jones and other contributors to the Julia language
 # Licensed under MIT License, see LICENSE.md
 
-# Renamed from ascii to to_ascii, to prevent issues
+# Renamed from ascii to to_ascii, to prevent issues with Base.ascii
 to_ascii(str) = convert(ASCIIStr, str)
 to_ascii(pnt::Ptr{UInt8}) = convert(ASCIIStr, unsafe_string(p))
 to_ascii(pnt::Ptr{UInt8}, len::Integer) = convert(ASCIIStr, unsafe_string(p, len))
-
-latin1(x) = convert(LatinCSE, x)
-latin1(p::Ptr{UInt8}) = latin1(unsafe_string(p))
-latin1(p::Ptr{UInt8}, len::Integer) = latin1(unsafe_string(p, len))
 
 """
     utf8(s)

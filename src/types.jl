@@ -123,7 +123,7 @@ end
 (::Type{Str})(::Type{C}, v::String) where {C<:CSE} = Str(C, v, nothing, nothing, nothing)
 (::Type{Str})(::Type{C}, v::Str) where {C<:CSE} = Str(C, v.data, nothing, nothing, nothing)
 
-const MaybeSub{T} = Union{T, SubString{T}} where {T<:Str}
+const MaybeSub{T} = Union{T, SubString{T}} where {T<:AbstractString}
 
 struct Chr{CS<:CharSet,T<:CodeUnitTypes} <: AbstractChar
     v::T

@@ -182,14 +182,14 @@ function testuni(T)
 
             s = convert(S, T(string(prefix, c, suffix)))
             r = reverse(s)
-            ri = fnd(Fwd, ==(c), r)
+            ri = fnd(First, ==(c), r)
             @test c == s[reverseind(s, ri)] == r[ri]
             s = convert(S, T(string(prefix, prefix, c, suffix, suffix)))
             pre = convert(S, T(prefix))
             sb = SubString(s, nextind(pre, lastindex(pre)),
                            lastindex(convert(S, T(string(prefix, prefix, c, suffix)))))
             r = reverse(sb)
-            ri = fnd(Fwd, ==(c), r)
+            ri = fnd(First, ==(c), r)
             @test c == sb[reverseind(sb, ri)] == r[ri]
         end
     end
@@ -226,9 +226,9 @@ function teststr(T)
     # search and SubString (issue #5679)
     let str = T("Hello, world!"),
         u = SubString(str, 1, 5)
-        @test fnd(Rev, T("World"), u) == 0:-1
-        @test fnd(Rev, ==('z'), u) == 0
-        @test fnd(Rev, T("ll"), u) == 3:4
+        @test fnd(Last, T("World"), u) == 0:-1
+        @test fnd(Last, ==('z'), u) == 0
+        @test fnd(Last, T("ll"), u) == 3:4
     end
 
     # SubString created from SubString

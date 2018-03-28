@@ -266,11 +266,11 @@
         @test replace(abc, ['a', 'd'] => 'A') == "Abc"
 
         # for Char pattern call Char replacement function
-        @test replace(ST("a"), "a" => typeof) == "SubString{String}"
-        @test replace(ST("a"), r"a" => typeof) == "SubString{String}"
-        @test replace(ST("a"), 'a' => typeof) == "Char"
-        @test replace(ST("a"), in("a") => typeof) == "Char"
-        @test replace(ST("a"), ['a'] => typeof) == "Char"
+        @test replace(ST("a"), "a" => typeof) == "SubString{$ST}"
+        @test replace(ST("a"), r"a" => typeof) == "SubString{$ST}"
+        @test replace(ST("a"), 'a' => typeof) == string(eltype(ST))
+        @test replace(ST("a"), in("a") => typeof) == string(eltype(ST))
+        @test replace(ST("a"), ['a'] => typeof) == string(eltype(ST))
 
     end # replace tests
 

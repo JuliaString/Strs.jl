@@ -83,11 +83,11 @@ end
 lpad(str::MaybeSub{<:Str}, cnt::Integer, pad::AbstractString) =
     (cnt -= length(str)) <= 0 ? str : _lpad(cnt, pad, str)
 lpad(ch::CodePoint, cnt::Integer, pad::AbstractString) =
-    cnt < 1 ? string(ch) : _lpad(cnt, pad, ch)
+    (cnt -= 1) <= 0 ? string(ch) : _lpad(cnt, pad, ch)
 lpad(str::MaybeSub{<:Str}, cnt::Integer, pad::AbsChar=' ') =
-    (len = length(str)) > cnt ? str : string(pad^cnt, str)
+    (cnt -= length(str)) <= 0 ? str : string(pad^cnt, str)
 lpad(ch::CodePoint, cnt::Integer, pad::AbstractChar=' ') =
-    cnt < 1 ? string(ch) : string(pad^cnt, ch)
+    (cnt -= 1) <= 0 ? string(ch) : string(pad^cnt, ch)
 
 function _rpad(cnt, pad, str)
     cnt, rem = divrem(cnt, length(pad))
@@ -96,11 +96,11 @@ end
 rpad(str::MaybeSub{<:Str}, cnt::Integer, pad::AbstractString) =
     (cnt -= length(str)) <= 0 ? str : _rpad(cnt, pad, str)
 rpad(ch::CodePoint, cnt::Integer, pad::AbstractString) =
-    cnt < 1 ? string(ch) : _rpad(cnt, pad, ch)
+    (cnt -= 1) <= 0 ? string(ch) : _rpad(cnt, pad, ch)
 rpad(str::MaybeSub{<:Str}, cnt::Integer, pad::AbsChar=' ') =
-    (len = length(str)) > cnt ? str : string(pad^cnt, str)
+    (cnt -= length(str)) <= 0 ? str : string(str, pad^cnt)
 rpad(ch::CodePoint, cnt::Integer, pad::AbsChar=' ') =
-    cnt < 1 ? string(ch) : string(ch, pad^cnt)
+    (cnt -= 1) <= 0 ? string(ch) : string(ch, pad^cnt)
 
 const SetOfChars = Union{Tuple{Vararg{<:AbstractChar}},
                          AbstractVector{<:AbstractChar},
@@ -114,29 +114,26 @@ split(str::MaybeSub{T}, splitter::AbstractChar;
       limit::Integer=0, keep::Bool=true) where {T<:Str} =
           _split(str, ==(splitter), limit, keep, SubString{T}[])
 
-function _split(str::MaybeSub{T}, splitter, limit::Integer, keep_empty::Bool,
-                strs::Array) where {T<:Str}
+function _split(str::MaybeSub{T}, splitter, limit::Integer,
+                keep_empty::Bool, strs::Array) where {T<:Str}
     i = 1
     n = lastindex(str)
-    r = find(Fwd, splitter, str)
+    r = find(First, splitter, str)
     if r != 0:-1
         j, k = first(r), nextind(str,last(r))
         while 0 < j <= n && length(strs) != limit-1
             if i < k
-                (keep_empty || i < j) &&
-                    push!(strs, SubString(str,i,prevind(str,j)))
+                (keep_empty || i < j) && push!(strs, SubString(str,i,prevind(str,j)))
                 i = k
             end
             (k <= j) && (k = nextind(str,j))
+            k > n && break
             r = find(Fwd, splitter, str, k)
             r == 0:-1 && break
             j, k = first(r), nextind(str,last(r))
         end
     end
-    if keep_empty || !done(str,i)
-        push!(strs, SubString(str,i))
-    end
-    strs
+    (keep_empty || !done(str,i)) ? push!(strs, SubString(str,i)) : strs
 end
 
 # a bit oddball, but standard behavior in Perl, Ruby & Python:
@@ -145,18 +142,18 @@ split(str::MaybeSub{<:Str}) = split(str, _default_delims; limit=0, keep=false)
 rsplit(str::MaybeSub{T}, splitter; limit::Integer=0, keep::Bool=true) where {T<:Str} =
     _rsplit(str, splitter, limit, keep, SubString{T}[])
 rsplit(str::MaybeSub{T}, splitter::SetOfChars; limit::Integer=0, keep::Bool=true) where {T<:Str} =
-  _rsplit(str, occurs_in(splitter), limit, keep, SubString{T}[])
-rsplit(str::MaybeSub{T}, splitter::AbstractChar;
-       limit::Integer=0, keep::Bool=true) where {T<:Str} =
-           _rsplit(str, ==(splitter), limit, keep, SubString{T}[])
+    _rsplit(str, occurs_in(splitter), limit, keep, SubString{T}[])
+rsplit(str::MaybeSub{T}, splitter::AbstractChar; limit::Integer=0, keep::Bool=true) where {T<:Str} =
+    _rsplit(str, ==(splitter), limit, keep, SubString{T}[])
 
-function _rsplit(str::Str, splitter, limit::Integer, keep_empty::Bool, strs::Array)
-    n = lastindex(str)
-    r = find(Rev, splitter, str, n)
+function _rsplit(str::MaybeSub{T}, splitter, limit::Integer,
+                 keep_empty::Bool, strs::Array) where {T<:Str}
+    r = find(Last, splitter, str)
     j, k = first(r), last(r)
+    n = lastindex(str)
     while j > 0 && k > 0 && length(strs) != limit-1
         (keep_empty || k < n) && pushfirst!(strs, SubString(str, nextind(str, k), n))
-        n = prevind(str, j)
+        (n = prevind(str, j)) > 0 || break
         r = find(Rev, splitter, str, n)
         j, k = first(r), last(r)
     end
@@ -185,8 +182,8 @@ function replace(str::MaybeSub{<:Str}, pat_repl::Pair; count::Integer=typemax(In
     n = 1
     i = 1
     e = lastindex(str)
-    print("find(Fwd, \"$pattern\", \"$str\")")
-    r = find(Fwd, pattern, str)
+    print("find(First, \"$pattern\", \"$str\")")
+    r = find(First, pattern, str)
     println(" => $r")
     (j = first(r)) == 0 && return str
     # Just return the string if not found
@@ -208,6 +205,7 @@ function replace(str::MaybeSub{<:Str}, pat_repl::Pair; count::Integer=typemax(In
             i = k = nextind(str, k)
         end
         print("find(Fwd, \"$pattern\", \"$str\", $k)")
+        k > e && break
         r = find(Fwd, pattern, str, k)
         println(" => $r, i=$i, j=$j, n=$n")
         (j = first(r)) == 0 && break
