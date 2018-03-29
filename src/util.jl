@@ -116,24 +116,24 @@ split(str::MaybeSub{T}, splitter::AbstractChar;
 
 function _split(str::MaybeSub{T}, splitter, limit::Integer,
                 keep_empty::Bool, strs::Array) where {T<:Str}
-    i = 1
-    n = lastindex(str)
-    r = find(First, splitter, str)
-    if r != 0:-1
-        j, k = first(r), nextind(str,last(r))
-        while 0 < j <= n && length(strs) != limit-1
-            if i < k
-                (keep_empty || i < j) && push!(strs, SubString(str,i,prevind(str,j)))
-                i = k
+    pos = 1
+    lst = lastindex(str)
+    res = find(First, splitter, str)
+    if res != 0:-1
+        j, k = first(res), nextind(str, last(res))
+        while 0 < j <= lst && length(strs) != limit - 1
+            if pos < k
+                (keep_empty || pos < j) &&
+                    push!(strs, SubString(str, pos, prevind(str, j)))
+                pos = k
             end
-            (k <= j) && (k = nextind(str,j))
-            k > n && break
-            r = find(Fwd, splitter, str, k)
-            r == 0:-1 && break
-            j, k = first(r), nextind(str,last(r))
+            (k <= j) && (k = nextind(str, j))
+            res = find(Fwd, splitter, str, k)
+            res == 0:-1 && break
+            j, k = first(res), nextind(str, last(res))
         end
     end
-    (keep_empty || !done(str,i)) ? push!(strs, SubString(str,i)) : strs
+    (keep_empty || pos <= lst) ? push!(strs, SubString(str, pos)) : strs
 end
 
 # a bit oddball, but standard behavior in Perl, Ruby & Python:
@@ -148,16 +148,16 @@ rsplit(str::MaybeSub{T}, splitter::AbstractChar; limit::Integer=0, keep::Bool=tr
 
 function _rsplit(str::MaybeSub{T}, splitter, limit::Integer,
                  keep_empty::Bool, strs::Array) where {T<:Str}
-    r = find(Last, splitter, str)
-    j, k = first(r), last(r)
-    n = lastindex(str)
+    res = find(Last, splitter, str)
+    j, k = first(res), last(res)
+    pos = lastindex(str)
     while j > 0 && k > 0 && length(strs) != limit-1
-        (keep_empty || k < n) && pushfirst!(strs, SubString(str, nextind(str, k), n))
-        (n = prevind(str, j)) > 0 || break
-        r = find(Rev, splitter, str, n)
-        j, k = first(r), last(r)
+        (keep_empty || k < pos) && pushfirst!(strs, SubString(str, nextind(str, k), pos))
+        (pos = prevind(str, j)) > 0 || break
+        res = find(Rev, splitter, str, pos)
+        j, k = first(res), last(res)
     end
-    (keep_empty || n > 0) && pushfirst!(strs, SubString(str,1,n))
+    (keep_empty || pos > 0) && pushfirst!(strs, SubString(str, 1, pos))
     strs
 end
 
@@ -175,42 +175,36 @@ replace(str::MaybeSub{<:Str}, pat_repl::Pair{<:SetOfChars}; count::Integer=typem
 
 # Todo: this is using print, but it should be changed to make sure that everything is done via
 # writes (i.e. no translation to UTF-8)
-function replace(str::MaybeSub{<:Str}, pat_repl::Pair; count::Integer=typemax(Int))
+function replace(str::MaybeSub{T}, pat_repl::Pair; count::Integer=typemax(Int)) where {T<:Str}
     pattern, repl = pat_repl
     count == 0 && return str
     count < 0 && throw(DomainError(count, "`count` must be non-negative."))
-    n = 1
-    i = 1
-    e = lastindex(str)
-    print("find(First, \"$pattern\", \"$str\")")
-    r = find(First, pattern, str)
-    println(" => $r")
-    (j = first(r)) == 0 && return str
+    pos = 1
+    lst = lastindex(str)
+    res = find(First, pattern, str)
     # Just return the string if not found
+    (j = first(res)) == 0 && return str
 
     out = IOBuffer(sizehint=floor(Int, 1.2 * sizeof(str)))
     while true
-        k = last(r)
-        if i == 1 || i <= k
-            print(out, SubString(str, i, thisind(str, j-1)))
-            println("$i $k $(pointer(str, i)), $(j-i)")
-            #unsafe_write(out, pointer(str, i), UInt(j-i))
-            _replace(out, repl, str, r, pattern)
+        k = last(res)
+        if pos == 1 || pos <= k
+            print(out, SubString(str, pos, thisind(str, j - 1)))
+            #unsafe_write(out, pointer(str, pos), UInt(j - pos))
+            _replace(out, repl, str, res, pattern)
         end
         if k < j
-            i = j
-            j > e && break
+            pos = j
+            j > lst && break
             k = nextind(str, j)
         else
-            i = k = nextind(str, k)
+            pos = k = nextind(str, k)
         end
-        print("find(Fwd, \"$pattern\", \"$str\", $k)")
-        k > e && break
-        r = find(Fwd, pattern, str, k)
-        println(" => $r, i=$i, j=$j, n=$n")
-        (j = first(r)) == 0 && break
-        (n += 1) == count && break
+        (count -= 1) > 0 || break
+        k > lst && break
+        res = find(Fwd, pattern, str, k)
+        (j = first(res)) == 0 && break
     end
-    print(out, SubString(str, i))
-    Str(cse(str), String(take!(out)))
+    print(out, SubString(str, pos))
+    convert(T, String(take!(out)))
 end

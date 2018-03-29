@@ -301,39 +301,36 @@ end
 # Todo: make use of CompareStyle trait to improve performance
 
 """Compare two strings, starting at nxtstr and nxtsub"""
-@inline function _cmp_str(str, strpos, sub, subpos)
-    while !done(str, strpos)
+@inline function _cmp_str(str, strpos, endpos, sub, subpos, endsub)
+    while strpos <= endpos
         c, strnxt = next(str, strpos)
         d, subpos = next(sub, subpos)
         c == d || break
-        done(sub, subpos) && return strpos
+        subpos > endsub && return strpos
         strpos = strnxt
     end
     0
 end
 
-function _srch_strings(::Fwd, ::CompareStyle, str, needle, ch, nxtsub, pos, slen, tlen)
+function _srch_strings(::Fwd, ::CompareStyle, str, needle, ch, subpos, pos, slen, tlen)
     cu = CodePointStyle(str)
-    @inbounds while (pos = _srch_cp(Fwd(), cu, str, ch, pos, slen)) != 0
+    while (pos = _srch_cp(Fwd(), cu, str, ch, pos, slen)) != 0
         nxt = nextind(str, pos)
-        res = _cmp_str(str, nxt, needle, nxtsub)
+        res = _cmp_str(str, nxt, slen, needle, subpos, tlen)
         res == 0 || return pos:res
         pos = nxt
-        done(str, nxt) && break
+        pos > slen && break
     end
     _not_found
 end
 
 function _srch_strings(::Rev, ::CompareStyle, str, needle, ch, nxtsub, pos, slen, tlen)
-    @inbounds begin
-        prv = prevind(str, pos)
-        prv == 0 && return _not_found
-        cu = CodePointStyle(str)
-        while (pos = _srch_cp(Rev(), cu, str, ch, prv, slen)) != 0
-            res = _cmp_str(str, nextind(str, pos), needle, nxtsub)
-            res == 0 || return pos:res
-            (prv = prevind(str, pos)) == 0 && break
-        end
+    cu = CodePointStyle(str)
+    while (prv = prevind(str, pos)) != 0 &&
+        (loc = _srch_cp(Rev(), cu, str, ch, prv, slen)) != 0
+        res = _cmp_str(str, nextind(str, loc), slen, needle, nxtsub, tlen)
+        res == 0 || res > pos || return loc:res
+        pos = loc
     end
     _not_found
 end
@@ -341,7 +338,7 @@ end
 _search_bloom_mask(ch) = UInt64(1) << (ch & 63)
 _check_bloom_mask(mask, pnt, off) = (mask & _search_bloom_mask(get_codeunit(pnt, off))) == 0
 
-function _srch_str_bloom(str, spnt, npnt, ch, pos, slen, tlen)
+function _srch_str_bloom(::Fwd, str, spnt, npnt, ch, pos, slen, tlen)
     tlast = get_codeunit(npnt, tlen)
     bloom_mask = _search_bloom_mask(tlast)
     skip = tlen - 1
@@ -378,10 +375,46 @@ function _srch_str_bloom(str, spnt, npnt, ch, pos, slen, tlen)
     _not_found
 end
 
+function _srch_str_bloom(::Rev, str, spnt, npnt, ch, pos, slen, tlen)
+    (slen < tlen || pos <= 0) && return 0
+
+    tfirst = is_multi(str) ? get_codeunit(npnt) : codepoint(ch)
+    bloom_mask = UInt64(0)
+    skip = tlen - 1
+    for j in skip:-1:0
+        cu = get_codeunit(npnt, j)
+        bloom_mask |= _search_bloom_mask(cu)
+        cu == tfirst && j > 0 && (skip = j - 1)
+    end
+
+    pos = min(pos, slen) - tlen
+    while pos >= 0
+        if get_codeunit(spnt, pos) == tfirst
+            # check candidate
+            j = 1
+            while j < tlen && get_codeunit(spnt, pos + j) == get_codeunit(npnt, j)
+                j += 1
+            end
+
+            # match found
+            j == tlen && return i
+
+            # no match, try to rule out the next character
+            pos -= ((pos > 0 && bloom_mask & _search_bloom_mask(get_codeunit(spnt, pos)) == 0)
+                  ? tlen : skip)
+        elseif pos > 0
+            (bloom_mask & _search_bloom_mask(get_codeunit(spnt, pos)) == 0) && (pos -= tlen)
+        end
+        pos -= 1
+    end
+
+    0
+end
+
 # This should work for compatible CSEs, like ASCII & Latin, ASCII & UTF8, etc.
 # See equals trait
 _srch_strings(::Fwd, ::Union{ByteCompare,WidenCompare}, str, needle, ch, nxtsub, pos, slen, tlen) =
-    @preserve str needle _srch_str_bloom(str, _pnt(str), _pnt(needle), ch, pos, slen, tlen)
+    @preserve str needle _srch_str_bloom(Fwd(), str, _pnt(str), _pnt(needle), ch, pos, slen, tlen)
 
 _occurs_in(needle, hay) = first(find(First, needle, hay)) != 0
 

@@ -144,22 +144,23 @@ function _find(::Type{C}, re, str) where {C}
     isempty(str) && return _not_found
     check_compile(C, re)
     (PCRE.exec(re.regex, str, 0, cvt_match(C, re.match_options), re.match_data)
-     ? ((Int(re.ovec[1])+1):prevind(str,Int(re.ovec[2])+1)) : _not_found)
+     ? ((Int(re.ovec[1]) + 1) : prevind(str, Int(re.ovec[2]) + 1)) : _not_found)
 end
 
 function _find(::Type{C}, re, str, idx) where {C}
-    if idx > ncodeunits(str)
+    if idx > ncodeunits(str)+1
         @boundscheck boundserr(str, idx)
         return _not_found
     end
     check_compile(C, re)
     (PCRE.exec(re.regex, str, idx-1, cvt_match(C, re.match_options), re.match_data)
-     ? ((Int(re.ovec[1])+1):prevind(str,Int(re.ovec[2])+1)) : _not_found)
+     ? ((Int(re.ovec[1]) + 1) : prevind(str, Int(re.ovec[2]) + 1)) : _not_found)
 end
 
 find(::Type{Fwd}, re::Regex, str::MaybeSub{<:AbstractString}, idx::Integer) =
     throw(ArgumentError("regex search is only available for the String or Str types with " *
-                        "codeunit == UInt8, or substrings of those types, use UTF8Str to convert"))
+                        "codeunit == UInt8, or substrings of those types, " *
+                        "use UTF8Str to convert"))
 
 find(::Type{Fwd}, re::Regex, str::MaybeSub{<:Str{C}}, idx::Integer) where {C<:Regex_CSEs} =
     _find(C, re, str, idx)
@@ -170,6 +171,7 @@ find(::Type{Fwd}, re::Regex, str::MaybeSub{<:Str{_LatinCSE}}, idx::Integer) =
 find(::Type{Fwd}, re::Regex, str::MaybeSub{String}, idx::Integer) =
     _find(UTF8CSE, re, str, idx)
 
-find(::Type{First}, re::Regex, str) = _find(cse(str), re, str)
+find(::Type{First}, re::Regex, str::MaybeSub{<:AbstractString}) = find(Fwd, re, str, 1)
+find(::Type{First}, re::Regex, str::MaybeSub{<:Str{C}}) where {C<:Regex_CSEs} = _find(C, re, str)
 find(::Type{First}, re::Regex, str::MaybeSub{<:Str{_LatinCSE}}) = _find(LatinCSE, re, str)
 find(::Type{First}, re::Regex, str::MaybeSub{String}) = _find(UTF8CSE, re, str)
