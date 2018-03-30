@@ -18,7 +18,7 @@ const _hi_bit_16  = 0x8000_8000_8000_8000
 
 @inline function _align_len_utf16(pnt, cnt, v)
     len = 0
-    fin = pnt + cnt<<1
+    fin = pnt + cnt
     while (pnt += CHUNKSZ) < fin
         len += count_ones(v)
         v = _get_lead(pnt)
@@ -27,7 +27,7 @@ const _hi_bit_16  = 0x8000_8000_8000_8000
 end
 
 _length_al(::CodeUnitMulti, ::Type{UTF16CSE}, beg::Ptr{UInt16}, cnt::Int) =
-    (pnt = reinterpret(Ptr{UInt64}, beg); _align_len_utf16(pnt, cnt, _get_lead(pnt)))
+    (pnt = reinterpret(Ptr{UInt64}, beg); _align_len_utf16(pnt, cnt<<1, _get_lead(pnt)))
 
 function _length(::CodeUnitMulti, ::Type{UTF16CSE}, beg::Ptr{UInt16}, cnt::Int)
     align = reinterpret(UInt, beg)
@@ -38,7 +38,7 @@ function _length(::CodeUnitMulti, ::Type{UTF16CSE}, beg::Ptr{UInt16}, cnt::Int)
         v = (v & ~msk) | (msk & _trail_mask)
         cnt += (align>>>1)
     end
-    _align_len_utf16(pnt, cnt, v)
+    _align_len_utf16(pnt, cnt<<1, v)
 end
 
 function _nextind(::CodeUnitMulti, str::MS_UTF16, pos::Int, nchar::Int)

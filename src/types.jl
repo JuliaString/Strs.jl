@@ -12,6 +12,7 @@ const BIG_ENDIAN    = (ENDIAN_BOM == 0x01020304)
 const LITTLE_ENDIAN = !BIG_ENDIAN
 
 const STR_KEEP_NUL    = true  # keep nul byte placed by String
+const USE_CODEPOINT   = false
 
 struct CharSet{CS}   end
 struct Encoding{Enc} end
@@ -58,7 +59,9 @@ const charsets = vcat(_cpname1, _cpname2, _cpname4)
 for nam in vcat(charsets,
                 :Binary,   # really, no character set at all, not text
                 :UniPlus)  # valid Unicode, plus unknown characters (for String)
-    @eval const $(symstr(nam, "CharSet")) = CharSet{$(quotesym(nam))}
+    charset = symstr(nam, "CharSet")
+    @eval const $charset = CharSet{$(quotesym(nam))}
+    @eval export $charset
 end
 
 # These are to indicate string types that must have at least one character of the type,
@@ -146,6 +149,8 @@ end
 
 # This needs to be redone, with character sets and the code unit as part of the type
 
+@static if USE_CODEPOINT
+
 abstract type CodePoint <: AbstractChar end
 
 for (names, siz) in ((_cpname1, 8), (_cpname2, 16), (_cpname4, 32)), nam in names
@@ -154,6 +159,7 @@ for (names, siz) in ((_cpname1, 8), (_cpname2, 16), (_cpname4, 32)), nam in name
     @eval export $chrnam
 end
 primitive type _LatinChr <: CodePoint 8 end
+charset(::Type{_LatinChr}) = LatinSubSet    # LatinSubSet instead of "_LatinCharSet"
 
 # Define all of the function for mapping CodePoint types to a CharSet
 for nam in charsets
@@ -162,13 +168,30 @@ for nam in charsets
     @eval export $csnam
 end
 
+else # !USE_CODEPOINT
+
+const CodePoint = Chr
+
+for (names, typ) in ((_cpname1, UInt8), (_cpname2, UInt16), (_cpname4, UInt32)), nam in names
+    chrnam = symstr(nam, "Chr")
+    @eval const $chrnam = Chr{$(symstr(nam, "CharSet")), $typ}
+    @eval export $chrnam
+end
+
+const _LatinChr = Chr{LatinSubSet, UInt8}
+
+codepoint(ch::Chr) = ch.v
+basetype(::Type{<:Chr{CS,B}}) where {CS,B} = B
+charset(::Type{<:Chr{CS,B}}) where {CS,B} = CS
+typemin(::Type{T}) where {CS,B,T<:Chr{CS,B}} = Chr(CS, typemin(B))
+typemax(::Type{T}) where {CS,B,T<:Chr{CS,B}} = Chr(CS, typemax(B))
+
+end # USE_CODEPOINT
+
 # Handle a few quirks
 charset(::Type{<:AbstractChar}) = UTF32CharSet
-charset(::Type{UInt8})     = BinaryCharSet  # UInt8 instead of "BinaryChr"
-charset(::Type{Char})      = UniPlusCharSet # Char instead of "UniPlusChr"
-charset(::Type{_LatinChr}) = LatinSubSet    # LatinSubSet instead of "_LatinCharSet"
-
-export BinaryCharSet, UniPlusCharSet
+charset(::Type{UInt8})          = BinaryCharSet  # UInt8 instead of "BinaryChr"
+charset(::Type{Char})           = UniPlusCharSet # Char instead of "UniPlusChr"
 
 const LatinChars   = Union{LatinChr, _LatinChr}
 const ByteChars    = Union{ASCIIChr, LatinChr, _LatinChr, Text1Chr}
@@ -358,6 +381,3 @@ pointer(str::Str, pos::Integer) = bytoff(pointer(str), pos - 1)
 # pointer conversions of SubString of ASCII/UTF8/UTF16/UTF32:
 pointer(x::SubString{<:Str}) = bytoff(pointer(x.string), x.offset)
 pointer(x::SubString{<:Str}, pos::Integer) = bytoff(pointer(x.string), x.offset + pos - 1)
-
-#ncodeunits(s::SubString{<:WordStr}) = sizeof(s) >>> 1
-#ncodeunits(s::SubString{<:QuadStr}) = sizeof(s) >>> 2

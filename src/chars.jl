@@ -28,21 +28,13 @@ chrdiff(pnt::Ptr{T}, beg::Ptr{T}) where {T<:CodeUnitTypes} = Int(chroff(T, pnt -
 
 bytoff(pnt::Ptr{T}, off) where {T<:CodeUnitTypes} = pnt + bytoff(T, off)
 
-# Alternate way for Chr type
-codepoint(ch::Chr) = ch.v
-basetype(::Type{<:Chr{CS,T}}) where {CS,T} = T
-charset(::Type{<:Chr{CS,T}}) where {CS,T} = CS
-
+@static if USE_CODEPOINT
 """Default value for CodePoint types"""
 basetype(::Type{<:CodePoint}) = UInt8
 basetype(::Type{UCS2Chr})     = UInt16
 basetype(::Type{Text2Chr})    = UInt16
 basetype(::Type{UTF32Chr})    = UInt32
 basetype(::Type{Text4Chr})    = UInt32
-
-basetype(::Type{Char})        = UInt32
-
-basetype(::Type{T}) where {T<:CodeUnitTypes} = T
 
 codepoint(v::T) where {T<:CodePoint} = reinterpret(basetype(T), v)
 
@@ -51,6 +43,16 @@ typemax(::Type{T}) where {T<:CodePoint} = reinterpret(T, typemax(basetype(T)))
 
 typemax(::Type{ASCIIChr}) = reinterpret(ASCIIChr, 0x7f)
 typemax(::Type{UTF32Chr}) = reinterpret(UTF32Chr, 0x10ffff)
+
+else # USE_CODEPOINT
+
+typemax(::Type{ASCIIChr}) = ASCIIChr(0x7f)
+typemax(::Type{UTF32Chr}) = UTF32Chr(0x10ffff)
+
+end # USE_CODEPOINT
+
+basetype(::Type{Char})        = UInt32
+basetype(::Type{T}) where {T<:CodeUnitTypes} = T
 
 eltype(::Type{<:Str{BinaryCSE}}) = UInt8
 
@@ -86,24 +88,39 @@ set_codeunit!(dat::String, ch) = set_codeunit!(dat, 1, ch)
 convert(::Type{T}, v::S) where {T<:Integer, S<:CodePoint} = convert(T, codepoint(v))::T
 convert(::Type{T}, v::Signed) where {T<:CodePoint} =
     (v >= 0 && is_valid(T, v%Unsigned)) ? convert(T, v%Unsigned) : codepoint_error(T, v)
+@static if USE_CODEPOINT
 convert(::Type{T}, v::Unsigned) where {T<:CodePoint} =
     is_valid(T, v) ? reinterpret(T, basetype(T)(v)) : codepoint_error(T, v)
+else
+convert(::Type{T}, v::Unsigned) where {CS,B,T<:Chr{CS,B}} =
+    is_valid(T, v) ? Chr(CS, v%B) : codepoint_error(T, v)
+end
 convert(::Type{Char}, v::T) where {T<:CodePoint} = convert(Char, codepoint(v))
 convert(::Type{T}, v::Char) where {T<:CodePoint} = convert(T, codepoint(v))::T
 
-rem(x::S, ::Type{T}) where {S<:CodePoint, T<:Number}    = rem(reinterpret(basetype(S), x), T)
-rem(x::S, ::Type{T}) where {S<:Number, T<:CodePoint}    = reinterpret(T, x%basetype(T))
-rem(x::S, ::Type{T}) where {S<:CodePoint, T<:CodePoint} = reinterpret(T, x%basetype(T))
-rem(x::S, ::Type{Char}) where {S<:CodePoint} = Char(x%basetype(S))
-rem(x::Char, ::Type{T}) where {T<:CodePoint} = x%UInt32%T
+@static if USE_CODEPOINT
+    rem(x::S, ::Type{T}) where {S<:CodePoint, T<:Number}    = rem(reinterpret(basetype(S), x), T)
+    rem(x::S, ::Type{T}) where {S<:Number, T<:CodePoint}    = reinterpret(T, x%basetype(T))
+    rem(x::S, ::Type{T}) where {S<:CodePoint, T<:CodePoint} = reinterpret(T, x%basetype(T))
+    rem(x::S, ::Type{Char}) where {S<:CodePoint} = Char(x%basetype(S))
+    rem(x::Char, ::Type{T}) where {T<:CodePoint} = x%UInt32%T
+else
+    rem(x::Number, ::Type{<:Chr{CS,B}}) where {CS,B} = Chr(CS, x%B)
+    rem(x::Chr, ::Type{T}) where {T<:Number} = (x.v)%T
+    rem(x::Chr, ::Type{T}) where {T<:Chr}    = (x.v)%T
+    rem(x::Chr, ::Type{T}) where {T<:Char}   = (x.v)%T
+    rem(x::Char, ::Type{T}) where {T<:Chr}   = x%UInt32%T
+end
 
 (::Type{S})(v::T) where {S<:Union{UInt32, Int, UInt}, T<:CodePoint} = codepoint(v)%S
 (::Type{Char})(v::CodePoint) = Char(codepoint(v))
 (::Type{T})(v::Char) where {T<:CodePoint} = T(codepoint(v))
 
+@static if USE_CODEPOINT
 for nam in (:Text1, :Text2, :Text4, :ASCII, :Latin, :_Latin, :UCS2, :UTF32)
     sym = Symbol(string(nam, "Chr"))
     @eval $sym(v::Number) = convert($sym, v)
+end
 end
 
 eltype(::Type{T}) where {T<:CodePoint} = T
