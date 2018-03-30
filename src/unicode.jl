@@ -129,20 +129,20 @@ const _isnumeric_a = _isdigit
 @inline is_digit(ch::CodePoint)     = is_digit(codepoint(ch))
 @inline is_hex_digit(ch::CodePoint) = is_hex_digit(codepoint(ch))
 
-@inline is_ascii(ch::Unsigned)    = ch <= 0x7f
-@inline is_ascii(ch::CodePoint)   = is_ascii(codepoint(ch))
-@inline is_ascii(ch::ASCIIChr)    = true
+@inline is_ascii(ch::AbstractChar) = is_ascii(codepoint(ch))
+@inline is_ascii(ch::Unsigned)     = ch <= 0x7f
+@inline is_ascii(ch::ASCIIChr)     = true
 
-@inline is_latin(ch::Unsigned)    = ch <= 0xff
-@inline is_latin(ch::CodePoint)   = is_latin(codepoint(ch))
+@inline is_latin(ch::AbstractChar) = is_latin(codepoint(ch))
+@inline is_latin(ch::Unsigned)     = ch <= 0xff
 
-@inline is_bmp(ch::Unsigned)      = ch <= 0xffff && !is_surrogate_codeunit(ch)
-@inline is_bmp(ch::UInt8)         = true
-@inline is_bmp(ch::CodePoint)     = is_bmp(codepoint(ch))
+@inline is_bmp(ch::AbstractChar)   = is_bmp(codepoint(ch))
+@inline is_bmp(ch::Unsigned)       = ch <= 0xffff && !is_surrogate_codeunit(ch)
+@inline is_bmp(ch::UInt8)          = true
 
-@inline is_unicode(ch::Unsigned)  = ch <= 0x10ffff && !is_surrogate_codeunit(ch)
-@inline is_unicode(ch::UInt8)     = true
-@inline is_unicode(ch::CodePoint) = is_unicode(codepoint(ch))
+@inline is_unicode(ch::AbstractChar) = is_unicode(codepoint(ch))
+@inline is_unicode(ch::Unsigned)     = ch <= 0x10ffff && !is_surrogate_codeunit(ch)
+@inline is_unicode(ch::UInt8)        = true
 
 const _catfuns =
     ((:numeric,      :numeric),
@@ -180,4 +180,69 @@ end
 else
     is_malformed(ch) = false
     is_overlong(ch) = false
+end
+
+function is_latin(str::MaybeSub{String})
+    (siz = sizeof(str)) == 0 && return true
+    @preserve str begin
+        len, pnt = _lenpnt(str)
+        fin = pnt + len
+        while pnt < fin
+            cu = get_codeunit(pnt)
+            # cu must be 1) 0-0x7f, or 2) 0xc2 or 0xc3 followed by 0x80-0xbf
+            (cu < 0x7f ||
+             ((cu - 0xc2) < 0x02 &&
+              (pnt += 1) < fin && is_valid_continuation(get_codeunit(pnt)))) ||
+              return false
+            pnt += 1
+        end
+        true
+    end
+end
+
+@inline function check_3byte(cu, pnt)
+    b2 = get_codeunit(pnt-1)
+    b3 = get_codeunit(pnt)
+    is_valid_continuation(b2) && is_valid_continuation(b3) &&
+        !is_surrogate_codeunit(((cu & 0x0f)%UInt32 << 12) | ((b2 & 0x3f)%UInt32 << 6) | (b3 & 0x3f))
+end
+
+function is_bmp(str::MaybeSub{String})
+    (siz = sizeof(str)) == 0 && return true
+    @preserve str begin
+        len, pnt = _lenpnt(str)
+        fin = pnt + len
+        while pnt < fin
+            cu = get_codeunit(pnt)
+            # cu must be 1) 0-0x7f, or 2) 0xc2 or 0xc3 followed by 0x80-0xbf
+            # c2-df -> de,df
+            (cu < 0x7f ||
+             ((cu - 0xc2) < 0x1e && (pnt += 1) < fin && checkcont(pnt)) ||
+             ((cu - 0xe0) < 0x0f && (pnt += 2) < fin && check_3byte(cu, pnt))) ||
+             return false
+             pnt += 1
+        end
+        true
+    end
+end
+
+function is_latin(str::AbstractString)
+    @inbounds for ch in str
+        is_latin(ch) || return false
+    end
+    true
+end
+
+function is_bmp(str::AbstractString)
+    @inbounds for ch in str
+        is_bmp(ch) || return false
+    end
+    true
+end
+
+function is_unicode(str::AbstractString)
+    @inbounds for ch in str
+        is_unicode(ch) || return false
+    end
+    true
 end
