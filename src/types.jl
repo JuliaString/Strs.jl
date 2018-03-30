@@ -12,7 +12,6 @@ const BIG_ENDIAN    = (ENDIAN_BOM == 0x01020304)
 const LITTLE_ENDIAN = !BIG_ENDIAN
 
 const STR_KEEP_NUL    = true  # keep nul byte placed by String
-const USE_CODEPOINT   = false
 
 struct CharSet{CS}   end
 struct Encoding{Enc} end
@@ -149,29 +148,6 @@ end
 
 # This needs to be redone, with character sets and the code unit as part of the type
 
-@static if USE_CODEPOINT
-
-abstract type CodePoint <: AbstractChar end
-
-for (names, siz) in ((_cpname1, 8), (_cpname2, 16), (_cpname4, 32)), nam in names
-    chrnam = symstr(nam, "Chr")
-    @eval primitive type $chrnam <: CodePoint $siz end
-    @eval export $chrnam
-end
-primitive type _LatinChr <: CodePoint 8 end
-charset(::Type{_LatinChr}) = LatinSubSet    # LatinSubSet instead of "_LatinCharSet"
-
-# Define all of the function for mapping CodePoint types to a CharSet
-for nam in charsets
-    csnam = symstr(nam, "CharSet")
-    @eval charset(::Type{$(symstr(nam, "Chr"))}) = $csnam
-    @eval export $csnam
-end
-
-else # !USE_CODEPOINT
-
-const CodePoint = Chr
-
 for (names, typ) in ((_cpname1, UInt8), (_cpname2, UInt16), (_cpname4, UInt32)), nam in names
     chrnam = symstr(nam, "Chr")
     @eval const $chrnam = Chr{$(symstr(nam, "CharSet")), $typ}
@@ -185,8 +161,6 @@ basetype(::Type{<:Chr{CS,B}}) where {CS,B} = B
 charset(::Type{<:Chr{CS,B}}) where {CS,B} = CS
 typemin(::Type{T}) where {CS,B,T<:Chr{CS,B}} = Chr(CS, typemin(B))
 typemax(::Type{T}) where {CS,B,T<:Chr{CS,B}} = Chr(CS, typemax(B))
-
-end # USE_CODEPOINT
 
 # Handle a few quirks
 charset(::Type{<:AbstractChar}) = UTF32CharSet
@@ -293,7 +267,7 @@ basecse(::Type{_LatinCSE}) = LatinCSE
 basecse(::Type{_UCS2CSE})  = UCS2CSE
 basecse(::Type{_UTF32CSE}) = UTF32CSE
 
-const AbsChar = @static isdefined(Base, :AbstractChar) ? AbstractChar : Union{Char, CodePoint}
+const AbsChar = @static isdefined(Base, :AbstractChar) ? AbstractChar : Union{Char, Chr}
 
 ## Get the character set / encoding used by a string type
 cse(::Type{<:AbstractString}) = UniPlusCSE     # allows invalid sequences
@@ -310,7 +284,7 @@ encoding(::Type{T}) where {T<:AbstractString} = encoding(cse(T)) # Default unles
 encoding(::Type{C}) where {CS,E,C<:CSE{CS,E}} = E
 encoding(str::AbstractString) = encoding(cse(str))
 
-promote_rule(::Type{T}, ::Type{T}) where {T<:CodePoint} = T
+promote_rule(::Type{T}, ::Type{T}) where {T<:Chr} = T
 promote_rule(::Type{Text2Chr}, ::Type{Text1Chr}) = Text2Chr
 promote_rule(::Type{Text4Chr}, ::Type{Text1Chr}) = Text4Chr
 promote_rule(::Type{Text4Chr}, ::Type{Text2Chr}) = Text4Chr
@@ -363,8 +337,8 @@ ncodeunits(s::QuadStr) = sizeof(s) >>> 2
 
 @inline _mask_bytes(n) = (1%UInt << ((n & (CHUNKSZ - 1)) << 3)) - 0x1
 
-Base.need_full_hex(c::CodePoint) = is_hex_digit(c)
-Base.escape_nul(c::CodePoint) = ('0' <= c <= '7') ? "\\x00" : "\\0"
+Base.need_full_hex(c::Chr) = is_hex_digit(c)
+Base.escape_nul(c::Chr) = ('0' <= c <= '7') ? "\\x00" : "\\0"
 
 # Support for SubString of Str
 
@@ -381,3 +355,31 @@ pointer(str::Str, pos::Integer) = bytoff(pointer(str), pos - 1)
 # pointer conversions of SubString of ASCII/UTF8/UTF16/UTF32:
 pointer(x::SubString{<:Str}) = bytoff(pointer(x.string), x.offset)
 pointer(x::SubString{<:Str}, pos::Integer) = bytoff(pointer(x.string), x.offset + pos - 1)
+
+# CodePoints iterator
+
+struct CodePoints{T}
+    xs::T
+end
+
+"""
+    codepoints(str)
+
+An iterator that generates the code points of a string
+
+# Examples
+```jldoctest
+julia> a = Str("abc\U1f596")
+
+julia> collect(a)
+
+julia> collect(codepoints(a))
+```
+"""
+codepoints(xs) = CodePoints(xs)
+eltype(::Type{<:CodePoints{S}}) where {S} = eltype(S)
+length(it::CodePoints) = length(it.xs)
+start(it::CodePoints) = start(it.xs)
+done(it::CodePoints, state) = done(it.xs, state)
+@propagate_inbounds next(it::CodePoints{T}, state) where {T<:Str} =
+    _next(CodePointStyle(T), eltype(T), it.xs, state)

@@ -293,8 +293,8 @@ function _nextcpfun(::CodeUnitMulti, ::Type{UTF8CSE}, pnt)
 end
 
 # Gets next codepoint
-@propagate_inbounds function _next(::CodeUnitMulti, ::Type{T},
-                                   str::MS_UTF8, pos::Int) where {T<:CodePoint}
+@propagate_inbounds function _next(::CodeUnitMulti, ::Type{T}, str::MS_UTF8,
+                                   pos::Int) where {T<:Chr}
     len = ncodeunits(str)
     @boundscheck 0 < pos <= len || boundserr(str, pos)
     @preserve str begin

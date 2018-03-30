@@ -421,15 +421,15 @@ _srch_strings(::Fwd, ::Union{ByteCompare,WidenCompare}, str, needle,
 _occurs_in(needle, hay) = first(find(First, needle, hay)) != 0
 
 # Avoid type piracy
-occurs_in(needle::AbstractString, hay::Str)       = _occurs_in(needle, hay)
-occurs_in(needle::Str, hay::AbstractString)       = _occurs_in(needle, hay)
-occurs_in(needle::Str, hay::Str)                  = _occurs_in(needle, hay)
-occurs_in(needle::Char, hay::Str)                 = _occurs_in(needle, hay)
-occurs_in(needle::Regex, hay::Str)                = _occurs_in(needle, hay)
-occurs_in(needle::CodePoint, hay::AbstractString) = _occurs_in(needle, hay)
+occurs_in(needle::AbstractString, hay::Str) = _occurs_in(needle, hay)
+occurs_in(needle::Str, hay::AbstractString) = _occurs_in(needle, hay)
+occurs_in(needle::Chr, hay::AbstractString) = _occurs_in(needle, hay)
+occurs_in(needle::Char, hay::Str)           = _occurs_in(needle, hay)
+occurs_in(needle::Str, hay::Str)            = _occurs_in(needle, hay)
+occurs_in(needle::Regex, hay::Str)          = _occurs_in(needle, hay)
 
-in(chr::CodePoint, str::AbstractString) = _occurs_in(chr, str)
-in(chr::AbsChar,   str::Str)            = _occurs_in(chr, str)
-in(pat::Str, str::AbstractString)       = _occurs_in(pat, str)
-in(pat::AbstractString, str::Str)       = _occurs_in(pat, str)
-in(pat::Str, str::Str)                  = _occurs_in(pat, str)
+in(chr::Chr, str::AbstractString) = _occurs_in(chr, str)
+in(chr::AbsChar,   str::Str)      = _occurs_in(chr, str)
+in(pat::Str, str::AbstractString) = _occurs_in(pat, str)
+in(pat::AbstractString, str::Str) = _occurs_in(pat, str)
+in(pat::Str, str::Str)            = _occurs_in(pat, str)

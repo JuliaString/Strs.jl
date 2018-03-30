@@ -79,7 +79,7 @@ export str, unsafe_str, codepoints, @str_str, @prn_str
 export category_code, category_string, category_abbrev, is_mutable, index
 
 # From types.jl
-export Str, Chr, UniStr, CSE, CodePoint, CharSet, Encoding, @cs_str, @enc_str, @cse
+export Str, Chr, UniStr, CSE, CharSet, Encoding, @cs_str, @enc_str, @cse
 export cse, charset, encoding, basetype
 
 # Note: the generated *Str, *Chr, *CSE, *CharSet and encoding names
@@ -216,7 +216,6 @@ include("traits.jl")
 include("utf8proc.jl")
 include("unicode.jl")
 include("casefold.jl")
-include("iters.jl")
 include("core.jl")
 include("support.jl")
 include("compare.jl")

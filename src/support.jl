@@ -555,7 +555,7 @@ function _copy!(out, pnt::Ptr{T}, len) where {T}
     end
 end
 
-(*)(s1::Union{C1, S1}, ss::Union{C2, S2}...) where {C1<:CodePoint,C2<:CodePoint,S1<:Str,S2<:Str} =
+(*)(s1::Union{C1, S1}, ss::Union{C2, S2}...) where {C1<:Chr,C2<:Chr,S1<:Str,S2<:Str} =
     string(s1, ss...)
 
 thisind(str::MaybeSub{<:Str}, i::Integer) = thisind(str, Int(i))
@@ -579,7 +579,7 @@ end
 first(str::Str, n::Integer) = str[1:min(end, nextind(str, 0, n))]
 last(str::Str, n::Integer)  = str[max(1, prevind(str, ncodeunits(str)+1, n)):end]
 
-const Chrs = @static V6_COMPAT ? Union{Char,AbstractChar} : CodePoint
+const Chrs = @static V6_COMPAT ? Union{Char,AbstractChar} : Chr
 
 function repeat(ch::CP, cnt::Integer) where {CP <: Chrs}
     C = codepoint_cse(CP)

@@ -12,9 +12,9 @@ _lowercase(ch) = is_latin(ch) ? _lowercase_l(ch) : _lowercase_u(ch)
 _uppercase(ch) = is_latin(ch) ? _uppercase_l(ch) : _uppercase_u(ch)
 _titlecase(ch) = is_latin(ch) ? _uppercase_l(ch) : _titlecase_u(ch)
 
-lowercase(ch::T) where {T<:CodePoint} = T(_lowercase(codepoint(ch)))
-uppercase(ch::T) where {T<:CodePoint} = T(_uppercase(codepoint(ch)))
-titlecase(ch::T) where {T<:CodePoint} = T(_titlecase(codepoint(ch)))
+lowercase(ch::T) where {T<:Chr} = T(_lowercase(codepoint(ch)))
+uppercase(ch::T) where {T<:Chr} = T(_uppercase(codepoint(ch)))
+titlecase(ch::T) where {T<:Chr} = T(_titlecase(codepoint(ch)))
 
 lowercase(ch::ASCIIChr) = ifelse(_isupper_a(ch), ASCIIChr(ch + 0x20), ch)
 uppercase(ch::ASCIIChr) = ifelse(_islower_a(ch), ASCIIChr(ch - 0x20), ch)

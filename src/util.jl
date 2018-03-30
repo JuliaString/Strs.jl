@@ -83,11 +83,11 @@ function _lpad(cnt, pad, str)
 end
 lpad(str::MaybeSub{<:Str}, cnt::Integer, pad::AbstractString) =
     (cnt -= length(str)) <= 0 ? str : _lpad(cnt, pad, str)
-lpad(ch::CodePoint, cnt::Integer, pad::AbstractString) =
+lpad(ch::Chr, cnt::Integer, pad::AbstractString) =
     (cnt -= 1) <= 0 ? string(ch) : _lpad(cnt, pad, ch)
 lpad(str::MaybeSub{<:Str}, cnt::Integer, pad::AbsChar=' ') =
     (cnt -= length(str)) <= 0 ? str : string(pad^cnt, str)
-lpad(ch::CodePoint, cnt::Integer, pad::AbstractChar=' ') =
+lpad(ch::Chr, cnt::Integer, pad::AbstractChar=' ') =
     (cnt -= 1) <= 0 ? string(ch) : string(pad^cnt, ch)
 
 function _rpad(cnt, pad, str)
@@ -96,11 +96,11 @@ function _rpad(cnt, pad, str)
 end
 rpad(str::MaybeSub{<:Str}, cnt::Integer, pad::AbstractString) =
     (cnt -= length(str)) <= 0 ? str : _rpad(cnt, pad, str)
-rpad(ch::CodePoint, cnt::Integer, pad::AbstractString) =
+rpad(ch::Chr, cnt::Integer, pad::AbstractString) =
     (cnt -= 1) <= 0 ? string(ch) : _rpad(cnt, pad, ch)
 rpad(str::MaybeSub{<:Str}, cnt::Integer, pad::AbsChar=' ') =
     (cnt -= length(str)) <= 0 ? str : string(str, pad^cnt)
-rpad(ch::CodePoint, cnt::Integer, pad::AbsChar=' ') =
+rpad(ch::Chr, cnt::Integer, pad::AbsChar=' ') =
     (cnt -= 1) <= 0 ? string(ch) : string(ch, pad^cnt)
 
 const SetOfChars = Union{Tuple{Vararg{<:AbstractChar}},

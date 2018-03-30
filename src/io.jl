@@ -1,5 +1,5 @@
 #=
-IO functions for Str and CodePoint types
+IO functions for Str and Chr types
 
 Copyright 2017-2018 Gandalf Software, Inc., Scott P. Jones
 Licensed under MIT License, see LICENSE.md
@@ -17,9 +17,9 @@ Licensed under MIT License, see LICENSE.md
 @inline print(io::IO, ch::UCS2Chr)  = _write_ucs2(io, codepoint(ch))
 @inline print(io::IO, ch::UTF32Chr) = write_utf8(io, codepoint(ch))
 
-## outputting Str strings and CodePoint characters ##
+## outputting Str strings and Chr characters ##
 
-write(io::IO, ch::CodePoint) = write(io, codepoint(ch))
+write(io::IO, ch::Chr) = write(io, codepoint(ch))
 
 write(io::IO, str::MaybeSub{T}) where {C<:CSE,T<:Str{C,Nothing}} =
     @preserve str unsafe_write(io, pointer(str), reinterpret(UInt, sizeof(str)))

@@ -199,6 +199,6 @@ is_grapheme_break!(state::Ref{Int32}, c1::CodeUnitTypes, c2::CodeUnitTypes) =
      ? ccall(:utf8proc_grapheme_break_stateful, Bool, (UInt32, UInt32, Ref{Int32}), c1, c2, state)
      : (state[] = 0; true))
 
-is_grapheme_break(c1::CodePoint, c2::CodePoint) = is_grapheme_break(codepoint(c1), codepoint(c2))
-is_grapheme_break(state::Ref{UInt32}, c1::CodePoint, c2::CodePoint) =
+is_grapheme_break(c1::Chr, c2::Chr) = is_grapheme_break(codepoint(c1), codepoint(c2))
+is_grapheme_break(state::Ref{UInt32}, c1::Chr, c2::Chr) =
     is_grapheme_break(state, codepoint(c1), codepoint(c2))

@@ -26,7 +26,7 @@ struct UnknownValidity <: ValidatedStyle end
 
 ValidatedStyle(::Type{<:AbstractChar}) = UnknownValidity()
 @static isdefined(Base, :AbstractChar) || (ValidatedStyle(::Type{Char}) = UnknownValidity())
-ValidatedStyle(::Type{<:CodePoint}) = AlwaysValid()
+ValidatedStyle(::Type{<:Chr}) = AlwaysValid()
 
 ValidatedStyle(::Type{<:AbstractString}) = UnknownValidity()
 ValidatedStyle(::Type{<:Str}) = AlwaysValid()
@@ -172,13 +172,13 @@ _isvalid(::UnknownValidity, str::T) where {T<:Str} = _isvalid(T, pointer(str), n
 _isvalid(::UnknownValidity, v) = _isvalid(UnknownValidity(), UTF32CharSet, charset(v), v)
 
 is_valid(::Type{T}, str::T) where {T<:Str}       = _isvalid(ValidatedStyle(T), str)
-is_valid(::Type{T}, chr::T) where {T<:CodePoint} = _isvalid(ValidatedStyle(T), chr)
+is_valid(::Type{T}, chr::T) where {T<:Chr} = _isvalid(ValidatedStyle(T), chr)
 
 is_valid(str::T) where {T<:Str}       = _isvalid(ValidatedStyle(T), str)
-is_valid(chr::T) where {T<:CodePoint} = _isvalid(ValidatedStyle(T), chr)
+is_valid(chr::T) where {T<:Chr} = _isvalid(ValidatedStyle(T), chr)
 
 # Different character set
-function is_valid(::Type{S}, chr::T) where {S<:CodePoint, T<:CodePoint}
+function is_valid(::Type{S}, chr::T) where {S<:Chr, T<:Chr}
     CS = charset(S)
     CT = charset(T)
     CS == CT ? _isvalid(ValidatedStyle(T), chr) : _isvalid(ValidatedStyle(T), CS, CT, chr)
@@ -202,15 +202,15 @@ _isvalid_chr(::Type{BinaryCharSet}, v) = v <= typemax(UInt8)
 # Not totally sure about this, base Char is rather funky in v0.7
 _isvalid_chr(::Type{UniPlusCharSet}, v) = v <= typemax(UInt32)
 
-is_valid(::Type{T}, v::Unsigned) where {T<:CodePoint} =
+is_valid(::Type{T}, v::Unsigned) where {T<:Chr} =
     _isvalid_chr(charset(T), v)
-is_valid(::Type{T}, v::Signed) where {T<:CodePoint} =
+is_valid(::Type{T}, v::Signed) where {T<:Chr} =
     v >= 0 && _isvalid_chr(charset(T), v%Unsigned)
 
 is_valid(::Type{Char}, ch::Union{Text1Chr, ASCIIChr, LatinChars, UCS2Chr, UTF32Chr}) = true
 is_valid(::Type{Char}, ch::Text2Chr) = is_bmp(ch)
 is_valid(::Type{Char}, ch::Text4Chr) = is_unicode(ch)
-is_valid(::Type{T},    ch::Char) where {T<:CodePoint} = Base.isvalid(ch) && is_valid(T, ch%UInt32)
+is_valid(::Type{T},    ch::Char) where {T<:Chr} = Base.isvalid(ch) && is_valid(T, ch%UInt32)
 
 # For now, there is only support for immutable `Str`s, when mutable `Str`s are added.
 
