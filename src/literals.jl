@@ -17,7 +17,7 @@ module Literals end
 #export @f_str, @F_str, @sinterpolate, @pr_str, @PR_str, @pr, @PR
 #export s_unescape_string, s_escape_string, s_print_unescaped, s_print_escaped
 
-@static if VERSION < v"0.7.0-DEV"
+@static if V6_COMPAT
     const _parse = parse
     const _ParseError = ParseError
     _sprint(f, s) = sprint(endof(s), f, s)
@@ -297,7 +297,7 @@ function s_interp_parse_vec(flg::Bool, s::AbstractString, unescape::Function)
         if c == '\\' && !done(s, k)
             if s[k] == '('
                 # Handle interpolation
-                isempty(s[i:j-1]) ||
+                is_empty(s[i:j-1]) ||
                     push!(sx, unescape(s[i:j-1]))
                 ex, j = _parse(s, k, greedy=false)
                 isa(ex, Expr) && (ex.head === :continue) &&
@@ -309,7 +309,7 @@ function s_interp_parse_vec(flg::Bool, s::AbstractString, unescape::Function)
                 c, k = next(s, k)
                 done(s, k) && throw(_ParseError("Incomplete % expression"))
                 # Handle interpolation
-                if !isempty(s[i:j-1])
+                if !is_empty(s[i:j-1])
                     push!(sx, unescape(s[i:j-1]))
                 end
                 if s[k] == '('
@@ -341,7 +341,7 @@ function s_interp_parse_vec(flg::Bool, s::AbstractString, unescape::Function)
                 done(s, k) &&
                     throw(_ParseError("Incomplete {...} Python format expression"))
                 # Handle interpolation
-                isempty(s[i:j-1]) ||
+                is_empty(s[i:j-1]) ||
                     push!(sx, unescape(s[i:j-1]))
                 beg = k # start location
                 c, k = next(s, k)
@@ -366,7 +366,7 @@ function s_interp_parse_vec(flg::Bool, s::AbstractString, unescape::Function)
                 push!(sx, esc(ex))
                 i = j
             elseif flg && s[k] == '$'
-                isempty(s[i:j-1]) ||
+                is_empty(s[i:j-1]) ||
                     push!(sx, unescape(s[i:j-1]))
                 i = k
                 # Move past \\, c should point to '$'
@@ -375,7 +375,7 @@ function s_interp_parse_vec(flg::Bool, s::AbstractString, unescape::Function)
                 j = k
             end
         elseif flg && c == '$'
-            isempty(s[i:j-1]) ||
+            is_empty(s[i:j-1]) ||
                 push!(sx, unescape(s[i:j-1]))
             ex, j = _parse(s, k, greedy=false)
             isa(ex,Expr) && ex.head === :continue &&
@@ -386,18 +386,18 @@ function s_interp_parse_vec(flg::Bool, s::AbstractString, unescape::Function)
             j = k
         end
     end
-    isempty(s[i:end]) ||
+    is_empty(s[i:end]) ||
         push!(sx, unescape(s[i:j-1]))
     sx
 end
 
 function s_unescape_str(s)
     s = s_unescape_string(s)
-    isvalid(String, s) ? s : throw_arg_err("Invalid UTF-8 sequence")
+    is_valid(String, s) ? s : throw_arg_err("Invalid UTF-8 sequence")
 end
 function s_unescape_legacy(s)
     s = _sprint(s_print_unescaped_legacy, s)
-    isvalid(String, s) ? s : throw_arg_err("Invalid UTF-8 sequence")
+    is_valid(String, s) ? s : throw_arg_err("Invalid UTF-8 sequence")
 end
 
 s_interp_parse(flg::Bool, s::AbstractString, u::Function) = s_interp_parse(flg, s, u, print)

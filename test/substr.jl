@@ -6,8 +6,6 @@ Licensed under MIT License, see LICENSE.md
 Based initially on julia/test/strings/types.jl
 =#
 
-@static V6_COMPAT || (using Random)
-
 function testuni(T)
     str = T(u8str)
     str2 = str^2
@@ -17,11 +15,13 @@ function testuni(T)
     @test sizeof(str2) == 2 * sizeof(str)
 
     for i1 = 1:length(str2)
-        if !isvalid(str2, i1); continue; end
-        for i2 = i1:length(str2)
-            if !isvalid(str2, i2); continue; end
-            @test length(str2[i1:i2]) == length(str2plain[i1:i2])
-            @test str2[i1:i2] == str2plain[i1:i2]
+        if is_valid(str2, i1)
+            for i2 = i1:length(str2)
+                if is_valid(str2, i2)
+                    @eval @test length($str2[$i1:$i2]) == length($str2plain[$i1:$i2])
+                    @eval @test $str2[$i1:$i2] == $str2plain[$i1:$i2]
+                end
+            end
         end
     end
 
@@ -42,11 +42,10 @@ function testuni(T)
         @test_throws BoundsError SubString(s1, 1, 4)
 
         # Substring provided with invalid start index throws BoundsError
-        if false # Todo: Fix these!
-            @test SubString(s2, 1, 1) == s1
-            @test SubString(s2, 1, 4) == s2
-            @test SubString(s2, 4, 4) == s1
-        end
+        @test SubString(s2, 1, 1) == s1
+        @test SubString(s2, 1, 4) == s2
+        @test SubString(s2, 4, 4) == s1
+
         @test_throws IndexError  SubString(s2, 1, 2)
         @test_throws IndexError  SubString(s2, 1, 5)
         @test_throws IndexError  SubString(s2, 2, 4)
@@ -78,20 +77,18 @@ function testuni(T)
     @test length(u) == 2
     b = IOBuffer()
     write(b, u)
-    @test_broken String(take!(b)) == "\u2200\u2222"
+    @test String(take!(b)) == "\u2200\u2222"
 
     V6_COMPAT || @test_throws IndexError SubString(str, 4, 5)
     @test_throws BoundsError next(u, 0)
     @test_throws BoundsError next(u, 7)
     @test_throws BoundsError getindex(u, 0)
     @test_throws BoundsError getindex(u, 7)
-    if false # !V6_COMPAT
-        @test_throws BoundsError getindex(u, 0, 1)
-        @test_throws BoundsError getindex(u, 7, 7)
-    end
+    @test_throws BoundsError getindex(u, 0:1)
+    @test_throws BoundsError getindex(u, 7:7)
     @test reverseind(u, 1) == 4
     @test_broken typeof(Base.cconvert(Ptr{Int8}, u)) == SubString{String}
-    @test_broken Base.cconvert(Ptr{Int8}, u) == u
+    @test Base.cconvert(Ptr{Int8}, u) == u
 
 
     str = T("føøbar")
@@ -107,7 +104,7 @@ function testuni(T)
 
     # proper nextind/prevind/thisind for SubString{String}
     let rng = MersenneTwister(1),
-        strs = ["∀∃∀" * String(rand(rng, UInt8, 40)) * "∀∃∀", String(rand(rng, UInt8, 50))]
+        strs = ["∀∃∀" * String(rand(rng, Char, 40)) * "∀∃∀", String(rand(rng, Char, 50))]
         for sa in strs
             try
                 s = T(sa)
@@ -123,30 +120,24 @@ function testuni(T)
                     ss = SubString(s, a, b)
                     s2 = s[a:b]
                     @test ncodeunits(ss) == ncodeunits(s2)
-                    if !V6_COMPAT
-                    for i in 0:ncodeunits(ss)+1
+                    for i in 1:ncodeunits(ss)
                         @test thisind(ss, i) == thisind(s2, i)
-                    end
                     end
                     for i in 0:ncodeunits(ss)
                         @test nextind(ss, i) == nextind(s2, i)
-                        if !V6_COMPAT
                         for j in 0:ncodeunits(ss)+5
-                            if j > 0 || isvalid(ss, i)
+                            if j > 0 || is_valid(ss, i)
                                 @test nextind(ss, i, j) == nextind(s2, i, j)
                             end
                         end
-                        end
                     end
-                    if !V6_COMPAT
                     for i in 1:ncodeunits(ss)+1
                         @test prevind(ss, i) == prevind(s2, i)
                         for j in 0:ncodeunits(ss)+5
-                            if j > 0 || isvalid(ss, i)
+                            if j > 0 || is_valid(ss, i)
                                 @test prevind(ss, i, j) == prevind(s2, i, j)
                             end
                         end
-                    end
                     end
                     b = nextind(s, b)
                 end
@@ -154,14 +145,14 @@ function testuni(T)
         end
     end
 
-    # for isvalid(SubString{String})
+    # for is_valid(SubString{String})
     s = T("Σx + βz - 2")
     for i in -1:ncodeunits(s)+2
         if checkbounds(Bool, s, i)
-            if isvalid(s, i)
+            if is_valid(s, i)
                 ss = SubString(s, 1, i)
                 for j = 1:ncodeunits(ss)
-                    @test isvalid(ss, j) == isvalid(s, j)
+                    @test is_valid(ss, j) == is_valid(s, j)
                 end
             else
                 V6_COMPAT || @test_throws IndexError SubString(s, 1, i)
@@ -175,12 +166,13 @@ function testuni(T)
 
     # length(SubString{String}) performance specialization
     s = T("|η(α)-ϕ(κ)| < ε")
-    @test length(SubString(s, 1, 0)) == length(s[1:0])
-    @test length(SubString(s, 4, 4)) == length(s[4:4])
-    @test length(SubString(s, 1, 7)) == length(s[1:7])
+    @test length(SubString(s, 1, 0))  == length(s[1:0])
+    @test length(SubString(s, 4, 4))  == length(s[4:4])
+    @test length(SubString(s, 1, 7))  == length(s[1:7])
     @test length(SubString(s, 4, 11)) == length(s[4:11])
 
-if false # Todo: Fix reverseind!
+
+    if false
     @testset "reverseind" for S in (T, SubString, GenericString)
         for prefix in ("", "abcd", "\U0001d6a4\U0001d4c1", "\U0001d6a4\U0001d4c1c",
                        " \U0001d6a4\U0001d4c1"),
@@ -188,20 +180,20 @@ if false # Todo: Fix reverseind!
                        " \U0001d4c1β\U0001d6a4"),
             c in ('X', 'δ', '\U0001d6a5')
 
-            s = convert(S, string(prefix, c, suffix))
+            s = convert(S, T(string(prefix, c, suffix)))
             r = reverse(s)
-            ri = fnd(Fwd, ==(c), r)
+            ri = fnd(First, ==(c), r)
             @test c == s[reverseind(s, ri)] == r[ri]
-            s = convert(S, string(prefix, prefix, c, suffix, suffix))
-            pre = convert(S, prefix)
+            s = convert(S, T(string(prefix, prefix, c, suffix, suffix)))
+            pre = convert(S, T(prefix))
             sb = SubString(s, nextind(pre, lastindex(pre)),
-                           lastindex(convert(S, string(prefix, prefix, c, suffix))))
+                           lastindex(convert(S, T(string(prefix, prefix, c, suffix)))))
             r = reverse(sb)
-            ri = fnd(Fwd, ==(c), r)
+            ri = fnd(First, ==(c), r)
             @test c == sb[reverseind(sb, ri)] == r[ri]
         end
     end
-end
+    end
 end
 
 function teststr(T)
@@ -232,27 +224,33 @@ function teststr(T)
     @test SubString(T("foobar"), big(1), big(3)) == "foo"
 
     # search and SubString (issue #5679)
-    str = T("Hello, world!")
-    u = SubString(str, 1, 5)
-    @test fnd(Rev, T("World"), u) == 0:-1
-    @test fnd(Rev, ==('z'), u) == 0
-    @test fnd(Rev, T("ll"), u) == 3:4
+    let str = T("Hello, world!"),
+        u = SubString(str, 1, 5)
+        @test fnd(Last, T("World"), u) == 0:-1
+        @test fnd(Last, ==('z'), u) == 0
+        @test fnd(Last, T("ll"), u) == 3:4
+    end
 
     # SubString created from SubString
-    u = SubString(str, 2, 5)
-    for idx in 1:4
-        @test SubString(u, 2, idx) == u[2:idx]
-        @test SubString(u, 2:idx) == u[2:idx]
+    let str = T("Hello, world!"),
+        u = SubString(str, 2, 5)
+        for idx in 1:4
+            @test SubString(u, 2, idx) == u[2:idx]
+            @test SubString(u, 2:idx) == u[2:idx]
+        end
+        if !V6_COMPAT
+            @test_throws BoundsError SubString(u, 1, 10)
+            @test_throws BoundsError SubString(u, 1:10)
+            @test_throws BoundsError SubString(u, 20:30)
+            @test_throws BoundsError SubString(u, -1:10)
+        end
+        @test SubString(u, 20:15) == ""
+        @test SubString(u, -1, -10) == ""
+        @test SubString(SubString(T("123"), 1, 2), -10, -20) == ""
     end
-    if !V6_COMPAT
-    @test_throws BoundsError SubString(u, 1, 10)
-    @test_throws BoundsError SubString(u, 1:10)
-    @test_throws BoundsError SubString(u, 20:30)
-    @test_throws BoundsError SubString(u, -1:10)
-    end
-    @test SubString(u, 20:15) == ""
-    @test SubString(u, -1, -10) == ""
-    @test SubString(SubString(T("123"), 1, 2), -10, -20) == ""
+
+    # sizeof
+    @test sizeof(SubString("abc\u2222def",4,4)) == 3
 
     # issue #3710
     @test prevind(SubString(T("{var}"),2,4),4) == 3
@@ -271,7 +269,7 @@ function teststr(T)
     V6_COMPAT || @test !occurs_in(Regex(T("aa")), SubString(T(""),1,0))
     V6_COMPAT || @test occurs_in(Regex(T("")), SubString(T(""),1,0))
 
-    # isvalid, length, prevind, nextind for SubString{String}
+    # is_valid, length, prevind, nextind for SubString{String}
     let s = T("lorem ipsum"),
         sdict = Dict(SubString(s, 1, 11)  => T("lorem ipsum"),
                      SubString(s, 1, 6)   => T("lorem "),
@@ -283,38 +281,31 @@ function teststr(T)
         for (ss, s) in sdict
             @test ncodeunits(ss) == ncodeunits(s)
             for i in -2:13
-                @test isvalid(ss, i) == isvalid(s, i)
+                @test is_valid(ss, i) == is_valid(s, i)
             end
-            if !V6_COMPAT
             for i in 1:ncodeunits(ss), j = i-1:ncodeunits(ss)
                 @test length(ss, i, j) == length(s, i, j)
-            end
             end
         end
         for (ss, s) in sdict
             @test length(ss) == length(s)
-            if false # !V6_COMPAT
             for i in 0:ncodeunits(ss), j = 0:length(ss)+1
                 @test prevind(ss, i+1, j) == prevind(s, i+1, j)
                 @test nextind(ss, i, j) == nextind(s, i, j)
             end
+            @test_throws BoundsError prevind(s, 0)
+            @test_throws BoundsError prevind(ss, 0)
             @test_throws BoundsError nextind(s, ncodeunits(ss)+1)
             @test_throws BoundsError nextind(ss, ncodeunits(ss)+1)
-            end
-            if !V6_COMPAT
-                # @test_throws BoundsError prevind(s, 0)
-                @test_throws BoundsError prevind(ss, 0)
-            end
         end
     end
 
     ss = SubString(T("hello"), 1, 5)
-    ### Todo: Add support for 3 argument length, prevind, nextind
-    if !V6_COMPAT
     @test length(ss, 1, 0) == 0
     @test_throws BoundsError length(ss, 1, -1)
     @test_throws BoundsError length(ss, 1, 6)
     @test_throws BoundsError length(ss, 1, 10)
+    #println("$(typeof(ss))(\"$ss\")")
     @test_throws BoundsError prevind(ss, 0, 1)
     @test prevind(ss, 1, 1) == 0
     @test prevind(ss, 6, 1) == 5
@@ -334,7 +325,6 @@ function teststr(T)
             @test reverseind(s, 0) == 1
             @test reverseind(s, 1) == 0
         end
-    end
     end
 
     ## Cstring tests ##

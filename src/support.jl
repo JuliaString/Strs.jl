@@ -71,10 +71,12 @@ const UTF_ERR_NORMALIZE         = " is not one of :NFC, :NFD, :NFKC, :NFKD"
 @noinline unierror(err, v)       = unierror(string(":", v, err))
 @noinline nulerr()               = unierror("cannot convert NULL to string")
 @noinline neginderr(s, n)        = unierror("Index ($n) must be non negative")
-@noinline ncharerr(n)            = unierror(string("nchar (", n, ") must be greater than 0"))
 @noinline codepoint_error(T, v)  = unierror(string("Invalid CodePoint: ", T, " 0x", outhex(v)))
 @noinline argerror(startpos, endpos) =
     unierror(string("End position ", endpos, " is less than start position (", startpos, ")"))
+
+@noinline ascii_err()    = throw(ArgumentError("Not a valid ASCII string"))
+@noinline ncharerr(n)    = throw(ArgumentError(string("nchar (", n, ") must be not be negative")))
 @noinline repeaterr(cnt) = throw(ArgumentError("repeat count $cnt must be >= 0"))
 
 @static isdefined(Base, :string_index_err) && (const index_error = Base.string_index_err)
@@ -515,6 +517,8 @@ function check_string(dat, startpos, endpos = lastindex(dat); kwargs...)
     unsafe_check_string(dat, startpos, endpos; kwargs...)
 end
 
+byte_string_classify(data) =
+    ccall(:u8_isvalid, Int32, (Ptr{UInt8}, Int), data, length(data))
 byte_string_classify(data::Vector{UInt8}) =
     ccall(:u8_isvalid, Int32, (Ptr{UInt8}, Int), data, length(data))
 byte_string_classify(s::ByteStr) = byte_string_classify(s.data)
@@ -522,30 +526,31 @@ byte_string_classify(s::ByteStr) = byte_string_classify(s.data)
     # 1: valid ASCII
     # 2: valid UTF-8
 
-is_valid(::Type{ASCIIStr},  s::Vector{UInt8}) = byte_string_classify(s) == 1
+is_valid(::Type{ASCIIStr},  s::Vector{UInt8}) = is_ascii(s)
 is_valid(::Type{UTF8Str},   s::Vector{UInt8}) = byte_string_classify(s) != 0
-is_valid(::Type{LatinStr},  s::Vector{UInt8}) = true
-is_valid(::Type{_LatinStr}, s::Vector{UInt8}) = true
+is_valid(::Type{<:Str{LatinCSE}},  s::Vector{UInt8}) = true
+# This should be optimized, stop at first character > 0x7f
+is_valid(::Type{<:Str{_LatinCSE}}, s::Vector{UInt8}) = !is_ascii(s)
 
-# These are deprecated in v0.7
-@static if V6_COMPAT
-    for sym in (:bin, :oct, :dec, :hex)
-        @eval import Base:$sym
-        @eval ($sym)(x::CodePoint, p::Int) = ($sym)(tobase(x), p, false)
-        @eval ($sym)(x::CodePoint)         = ($sym)(tobase(x), 1, false)
-    end
-end
+is_valid(::Type{UniStr}, s::String) = is_unicode(s)
+is_valid(::Type{<:Str{C}}, s::String) where {C<:Union{UTF8CSE,UTF16CSE,UTF32CSE}} = is_unicode(s)
+is_valid(::Type{<:Str{ASCIICSE}}, s::String) = is_ascii(s)
+is_valid(::Type{<:Str{UCS2CSE}}, s::String)  = is_bmp(s)
+is_valid(::Type{<:Str{LatinCSE}}, s::String) = is_latin(s)
 
 function _cvtsize(::Type{T}, dat, len) where {T <: CodeUnitTypes}
     buf, pnt = _allocate(T, len)
-    @inbounds for i = 1:len ; set_codeunit!(pnt, i, get_codeunit(dat, i)) ; end
+    @inbounds for i = 1:len
+        set_codeunit!(pnt, get_codeunit(dat, i))
+        pnt += sizeof(T)
+    end
     buf
 end
 
 # Function barrier here, to allow specialization
 function _copy!(out, pnt::Ptr{T}, len) where {T}
     @inbounds for i in 1:len
-        set_codeunit!(out, i, unsafe_load(pnt))
+        set_codeunit!(out, i, get_codeunit(pnt))
         pnt += sizeof(T)
     end
 end
@@ -553,38 +558,34 @@ end
 (*)(s1::Union{C1, S1}, ss::Union{C2, S2}...) where {C1<:CodePoint,C2<:CodePoint,S1<:Str,S2<:Str} =
     string(s1, ss...)
 
-thisind(s::Str, i::Integer) = thisind(s, Int(i))
+thisind(str::MaybeSub{<:Str}, i::Integer) = thisind(str, Int(i))
 
-function filter(f, s::T) where {T<:Str}
-    out = IOBuffer(StringVector(lastindex(s)), true, true)
+@inline write(::Type{<:CSE}, io, ch)    = write(io, codepoint(ch))
+@inline write(::Type{UTF8CSE}, io, ch)  = write_utf8(io, codepoint(ch))
+@inline write(::Type{UTF16CSE}, io, ch) = write_utf16(io, codepoint(ch))
+
+function filter(fun, str::MaybeSub{T}) where {C<:CSE,T<:Str{C}}
+    out = IOBuffer(StringVector(lastindex(str)), true, true)
     truncate(out, 0)
-    for c in codepoints(s)
-        f(c) && write(out, c)
+    for ch in codepoints(str)
+        fun(ch) && write(C, out, ch)
     end
-    T(take!(out))
+    Str{C}(String(take!(out)))
 end
 
-# These should be optimized based on the traits, and return internal substrings, once
+# Todo: These should be optimized based on the traits, and return internal substrings, once
 # I've implemented those
 
 first(str::Str, n::Integer) = str[1:min(end, nextind(str, 0, n))]
-last(str::Str, n::Integer) = str[max(1, prevind(str, ncodeunits(s)+1, n)):end]
+last(str::Str, n::Integer)  = str[max(1, prevind(str, ncodeunits(str)+1, n)):end]
 
 const Chrs = @static V6_COMPAT ? Union{Char,AbstractChar} : CodePoint
 
-@static if V6_COMPAT
-    function repeat(ch::Char, cnt::Integer)
-        cnt > 1 && return String(_repeat(CodeUnitMulti(), UTF8CSE, ch%UInt32, cnt))
-        cnt < 0 && repeaterr(cnt)
-        cnt == 0 ? empty_string : string(Char(ch%UInt32))
-    end
-end
-
 function repeat(ch::CP, cnt::Integer) where {CP <: Chrs}
     C = codepoint_cse(CP)
-    cnt > 1 && return Str(C, _repeat(CodePointStyle(C), C, tobase(ch), cnt))
+    cnt > 1 && return Str(C, _repeat(CodePointStyle(C), C, codepoint(ch), cnt))
     cnt < 0 && repeaterr(cnt)
-    cnt == 0 ? empty_str(C) : _convert(C, tobase(ch))
+    cnt == 0 ? empty_str(C) : _convert(C, codepoint(ch))
 end
 
 (^)(ch::CP, cnt::Integer) where {CP <: Chrs} = repeat(ch, cnt)
@@ -642,9 +643,21 @@ function _memcmp(apnt::Ptr{OthChr}, bpnt::Ptr{OthChr}, len)
     0
 end
 
-_memcmp(a::Union{String, ByteStr}, b::Union{String, ByteStr}, siz) = _memcmp(_pnt(a), _pnt(b), siz)
-_memcmp(a::WordStr, b::WordStr, siz) = _memcmp(_pnt(a), _pnt(b), siz)
-_memcmp(a::QuadStr, b::QuadStr, siz) = _memcmp(_pnt(a), _pnt(b), siz)
+# These should probably be handled by traits, or dispatched by getting the codeunit type for each
+_memcmp(a::Union{String, ByteStr},
+        b::Union{String, ByteStr, SubString{String}, SubString{<:ByteStr}}, siz) =
+    _memcmp(_pnt(a), _pnt(b), siz)
+_memcmp(a::SubString{<:Union{String, ByteStr}}, b::Union{String, ByteStr}, siz) =
+    _memcmp(_pnt(a), _pnt(b), siz)
+_memcmp(a::SubString{<:Union{String, ByteStr}}, b::SubString{<:Union{String, ByteStr}}, siz) =
+    _memcmp(_pnt(a), _pnt(b), siz)
+
+_memcmp(a::WordStr, b::MaybeSub{<:WordStr}, siz) = _memcmp(_pnt(a), _pnt(b), siz)
+_memcmp(a::QuadStr, b::MaybeSub{<:QuadStr}, siz) = _memcmp(_pnt(a), _pnt(b), siz)
+_memcmp(a::SubString{<:WordStr}, b::WordStr, siz) = _memcmp(_pnt(a), _pnt(b), siz)
+_memcmp(a::SubString{<:QuadStr}, b::QuadStr, siz) = _memcmp(_pnt(a), _pnt(b), siz)
+_memcmp(a::SubString{<:WordStr}, b::SubString{<:WordStr}, siz) = _memcmp(_pnt(a), _pnt(b), siz)
+_memcmp(a::SubString{<:QuadStr}, b::SubString{<:QuadStr}, siz) = _memcmp(_pnt(a), _pnt(b), siz)
 
 _memcpy(dst::Ptr{UInt8}, src::Ptr, siz) =
     ccall(:memcpy, Ptr{UInt8}, (Ptr{Cvoid}, Ptr{Cvoid}, UInt), dst, src, siz)
@@ -714,17 +727,19 @@ _repeat(::CodeUnitMulti, ::Type{UTF16CSE}, ch, cnt) =
 function repeat(str::T, cnt::Integer) where {C<:CSE,T<:Str{C}}
     cnt < 2 && return cnt == 1 ? str : (cnt == 0 ? empty_str(C) : repeaterr(cnt))
     CU = codeunit(T)
-    len, pnt = _lenpnt(str)
-    totlen = len * cnt
-    buf, out = _allocate(CU, totlen)
-    if len == 1 # common case: repeating a single codeunit string
-        _memset(out, get_codeunit(pnt), cnt)
-    else
-        fin = bytoff(out, totlen)
-        siz = bytoff(CU, len)
-        while out < fin
-            _memcpy(out, pnt, len)
-            out += siz
+    @preserve str begin
+        len, pnt = _lenpnt(str)
+        totlen = len * cnt
+        buf, out = _allocate(CU, totlen)
+        if len == 1 # common case: repeating a single codeunit string
+            _memset(out, get_codeunit(pnt), cnt)
+        else
+            fin = bytoff(out, totlen)
+            siz = bytoff(CU, len)
+            while out < fin
+                _memcpy(out, pnt, len)
+                out += siz
+            end
         end
     end
     Str(C, buf)
@@ -739,23 +754,27 @@ containsnul(str::ByteStr) = containsnul(unsafe_convert(Ptr{Cchar}, str), sizeof(
 # Check 4 characters at a time
 function containsnul(str::WordStr)
     (siz = sizeof(str)) == 0 && return true
-    pnt, fin = _calcpnt(str, siz)
-    while (pnt += CHUNKSZ) <= fin
-        ((v = unsafe_load(pnt))%UInt16 == 0 || (v>>>16)%UInt16 == 0 ||
-         (v>>>32)%UInt16 == 0 || (v>>>48) == 0) && return true
+    @preserve str begin
+        pnt, fin = _calcpnt(str, siz)
+        while (pnt += CHUNKSZ) <= fin
+            ((v = unsafe_load(pnt))%UInt16 == 0 || (v>>>16)%UInt16 == 0 ||
+             (v>>>32)%UInt16 == 0 || (v>>>48) == 0) && return true
+        end
+        pnt - CHUNKSZ != fin &&
+            ((v = (unsafe_load(pnt) | ~_mask_bytes(siz)))%UInt16 == 0 ||
+             (v>>>16)%UInt16 == 0 || (v>>>32)%UInt16 == 0)
     end
-    pnt - CHUNKSZ != fin &&
-        ((v = (unsafe_load(pnt) | ~_mask_bytes(siz)))%UInt16 == 0 ||
-         (v>>>16)%UInt16 == 0 || (v>>>32)%UInt16 == 0)
 end
 
 function containsnul(str::QuadStr)
     (siz = sizeof(str)) == 0 && return true
-    pnt, fin = _calcpnt(str, siz)
-    while (pnt += CHUNKSZ) <= fin
-        ((v = unsafe_load(pnt))%UInt32 == 0 || (v>>>32) == 0) && return true
+    @preserve str begin
+        pnt, fin = _calcpnt(str, siz)
+        while (pnt += CHUNKSZ) <= fin
+            ((v = unsafe_load(pnt))%UInt32 == 0 || (v>>>32) == 0) && return true
+        end
+        pnt - CHUNKSZ != fin && unsafe_load(reinterpret(Ptr{UInt32}, pnt)) == 0x00000
     end
-    pnt - CHUNKSZ != fin && unsafe_load(reinterpret(Ptr{UInt32}, pnt)) == 0x00000
 end
 
 # pointer conversions of ASCII/UTF8/UTF16/UTF32 strings:

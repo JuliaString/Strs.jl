@@ -2,7 +2,8 @@ __precompile__(true)
 """
 Strs package
 
-Copyright 2017 Gandalf Software, Inc., Scott P. Jones, and other contributors to the Julia language
+Copyright 2017-2018 Gandalf Software, Inc., Scott P. Jones,
+and other contributors to the Julia language
 Licensed under MIT License, see LICENSE.md
 Based partly on code in LegacyStrings that used to be part of Julia
 """
@@ -43,6 +44,29 @@ In addition, depending on the percentage of characters still pointing into the o
 all of the ASCII substrings into the pool.
 Note: for good substring performance, some of the operations that are optimized to work 8 bytes
 (or more) at a time, will need to deal with masking the initial chunk, not just the final chunk.
+
+
+New ideas:
+Have a single concrete "UniStr" type, which uses bits in the trailing "nul" byte of the String
+representation, to store the following information:
+
+NotValidated, Invalid, NoASCII, Latin, BMP, UTF32, Hash present, Short
+
+2 bits: 00 -> Valid, 01 -> Invalid, 1x -> NotValidated
+1 bit:  0  -> Some ASCII, 1 -> no ASCII (bit flipped from others so that 0 -> ASCIIStr)
+1 bit:  0  -> No Latin1,  1 -> some Latin1
+1 bit:  0  -> ByteWise,   1 -> WordWise
+1 bit:  0/1 Hash present
+1 bit:  0/1 Short
+
+Extra byte for wordwise:
+1 bit:  0  -> No BMP,   1 -> some BMP
+1 bit:  0  -> All BMP,   1 -> some non-BMP
+
+So: ASCIIStr would be: Valid, All ASCII, ... i.e. 0 + short/hash bits
+    _LatinStr would be: Valid, maybe no ascii, Latin1, no bmp, no non-bmp
+    _UCS2Str  would be: Valid, maybe no ascii, maybe Latin1, some bmp, no non-bmp
+    _UTF32Str would be: Valid, maybe no ascii, maybe Latin1, maybe BMP, some non-bmp
 =#
 
 const V6_COMPAT = VERSION < v"0.7.0-DEV"
@@ -52,7 +76,7 @@ export to_ascii, utf8, utf16, utf32
 
 export str, unsafe_str, codepoints, @str_str, @prn_str
 
-export category_code, category_string, category_abbrev, is_mutable
+export category_code, category_string, category_abbrev, is_mutable, index
 
 # From types.jl
 export Str, Chr, UniStr, CSE, CodePoint, CharSet, Encoding, @cs_str, @enc_str, @cse
@@ -65,7 +89,6 @@ export BIG_ENDIAN, LITTLE_ENDIAN
 
 # From search.jl
 export found, find_result
-export FindOp, Direction, Fwd, Rev
 
 # From unicode.jl
 export is_assigned, is_grapheme_break, is_grapheme_break!
@@ -77,16 +100,15 @@ using Base: @_inline_meta, @propagate_inbounds, @_propagate_inbounds_meta
 
 import Base: containsnul, convert, getindex, length, map, pointer, collect, in, hash,
              reverse, sizeof, string, unsafe_convert, unsafe_load, write,
-             start, next, done, nextind, prevind, reverseind,
+             start, next, done, nextind, prevind, #reverseind,
              typemin, typemax, rem, size, ndims, first, last, eltype,
              isless, isequal, ==, -, +, *, ^, cmp, promote_rule, one, repeat, filter,
              print, show, isimmutable, chop, chomp, replace, ascii, uppercase, lowercase,
              lstrip, rstrip, strip, lpad, rpad, split, rsplit
 
 # Conditionally import names that are only in v0.6 or in master
-for sym in (:ind2chr, :chr2ind,
-            :codeunit, :codeunits, :ncodeunits,
-            :thisind, :firstindex, :lastindex, :codepoint, :Fix2)
+for sym in (:codeunit, :codeunits, :ncodeunits,
+            :thisind, :firstindex, :lastindex, :codepoint, :Fix2, :unsafe_crc32c)
     if isdefined(Base, sym)
         @eval import Base: $sym
     else
@@ -123,21 +145,6 @@ for (oldn, newn) in ((:xdigit, :hex_digit),
     @eval export $newname
 end
 
-# Handle renames where function was deprecated
-
-export is_alphanumeric, is_graphic, is_lowercase, is_uppercase
-@static if V6_COMPAT
-    import Base: isalnum, isgraph, islower, isupper
-    const is_alphanumeric = isalnum
-    const is_graphic      = isgraph
-    const is_lowercase    = islower
-    const is_uppercase    = isupper
-else
-    import Base: islowercase, isuppercase
-    const is_lowercase = islowercase
-    const is_uppercase = isuppercase
-end
-
 # Possibly import `is` functions, rename to start with `is_`
 
 for nam in (:ascii, :digit, :space, :alpha, :numeric, :valid, :defined, :empty)
@@ -149,36 +156,58 @@ for nam in (:ascii, :digit, :space, :alpha, :numeric, :valid, :defined, :empty)
     @eval export $newname
 end
 
-# Location of isgraphemebreak moved from Base.UTF8proc to Base.Unicode,
-# import and add new names with underscores
+# Handle renames where function was deprecated
 
-const unimod = @static isdefined(Base, :UTF8proc) ? :UTF8proc : :Unicode
+export utf8crc, is_alphanumeric, is_graphic, is_lowercase, is_uppercase
 
-@eval import Base.$unimod: isgraphemebreak, isgraphemebreak!, graphemes
+@static if V6_COMPAT
+    include("compat.jl")
+else
+    using Random
+
+    import Base.GC: @preserve
+
+    function find end
+
+    export fnd
+    const fnd = find
+
+    # Handle changes in array allocation
+    create_vector(T, len)  = Vector{T}(undef, len)
+
+    # Add new short name for deprecated hex function
+    outhex(v, p=1) = string(v, base=16, pad=p)
+
+    const utf8crc = Base._crc32c
+
+    import Base: islowercase, isuppercase
+    const is_lowercase = islowercase
+    const is_uppercase = isuppercase
+
+    # Location of isgraphemebreak moved from Base.UTF8proc to Base.Unicode,
+    # import and add new names with underscores
+
+    import Base.Unicode: isgraphemebreak, isgraphemebreak!, graphemes
+end
+
 const is_grapheme_break  = isgraphemebreak
 const is_grapheme_break! = isgraphemebreak!
 
-@static V6_COMPAT || import Base.GC: @preserve
-@static V6_COMPAT && include("compat.jl")
-@static isdefined(Base, :codeunits) || include("codeunits.jl")
-@static isdefined(Base, :Fix2)      || include("fix2.jl")
+# Operations for find/search operations
 
-# Work around deprecation on v0.7
-@static if V6_COMPAT
-    import Base: find
-else
-    import Base: findall
-    const find = findall
-    #function find end
-end
-export fnd
-const fnd = find
+export FindOp, Direction, Fwd, Rev, First, Last, Next, Prev, Each, All
 
-# Handle changes in array allocation
-create_vector(T, len)  = @static V6_COMPAT ? Vector{T}(len) : Vector{T}(undef, len)
+abstract type FindOp end
+abstract type Direction <: FindOp end
+struct Fwd <: Direction end
+struct Rev <: Direction end
 
-# Add new short name for deprecated hex function
-outhex(v, p=1) = @static V6_COMPAT ? hex(v,p) : string(v, base=16, pad=p)
+struct First <: FindOp end
+struct Last <: FindOp end
+struct Next <: FindOp end
+struct Prev <: FindOp end
+struct Each <: FindOp end
+struct All <: FindOp end
 
 include("types.jl")
 include("chars.jl")

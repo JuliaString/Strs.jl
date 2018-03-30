@@ -8,16 +8,6 @@ Licensed under MIT License, see LICENSE.md
 # Use crc32c to make CRC32c of UTF8 view of string, for use with hashing
 # where different string types are supposed to compare as ==
 
-export utf8crc
-
-@static if V6_COMPAT
-    unsafe_crc32c(a, n, crc) = ccall(:jl_crc32c, UInt32, (UInt32, Ptr{UInt8}, Csize_t), crc, a, n)
-else
-    import Base: unsafe_crc32c
-end
-
-const utf8crc = @static V6_COMPAT ? Base.crc32c : Base._crc32c
-
 function utf8crc(str::Union{S,SubString{S}}, seed::UInt) where {S<:Str}
     @preserve str begin
         len, pnt = _lenpnt(str)

@@ -108,23 +108,25 @@ end
 utf8proc_error(result) =
     error(unsafe_string(ccall(:utf8proc_errmsg, Cstring, (Cssize_t,), result)))
 
-function utf8proc_map(::Type{T}, str, options::Integer) where {T<:Str}
+function utf8proc_map(::Type{T}, str::MaybeSub{T}, options::Integer) where {T<:Str}
     nwords = ccall(:utf8proc_decompose, Int, (Ptr{UInt8}, Int, Ptr{UInt8}, Int, Cint),
                    str, sizeof(str), C_NULL, 0, options)
     nwords < 0 && utf8proc_error(nwords)
-    buffer = _allocate(nwords*4)
+    buffer = Base.StringVector(nwords*4)
     nwords = ccall(:utf8proc_decompose, Int, (Ptr{UInt8}, Int, Ptr{UInt8}, Int, Cint),
                    str, sizeof(str), buffer, nwords, options)
     nwords < 0 && utf8proc_error(nwords)
     nbytes = ccall(:utf8proc_reencode, Int, (Ptr{UInt8}, Int, Cint), buffer, nwords, options)
     nbytes < 0 && utf8proc_error(nbytes)
-    T(resize!(buffer, nbytes))
+    Str(cse(T), String(resize!(buffer, nbytes)))
 end
 
 utf8proc_charwidth(ch) = Int(ccall(:utf8proc_charwidth, Cint, (UInt32,), ch))
 
-utf8proc_map(str::T, options::Integer) where {T<:Str} = utf8proc_map(T, UTF8Str(str), options)
-utf8proc_map(str::Str{UTF8CSE}, options::Integer) = utf8proc_map(UTF8Str, str, options)
+utf8proc_map(str::MaybeSub{T}, options::Integer) where {T<:Str} =
+    utf8proc_map(T, convert(UTF8Str, str), options)
+utf8proc_map(str::MaybeSub{<:Str{UTF8CSE}}, options::Integer) =
+    utf8proc_map(UTF8Str, str, options)
 
 @inline utf8proc_cat(ch) = ccall(:utf8proc_category, Cint, (UInt32,), ch)
 @inline utf8proc_cat_abbr(ch) =
@@ -185,15 +187,18 @@ normalize(str::Str, nf::Symbol) =
 
 # iterators for grapheme segmentation
 
-is_grapheme_break(c1::CodePointTypes, c2::CodePointTypes) =
+is_grapheme_break(c1::CodeUnitTypes, c2::CodeUnitTypes) =
     !(c1 <= 0x10ffff && c2 <= 0x10ffff) ||
     ccall(:utf8proc_grapheme_break, Bool, (UInt32, UInt32), c1, c2)
 
 # Stateful grapheme break required by Unicode-9 rules: the string
 # must be processed in sequence, with state initialized to Ref{Int32}(0).
 # Requires utf8proc v2.0 or later.
-is_grapheme_break!(state::Ref{Int32}, c1::CodePointTypes, c2::CodePointTypes) =
+is_grapheme_break!(state::Ref{Int32}, c1::CodeUnitTypes, c2::CodeUnitTypes) =
     ((c1 <= 0x10ffff && c2 <= 0x10ffff)
      ? ccall(:utf8proc_grapheme_break_stateful, Bool, (UInt32, UInt32, Ref{Int32}), c1, c2, state)
      : (state[] = 0; true))
 
+is_grapheme_break(c1::CodePoint, c2::CodePoint) = is_grapheme_break(codepoint(c1), codepoint(c2))
+is_grapheme_break(state::Ref{UInt32}, c1::CodePoint, c2::CodePoint) =
+    is_grapheme_break(state, codepoint(c1), codepoint(c2))

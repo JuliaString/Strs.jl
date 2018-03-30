@@ -123,6 +123,8 @@ end
 (::Type{Str})(::Type{C}, v::String) where {C<:CSE} = Str(C, v, nothing, nothing, nothing)
 (::Type{Str})(::Type{C}, v::Str) where {C<:CSE} = Str(C, v.data, nothing, nothing, nothing)
 
+const MaybeSub{T} = Union{T, SubString{T}} where {T<:AbstractString}
+
 struct Chr{CS<:CharSet,T<:CodeUnitTypes} <: AbstractChar
     v::T
     (::Type{Chr})(::Type{CS}, v::T) where {CS<:CharSet,T<:CodeUnitTypes} = new{CS,T}(v)
@@ -167,8 +169,6 @@ charset(::Type{Char})      = UniPlusCharSet # Char instead of "UniPlusChr"
 charset(::Type{_LatinChr}) = LatinSubSet    # LatinSubSet instead of "_LatinCharSet"
 
 export BinaryCharSet, UniPlusCharSet
-
-const CodePointTypes = Union{CodeUnitTypes, CodePoint}
 
 const LatinChars   = Union{LatinChr, _LatinChr}
 const ByteChars    = Union{ASCIIChr, LatinChr, _LatinChr, Text1Chr}
@@ -221,6 +221,9 @@ end
 empty_str(::Type{<:Str{C}}) where {C<:CSE} = empty_str(C)
 empty_str(::Type{String}) = empty_string
 
+typemin(::Type{T}) where {T<:Str} = empty_str(T)
+typemin(::T) where {T<:Str} = empty_str(T)
+
 """Union type for fast dispatching"""
 const UniStr = Union{ASCIIStr, _LatinStr, _UCS2Str, _UTF32Str}
 show(io::IO, ::Type{UniStr}) = print(io, :UniStr)
@@ -238,6 +241,7 @@ end
 const Binary_CSEs   = Union{Text1CSE, BinaryCSE}
 const Raw_CSEs      = Union{Text1CSE, Text2CSE, Text4CSE}
 const Latin_CSEs    = Union{LatinCSE, _LatinCSE}
+const UTF8_CSEs     = Union{UTF8CSE,  UniPlusCSE}
 const UCS2_CSEs     = Union{UCS2CSE,  _UCS2CSE}
 const UTF32_CSEs    = Union{UTF32CSE, _UTF32CSE}
 const Unicode_CSEs  = Union{UTF8CSE, UTF16CSE, UTF32_CSEs}
@@ -269,26 +273,19 @@ basecse(::Type{_UTF32CSE}) = UTF32CSE
 const AbsChar = @static isdefined(Base, :AbstractChar) ? AbstractChar : Union{Char, CodePoint}
 
 ## Get the character set / encoding used by a string type
-cse(::Type{<:AbstractString}) = UTF8CSE # Default unless overridden
-cse(::Type{String}) = UniPlusCSE         # allows invalid sequences
+cse(::Type{<:AbstractString}) = UniPlusCSE     # allows invalid sequences
 cse(::Type{<:SubString{T}}) where {T} = cse(T)
 cse(::Type{<:SubString{<:Str{C}}}) where {C<:SubSet_CSEs} = basecse(C)
 cse(::Type{<:Str{C}}) where {C<:CSE} = C
 cse(str::AbstractString) = cse(typeof(str))
 
-charset(::Type{<:AbstractString}) = UTF32CharSet # Default unless overridden
-charset(::Type{String}) = UniPlusCharSet # allows invalid sequences
-charset(::Type{<:SubString{T}}) where {T} = charset(T)
-charset(::Type{<:SubString{<:Str{C}}}) where {C<:SubSet_CSEs} = charset(basecse(C))
+charset(::Type{T}) where {T<:AbstractString} = charset(cse(T)) # Default unless overridden
 charset(::Type{C}) where {CS,C<:CSE{CS}} = CS
-charset(::Type{<:Str{C}}) where {C} = charset(C)
-charset(str::AbstractString) = charset(typeof(str))
+charset(str::AbstractString) = charset(cse(str))
 
-encoding(::Type{<:AbstractString}) = UTF8Encoding # Julia likes to think of this as the default
-encoding(::Type{<:SubString{T}}) where {T} = encoding(T)
+encoding(::Type{T}) where {T<:AbstractString} = encoding(cse(T)) # Default unless overridden
 encoding(::Type{C}) where {CS,E,C<:CSE{CS,E}} = E
-encoding(::Type{<:Str{C}}) where {C} = encoding(C)
-encoding(str::AbstractString) = encoding(typeof(str))
+encoding(str::AbstractString) = encoding(cse(str))
 
 promote_rule(::Type{T}, ::Type{T}) where {T<:CodePoint} = T
 promote_rule(::Type{Text2Chr}, ::Type{Text1Chr}) = Text2Chr
@@ -322,7 +319,7 @@ _data(s::String)  = s
 _data(s::ByteStr) = @static V6_COMPAT ? Vector{UInt8}(s.data) : unsafe_wrap(Vector{UInt8}, s.data)
 
 """Pointer to codeunits of string"""
-_pnt(s::Union{String,Vector{UInt8}}) = pointer(s)
+_pnt(s)          = pointer(s)
 _pnt(s::ByteStr) = pointer(s.data)
 _pnt(s::WordStr) = reinterpret(Ptr{UInt16}, pointer(s.data))
 _pnt(s::QuadStr) = reinterpret(Ptr{UInt32}, pointer(s.data))
@@ -357,12 +354,8 @@ Base.SubString(str::Str{C}, off::Int, fin::Int) where {C<:SubSet_CSEs} =
     SubString(Str(basecse(C), str), off, fin)
 
 # Todo: clean these up, avoid so many definitions
-_pnt(s::SubString{<:ByteStr}) = pointer(s)
 _pnt(s::SubString{<:WordStr}) = reinterpret(Ptr{UInt16}, pointer(s))
 _pnt(s::SubString{<:QuadStr}) = reinterpret(Ptr{UInt32}, pointer(s))
 
-_len(s::SubString{<:ByteStr}) = sizeof(s)
 _len(s::SubString{<:WordStr}) = sizeof(s) >>> 1
 _len(s::SubString{<:QuadStr}) = sizeof(s) >>> 2
-
-@static V6_COMPAT && (sizeof(s::SubString{<:Str}) = s.endof == 0 ? 0 : nextind(s, s.endof) - 1)

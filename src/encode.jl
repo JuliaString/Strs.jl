@@ -75,12 +75,14 @@ function _str(str::T) where {T<:Union{Vector{UInt8}, BinaryStrings, String}}
 end
 
 function _str_cpy(::Type{T}, str, len) where {T}
-    buf, pnt = _allocate(T, len)
-    @inbounds for ch in str
-        set_codeunit!(pnt, ch%T)
-        pnt += sizeof(T)
+    @preserve str begin
+        buf, pnt = _allocate(T, len)
+        @inbounds for ch in str
+            set_codeunit!(pnt, ch%T)
+            pnt += sizeof(T)
+        end
+        buf
     end
-    buf
 end
 
 """Encode as a possibly smaller type"""
@@ -102,7 +104,12 @@ function convert(::Type{<:Str}, str::AbstractString)
     len, flags = unsafe_check_string(str)
     _str_encode(str, len, flags)
 end
-convert(::Type{<:Str}, str::String) = _str(str)
+#convert(::Type{<:Str{Text1CSE}}, str::String) =
+#    Str{Text1CSE,Nothing,Nothing,Nothing}(str,nothing,nothing,nothing)
+
+# This needs to be optimized
+convert(::Type{T},  str::String) where {C<:CSE,T<:Str{C}} =
+    convert(T, unsafe_str(str))
 
 convert(::Type{UniStr}, str::AbstractString) = _str(str)
 convert(::Type{UniStr}, str::String)         = _str(str)

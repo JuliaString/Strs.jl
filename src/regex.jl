@@ -27,9 +27,9 @@ cvt_match(::Type{<:Str{C}}, co) where {C<:CSE}   = cvt_match(C, co)
 cvt_compile(::Type{String}, co) = (co & ~PCRE.NO_UTF_CHECK) | PCRE.UTF
 cvt_match(::Type{String}, co)   = (co & ~PCRE.NO_UTF_CHECK)
 
-Regex(pattern::Str{C}, co, mo) where {C<:Byte_CSEs} =
+Regex(pattern::MaybeSub{<:Str{C}}, co, mo) where {C<:Byte_CSEs} =
     Regex(String(pattern), cvt_compile(C, co), mo)
-Regex(pattern::Str{C}) where {C<:Byte_CSEs} =
+Regex(pattern::MaybeSub{<:Str{C}}) where {C<:Byte_CSEs} =
     Regex(String(pattern),
           cvt_compile(C, DEFAULT_COMPILER_OPTS), cvt_match(C, DEFAULT_MATCH_OPTS))
 
@@ -45,7 +45,7 @@ function _update_compiler_opts(flags)
     options
 end
 
-Regex(pattern::Str{C}, flags::AbstractString) where {C<:Byte_CSEs} =
+Regex(pattern::MaybeSub{<:Str{C}}, flags::AbstractString) where {C<:Byte_CSEs} =
     Regex(pattern, cvt_compile(C, _update_compile_opts(flags)), cvt_match(C, DEFAULT_MATCH_OPTS))
 
 struct RegexMatchStr{T<:AbstractString}
@@ -129,37 +129,49 @@ function _match(::Type{C}, re, str, idx, add_opts) where {C<:CSE}
     RegexMatchStr(mat, cap, Int(ovec[1]+1), off, re)
 end
 
-match(re::Regex, str::Str{C}, idx::Integer, add_opts::UInt32=UInt32(0)) where {C<:CSE} =
+match(re::Regex, str::MaybeSub{<:Str{C}}, idx::Integer,
+      add_opts::UInt32=UInt32(0)) where {C<:CSE} =
     error("Regex not supported yet on strings with codeunit == UInt16 or UInt32")
-match(re::Regex, str::Str{C}, idx::Integer, add_opts::UInt32=UInt32(0)) where {C<:Regex_CSEs} =
+match(re::Regex, str::MaybeSub{<:Str{C}}, idx::Integer,
+      add_opts::UInt32=UInt32(0)) where {C<:Regex_CSEs} =
     _match(C, re, str, Int(idx), add_opts)
-match(re::Regex, str::Str{UTF8CSE}, idx::Integer, add_opts::UInt32=UInt32(0)) =
+match(re::Regex, str::MaybeSub{<:Str{UTF8CSE}}, idx::Integer, add_opts::UInt32=UInt32(0)) =
     _match(UTF8CSE, re, str, Int(idx), add_opts)
-match(re::Regex, str::Str{_LatinCSE}, idx::Integer, add_opts::UInt32=UInt32(0)) =
+match(re::Regex, str::MaybeSub{<:Str{_LatinCSE}}, idx::Integer, add_opts::UInt32=UInt32(0)) =
     _match(LatinCSE, re, Str{LatinCSE}(str), Int(idx), add_opts)
 
+function _find(::Type{C}, re, str) where {C}
+    isempty(str) && return _not_found
+    check_compile(C, re)
+    (PCRE.exec(re.regex, str, 0, cvt_match(C, re.match_options), re.match_data)
+     ? ((Int(re.ovec[1]) + 1) : prevind(str, Int(re.ovec[2]) + 1)) : _not_found)
+end
 
-const StrOrSubStr{T} = Union{T,SubString{<:T}}
-
-function _fnd(::Type{C}, re, str, idx) where {C}
-    if idx > ncodeunits(str)
+function _find(::Type{C}, re, str, idx) where {C}
+    if idx > ncodeunits(str)+1
         @boundscheck boundserr(str, idx)
         return _not_found
     end
     check_compile(C, re)
     (PCRE.exec(re.regex, str, idx-1, cvt_match(C, re.match_options), re.match_data)
-     ? ((Int(re.ovec[1])+1):prevind(str,Int(re.ovec[2])+1)) : _not_found)
+     ? ((Int(re.ovec[1]) + 1) : prevind(str, Int(re.ovec[2]) + 1)) : _not_found)
 end
 
-fnd(::Type{Fwd}, re::Regex, str::StrOrSubStr{AbstractString}, idx::Integer) =
+find(::Type{Fwd}, re::Regex, str::MaybeSub{<:AbstractString}, idx::Integer) =
     throw(ArgumentError("regex search is only available for the String or Str types with " *
-                        "codeunit == UInt8, or substrings of those types, use UTF8Str to convert"))
+                        "codeunit == UInt8, or substrings of those types, " *
+                        "use UTF8Str to convert"))
 
-fnd(::Type{Fwd}, re::Regex, str::StrOrSubStr{Str{C}}, idx::Integer) where {C<:Regex_CSEs} =
-    _fnd(C, re, str, idx)
-fnd(::Type{Fwd}, re::Regex, str::StrOrSubStr{Str{C}}, idx::Integer) where {C<:UTF8CSE} =
-    _fnd(C, re, str, idx)
-fnd(::Type{Fwd}, re::Regex, str::StrOrSubStr{Str{C}}, idx::Integer) where {C<:_LatinCSE} =
-    _fnd(LatinCSE, re, str, idx)
-fnd(::Type{Fwd}, re::Regex, str::StrOrSubStr{String}, idx::Integer) =
-    _fnd(String, re, str, idx)
+find(::Type{Fwd}, re::Regex, str::MaybeSub{<:Str{C}}, idx::Integer) where {C<:Regex_CSEs} =
+    _find(C, re, str, idx)
+find(::Type{Fwd}, re::Regex, str::MaybeSub{<:Str{UTF8CSE}}, idx::Integer) =
+    _find(UTF8CSE, re, str, idx)
+find(::Type{Fwd}, re::Regex, str::MaybeSub{<:Str{_LatinCSE}}, idx::Integer) =
+    _find(LatinCSE, re, str, idx)
+find(::Type{Fwd}, re::Regex, str::MaybeSub{String}, idx::Integer) =
+    _find(UTF8CSE, re, str, idx)
+
+find(::Type{First}, re::Regex, str::MaybeSub{<:AbstractString}) = find(Fwd, re, str, 1)
+find(::Type{First}, re::Regex, str::MaybeSub{<:Str{C}}) where {C<:Regex_CSEs} = _find(C, re, str)
+find(::Type{First}, re::Regex, str::MaybeSub{<:Str{_LatinCSE}}) = _find(LatinCSE, re, str)
+find(::Type{First}, re::Regex, str::MaybeSub{String}) = _find(UTF8CSE, re, str)

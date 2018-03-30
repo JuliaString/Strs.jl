@@ -31,8 +31,7 @@ chrdiff(pnt::Ptr{T}, beg::Ptr{T}) where {T<:CodeUnitTypes} = Int(chroff(T, pnt -
 bytoff(pnt::Ptr{T}, off) where {T<:CodeUnitTypes} = pnt + bytoff(T, off)
 
 # Alternate way for Chr type
-tobase(ch::Chr) = ch.v
-codepoint(v::Chr) = ch.v
+codepoint(ch::Chr) = ch.v
 basetype(::Type{<:Chr{CS,T}}) where {CS,T} = T
 charset(::Type{<:Chr{CS,T}}) where {CS,T} = CS
 
@@ -47,16 +46,7 @@ basetype(::Type{Char})        = UInt32
 
 basetype(::Type{T}) where {T<:CodeUnitTypes} = T
 
-@static if V6_COMPAT
-    tobase(v::Char) = v%UInt32
-else
-    tobase(v::AbstractChar) = codepoint(v)
-end
-
-tobase(v::T) where {T<:CodePoint} = reinterpret(basetype(T), v)
-tobase(v::T) where {T<:CodeUnitTypes} = v
-
-codepoint(v::T) where {T<:CodePoint} = tobase(v)
+codepoint(v::T) where {T<:CodePoint} = reinterpret(basetype(T), v)
 
 typemin(::Type{T}) where {T<:CodePoint} = reinterpret(T, typemin(basetype(T)))
 typemax(::Type{T}) where {T<:CodePoint} = reinterpret(T, typemax(basetype(T)))
@@ -95,13 +85,13 @@ set_codeunit!(pnt::Ptr{<:CodeUnitTypes}, ch) = unsafe_store!(pnt, ch)
 set_codeunit!(dat::AbstractVector{<:CodeUnitTypes}, ch) = (dat[1] = ch)
 set_codeunit!(dat::String, ch) = set_codeunit!(dat, 1, ch)
 
-convert(::Type{T}, v::S) where {T<:Integer, S<:CodePoint} = convert(T, tobase(v))::T
+convert(::Type{T}, v::S) where {T<:Integer, S<:CodePoint} = convert(T, codepoint(v))::T
 convert(::Type{T}, v::Signed) where {T<:CodePoint} =
-    (v >= 0 && is_valid(T, v%Unsigned)) ? convert(T, tobase(v)) : codepoint_error(T, v)
+    (v >= 0 && is_valid(T, v%Unsigned)) ? convert(T, v%Unsigned) : codepoint_error(T, v)
 convert(::Type{T}, v::Unsigned) where {T<:CodePoint} =
     is_valid(T, v) ? reinterpret(T, basetype(T)(v)) : codepoint_error(T, v)
-convert(::Type{Char}, v::T) where {T<:CodePoint} = convert(Char, tobase(v))
-convert(::Type{T}, v::Char) where {T<:CodePoint} = convert(T, tobase(v))::T
+convert(::Type{Char}, v::T) where {T<:CodePoint} = convert(Char, codepoint(v))
+convert(::Type{T}, v::Char) where {T<:CodePoint} = convert(T, codepoint(v))::T
 
 rem(x::S, ::Type{T}) where {S<:CodePoint, T<:Number}    = rem(reinterpret(basetype(S), x), T)
 rem(x::S, ::Type{T}) where {S<:Number, T<:CodePoint}    = reinterpret(T, x%basetype(T))
@@ -109,9 +99,9 @@ rem(x::S, ::Type{T}) where {S<:CodePoint, T<:CodePoint} = reinterpret(T, x%baset
 rem(x::S, ::Type{Char}) where {S<:CodePoint} = Char(x%basetype(S))
 rem(x::Char, ::Type{T}) where {T<:CodePoint} = x%UInt32%T
 
-(::Type{S})(v::T) where {S<:Union{UInt32, Int, UInt}, T<:CodePoint} = tobase(v)%S
-(::Type{Char})(v::CodePoint) = Char(tobase(v))
-(::Type{T})(v::Char) where {T<:CodePoint} = T(tobase(v))
+(::Type{S})(v::T) where {S<:Union{UInt32, Int, UInt}, T<:CodePoint} = codepoint(v)%S
+(::Type{Char})(v::CodePoint) = Char(codepoint(v))
+(::Type{T})(v::Char) where {T<:CodePoint} = T(codepoint(v))
 
 for nam in (:Text1, :Text2, :Text4, :ASCII, :Latin, :_Latin, :UCS2, :UTF32)
     sym = Symbol(string(nam, "Chr"))
@@ -123,28 +113,6 @@ size(cp::CodePoint, dim) = convert(Int, dim) < 1 ? boundserr(cp, dim) : 1
 getindex(cp::CodePoint, i::Integer) = i == 1 ? cp : boundserr(cp, i)
 getindex(cp::CodePoint, I::Integer...) = all(x -> x == 1, I) ? cp : boundserr(cp, I)
 
-@static if !isdefined(Base, :AbstractChar)
-    size(cp::CodePoint) = ()
-    ndims(cp::CodePoint) = 0
-    ndims(::Type{<:CodePoint}) = 0
-    length(cp::CodePoint) = 1
-    lastindex(cp::CodePoint) = 1
-    getindex(cp::CodePoint) = cp
-    first(cp::CodePoint) = cp
-    last(cp::CodePoint) = cp
-    start(cp::CodePoint) = false
-    next(cp::CodePoint, state) = (cp, true)
-    done(cp::CodePoint, state) = state
-    isempty(cp::CodePoint) = false
-    in(x::CodePoint, y::CodePoint) = x == y
-    -(x::CodePoint, y::CodePoint) = Int(x) - Int(y)
-    -(x::CodePoint, y::Integer) = CodePoint((Int32(x) - Int32(y))%UInt32)
-    +(x::CodePoint, y::Integer) = CodePoint((Int32(x) + Int32(y))%UInt32)
-    +(x::Integer, y::CodePoint) = y + x
-    show(io::IO, cp::CodePoint)  = show(io, Char(cp))
-    print(io::IO, cp::CodePoint) = print(io, Char(cp))
-end
-
 _uni_rng(m) = 0x00000:ifelse(m < 0xd800, m, m-0x800)
 codepoint_rng(::Type{T}) where {T<:CodePoint} = _uni_rng(typemax(T)%UInt32)
 codepoint_rng(::Type{Char}) = _uni_rng(0x10ffff)
@@ -154,13 +122,17 @@ codepoint_rng(::Type{Text4Chr}) = 0%UInt32:typemax(UInt32)
 codepoint_adj(::Type{T}, ch) where {T} = ifelse(ch < 0xd800, ch, ch+0x800)%T
 codepoint_adj(::Type{T}, ch) where {T<:Union{Text2Chr,Text4Chr}} = ch%T
 
-==(x::CodePoint, y::AbsChar)   = tobase(x) == tobase(y)
-==(x::AbsChar,   y::CodePoint) = tobase(x) == tobase(y)
-==(x::CodePoint, y::CodePoint) = tobase(x) == tobase(y)
+# returns a random valid Unicode scalar value in the correct range for the type of character
+Random.rand(r::Random.AbstractRNG, ::Random.SamplerType{T}) where {T<:CodePoint} =
+    codepoint_adj(T, rand(r, codepoint_rng(T)))
 
-isless(x::CodePoint, y::AbsChar)   = tobase(x) < tobase(y)
-isless(x::AbsChar,   y::CodePoint) = tobase(x) < tobase(y)
-isless(x::CodePoint, y::CodePoint) = tobase(x) < tobase(y)
+==(x::CodePoint, y::AbsChar)   = codepoint(x) == codepoint(y)
+==(x::AbsChar,   y::CodePoint) = codepoint(x) == codepoint(y)
+==(x::CodePoint, y::CodePoint) = codepoint(x) == codepoint(y)
+
+isless(x::CodePoint, y::AbsChar)   = codepoint(x) < codepoint(y)
+isless(x::AbsChar,   y::CodePoint) = codepoint(x) < codepoint(y)
+isless(x::CodePoint, y::CodePoint) = codepoint(x) < codepoint(y)
 
 # This is so that the hash is compatible with isless, but it's very inefficient
 Base.hash(x::CodePoint, h::UInt) = hash(Char(x), h)

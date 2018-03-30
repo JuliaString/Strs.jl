@@ -91,7 +91,7 @@ function _cpeq(a::T, b) where {C<:CSE, T<:Str{C}}
         done(b, pos) && return false
         c1, pnt = _nextcp(C, pnt)
         ch, pos = next(b, pos)
-        c1 == tobase(ch) || return false
+        c1 == codepoint(ch) || return false
     end
     true
 end

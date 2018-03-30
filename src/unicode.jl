@@ -5,26 +5,22 @@ Copyright 2017-2018 Gandalf Software, Inc., Scott P. Jones,
 Licensed under MIT License, see LICENSE.md
 =#
 
-@static isdefined(Base, :textwidth) || (text_width(str::AbstractString) = strwidth(str))
-@static isdefined(Base, :textwidth) || (text_width(ch::Char) = charwidth(ch))
-
 # Recommended by deprecate
-@static if VERSION < v"0.7.0-DEV"
-    import Base: is_assigned_char, normalize_string
+@static if V6_COMPAT
+    text_width(str::AbstractString) = strwidth(str)
+    text_width(ch::Char) = charwidth(ch)
+
+    import Base: is_assigned_char, normalize_string, isnumber
     Base.is_assigned_char(ch::CodePoint) = is_assigned(ch)
-    Base.normalize_string(str::Str, opt) = normalize(str, opt)
+    Base.normalize_string(str::Str, opt::Symbol) = normalize(str, opt)
     Base.strwidth(str::Str) = text_width(str)
     Base.charwidth(ch::CodePoint) = text_width(ch)
-else
-    Base.Unicode.normalize(str::Str, opt) = normalize(str, opt)
-    Base.Unicode.isassigned(ch::CodePoint) = is_assigned(ch)
-    is_graphic(ch::Char) = is_graphic(tobase(ch))
-    is_alphanumeric(ch::Char) = is_alphanumeric(tobase(ch))
-end
-
-@static if isdefined(Base, :isnumber)
-    import Base: isnumber
     isnumber(val::CodePoint) = is_numeric(val)
+else
+    Base.Unicode.normalize(str::Str, opt::Symbol) = normalize(str, opt)
+    Base.Unicode.isassigned(ch::CodePoint) = is_assigned(ch)
+    is_graphic(ch::Char) = is_graphic(codepoint(ch))
+    is_alphanumeric(ch::Char) = is_alphanumeric(codepoint(ch))
 end
 
 ############################################################################
@@ -34,31 +30,29 @@ end
 text_width(ch::UInt8)     = Int(ifelse(ch < 0x7f, ch > 0x1f, ch > 0x9f & ch != 0xad))
 text_width(ch::UInt16)    = utf8proc_charwidth(ch)
 text_width(ch::UInt32)    = utf8proc_charwidth(ch)
-text_width(ch::CodePoint) = text_width(tobase(ch))
-text_width(ch::ASCIIChr)  = Int(32 <= tobase(ch) <= 126)
+text_width(ch::CodePoint) = text_width(codepoint(ch))
+text_width(ch::ASCIIChr)  = Int(32 <= codepoint(ch) <= 126)
 
 text_width(str::Str) = mapreduce(text_width, +, 0, str)
 text_width(str::Str{Union{ASCIICSE,Latin_CSEs}}) = length(str)
 
 ############################################################################
 
-@inline _cat(ch::CodePoint)     = utf8proc_cat(tobase(ch))
 @inline _cat(ch::CodeUnitTypes) = ch <= 0x10ffff ? utf8proc_cat(ch) : Cint(30)
-@inline _cat(ch::Text4Chr)      = _cat(ch%UInt32)
+@inline _cat(ch::CodePoint)     = _cat(codepoint(ch))
 
 # returns code in 0:30 giving Unicode category
-@inline category_code(ch::CodePointTypes) = _cat(ch)
-
-@inline _cat_abbr(ch::CodePointTypes) = utf8proc_cat_abbr(tobase(ch))
+@inline category_code(ch::Union{CodePoint,CodeUnitTypes}) = _cat(ch)
 
 # more human-readable representations of the category code
-@inline category_abbrev(ch::CodePoint)     = _cat_abbr(ch)
-@inline category_abbrev(ch::CodeUnitTypes) = ch <= 0x10ffff ? _cat_abbr(ch) : "In"
-@inline category_abbrev(ch::Text4Chr)      = category_abbrev(ch%UInt32)
+@inline category_abbrev(ch::CodeUnitTypes) = ch <= 0x10ffff ? utf8proc_cat_abbr(ch) : "In"
+@inline category_abbrev(ch::CodePoint)     = category_abbrev(codepoint(ch))
 
-category_string(ch::CodePointTypes) = category_strings[category_code(ch) + 1]
+category_string(ch::CodeUnitTypes) = category_strings[_cat(ch) + 1]
+category_string(ch::CodePoint)     = category_string(codepoint(ch))
 
-is_assigned(ch::CodePointTypes) = category_code(ch) != Uni.CN
+is_assigned(ch::CodeUnitTypes) = category_code(ch) != Uni.CN
+is_assigned(ch::CodePoint) = is_assigned(codepoint(ch))
 
 _cat_mask(a) = a
 @inline _cat_mask(a, b) = (1%UInt << a%UInt) | (1%UInt << b%UInt)
@@ -127,24 +121,28 @@ const _isnumeric_a = _isdigit
 ############################################################################
 # Fallback definitions for all CodePoint types
 
-@inline is_control(ch::CodePointTypes)   = _iscntrl(tobase(ch))
-@inline is_digit(ch::CodePointTypes)     = _isdigit(tobase(ch))
-@inline is_hex_digit(ch::CodePointTypes) = _isxdigit(tobase(ch))
+@inline is_control(ch::CodeUnitTypes)   = _iscntrl(ch)
+@inline is_digit(ch::CodeUnitTypes)     = _isdigit(ch)
+@inline is_hex_digit(ch::CodeUnitTypes) = _isxdigit(ch)
+
+@inline is_control(ch::CodePoint)   = is_control(codepoint(ch))
+@inline is_digit(ch::CodePoint)     = is_digit(codepoint(ch))
+@inline is_hex_digit(ch::CodePoint) = is_hex_digit(codepoint(ch))
 
 @inline is_ascii(ch::Unsigned)    = ch <= 0x7f
-@inline is_ascii(ch::CodePoint)   = is_ascii(tobase(ch))
+@inline is_ascii(ch::CodePoint)   = is_ascii(codepoint(ch))
 @inline is_ascii(ch::ASCIIChr)    = true
 
 @inline is_latin(ch::Unsigned)    = ch <= 0xff
-@inline is_latin(ch::CodePoint)   = is_latin(tobase(ch))
+@inline is_latin(ch::CodePoint)   = is_latin(codepoint(ch))
 
 @inline is_bmp(ch::Unsigned)      = ch <= 0xffff && !is_surrogate_codeunit(ch)
 @inline is_bmp(ch::UInt8)         = true
-@inline is_bmp(ch::CodePoint)     = is_bmp(tobase(ch))
+@inline is_bmp(ch::CodePoint)     = is_bmp(codepoint(ch))
 
 @inline is_unicode(ch::Unsigned)  = ch <= 0x10ffff && !is_surrogate_codeunit(ch)
 @inline is_unicode(ch::UInt8)     = true
-@inline is_unicode(ch::CodePoint) = is_unicode(tobase(ch))
+@inline is_unicode(ch::CodePoint) = is_unicode(codepoint(ch))
 
 const _catfuns =
     ((:numeric,      :numeric),
@@ -166,9 +164,10 @@ for (nnam, fnam) in _catfuns
         
     @eval $(fnam_al)(ch) = is_ascii(ch) ? $(fnam_a)(ch) : $(Symbol(string(namroot, "_l")))(ch)
     @eval $(fnam_ch)(ch) = is_latin(ch) ? $(fnam_al)(ch) : $(Symbol(string(namroot, "_u")))(ch)
-    @eval $(isnam)(ch::CodePointTypes) = $(fnam_ch)(tobase(ch))
-    @eval $(isnam)(ch::ASCIIChr)       = $(fnam_a)(tobase(ch))
-    @eval $(isnam)(ch::LatinChars)     = $(fnam_al)(tobase(ch))
+    @eval $(isnam)(ch::CodeUnitTypes)  = $(fnam_ch)(ch)
+    @eval $(isnam)(ch::CodePoint)      = $(fnam_ch)(codepoint(ch))
+    @eval $(isnam)(ch::ASCIIChr)       = $(fnam_a)(codepoint(ch))
+    @eval $(isnam)(ch::LatinChars)     = $(fnam_al)(codepoint(ch))
 end
 
 ############################################################################
