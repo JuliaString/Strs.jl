@@ -81,7 +81,7 @@ cmp(a::Str, b::Str)            = @preserve a b _cmp(CompareStyle(a, b), a, b)
 # as if comparing Char to Char, to get ordering correct when dealing with > 0xffff non-BMP
 # characters
 
-@inline _fasteq(a, b) = (len = _len(a)) == _len(b) && _memcmp(a, b, len) == 0
+@inline _fasteq(a, b) = (len = ncodeunits(a)) == ncodeunits(b) && _memcmp(a, b, len) == 0
 
 function _cpeq(a::T, b) where {C<:CSE, T<:Str{C}}
     len, pnt = _lenpnt(a)
@@ -115,9 +115,9 @@ end
 # This can be speeded up in the future with SSE/AVX instructions to unpack bytes,
 # or to mask chunks of characters first to see if there are any too large in the wider of the two
 function _wideneq(a::S, b::T) where {S<:Str,T<:Str}
-    (len = _len(a)) == _len(b) || return false
-    pnt1 = _pnt(a)
-    pnt2 = _pnt(b)
+    (len = ncodeunits(a)) == ncodeunits(b) || return false
+    pnt1 = pointer(a)
+    pnt2 = pointer(b)
     fin  = pnt1 + sizeof(a)
     while pnt1 < fin
         get_codeunit(pnt1) == get_codeunit(pnt2) || return false

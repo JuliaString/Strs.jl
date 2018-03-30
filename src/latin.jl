@@ -19,12 +19,12 @@ function string(collection::_UBS...)
     length(c) == 1 && return collection[1]
     len = 0
     for str in collection
-        len += _len(str)
+        len += ncodeunits(str)
     end
     buf, pnt = _allocate(len)
     for str in collection
-        len = _len(str)
-        _memcpy(pnt, _pnt(str), len)
+        len = ncodeunits(str)
+        _memcpy(pnt, pointer(str), len)
         pnt += len
     end
     Str(LatinCSE, buf)
@@ -74,7 +74,7 @@ function convert(::Type{LatinStr}, str::String)
     # get number of bytes to allocate
     len, flags, num4byte, num3byte, num2byte, latinbyte = unsafe_check_string(str, 1, sizeof(str))
     num4byte + num3byte + num2byte == 0 || unierror(UTF_ERR_INVALID_LATIN1)
-    Str(LatinCSE, flags == 0 ? str : _utf8_to_latin(_pnt(str), len))
+    Str(LatinCSE, flags == 0 ? str : _utf8_to_latin(pointer(str), len))
 end
 
 _convert(::Type{_LatinCSE}, ch::UInt8) = _convert(ch <= 0x7f ? ASCIICSE : _LatinCSE, ch)
@@ -89,7 +89,7 @@ function convert(::Type{_LatinStr}, str::String)
         unsafe_check_string(str, 1, sizeof(str))
     num4byte + num3byte + num2byte == 0 || unierror(UTF_ERR_INVALID_LATIN1)
     Str(latinbyte == 0 ? ASCIICSE : _LatinCSE,
-        flags == 0 ? str : _utf8_to_latin(_pnt(str), len))
+        flags == 0 ? str : _utf8_to_latin(pointer(str), len))
 end
 
 convert(::Type{LatinStr}, a::Vector{UInt8}) = _convert(LatinStr, a)

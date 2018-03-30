@@ -75,9 +75,9 @@ hash(str::Union{S,SubString{S}},
                           
 function cvthash(str::Union{S,SubString{S}}, seed::UInt) where {S<:Str}
     seed += Base.memhash_seed
-    (len = _len(str)) == 0 && return _hash(seed)
+    (len = ncodeunits(str)) == 0 && return _hash(seed)
     @preserve str begin
-        pnt = _pnt(str)
+        pnt = pointer(str)
         len, flags, num4byte, num3byte, num2byte, latin1 = count_chars(S, pnt, len)
         # could be UCS2, _UCS2, UTF32, _UTF32, Text2, Text4
         _hash((flags == 0
@@ -89,18 +89,18 @@ end
 
 function cvthash(str::Union{S,SubString{S}}, seed::UInt) where {S<:Str{<:Latin_CSEs}}
     seed += Base.memhash_seed
-    (len = _len(str)) == 0 && return _hash(seed)
+    (len = ncodeunits(str)) == 0 && return _hash(seed)
     @preserve str begin
-        pnt = _pnt(str)
+        pnt = pointer(str)
         _hash((cnt = count_latin(len, pnt)) == 0 ? str : _latin_to_utf8(pnt, len + cnt), seed)
     end
 end
 
 function cvthash(str::Union{S,SubString{S}}, seed::UInt) where {S<:Str{UTF16CSE}}
     seed += Base.memhash_seed
-    (len = _len(str)) == 0 && return _hash(seed)
+    (len = ncodeunits(str)) == 0 && return _hash(seed)
     @preserve str begin
-        pnt = _pnt(str)
+        pnt = pointer(str)
         len, flags, num4byte, num3byte, num2byte, latin1 = count_chars(S, pnt, len)
         _hash((flags == 0
                ? _cvtsize(UInt8, pnt, len)

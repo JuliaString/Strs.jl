@@ -646,18 +646,18 @@ end
 # These should probably be handled by traits, or dispatched by getting the codeunit type for each
 _memcmp(a::Union{String, ByteStr},
         b::Union{String, ByteStr, SubString{String}, SubString{<:ByteStr}}, siz) =
-    _memcmp(_pnt(a), _pnt(b), siz)
+    _memcmp(pointer(a), pointer(b), siz)
 _memcmp(a::SubString{<:Union{String, ByteStr}}, b::Union{String, ByteStr}, siz) =
-    _memcmp(_pnt(a), _pnt(b), siz)
+    _memcmp(pointer(a), pointer(b), siz)
 _memcmp(a::SubString{<:Union{String, ByteStr}}, b::SubString{<:Union{String, ByteStr}}, siz) =
-    _memcmp(_pnt(a), _pnt(b), siz)
+    _memcmp(pointer(a), pointer(b), siz)
 
-_memcmp(a::WordStr, b::MaybeSub{<:WordStr}, siz) = _memcmp(_pnt(a), _pnt(b), siz)
-_memcmp(a::QuadStr, b::MaybeSub{<:QuadStr}, siz) = _memcmp(_pnt(a), _pnt(b), siz)
-_memcmp(a::SubString{<:WordStr}, b::WordStr, siz) = _memcmp(_pnt(a), _pnt(b), siz)
-_memcmp(a::SubString{<:QuadStr}, b::QuadStr, siz) = _memcmp(_pnt(a), _pnt(b), siz)
-_memcmp(a::SubString{<:WordStr}, b::SubString{<:WordStr}, siz) = _memcmp(_pnt(a), _pnt(b), siz)
-_memcmp(a::SubString{<:QuadStr}, b::SubString{<:QuadStr}, siz) = _memcmp(_pnt(a), _pnt(b), siz)
+_memcmp(a::WordStr, b::MaybeSub{<:WordStr}, siz) = _memcmp(pointer(a), pointer(b), siz)
+_memcmp(a::QuadStr, b::MaybeSub{<:QuadStr}, siz) = _memcmp(pointer(a), pointer(b), siz)
+_memcmp(a::SubString{<:WordStr}, b::WordStr, siz) = _memcmp(pointer(a), pointer(b), siz)
+_memcmp(a::SubString{<:QuadStr}, b::QuadStr, siz) = _memcmp(pointer(a), pointer(b), siz)
+_memcmp(a::SubString{<:WordStr}, b::SubString{<:WordStr}, siz) = _memcmp(pointer(a), pointer(b), siz)
+_memcmp(a::SubString{<:QuadStr}, b::SubString{<:QuadStr}, siz) = _memcmp(pointer(a), pointer(b), siz)
 
 _memcpy(dst::Ptr{UInt8}, src::Ptr, siz) =
     ccall(:memcpy, Ptr{UInt8}, (Ptr{Cvoid}, Ptr{Cvoid}, UInt), dst, src, siz)
@@ -776,11 +776,3 @@ function containsnul(str::QuadStr)
         pnt - CHUNKSZ != fin && unsafe_load(reinterpret(Ptr{UInt32}, pnt)) == 0x00000
     end
 end
-
-# pointer conversions of ASCII/UTF8/UTF16/UTF32 strings:
-pointer(str::Str) = _pnt(str)
-pointer(str::Str, pos::Integer) = bytoff(_pnt(str), pos - 1)
-
-# pointer conversions of SubString of ASCII/UTF8/UTF16/UTF32:
-pointer(x::SubString{<:Str}) = bytoff(_pnt(x.string), x.offset)
-pointer(x::SubString{<:Str}, pos::Integer) = bytoff(_pnt(x.string), x.offset + pos - 1)

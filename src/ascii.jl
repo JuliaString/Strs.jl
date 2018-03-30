@@ -12,7 +12,7 @@ Based in part on code for ASCIIString that used to be in Julia
 function _string(coll)
     n = 0
     for str in coll
-        n += _len(str)
+        n += ncodeunits(str)
     end
     buf, out = _allocate(UInt8, n)
     for str in coll

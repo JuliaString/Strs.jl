@@ -11,8 +11,6 @@ codeunit(::Type{<:CSE}) = UInt8
 codeunit(::Type{<:Word_CSEs}) = UInt16
 codeunit(::Type{<:Quad_CSEs}) = UInt32
 
-ncodeunits(str::T) where {T<:Str} = _len(str)
-
 """Type of codeunits"""
 codeunit(::Type{UniStr})    = UInt32 # Note, the real type could be UInt8, UInt16, or UInt32
 codeunit(::Type{<:Str{C}}) where {C<:CSE} = codeunit(C)
@@ -70,7 +68,7 @@ codepoint_size(::Type{T}) where {T<:Union{String,Str}} = sizeof(eltype(T))
 get_codeunit(dat, pos) = codeunit(dat, pos)
 get_codeunit(pnt::Ptr{<:CodeUnitTypes}, pos) = unsafe_load(pnt, pos)
 get_codeunit(dat::AbstractVector{<:CodeUnitTypes}, pos) = dat[pos]
-get_codeunit(str::Str, pos) = get_codeunit(_pnt(str), pos)
+get_codeunit(str::Str, pos) = get_codeunit(pointer(str), pos)
 
 codeunit(str::Str, pos::Integer) = get_codeunit(str, pos)
 

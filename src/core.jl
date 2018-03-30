@@ -13,12 +13,12 @@ _lastindex(::CodeUnitSingle, str) = (@_inline_meta(); ncodeunits(str))
 @propagate_inbounds function _getindex(::CodeUnitSingle, T, str, pos::Int)
     @_inline_meta()
     @boundscheck checkbounds(str, pos)
-    T(get_codeunit(_pnt(str), pos))
+    T(get_codeunit(pointer(str), pos))
 end
 
 @propagate_inbounds function _next(::CodeUnitSingle, T, str, pos)
     @_inline_meta()
-    @boundscheck 0 < pos <= _len(str) || boundserr(str, pos)
+    @boundscheck 0 < pos <= ncodeunits(str) || boundserr(str, pos)
     T(get_codeunit(str, pos)), pos + 1
 end
 
@@ -65,7 +65,7 @@ end
     len = ncodeunits(str)
     pos == len + 1 && return pos
     @boundscheck 0 < pos <= len || boundserr(str, pos)
-    @preserve str _thisind(cs, str, len, _pnt(str), pos)
+    @preserve str _thisind(cs, str, len, pointer(str), pos)
 end
 
 @propagate_inbounds function _prevind(::CodeUnitSingle, str, i)
@@ -255,7 +255,7 @@ unsafe_convert(::Type{Ptr{Int8}}, s::SubString{<:ByteStr}) =
 function _reverse(::CodeUnitSingle, ::Type{C}, len, str::Str{C}) where {C<:CSE}
     len < 2 && return str
     @preserve str begin
-        pnt = _pnt(str)
+        pnt = pointer(str)
         T = codeunit(C)
         buf, beg = _allocate(T, len)
         out = bytoff(beg, len)
@@ -269,7 +269,7 @@ end
 
 function _reverse(::CodeUnitMulti, ::Type{C}, len, str) where {C<:CSE}
     @inbounds ((t = nextind(str, 0)) > len || nextind(str, t) > len) && return str
-    @preserve str _reverse(CodeUnitMulti(), C, len, _pnt(str))
+    @preserve str _reverse(CodeUnitMulti(), C, len, pointer(str))
 end
 
 reverse(str::MaybeSub{T}) where {C<:CSE,T<:Str{C}} =

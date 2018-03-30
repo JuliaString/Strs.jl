@@ -166,7 +166,7 @@ is_valid(::Type{Str{<:CSE{CS}}}, str::T) where {T<:Str{<:CSE{CS}}} where {CS} =
 
 _isvalid(::AlwaysValid, v) = true
 
-_isvalid(::UnknownValidity, str::T) where {T<:Str} = _isvalid(T, _pnt(str), _len(str))
+_isvalid(::UnknownValidity, str::T) where {T<:Str} = _isvalid(T, pointer(str), ncodeunits(str))
 
 # By default, check that it is valid Unicode codepoint
 _isvalid(::UnknownValidity, v) = _isvalid(UnknownValidity(), UTF32CharSet, charset(v), v)

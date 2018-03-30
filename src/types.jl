@@ -319,10 +319,9 @@ _data(s::String)  = s
 _data(s::ByteStr) = @static V6_COMPAT ? Vector{UInt8}(s.data) : unsafe_wrap(Vector{UInt8}, s.data)
 
 """Pointer to codeunits of string"""
-_pnt(s)          = pointer(s)
-_pnt(s::ByteStr) = pointer(s.data)
-_pnt(s::WordStr) = reinterpret(Ptr{UInt16}, pointer(s.data))
-_pnt(s::QuadStr) = reinterpret(Ptr{UInt32}, pointer(s.data))
+pointer(s::ByteStr) = pointer(s.data)
+pointer(s::WordStr) = reinterpret(Ptr{UInt16}, pointer(s.data))
+pointer(s::QuadStr) = reinterpret(Ptr{UInt32}, pointer(s.data))
 
 const CHUNKSZ = sizeof(UInt64) # used for fast processing of strings
 
@@ -330,12 +329,12 @@ _pnt64(s::Union{String,Vector{UInt8}}) = reinterpret(Ptr{UInt64}, pointer(s))
 _pnt64(s::Str) = reinterpret(Ptr{UInt64}, pointer(s.data))
 
 """Length of string in codeunits"""
-_len(s) = sizeof(s)
-_len(s::WordStr) = sizeof(s) >>> 1
-_len(s::QuadStr) = sizeof(s) >>> 2
+ncodeunits(s::Str)     = sizeof(s)
+ncodeunits(s::WordStr) = sizeof(s) >>> 1
+ncodeunits(s::QuadStr) = sizeof(s) >>> 2
 
 # For convenience
-@inline _lenpnt(s) = _len(s), _pnt(s)
+@inline _lenpnt(s) = ncodeunits(s), pointer(s)
 
 @inline _calcpnt(str, siz) = (pnt = _pnt64(str) - CHUNKSZ;  (pnt, pnt + siz))
 
@@ -353,9 +352,12 @@ Base.SubString(str::Str{C}, off::Int) where {C<:SubSet_CSEs} =
 Base.SubString(str::Str{C}, off::Int, fin::Int) where {C<:SubSet_CSEs} =
     SubString(Str(basecse(C), str), off, fin)
 
-# Todo: clean these up, avoid so many definitions
-_pnt(s::SubString{<:WordStr}) = reinterpret(Ptr{UInt16}, pointer(s))
-_pnt(s::SubString{<:QuadStr}) = reinterpret(Ptr{UInt32}, pointer(s))
+# pointer conversions of ASCII/UTF8/UTF16/UTF32 strings:
+pointer(str::Str, pos::Integer) = bytoff(pointer(str), pos - 1)
 
-_len(s::SubString{<:WordStr}) = sizeof(s) >>> 1
-_len(s::SubString{<:QuadStr}) = sizeof(s) >>> 2
+# pointer conversions of SubString of ASCII/UTF8/UTF16/UTF32:
+pointer(x::SubString{<:Str}) = bytoff(pointer(x.string), x.offset)
+pointer(x::SubString{<:Str}, pos::Integer) = bytoff(pointer(x.string), x.offset + pos - 1)
+
+#ncodeunits(s::SubString{<:WordStr}) = sizeof(s) >>> 1
+#ncodeunits(s::SubString{<:QuadStr}) = sizeof(s) >>> 2

@@ -196,8 +196,8 @@ end
     throw(UnicodeError(UTF_ERR_INVALID_INDEX, Int(i), codeunit(s, i)))
 
 function thisind(str::String, pos::Integer)
-    @boundscheck 0 < pos <= _len(str) || boundserr(str, pos)
-    pnt = _pnt(str) + pos - 1
+    @boundscheck 0 < pos <= ncodeunits(str) || boundserr(str, pos)
+    pnt = pointer(str) + pos - 1
     pos - (checkcont(pnt) ? (checkcont(pnt - 1) ? (checkcont(pnt - 2) ? 3 : 2) : 1) : 0)
 end
 

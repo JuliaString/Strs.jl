@@ -32,7 +32,7 @@ print(io::IO, str::MaybeSub{T}) where {T<:Str{<:Union{ASCIICSE,UTF8CSE},Nothing}
 
 function print(io::IO, str::MaybeSub{<:LatinStrings})
     @preserve str begin
-        pnt = _pnt(str)
+        pnt = pointer(str)
         fin = pnt + sizeof(str)
         # Skip and write out ASCII sequences together
         while pnt < fin

@@ -1,7 +1,7 @@
 #=
 Constructors for Str strings
 
-Copyright 2017 Gandalf Software, Inc., Scott P. Jones
+Copyright 2017-2018 Gandalf Software, Inc., Scott P. Jones
 Licensed under MIT License, see LICENSE.md
 =#
 
@@ -58,7 +58,7 @@ function _str(str::T) where {T<:Union{Vector{UInt8}, BinaryStrings, String}}
     # handle zero length string quickly
     (siz = sizeof(str)) == 0 && return empty_ascii
     @preserve str begin
-        pnt = _pnt(str)
+        pnt = pointer(str)
         len, flags, num4byte, num3byte, num2byte, latin1byte = unsafe_check_string(pnt, 1, siz)
         if flags == 0
             buf, out = _allocate(UInt8, len)
@@ -118,7 +118,7 @@ convert(::Type{UniStr}, str::Str{<:Union{ASCIICSE,SubSet_CSEs}}) = str
 function convert(::Type{UniStr}, str::T) where {T<:Str}
     # handle zero length string quickly
     is_empty(str) && return empty_ascii
-    len, flags = count_chars(T, _pnt(str), _len(str))
+    len, flags = count_chars(T, pointer(str), ncodeunits(str))
     _str_encode(str, len, flags)
 end
 
@@ -131,7 +131,7 @@ function unsafe_str(str::Union{Vector{UInt8}, T, SubString{T}};
                     ) where {T <: Union{BinaryStr, Text1Str, String}}
     # handle zero length string quickly
     (siz = sizeof(str)) == 0 && return empty_ascii
-    pnt = _pnt(str)
+    pnt = pointer(str)
     len, flags, num4byte, num3byte, num2byte, latin1byte, invalids =
         unsafe_check_string(pnt, 1, siz;
                             accept_long_null  = accept_long_null,
@@ -148,7 +148,7 @@ function unsafe_str(str::Union{Vector{UInt8}, T, SubString{T}};
     elseif num2byte + num3byte != 0
         Str(_UCS2CSE, _encode_utf16(pnt, len))
     else
-        Str(latin1byte == 0 ? ASCIICSE : _LatinCSE, _encode_ascii_latin(_pnt(str), len))
+        Str(latin1byte == 0 ? ASCIICSE : _LatinCSE, _encode_ascii_latin(pointer(str), len))
     end
 end
 

@@ -42,8 +42,7 @@ function _lower_utf8(beg, off, len)
                     if diff < 0
                         outend -= diff
                         resize!(buf, outend - out)
-                        #println("diff=$diff, out=$out, _pnt(buf)=$(_pnt(buf))")
-                        out = _pnt(buf)
+                        out = pointer(buf)
                         outend = out + sizeof(buf)
                     end
                     out = output_utf8_3byte!(out, c16)
@@ -111,8 +110,7 @@ function _upper_utf8(beg, off, len)
                     if diff < 0
                         outend -= diff
                         resize!(buf, outend - out)
-                        #println("diff=$diff, out=$out, _pnt(buf)=$(_pnt(buf))")
-                        out = _pnt(buf)
+                        out = pointer(buf)
                         outend = out + sizeof(buf)
                     end
                     out = output_utf8_3byte!(out, c16)
@@ -148,7 +146,7 @@ end
 
 function lowercase(str::Str{UTF8CSE})
     @preserve str begin
-        pnt = beg = _pnt(str)
+        pnt = beg = pointer(str)
         fin = beg + sizeof(str)
         while pnt < fin
             ch = get_codeunit(pnt)
@@ -162,7 +160,7 @@ function lowercase(str::Str{UTF8CSE})
                              : (ch < 0xe0
                                 ? get_utf8_2byte(pnt += 1, ch)
                                 : get_utf8_3byte(pnt += 2, ch))%UInt32))) &&
-                                    return _lower_utf8(beg, prv-beg, _len(str))
+                                    return _lower_utf8(beg, prv-beg, ncodeunits(str))
             pnt += 1
         end
         str
@@ -171,7 +169,7 @@ end
 
 function uppercase(str::Str{UTF8CSE})
     @preserve str begin
-        pnt = beg = _pnt(str)
+        pnt = beg = pointer(str)
         fin = beg + sizeof(str)
         while pnt < fin
             ch = get_codeunit(pnt)
@@ -185,7 +183,7 @@ function uppercase(str::Str{UTF8CSE})
                              : (ch < 0xe0
                                 ? get_utf8_2byte(pnt += 1, ch)
                                 : get_utf8_3byte(pnt += 2, ch))%UInt32))) &&
-                                    return _upper_utf8(beg, prv-beg, _len(str))
+                                    return _upper_utf8(beg, prv-beg, ncodeunits(str))
             pnt += 1
         end
         str

@@ -30,11 +30,12 @@ ends_with(str::AbstractString, chars::Chars) = !is_empty(str) && last(str) in ch
 end # if false
 
 starts_with(a::MaybeSub{<:Str{C}}, b::MaybeSub{<:Str{C}}) where {C<:CSE} =
-    (len = _len(b)) <= _len(a) && (@preserve a b _memcmp(_pnt(a), _pnt(b), len)) == 0
+    (len = ncodeunits(b)) <= ncodeunits(a) &&
+    (@preserve a b _memcmp(pointer(a), pointer(b), len)) == 0
 
 ends_with(a::MaybeSub{<:Str{C}}, b::MaybeSub{<:Str{C}}) where {C<:CSE} =
-    (lenb = _len(b)) <= (lena = _len(a)) &&
-    (@preserve a b _memcmp(_pnt(a) + lena - lenb, _pnt(b), lenb)) == 0
+    (lenb = ncodeunits(b)) <= (lena = ncodeunits(a)) &&
+    (@preserve a b _memcmp(pointer(a) + lena - lenb, pointer(b), lenb)) == 0
 
 @static if false
 function chop(s::AbstractString; head::Integer = 0, tail::Integer = 1)
