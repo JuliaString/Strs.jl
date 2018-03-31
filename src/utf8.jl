@@ -351,9 +351,9 @@ end
 
 @propagate_inbounds function _prevind(::CodeUnitMulti, str::MS_UTF8, pos::Integer)
     (pos -= 1) == 0 && return 0
+    numcu = ncodeunits(str)
     @preserve str begin
-        numcu, pnt = _lenpnt(str)
-        pnt += pos
+        pnt = pointer(str) + pos
         pos == numcu &&
             return pos - (checkcont(pnt-1) ? (checkcont(pnt-2) ? checkcont(pnt-3) + 2 : 1) : 0)
         @boundscheck 0 < pos < numcu || boundserr(str, pos+1)
@@ -654,27 +654,26 @@ _transcode_utf8(dat::Vector{<:WideCodeUnit}, len) = _transcode_utf8(pointer(dat)
 
 function convert(::Type{<:Str{UTF8CSE}}, str::MS_UTF16)
     # handle zero length string quickly
-    isempty(str) && return empty_utf8
+    (siz = ncodeunits(str)) == 0 && return empty_utf8
     @preserve str begin
-        siz, pnt = _lenpnt(str)
+        pnt = pointer(str)
         len, flags, num4byte, num3byte, num2byte, latinbyte = count_chars(UTF16Str, pnt, siz)
         if flags == 0
-            buf = _cvtsize(UInt8, pnt, len)
+            Str(UTF8CSE, _cvtsize(UInt8, pnt, len))
         elseif num4byte == 0
-            buf = _encode_utf8(pnt, len + latinbyte + num2byte + num3byte*2)
+            Str(UTF8CSE, _encode_utf8(pnt, len + latinbyte + num2byte + num3byte*2))
         else
-            buf = _transcode_utf8(pnt, len + latinbyte + num2byte + num3byte*2 + num4byte*3)
+            Str(UTF8CSE, _transcode_utf8(pnt, len + latinbyte + num2byte + num3byte*2 + num4byte*3))
         end
-        Str(UTF8CSE, buf)
     end
 end
 
 function convert(::Type{<:Str{UTF8CSE}},
                  str::MaybeSub{T}) where {C<:Union{UCS2_CSEs,UTF32_CSEs},T<:Str{C}}
     # handle zero length string quickly
-    isempty(str) && return empty_utf8
+    (siz = ncodeunits(str)) == 0 && return empty_utf8
     @preserve str begin
-        siz, pnt = _lenpnt(str)
+        pnt = pointer(str)
         len, flags, num4byte, num3byte, num2byte, latinbyte = count_chars(T, pnt, siz)
         Str(UTF8CSE, (flags == 0
                       ? _cvtsize(UInt8, pnt, len)

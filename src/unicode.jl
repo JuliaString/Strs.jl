@@ -185,8 +185,8 @@ end
 function is_latin(str::MaybeSub{String})
     (siz = sizeof(str)) == 0 && return true
     @preserve str begin
-        len, pnt = _lenpnt(str)
-        fin = pnt + len
+        pnt = pointer(str)
+        fin = pnt + siz
         while pnt < fin
             cu = get_codeunit(pnt)
             # cu must be 1) 0-0x7f, or 2) 0xc2 or 0xc3 followed by 0x80-0xbf
@@ -210,8 +210,8 @@ end
 function is_bmp(str::MaybeSub{String})
     (siz = sizeof(str)) == 0 && return true
     @preserve str begin
-        len, pnt = _lenpnt(str)
-        fin = pnt + len
+        pnt = pointer(str)
+        fin = pnt + siz
         while pnt < fin
             cu = get_codeunit(pnt)
             # cu must be 1) 0-0x7f, or 2) 0xc2 or 0xc3 followed by 0x80-0xbf

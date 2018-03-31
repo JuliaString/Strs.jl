@@ -728,12 +728,13 @@ function repeat(str::T, cnt::Integer) where {C<:CSE,T<:Str{C}}
     cnt < 2 && return cnt == 1 ? str : (cnt == 0 ? empty_str(C) : repeaterr(cnt))
     CU = codeunit(T)
     @preserve str begin
-        len, pnt = _lenpnt(str)
+        len = ncodeunits(str)
         totlen = len * cnt
         buf, out = _allocate(CU, totlen)
         if len == 1 # common case: repeating a single codeunit string
-            _memset(out, get_codeunit(pnt), cnt)
+            _memset(out, get_codeunit(pointer(str)), cnt)
         else
+            pnt = pointer(str)
             fin = bytoff(out, totlen)
             siz = bytoff(CU, len)
             while out < fin

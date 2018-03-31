@@ -175,14 +175,17 @@ end
 
 @propagate_inbounds function _collectstr(::CodeUnitSingle, ::Type{S},
                                          str::MaybeSub{T}) where {S,T<:Str}
-    len, pnt = _lenpnt(str)
+    len = ncodeunits(str)
     vec = create_vector(S, len)
     cpt = eltype(T)
-    if S == cpt
-        @inbounds unsafe_copyto!(reinterpret(Ptr{basetype(cpt)}, pointer(vec)), pnt, len)
-    else
-        @inbounds for i = 1:len
-            vec[i] = T(get_codeunit(pnt, i))
+    @preserve str begin
+        pnt = pointer(str)
+        if S == cpt
+            unsafe_copyto!(reinterpret(Ptr{basetype(cpt)}, pointer(vec)), pnt, len)
+        else
+            @inbounds for i = 1:len
+                vec[i] = T(get_codeunit(pnt, i))
+            end
         end
     end
     vec

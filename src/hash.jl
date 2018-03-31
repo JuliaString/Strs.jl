@@ -9,36 +9,36 @@ Licensed under MIT License, see LICENSE.md
 # where different string types are supposed to compare as ==
 
 function utf8crc(str::Union{S,SubString{S}}, seed::UInt) where {S<:Str}
+    (len = ncodeunits(str)) == 0 && return utf8crc(str, seed)
     @preserve str begin
-        len, pnt = _lenpnt(str)
-        len == 0 && return utf8crc(str, seed)
+        pnt = pointer(str)
         len, flags, num4byte, num3byte, num2byte, latin1 = count_chars(S, pnt, len)
         # could be UCS2, _UCS2, UTF32, _UTF32, Text2, Text4
-        buf = (flags == 0
-               ? _cvtsize(UInt8, pnt, len)
-               : _encode_utf8(pnt, len += latin1 + num2byte + num3byte*2 + num4byte*3))
-        utf8crc(buf, seed)
+        utf8crc((flags == 0
+                 ? _cvtsize(UInt8, pnt, len)
+                 : _encode_utf8(pnt, len += latin1 + num2byte + num3byte*2 + num4byte*3)),
+                seed)
     end
 end
 
 function utf8crc(str::Union{S,SubString{S}},
                  seed::UInt) where {S<:Str{<:Union{Text1CSE,Latin_CSEs}}}
+    (len = ncodeunits(str)) == 0 && return utf8crc(str, seed)
     @preserve str begin
-        len, pnt = _lenpnt(str)
-        len != 0 && (cnt = count_latin(len, pnt)) != 0 && (str = _latin_to_utf8(pnt, len + cnt))
-        utf8crc(str, seed)
+        pnt = pointer(str)
+        utf8crc((cnt = count_latin(len, pnt)) == 0 ? str : _latin_to_utf8(pnt, len + cnt), seed)
     end
 end
 
 function utf8crc(str::Union{S,SubString{S}}, seed::UInt) where {S<:Str{UTF16CSE}}
+    (len = ncodeunits(str)) == 0 && return utf8crc(str, seed)
     @preserve str begin
-        len, pnt = _lenpnt(str)
-        len == 0 && return utf8crc(str, seed)
+        pnt = pointer(str)
         len, flags, num4byte, num3byte, num2byte, latin1 = count_chars(S, pnt, len)
-        buf = (flags == 0
-               ? _cvtsize(UInt8, pnt, len)
-               : _cvt_16_to_utf8(S, pnt, len += latin1 + num2byte + num3byte*2 + num4byte*3))
-        utf8crc(buf, seed)
+        utf8crc((flags == 0
+                 ? _cvtsize(UInt8, pnt, len)
+                 : _cvt_16_to_utf8(S, pnt, len += latin1 + num2byte + num3byte*2 + num4byte*3)),
+                seed)
     end
 end
 

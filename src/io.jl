@@ -62,7 +62,8 @@ write(io::IO, ch::LatinChars) = write(io, ch%UInt8)
 
 function print(io::IO, str::MaybeSub{<:UCS2Strings})
     @preserve str begin
-        len, pnt = _lenpnt(str)
+        len = ncodeunits(str)
+        pnt = pointer(str)
         fin = bytoff(pnt, len)
         while pnt < fin
             _write_ucs2(io, get_codeunit(pnt))
@@ -76,7 +77,8 @@ end
 
 function print(io::IO, str::MaybeSub{<:Str{UTF16CSE}})
     @preserve str begin
-        siz, pnt = _lenpnt(str)
+        siz = ncodeunits(str)
+        pnt = pointer(str)
         # Skip and write out ASCII sequences together
         fin = pnt + siz
         while pnt < fin
@@ -101,7 +103,8 @@ end
 
 function print(io::IO, str::MaybeSub{<:UTF32Strings})
     @preserve str begin
-        len, pnt = _lenpnt(str)
+        len = ncodeunits(str)
+        pnt = pointer(str)
         fin = bytoff(pnt, len)
         while pnt < fin
             write_utf8(io, get_codeunit(pnt))

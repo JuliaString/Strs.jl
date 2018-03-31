@@ -10,7 +10,7 @@ Based in part on code for ASCIIString that used to be in Julia
 
 is_ascii(str::Str{C}) where {C<:_LatinCSE}    = false
 is_latin(str::Str{C}) where {C<:Latin_CSEs}   = true
-is_bmp(str::Str{C}) where {C<:Latin_CSEs)     = true
+is_bmp(str::Str{C}) where {C<:Latin_CSEs}     = true
 is_unicode(str::Str{C}) where {C<:Latin_CSEs} = true
 
 const _UBS = Str{<:Union{ASCIICSE, Latin_CSEs}}

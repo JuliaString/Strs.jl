@@ -2,8 +2,10 @@
 # Licensed under MIT License, see LICENSE.md
 
 function _cmp(::ByteCompare, a, b)
-    asiz, apnt = _lenpnt(a)
-    bsiz, bpnt = _lenpnt(b)
+    asiz = ncodeunits(a)
+    apnt = pointer(a)
+    bsiz = ncodeunits(b)
+    bpnt = pointer(b)
     asiz == bsiz && return apnt === bpnt ? 0 : _memcmp(apnt, bpnt, asiz)
     res = _memcmp(apnt, bpnt, min(asiz, bsiz))
     res < 0 ? -1 : res > 0 ? 1 : cmp(asiz, bsiz)
@@ -29,8 +31,10 @@ function _memcmp16(apnt, bpnt, len)
 end
 
 function _cmp(::UTF16Compare, a, b)
-    asiz, apnt = _lenpnt(a)
-    bsiz, bpnt = _lenpnt(b)
+    asiz = ncodeunits(a)
+    apnt = pointer(a)
+    bsiz = ncodeunits(b)
+    bpnt = pointer(b)
     if asiz < bsiz
         ifelse(_memcmp16(apnt, bpnt, asiz) <= 0, -1, 1)
     elseif asiz > bsiz
@@ -42,9 +46,10 @@ function _cmp(::UTF16Compare, a, b)
     end
 end
 
+@inline _lenpntfin(str) = (ncodeunits(str), pointer(str), pointer(str) + sizeof(str))
+
 @inline function _cpcmp(a::T, b) where {C<:CSE,T<:Str{C}}
-    len, pnt = _lenpnt(a)
-    fin = pnt + sizeof(a)
+    len, pnt, fin = _lenpntfin(a)
     pos = start(b)
     while pnt < fin
         done(b, pos) && return 1
@@ -60,10 +65,8 @@ _cmp(::CodePointCompare, a::Str, b::AbstractString) = _cpcmp(a, b)
 _cmp(::CodePointCompare, a::AbstractString, b::Str) = -_cpcmp(b, a)
 
 function _cmp(::CodePointCompare, a::S, b::T) where {CSE1,CSE2,S<:Str{CSE1},T<:Str{CSE2}}
-    len1, pnt1 = _lenpnt(a)
-    fin1 = pnt1 + sizeof(a)
-    len2, pnt2 = _lenpnt(b)
-    fin2 = pnt2 + sizeof(b)
+    len1, pnt1, fin1 = _lenpntfin(a)
+    len2, pnt2, fin2 = _lenpntfin(b)
     while pnt1 < fin1
         pnt2 < fin2 || return 1
         c1, pnt1 = _nextcp(CSE1, pnt1)
@@ -84,8 +87,7 @@ cmp(a::Str, b::Str)            = @preserve a b _cmp(CompareStyle(a, b), a, b)
 @inline _fasteq(a, b) = (len = ncodeunits(a)) == ncodeunits(b) && _memcmp(a, b, len) == 0
 
 function _cpeq(a::T, b) where {C<:CSE, T<:Str{C}}
-    len, pnt = _lenpnt(a)
-    fin = pnt + sizeof(a)
+    len, pnt, fin = _lenpntfin(a)
     pos = start(b)
     while pnt < fin
         done(b, pos) && return false
@@ -99,10 +101,8 @@ end
 _cpeq(a, b::T) where {C<:CSE, T<:Str{C}} = _cpeq(b, a)
 
 function _cpeq(a::Str{C1}, b::Str{C2}) where {C1<:CSE, C2<:CSE}
-    len1, pnt1 = _lenpnt(a)
-    fin1 = pnt1 + sizeof(a)
-    len2, pnt2 = _lenpnt(b)
-    fin2 = pnt2 + sizeof(b)
+    len1, pnt1, fin1 = _lenpntfin(a)
+    len2, pnt2, fin2 = _lenpntfin(b)
     while pnt1 < fin1
         pnt2 < fin2 || return false
         c1, pnt1 = _nextcp(C1, pnt1)

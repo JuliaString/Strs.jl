@@ -333,8 +333,6 @@ ncodeunits(s::WordStr) = sizeof(s) >>> 1
 ncodeunits(s::QuadStr) = sizeof(s) >>> 2
 
 # For convenience
-@inline _lenpnt(s) = ncodeunits(s), pointer(s)
-
 @inline _calcpnt(str, siz) = (pnt = _pnt64(str) - CHUNKSZ;  (pnt, pnt + siz))
 
 @inline _mask_bytes(n) = (1%UInt << ((n & (CHUNKSZ - 1)) << 3)) - 0x1

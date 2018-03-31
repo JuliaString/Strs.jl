@@ -29,9 +29,9 @@ end
 
 @inline function safe_copy(::Type{Vector{T}}, ::Type{C}, str) where {T<:CodeUnitTypes,C<:CSE}
     @preserve str buf begin
-        len, pnt = _lenpnt(str)
+        len = ncodeunits(str)
         buf, out = _allocate(T, len)
-        _memcpy(out, pnt, len)
+        _memcpy(out, pointer(str), len)
         Str(C, buf)
     end
 end
@@ -111,7 +111,9 @@ function convert(::Type{UniStr}, str::T) where {T<:Str}
     end
 end
 
-function convert(::Type{<:Str{C}}, str::String) where {C} = convert(C, _str(str))
+convert(::Type{<:Str{C}}, str::String) where {C} = convert(C, _str(str))
+convert(::Type{<:Str{BinaryCSE}}, str::String) = Str(BinaryCSE, str)
+
 """Convert to a UniStr if valid Unicode, otherwise return a Text1Str"""
 function unsafe_str(str::Union{Vector{UInt8}, T, SubString{T}};
                     accept_long_null  = false,

@@ -286,8 +286,9 @@ is_valid(vec::Vector{Char}) = is_unicode(vec)
 
 function map(fun, str::MS_UTF32)
     @preserve str buf begin
-        len, pnt = _lenpnt(str)
+        len = ncodeunits(str)
         buf, out = _allocate(UInt32, len)
+        pnt = pointer(str)
         fin = bytoff(pnt, len)
         while pnt < fin
             set_codeunit!(out, check_valid(fun(get_codeunit(pnt))))
@@ -301,10 +302,11 @@ end
 # Make sure the result actually still has at least one character > 0xffff
 function map(fun, str::MS_SubUTF32)
     @preserve str buf begin
-        len, pnt = _lenpnt(str)
-        fin = bytoff(pnt, len)
-        buf, out = _allocate(UInt32, len)
         msk = 0%UInt32
+        len = ncodeunits(str)
+        buf, out = _allocate(UInt32, len)
+        pnt = pointer(str)
+        fin = bytoff(pnt, len)
         while pnt < fin
             ch = check_valid(fun(get_codeunit(pnt)))
             msk |= ch

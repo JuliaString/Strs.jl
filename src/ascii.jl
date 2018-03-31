@@ -17,8 +17,8 @@ function _string(coll)
     buf, out = _allocate(UInt8, n)
     for str in coll
         @preserve str begin
-            len, pnt = _lenpnt(str)
-            unsafe_copyto!(out, pnt, len)
+            len = ncodeunits(str)
+            unsafe_copyto!(out, pointer(str), len)
             out += len
         end
     end
@@ -61,9 +61,9 @@ function convert(::Type{<:Str{ASCIICSE}}, str::SubString{T}) where
     is_empty(str) && return empty_ascii
     is_ascii(str) || unierror(UTF_ERR_INVALID_ASCII)
     @preserve str begin
-        len, pnt = _lenpnt(str)
+        len = ncodeunits(str)
         buf, out = _allocate(UInt8, len)
-        unsafe_copyto!(out, pnt, len)
+        unsafe_copyto!(out, pointer(str), len)
         Str(ASCIICSE, buf)
     end
 end
@@ -77,7 +77,7 @@ convert(::Type{<:Str{ASCIICSE}}, str::String) =
 
 ascii(str::MaybeSub{<:Str}) = is_ascii(str) ? convert(ASCIIStr, str).data : ascii_err()
 ascii(str::MaybeSub{<:Str{<:SubSet_CSEs}}) = ascii_err()
-ascii(str::<:Str{ASCIICSE}) = str.data
+ascii(str::Str{T}) where {T<:ASCIICSE} = str.data
 
 # This should really use a keyword argument, and allow for the following possibilities:
 # 1) use default substitution character \u{1a} for ASCII/Latin1 (SUB) or \u{fffd} for Unicode
