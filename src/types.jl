@@ -152,9 +152,11 @@ for (names, typ) in ((_cpname1, UInt8), (_cpname2, UInt16), (_cpname4, UInt32)),
     chrnam = symstr(nam, "Chr")
     @eval const $chrnam = Chr{$(symstr(nam, "CharSet")), $typ}
     @eval export $chrnam
+    @eval show(io::IO, ::Type{$chrnam}) = print(io, $(quotesym(chrnam)))
 end
 
 const _LatinChr = Chr{LatinSubSet, UInt8}
+show(io::IO, ::Type{_LatinChr}) = print(io, :_LatinChr)
 
 codepoint(ch::Chr) = ch.v
 basetype(::Type{<:Chr{CS,B}}) where {CS,B} = B

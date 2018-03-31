@@ -90,7 +90,6 @@ convert(::Type{Str}, str::String)         = _str(str)
 convert(::Type{Str}, str::Str)            = str
 
 convert(::Type{<:Str{C}}, str::AbstractString) where {C} = convert(C, _str(str))
-convert(::Type{<:Str{C}}, str::String) where {C} = convert(C, _str(str))
 convert(::Type{<:Str{C}}, str::Str{C}) where {C} = str
 
 convert(::Type{UniStr}, str::AbstractString) = _str(str)
@@ -112,6 +111,7 @@ function convert(::Type{UniStr}, str::T) where {T<:Str}
     end
 end
 
+function convert(::Type{<:Str{C}}, str::String) where {C} = convert(C, _str(str))
 """Convert to a UniStr if valid Unicode, otherwise return a Text1Str"""
 function unsafe_str(str::Union{Vector{UInt8}, T, SubString{T}};
                     accept_long_null  = false,

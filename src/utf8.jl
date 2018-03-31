@@ -544,7 +544,7 @@ convert(::Type{UTF8Str}, s::ASCIIStr) = Str(UTF8CSE, s.data)
 convert(::Type{SubString{UTF8Str}}, s::SubString{ASCIIStr}) =
     SubString(convert(UTF8Str, s.string), s.offset + 1, s.offset + s.ncodeunits)
 
-function convert(::Type{UTF8Str}, dat::Vector{UInt8})
+function convert(::Type{<:Str{UTF8CSE}}, dat::Vector{UInt8})
     # handle zero length string quickly
     isempty(dat) && return empty_utf8
     # get number of bytes to allocate
@@ -560,7 +560,7 @@ function convert(::Type{UTF8Str}, dat::Vector{UInt8})
     end
 end
 
-function convert(::Type{UTF8Str}, str::String)
+function convert(::Type{<:Str{UTF8CSE}}, str::String)
     # handle zero length string quickly
     isempty(str) && return empty_utf8
     # get number of bytes to allocate
@@ -573,7 +573,7 @@ function convert(::Type{UTF8Str}, str::String)
          : _transcode_utf8(pointer(str), len + latinbyte + num2byte + num3byte*2 + num4byte*3)))
 end
 
-function convert(::Type{UTF8Str}, str::AbstractString)
+function convert(::Type{<:Str{UTF8CSE}}, str::AbstractString)
     # handle zero length string quickly
     isempty(str) && return empty_utf8
     # get number of bytes to allocate
@@ -652,7 +652,7 @@ function _transcode_utf8(pnt::Ptr{T}, len) where {T<:WideCodeUnit}
 end
 _transcode_utf8(dat::Vector{<:WideCodeUnit}, len) = _transcode_utf8(pointer(dat), len)
 
-function convert(::Type{UTF8Str}, str::MS_UTF16)
+function convert(::Type{<:Str{UTF8CSE}}, str::MS_UTF16)
     # handle zero length string quickly
     isempty(str) && return empty_utf8
     @preserve str begin
@@ -669,7 +669,8 @@ function convert(::Type{UTF8Str}, str::MS_UTF16)
     end
 end
 
-function convert(::Type{UTF8Str}, str::MaybeSub{T}) where {C<:Union{UCS2_CSEs,UTF32_CSEs},T<:Str{C}}
+function convert(::Type{<:Str{UTF8CSE}},
+                 str::MaybeSub{T}) where {C<:Union{UCS2_CSEs,UTF32_CSEs},T<:Str{C}}
     # handle zero length string quickly
     isempty(str) && return empty_utf8
     @preserve str begin
