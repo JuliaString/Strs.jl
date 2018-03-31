@@ -238,31 +238,15 @@ end
 
 # These should be done via traits
 const Binary_CSEs   = Union{Text1CSE, BinaryCSE}
-const Raw_CSEs      = Union{Text1CSE, Text2CSE, Text4CSE}
 const Latin_CSEs    = Union{LatinCSE, _LatinCSE}
 const UTF8_CSEs     = Union{UTF8CSE,  UniPlusCSE}
 const UCS2_CSEs     = Union{UCS2CSE,  _UCS2CSE}
 const UTF32_CSEs    = Union{UTF32CSE, _UTF32CSE}
-const Unicode_CSEs  = Union{UTF8CSE, UTF16CSE, UTF32_CSEs}
 const SubSet_CSEs   = Union{_LatinCSE, _UCS2CSE, _UTF32CSE}
 
-const Byte_CSEs     = Union{ASCIICSE, Binary_CSEs, Latin_CSEs, UTF8CSE}
-const Word_CSEs     = Union{Text2CSE, UCS2_CSEs, UTF16CSE} # 16-bit characters
-const Quad_CSEs     = Union{Text4CSE, UTF32_CSEs}          # 32-bit code units
-const Wide_CSEs     = Union{UTF16CSE, UCS2_CSEs, UTF32_CSEs}
-const WordQuad_CSEs = Union{Text2CSE,Text4CSE,UCS2CSE,UTF16CSE,UTF32CSE}
-
-const ASCIIStrings  = Str{ASCIICSE}
-const BinaryStrings = Str{<:Binary_CSEs}
-const RawStrings    = Str{<:Raw_CSEs}
-const LatinStrings  = Str{<:Latin_CSEs}
-const UCS2Strings   = Str{<:UCS2_CSEs}
-const UTF32Strings  = Str{<:UTF32_CSEs}
-
-const ByteStr = Str{<:Byte_CSEs}
-const WordStr = Str{<:Word_CSEs}
-const QuadStr = Str{<:Quad_CSEs}
-const WideStr = Str{<:Wide_CSEs}
+const Byte_CSEs     = Union{Text1CSE, BinaryCSE, ASCIICSE, LatinCSE, _LatinCSE, UTF8CSE}
+const Word_CSEs     = Union{Text2CSE, UCS2CSE, _UCS2CSE, UTF16CSE} # 16-bit characters
+const Quad_CSEs     = Union{Text4CSE, UTF32CSE, _UTF32CSE}         # 32-bit code units
 
 basecse(::Type{C}) where {C<:CSE} = C
 basecse(::Type{_LatinCSE}) = LatinCSE
@@ -297,30 +281,36 @@ promote_rule(::Type{UTF32Chr}, ::Type{UCS2Chr}) = UTF32Chr
 promote_rule(::Type{T}, ::Type{<:ByteChars}) where {T<:WideChars} = T
 
 promote_rule(::Type{T}, ::Type{T}) where {T<:Str} = T
-promote_rule(::Type{T}, ::Type{<:Str{Text1CSE}}) where {T<:Str{Text2CSE}} = T
-promote_rule(::Type{T}, ::Type{<:Str{Text1CSE}}) where {T<:Str{Text4CSE}} = T
-promote_rule(::Type{T}, ::Type{<:Str{Text2CSE}}) where {T<:Str{Text4CSE}} = T
 
-promote_rule(::Type{String}, ::Type{<:Str{ASCIICSE}}) = String
-promote_rule(::Type{T}, ::Type{<:Str{ASCIICSE}}) where {T<:Str{<:CSE}} = T
-promote_rule(::Type{T}, ::Type{<:Str{Latin_CSEs}}) where {T<:Str{<:Union{UTF8CSE, Wide_CSEs}}} = T
-promote_rule(::Type{T}, ::Type{<:Str{UCS2_CSEs}}) where {T<:Str{UTF32_CSEs}} = T
+promote_rule(::Type{Text2CSE}, ::Type{Text1CSE}) = Text2CSE
+promote_rule(::Type{Text4CSE}, ::Type{Text1CSE}) = Text4CSE
+promote_rule(::Type{Text4CSE}, ::Type{Text2CSE}) = Text4CSE
 
-promote_rule(::Type{T}, ::Type{<:Str{_LatinCSE}}) where {T<:Str{LatinCSE}} = T
-promote_rule(::Type{T}, ::Type{<:Str{_UCS2CSE}})  where {T<:Str{UCS2CSE}} = T
-promote_rule(::Type{T}, ::Type{<:Str{_UTF32CSE}}) where {T<:Str{UTF32CSE}} = T
+promote_rule(::Type{T}, ::Type{ASCIICSE}) where {T<:CSE} = T
+promote_rule(::Type{T},
+             ::Type{<:Latin_CSEs}) where {T<:Union{UTF8CSE,UTF16CSE,UCS2_CSEs,UTF32_CSEs}} = T
+promote_rule(::Type{T}, ::Type{<:UCS2_CSEs}) where {T<:UTF32_CSEs} = T
+
+promote_rule(::Type{LatinCSE}, ::Type{_LatinCSE}) = LatinCSE
+promote_rule(::Type{UCS2CSE}, ::Type{_UCS2CSE})   = UCS2CSE
+promote_rule(::Type{UTF32CSE}, ::Type{_UTF32CSE}) = UTF32CSE
+
+promote_rule(::Type{String}, ::Type{<:Str}) = String
+
+promote_rule(::Type{<:Str{S}}, ::Type{<:Str{T}}) where {S,T} = Str{promote_rule(S,T)}
 
 sizeof(s::Str) = sizeof(s.data) + 1 - STR_KEEP_NUL
 
 """Codeunits of string as a Vector"""
 _data(s::Vector{UInt8}) = s
-_data(s::String)  = s
-_data(s::ByteStr) = @static V6_COMPAT ? Vector{UInt8}(s.data) : unsafe_wrap(Vector{UInt8}, s.data)
+_data(s::String)        = s
+_data(s::Str{<:Byte_CSEs}) =
+    @static V6_COMPAT ? Vector{UInt8}(s.data) : unsafe_wrap(Vector{UInt8}, s.data)
 
 """Pointer to codeunits of string"""
-pointer(s::ByteStr) = pointer(s.data)
-pointer(s::WordStr) = reinterpret(Ptr{UInt16}, pointer(s.data))
-pointer(s::QuadStr) = reinterpret(Ptr{UInt32}, pointer(s.data))
+pointer(s::Str{<:Byte_CSEs}) = pointer(s.data)
+pointer(s::Str{<:Word_CSEs}) = reinterpret(Ptr{UInt16}, pointer(s.data))
+pointer(s::Str{<:Quad_CSEs}) = reinterpret(Ptr{UInt32}, pointer(s.data))
 
 const CHUNKSZ = sizeof(UInt64) # used for fast processing of strings
 
@@ -328,9 +318,9 @@ _pnt64(s::Union{String,Vector{UInt8}}) = reinterpret(Ptr{UInt64}, pointer(s))
 _pnt64(s::Str) = reinterpret(Ptr{UInt64}, pointer(s.data))
 
 """Length of string in codeunits"""
-ncodeunits(s::Str)     = sizeof(s)
-ncodeunits(s::WordStr) = sizeof(s) >>> 1
-ncodeunits(s::QuadStr) = sizeof(s) >>> 2
+ncodeunits(s::Str)              = sizeof(s)
+ncodeunits(s::Str{<:Word_CSEs}) = sizeof(s) >>> 1
+ncodeunits(s::Str{<:Quad_CSEs}) = sizeof(s) >>> 2
 
 # For convenience
 @inline _calcpnt(str, siz) = (pnt = _pnt64(str) - CHUNKSZ;  (pnt, pnt + siz))

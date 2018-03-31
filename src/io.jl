@@ -30,7 +30,7 @@ print(io::IO, str::MaybeSub{T}) where {T<:Str{<:Union{ASCIICSE,UTF8CSE},Nothing}
 
 ## outputting Latin 1 strings ##
 
-function print(io::IO, str::MaybeSub{<:LatinStrings})
+function print(io::IO, str::MaybeSub{<:Str{Latin_CSEs}})
     @preserve str begin
         pnt = pointer(str)
         fin = pnt + sizeof(str)
@@ -60,7 +60,7 @@ write(io::IO, ch::LatinChars) = write(io, ch%UInt8)
 
 ## outputting UCS2 strings as UTF-8 ##
 
-function print(io::IO, str::MaybeSub{<:UCS2Strings})
+function print(io::IO, str::MaybeSub{<:Str{<:UCS2_CSEs}})
     @preserve str begin
         len = ncodeunits(str)
         pnt = pointer(str)
@@ -101,7 +101,7 @@ end
 
 ## outputting UTF32 strings as UTF-8 ##
 
-function print(io::IO, str::MaybeSub{<:UTF32Strings})
+function print(io::IO, str::MaybeSub{<:Str{<:UTF32_CSEs}})
     @preserve str begin
         len = ncodeunits(str)
         pnt = pointer(str)

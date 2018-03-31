@@ -42,8 +42,8 @@ eltype(::Type{<:Str{Text4CSE}})       = Text4Chr
 eltype(::Type{<:Str{ASCIICSE}})       = ASCIIChr
 eltype(::Type{<:Str{LatinCSE}})       = LatinChr
 eltype(::Type{<:Str{_LatinCSE}})      = _LatinChr
-eltype(::Type{<:Str{<:UCS2_CSEs}})    = UCS2Chr
-eltype(::Type{<:Str{<:Unicode_CSEs}}) = UTF32Chr
+eltype(::Type{<:Str{<:Union{UCS2CSE, _UCS2CSE}}}) = UCS2Chr
+eltype(::Type{<:Str{<:Union{UTF8CSE, UTF16CSE, UTF32_CSEs}}}) = UTF32Chr
 
 codepoint_size(::Type{T}) where {T<:Union{String,Str}} = sizeof(eltype(T))
 

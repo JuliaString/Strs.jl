@@ -128,7 +128,7 @@ is_ascii(str::Str{_UCS2CSE}) = false
 is_latin(str::Str{_UCS2CSE}) = false
 is_ascii(str::SubString{<:Str{_UCS2CSE}}) = is_ascii(Str{UCS2CSE}(str.data))
 is_latin(str::SubString{<:Str{_UCS2CSE}}) = is_latin(Str{UCS2CSE}(str.data))
-is_bmp(str::MaybeSub{<:UCS2Strings}) = true
+is_bmp(str::MaybeSub{<:Str{<:UCS2_CSEs}}) = true
 
 # Speed this up accessing 64 bits at a time
 @propagate_inbounds function _cnt_non_bmp(len, pnt::Ptr{UInt16})
@@ -196,14 +196,14 @@ end
 @inline _isvalid_char_pos(::CodeUnitMulti, ::Type{UTF16CSE}, str, pos::Integer) =
     @preserve str !is_surrogate_trail(get_codeunit(pointer(str), pos))
 
-function is_valid(::Type{<:UCS2Strings}, data::AbstractArray{UInt16})
+function is_valid(::Type{<:Str{<:UCS2_CSEs}}, data::AbstractArray{UInt16})
     @inbounds for ch in data
         is_surrogate_codeunit(ch) && return false
     end
     true
 end
 
-function is_valid(::Type{<:UCS2Strings}, pnt::Ptr{UInt16}, len)
+function is_valid(::Type{<:Str{<:UCS2_CSEs}}, pnt::Ptr{UInt16}, len)
     fin = bytoff(pnt, len)
     while pnt < fin # check for surrogates
         is_surrogate_codeunit(get_codeunit(pnt)) && return false
@@ -385,9 +385,9 @@ end
 _encode_utf16(dat::Vector{UInt8}, len) = @preserve dat _encode_utf16(pointer(dat), len)
 _encode_utf16(str::String, len)        = @preserve str _encode_utf16(pointer(str), len)
 
-@inline _cvt_16_to_utf8(::Type{<:Str{UTF16CSE}}, pnt, len) = _transcode_utf8(pnt, len)
-@inline _cvt_16_to_utf8(::Type{<:UCS2Strings}, pnt, len)   = _encode_utf8(pnt, len)
-@inline _cvt_16_to_utf8(::Type{<:UTF32Strings}, pnt, len)  = _encode_utf8(pnt, len)
+@inline _cvt_16_to_utf8(::Type{<:Str{UTF16CSE}}, pnt, len)     = _transcode_utf8(pnt, len)
+@inline _cvt_16_to_utf8(::Type{<:Str{<:UCS2_CSEs}}, pnt, len)  = _encode_utf8(pnt, len)
+@inline _cvt_16_to_utf8(::Type{<:Str{<:UTF32_CSEs}}, pnt, len) = _encode_utf8(pnt, len)
 
 function _cvt_utf8(::Type{T}, str::S) where {T<:Union{String, Str{UTF8CSE}}, S}
     # handle zero length string quickly
@@ -404,10 +404,8 @@ function _cvt_utf8(::Type{T}, str::S) where {T<:Union{String, Str{UTF8CSE}}, S}
 end
 
 # Split this way to avoid ambiguity errors
-convert(::Type{String},  str::MaybeSub{<:Str{Union{Wide_CSEs,Text2CSE,Text4CSE}}}) =
-    _cvt_utf8(String, str)
-convert(::Type{UTF8Str}, str::MaybeSub{<:Str{Union{Wide_CSEs,Text2CSE,Text4CSE}}}) =
-    _cvt_utf8(UTF8Str, str)
+convert(::Type{String},  str::MaybeSub{<:Str{Union{Word_CSEs,Quad_CSEs}}}) = _cvt_utf8(String, str)
+convert(::Type{UTF8Str}, str::MaybeSub{<:Str{Union{Word_CSEs,Quad_CSEs}}}) = _cvt_utf8(UTF8Str, str)
 
 """
 Converts an already validated UTF-32 encoded vector of `UInt32` to a `UTF16Str`
@@ -442,7 +440,7 @@ function _encode_utf16(dat::Ptr{UInt32}, len)
 end
 
 # Copies because not safe to expose the internal array (would allow mutation)
-function convert(::Type{Vector{UInt16}}, str::WordStr)
+function convert(::Type{Vector{UInt16}}, str::Str{<:Word_CSEs})
     len = ncodeunits(str)
     vec = create_vector(UInt16, len)
     @inbounds unsafe_copyto!(pointer(vec), pointer(str), len)
@@ -450,12 +448,12 @@ function convert(::Type{Vector{UInt16}}, str::WordStr)
 end
 
 # Todo: Some of these need to be fixed to account for SubStr, when that is added
-convert(::Type{T},  str::MaybeSub{S}) where {T<:UCS2Strings, S<:UCS2Strings} = str
-convert(::Type{UTF16Str}, str::MaybeSub{<:UCS2Strings}) = Str(UTF16CSE, str.data)
+convert(::Type{T},  str::MaybeSub{T}) where {T<:Str{<:Union{UCS2_CSEs, UTF32_CSEs}}} = str
+convert(::Type{<:Str{UTF16CSE}}, str::MaybeSub{<:Str{<:UCS2_CSEs}}) = Str(UTF16CSE, str.data)
 
 unsafe_convert(::Type{Ptr{UInt16}}, s::MS_UTF16) = pointer(s)
 
-function convert(::Type{UTF16Str}, dat::AbstractVector{UInt16})
+function convert(::Type{<:Str{UTF16CSE}}, dat::AbstractVector{UInt16})
     is_empty(dat) && return empty_utf16
     len, flags, num4byte = unsafe_check_string(dat, 1, lastindex(dat))
     # Optimize case where no surrogate characters

@@ -54,7 +54,7 @@ function _str(str::AbstractString)
     end
 end
 
-function _str(str::T) where {T<:Union{Vector{UInt8}, BinaryStrings, String}}
+function _str(str::T) where {T<:Union{Vector{UInt8}, Str{<:Binary_CSEs}, String}}
     # handle zero length string quickly
     (siz = sizeof(str)) == 0 && return empty_ascii
     @preserve str begin
@@ -112,7 +112,11 @@ function convert(::Type{UniStr}, str::T) where {T<:Str}
 end
 
 convert(::Type{<:Str{C}}, str::String) where {C} = convert(C, _str(str))
+
+convert(::Type{<:Str{Text1CSE}}, str::String) = Str(Text1CSE, str)
 convert(::Type{<:Str{BinaryCSE}}, str::String) = Str(BinaryCSE, str)
+
+convert(::Type{String}, str::Str{<:Union{Text1CSE,BinaryCSE}}) = str.data
 
 """Convert to a UniStr if valid Unicode, otherwise return a Text1Str"""
 function unsafe_str(str::Union{Vector{UInt8}, T, SubString{T}};

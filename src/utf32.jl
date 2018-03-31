@@ -216,8 +216,8 @@ end
 
 const UniRawChar = Union{UInt32, Int32, Text4Chr, Char}
 
-function convert(::Type{T}, dat::AbstractVector{<:UniRawChar}) where {T<:UTF32Strings}
-    (len = length(dat)) == 0 && empty_str(T)
+function convert(::Type{<:Str{C}}, dat::AbstractVector{<:UniRawChar}) where {C<:UTF32_CSEs}
+    (len = length(dat)) == 0 && empty_str(C)
     buf, pnt = _allocate(UInt32, len)
     @preserve buf begin
         fin = bytoff(pnt, len)
@@ -227,7 +227,7 @@ function convert(::Type{T}, dat::AbstractVector{<:UniRawChar}) where {T<:UTF32St
             set_codeunit!(pnt, check_valid(ch, pos))
             pnt += sizeof(UInt32)
         end
-        Str(cse(T), buf)
+        Str(C, buf)
     end
 end
 
@@ -236,7 +236,7 @@ convert(::Type{T}, v::AbstractVector{<:UniRawChar}) where {T<:AbstractString} =
     convert(T, convert(UTF32Str, v))
 
 # To do, make this more generic, add a function that can create a vector & fill it from an Str
-function convert(::Type{Vector{UInt32}}, str::MaybeSub{<:QuadStr})
+function convert(::Type{Vector{UInt32}}, str::MaybeSub{<:Str{<:Quad_CSEs}})
     len = ncodeunits(str)
     vec = create_vector(UInt32, len)
     @preserve str _memcpy(pointer(vec), pointer(str), len)
@@ -253,7 +253,7 @@ _convert(pnt::Ptr{T}, len, T1) where {T<:Union{UInt32,UInt32_U,UInt32_S,UInt32_U
      ? _convert(reinterpret(Ptr{T1}, pnt + 4), len - 1)
      : (ch == 0x0feff ? _convert(pnt + 4, len - 1) : _convert(pnt, len)))
 
-function convert(::Type{T}, bytes::AbstractArray{UInt8}) where {T<:UTF32Strings}
+function convert(::Type{T}, bytes::AbstractArray{UInt8}) where {C<:UTF32_CSEs,T<:Str{C}}
     is_empty(bytes) && return empty_utf32
     # Note: there are much better ways of detecting what the likely encoding is here,
     # this only deals with big or little-ending UTF-32
@@ -270,11 +270,11 @@ function convert(::Type{T}, bytes::AbstractArray{UInt8}) where {T<:UTF32Strings}
         end
         # Todo, this needs better handling
         is_valid(T, out, len) || unierror(UTF_ERR_INVALID, 0, 0)
-        Str(cse(T), buf)
+        Str(C, buf)
     end
 end
 
-function is_valid(::Type{<:UTF32Strings}, str::Vector{<:UniRawChar})
+function is_valid(::Type{<:Str{<:UTF32_CSEs}}, str::Vector{<:UniRawChar})
     @inbounds for c in str
         ch = c%UInt32
         (!is_surrogate_codeunit(ch) && ch <= 0x10ffff) || return false

@@ -521,7 +521,7 @@ byte_string_classify(data) =
     ccall(:u8_isvalid, Int32, (Ptr{UInt8}, Int), data, length(data))
 byte_string_classify(data::Vector{UInt8}) =
     ccall(:u8_isvalid, Int32, (Ptr{UInt8}, Int), data, length(data))
-byte_string_classify(s::ByteStr) = byte_string_classify(s.data)
+byte_string_classify(s::Str{<:Byte_CSEs}) = byte_string_classify(s.data)
     # 0: neither valid ASCII nor UTF-8
     # 1: valid ASCII
     # 2: valid UTF-8
@@ -644,20 +644,27 @@ function _memcmp(apnt::Ptr{OthChr}, bpnt::Ptr{OthChr}, len)
 end
 
 # These should probably be handled by traits, or dispatched by getting the codeunit type for each
-_memcmp(a::Union{String, ByteStr},
-        b::Union{String, ByteStr, SubString{String}, SubString{<:ByteStr}}, siz) =
+_memcmp(a::Union{String, Str{<:Byte_CSEs}},
+        b::Union{String, Str{<:Byte_CSEs}, SubString{String}, SubString{<:Str{<:Byte_CSEs}}}, siz) =
     _memcmp(pointer(a), pointer(b), siz)
-_memcmp(a::SubString{<:Union{String, ByteStr}}, b::Union{String, ByteStr}, siz) =
+_memcmp(a::SubString{<:Union{String, Str{<:Byte_CSEs}}}, b::Union{String, Str{<:Byte_CSEs}}, siz) =
     _memcmp(pointer(a), pointer(b), siz)
-_memcmp(a::SubString{<:Union{String, ByteStr}}, b::SubString{<:Union{String, ByteStr}}, siz) =
+_memcmp(a::SubString{<:Union{String, Str{<:Byte_CSEs}}},
+        b::SubString{<:Union{String, Str{<:Byte_CSEs}}}, siz) =
     _memcmp(pointer(a), pointer(b), siz)
 
-_memcmp(a::WordStr, b::MaybeSub{<:WordStr}, siz) = _memcmp(pointer(a), pointer(b), siz)
-_memcmp(a::QuadStr, b::MaybeSub{<:QuadStr}, siz) = _memcmp(pointer(a), pointer(b), siz)
-_memcmp(a::SubString{<:WordStr}, b::WordStr, siz) = _memcmp(pointer(a), pointer(b), siz)
-_memcmp(a::SubString{<:QuadStr}, b::QuadStr, siz) = _memcmp(pointer(a), pointer(b), siz)
-_memcmp(a::SubString{<:WordStr}, b::SubString{<:WordStr}, siz) = _memcmp(pointer(a), pointer(b), siz)
-_memcmp(a::SubString{<:QuadStr}, b::SubString{<:QuadStr}, siz) = _memcmp(pointer(a), pointer(b), siz)
+_memcmp(a::Str{<:Word_CSEs}, b::MaybeSub{<:Str{<:Word_CSEs}}, siz) =
+    _memcmp(pointer(a), pointer(b), siz)
+_memcmp(a::Str{<:Quad_CSEs}, b::MaybeSub{<:Str{<:Quad_CSEs}}, siz) =
+    _memcmp(pointer(a), pointer(b), siz)
+_memcmp(a::SubString{<:Str{<:Word_CSEs}}, b::Str{<:Word_CSEs}, siz) =
+    _memcmp(pointer(a), pointer(b), siz)
+_memcmp(a::SubString{<:Str{<:Quad_CSEs}}, b::Str{<:Quad_CSEs}, siz) =
+    _memcmp(pointer(a), pointer(b), siz)
+_memcmp(a::SubString{<:Str{<:Word_CSEs}}, b::SubString{<:Str{Word_CSEs}}, siz) =
+    _memcmp(pointer(a), pointer(b), siz)
+_memcmp(a::SubString{<:Str{<:Quad_CSEs}}, b::SubString{<:Str{Quad_CSEs}}, siz) =
+    _memcmp(pointer(a), pointer(b), siz)
 
 _memcpy(dst::Ptr{UInt8}, src::Ptr, siz) =
     ccall(:memcpy, Ptr{UInt8}, (Ptr{Cvoid}, Ptr{Cvoid}, UInt), dst, src, siz)
@@ -750,10 +757,10 @@ end
 # Definitions for C compatible strings, that don't allow embedded
 # '\0', and which are terminated by a '\0'
 
-containsnul(str::ByteStr) = containsnul(unsafe_convert(Ptr{Cchar}, str), sizeof(str))
+containsnul(str::Str{<:Byte_CSEs}) = containsnul(unsafe_convert(Ptr{Cchar}, str), sizeof(str))
 
 # Check 4 characters at a time
-function containsnul(str::WordStr)
+function containsnul(str::Str{<:Word_CSEs})
     (siz = sizeof(str)) == 0 && return true
     @preserve str begin
         pnt, fin = _calcpnt(str, siz)
@@ -767,7 +774,7 @@ function containsnul(str::WordStr)
     end
 end
 
-function containsnul(str::QuadStr)
+function containsnul(str::Str{<:Quad_CSEs})
     (siz = sizeof(str)) == 0 && return true
     @preserve str begin
         pnt, fin = _calcpnt(str, siz)

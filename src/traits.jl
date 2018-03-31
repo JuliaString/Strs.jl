@@ -99,13 +99,12 @@ struct CharSetUnknown       <: CharSetStyle end
                                  
 CharSetStyle(A::AbstractString) = CharSetStyle(typeof(A))
 
-CharSetStyle(::Type{<:AbstractString}) = CharSetUnicode()
-CharSetStyle(::Type{String})           = CharSetUnicodePlus() # Encodes invalid characters also
-CharSetStyle(::Type{<:RawStrings})     = CharSetUnknown()
-CharSetStyle(::Type{Str{<:BinaryCSE}}) = CharSetBinary()
-CharSetStyle(::Type{Str{<:ASCIICSE}})  = CharSetASCIICompat()
-CharSetStyle(::Type{<:UCS2Strings})    = CharSetBMPCompat()
-CharSetStyle(::Type{<:LatinStrings})   = CharSetISOCompat()
+CharSetStyle(::Type{<:AbstractString})    = CharSetUnicodePlus()
+CharSetStyle(::Type{<:Str{<:Union{Text1CSE, Text2CSE, Text4CSE}}}) = CharSetUnknown()
+CharSetStyle(::Type{<:Str{BinaryCSE}})    = CharSetBinary()
+CharSetStyle(::Type{<:Str{ASCIICSE}})     = CharSetASCIICompat()
+CharSetStyle(::Type{<:Str{<:Latin_CSEs}}) = CharSetISOCompat()
+CharSetStyle(::Type{<:Str{<:UCS2_CSEs}})  = CharSetBMPCompat()
 
 CharSetStyle(A::AbstractChar)   = CharSetStyle(typeof(A))
 
@@ -326,14 +325,14 @@ CanContain(::Type{<:Binary_CSEs}, ::Type{<:Union{_UCS2CSE,_UTF32CSE}}) =
     NoCompare()
 CanContain(::Type{<:Binary_CSEs}, ::Type{<:Byte_CSEs}) =
     ByteCompare()
-CanContain(::Type{<:Binary_CSEs}, ::Type{<:WordQuad_CSEs}) =
+CanContain(::Type{<:Binary_CSEs}, ::Type{<:Union{Word_CSEs, Quad_CSEs}}) =
     WidenCompare()
 
 CanContain(::Type{ASCIICSE}, ::Type{<:SubSet_CSEs}) =
     NoCompare()
 CanContain(::Type{ASCIICSE}, ::Type{<:Union{Binary_CSEs, LatinCSE, UTF8_CSEs}}) =
     ByteCompare()
-CanContain(::Type{ASCIICSE}, ::Type{<:WordQuad_CSEs}) =
+CanContain(::Type{ASCIICSE}, ::Type{<:Union{Word_CSEs, Quad_CSEs}}) =
     WidenCompare()
 
 CanContain(::Type{<:Latin_CSEs}, ::Type{<:Union{_UCS2CSE,_UTF32CSE}}) =
@@ -342,7 +341,7 @@ CanContain(::Type{<:Latin_CSEs}, ::Type{<:Union{Binary_CSEs,ASCIICSE,Latin_CSEs}
     ByteCompare()
 CanContain(::Type{<:Latin_CSEs}, ::Type{<:UTF8_CSEs}) =
     ASCIICompare()
-CanContain(::Type{<:Latin_CSEs}, ::Type{<:WordQuad_CSEs}) =
+CanContain(::Type{<:Latin_CSEs}, ::Type{<:Union{Word_CSEs, Quad_CSEs}}) =
     WidenCompare()
 
 CanContain(::Type{<:UTF8_CSEs}, ::Type{<:Union{ASCIICSE,Binary_CSEs}}) =

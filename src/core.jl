@@ -247,12 +247,12 @@ Str(str::SubString{<:Str{C}}) where {C<:Byte_CSEs} =
     Str(C, unsafe_string(pointer(str.string, str.offset+1), str.ncodeunits))
 
 # don't make unnecessary copies when passing substrings to C functions
-cconvert(::Type{Ptr{UInt8}}, str::SubString{<:ByteStr}) = str
-cconvert(::Type{Ptr{Int8}},  str::SubString{<:ByteStr}) = str
+cconvert(::Type{Ptr{UInt8}}, str::SubString{<:Str{<:Byte_CSEs}}) = str
+cconvert(::Type{Ptr{Int8}},  str::SubString{<:Str{<:Byte_CSEs}}) = str
 
-unsafe_convert(::Type{Ptr{UInt8}}, s::SubString{<:ByteStr}) =
+unsafe_convert(::Type{Ptr{UInt8}}, s::SubString{<:Str{Byte_CSEs}}) =
     convert(Ptr{UInt8}, pointer(s.string)) + s.offset
-unsafe_convert(::Type{Ptr{Int8}}, s::SubString{<:ByteStr}) =
+unsafe_convert(::Type{Ptr{Int8}}, s::SubString{<:Str{Byte_CSEs}}) =
     convert(Ptr{Int8}, pointer(s.string)) + s.offset
 
 function _reverse(::CodeUnitSingle, ::Type{C}, len, str::Str{C}) where {C<:CSE}
