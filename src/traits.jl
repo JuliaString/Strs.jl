@@ -300,12 +300,12 @@ CompareStyle(::Type{T}, ::Type{T}) where {T<:AbstractString} = ByteCompare()
 
 CompareStyle(A::AbstractString, B::AbstractString) = CompareStyle(typeof(A), typeof(B))
 
-Base.promote(::Type{NoCompare},    ::Type{<:CompareStyle})   = NoCompare
-Base.promote(::Type{ByteCompare},  ::Type{CodePointCompare}) = ByteCompare
-Base.promote(::Type{WordCompare},  ::Type{CodePointCompare}) = WordCompare
-Base.promote(::Type{UTF16Compare}, ::Type{CodePointCompare}) = UTF16Compare
-Base.promote(::Type{ASCIICompare}, ::Type{CodePointCompare}) = ASCIICompare
-Base.promote(::Type{WidenCompare}, ::Type{CodePointCompare}) = WidenCompare
+Base.promote_rule(::Type{NoCompare},    ::Type{<:CompareStyle})   = NoCompare
+Base.promote_rule(::Type{ByteCompare},  ::Type{CodePointCompare}) = ByteCompare
+Base.promote_rule(::Type{WordCompare},  ::Type{CodePointCompare}) = WordCompare
+Base.promote_rule(::Type{UTF16Compare}, ::Type{CodePointCompare}) = UTF16Compare
+Base.promote_rule(::Type{ASCIICompare}, ::Type{CodePointCompare}) = ASCIICompare
+Base.promote_rule(::Type{WidenCompare}, ::Type{CodePointCompare}) = WidenCompare
 
 """
     CanContain(Union{A, typeof(A)}, Union{B, typeof(B)})

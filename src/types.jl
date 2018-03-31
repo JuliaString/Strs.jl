@@ -98,13 +98,13 @@ const _CSE{U} = Union{CharSet{U}, Encoding{U}} where {U}
 
 print(io::IO, ::S) where {S<:_CSE{U}} where {U} =
     print(io, U)
-print(io::IO, ::CSE{CS,E}) where {S,U,CS<:CharSet{S},E<:Encoding{U}} =
-    print(io, "CSE{", string(S), ",", string(U), "}()")
 
 show(io::IO, ::Type{CharSet{S}}) where {S}   = print(io, "CharSet{", string(S), "}")
 show(io::IO, ::Type{Encoding{S}}) where {S}  = print(io, "Encoding{", string(S), "}")
 show(io::IO, ::Type{CSE{CS,E}}) where {S,T,CS<:CharSet{S},E<:Encoding{T}} =
     print(io, "CSE{", string(S), ", ", string(T), "}")
+print(io::IO, ::T) where {S,U,CS<:CharSet{S},E<:Encoding{U},T<:CSE{CS,E}} =
+    (show(io, T); print(io, "()"))
 
 const CodeUnitTypes = Union{UInt8, UInt16, UInt32}
 
@@ -226,6 +226,11 @@ typemin(::T) where {T<:Str} = empty_str(T)
 """Union type for fast dispatching"""
 const UniStr = Union{ASCIIStr, _LatinStr, _UCS2Str, _UTF32Str}
 show(io::IO, ::Type{UniStr}) = print(io, :UniStr)
+
+# Display BinaryCSE as if String
+show(io::IO, str::T) where {T<:Str{BinaryCSE}} = show(io, str.data)
+show(io::IO, str::SubString{T}) where {T<:Str{BinaryCSE}} =
+    @inbounds show(io, SubString(str.string.data, str.offset+1, str.offset+lastindex(str)))
 
 _allocate(len) = Base._string_n((len+STR_KEEP_NUL-1)%Csize_t)
 

@@ -48,7 +48,7 @@ end
 
 @inline _lenpntfin(str) = (ncodeunits(str), pointer(str), pointer(str) + sizeof(str))
 
-@inline function _cpcmp(a::T, b) where {C<:CSE,T<:Str{C}}
+@inline function _cpcmp(a::MaybeSub{T}, b) where {C<:CSE,T<:Str{C}}
     len, pnt, fin = _lenpntfin(a)
     pos = start(b)
     while pnt < fin
@@ -61,10 +61,11 @@ end
     ifelse(done(b, pos), 0, -1)
 end
 
-_cmp(::CodePointCompare, a::Str, b::AbstractString) = _cpcmp(a, b)
-_cmp(::CodePointCompare, a::AbstractString, b::Str) = -_cpcmp(b, a)
+_cmp(::CodePointCompare, a::MaybeSub{<:Str}, b::AbstractString) = _cpcmp(a, b)
+_cmp(::CodePointCompare, a::AbstractString, b::MaybeSub{<:Str}) = -_cpcmp(b, a)
 
-function _cmp(::CodePointCompare, a::S, b::T) where {CSE1,CSE2,S<:Str{CSE1},T<:Str{CSE2}}
+function _cmp(::CodePointCompare,
+              a::MaybeSub{S}, b::MaybeSub{T}) where {CSE1,CSE2,S<:Str{CSE1},T<:Str{CSE2}}
     len1, pnt1, fin1 = _lenpntfin(a)
     len2, pnt2, fin2 = _lenpntfin(b)
     while pnt1 < fin1
@@ -76,9 +77,9 @@ function _cmp(::CodePointCompare, a::S, b::T) where {CSE1,CSE2,S<:Str{CSE1},T<:S
     ifelse(pnt2 < fin2, -1, 0)
 end
 
-cmp(a::Str, b::AbstractString) = @preserve a _cmp(CompareStyle(a, b), a, b)
-cmp(a::AbstractString, b::Str) = @preserve b _cmp(CompareStyle(a, b), a, b)
-cmp(a::Str, b::Str)            = @preserve a b _cmp(CompareStyle(a, b), a, b)
+cmp(a::MaybeSub{<:Str}, b::AbstractString)  = @preserve a _cmp(CompareStyle(a, b), a, b)
+cmp(a::AbstractString,  b::MaybeSub{<:Str}) = @preserve b _cmp(CompareStyle(a, b), a, b)
+cmp(a::MaybeSub{<:Str}, b::MaybeSub{<:Str}) = @preserve a b _cmp(CompareStyle(a, b), a, b)
 
 # Todo: handle comparisons of UTF16 specially, to compare first non-matching character
 # as if comparing Char to Char, to get ordering correct when dealing with > 0xffff non-BMP
@@ -86,7 +87,7 @@ cmp(a::Str, b::Str)            = @preserve a b _cmp(CompareStyle(a, b), a, b)
 
 @inline _fasteq(a, b) = (len = ncodeunits(a)) == ncodeunits(b) && _memcmp(a, b, len) == 0
 
-function _cpeq(a::T, b) where {C<:CSE, T<:Str{C}}
+function _cpeq(a::MaybeSub{T}, b) where {C<:CSE, T<:Str{C}}
     len, pnt, fin = _lenpntfin(a)
     pos = start(b)
     while pnt < fin
@@ -98,9 +99,9 @@ function _cpeq(a::T, b) where {C<:CSE, T<:Str{C}}
     true
 end
 
-_cpeq(a, b::T) where {C<:CSE, T<:Str{C}} = _cpeq(b, a)
+_cpeq(a, b::MaybeSub{T}) where {C<:CSE, T<:Str{C}} = _cpeq(b, a)
 
-function _cpeq(a::Str{C1}, b::Str{C2}) where {C1<:CSE, C2<:CSE}
+function _cpeq(a::MaybeSub{<:Str{C1}}, b::MaybeSub{<:Str{C2}}) where {C1<:CSE, C2<:CSE}
     len1, pnt1, fin1 = _lenpntfin(a)
     len2, pnt2, fin2 = _lenpntfin(b)
     while pnt1 < fin1
@@ -114,7 +115,7 @@ end
 
 # This can be speeded up in the future with SSE/AVX instructions to unpack bytes,
 # or to mask chunks of characters first to see if there are any too large in the wider of the two
-function _wideneq(a::S, b::T) where {S<:Str,T<:Str}
+function _wideneq(a::MaybeSub{S}, b::MaybeSub{T}) where {S<:Str,T<:Str}
     (len = ncodeunits(a)) == ncodeunits(b) || return false
     pnt1 = pointer(a)
     pnt2 = pointer(b)
@@ -135,10 +136,10 @@ _iseq(::WidenCompare,     a, b) = _wideneq(a, b)
 _iseq(::ASCIICompare,     a, b) = _cpeq(a, b) # This can be optimized later
 _iseq(::CodePointCompare, a, b) = _cpeq(a, b)
 
-==(a::AbstractString, b::Str) = @preserve b _iseq(EqualsStyle(a, b), a, b)
-==(a::Str, b::AbstractString) = @preserve a _iseq(EqualsStyle(a, b), a, b)
-==(a::Str, b::Str)            = @preserve a b _iseq(EqualsStyle(a, b), a, b)
+==(a::AbstractString,  b::MaybeSub{<:Str}) = @preserve b _iseq(EqualsStyle(a, b), a, b)
+==(a::MaybeSub{<:Str}, b::AbstractString)  = @preserve a _iseq(EqualsStyle(a, b), a, b)
+==(a::MaybeSub{<:Str}, b::MaybeSub{<:Str}) = @preserve a b _iseq(EqualsStyle(a, b), a, b)
 
-isless(a::AbstractString, b::Str) = cmp(a, b) < 0
-isless(a::Str, b::AbstractString) = cmp(a, b) < 0
-isless(a::Str, b::Str)            = cmp(a, b) < 0
+isless(a::AbstractString,  b::MaybeSub{<:Str}) = cmp(a, b) < 0
+isless(a::MaybeSub{<:Str}, b::AbstractString)  = cmp(a, b) < 0
+isless(a::MaybeSub{<:Str}, b::MaybeSub{<:Str}) = cmp(a, b) < 0

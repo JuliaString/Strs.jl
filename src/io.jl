@@ -21,16 +21,16 @@ Licensed under MIT License, see LICENSE.md
 
 write(io::IO, ch::Chr) = write(io, codepoint(ch))
 
-write(io::IO, str::MaybeSub{T}) where {C<:CSE,T<:Str{C,Nothing}} =
+write(io::IO, str::MaybeSub{<:Str{<:CSE}}) =
     @preserve str unsafe_write(io, pointer(str), reinterpret(UInt, sizeof(str)))
 
 # optimized methods to avoid iterating over chars
-print(io::IO, str::MaybeSub{T}) where {T<:Str{<:Union{ASCIICSE,UTF8CSE},Nothing}} =
+print(io::IO, str::MaybeSub{T}) where {T<:Str{<:Union{Text1CSE,BinaryCSE,ASCIICSE,UTF8CSE}}} =
     (write(io, str); nothing)
 
 ## outputting Latin 1 strings ##
 
-function print(io::IO, str::MaybeSub{<:Str{Latin_CSEs}})
+function print(io::IO, str::MaybeSub{<:Str{<:Latin_CSEs}})
     @preserve str begin
         pnt = pointer(str)
         fin = pnt + sizeof(str)
