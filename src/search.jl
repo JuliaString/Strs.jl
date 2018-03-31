@@ -276,9 +276,9 @@ end
 # and checking as already been done on the position (pos)
 # These definitions only work for CodeUnitSingle types
 _srch_cp(::Fwd, ::CodeUnitSingle, str::T, cp::AbsChar, pos, len) where {T<:Str} =
-    @preserve str _srch_codeunit(Fwd(), _pnt(str), cp%codeunit(T), pos, len)
+    @preserve str _srch_codeunit(Fwd(), pointer(str), cp%codeunit(T), pos, len)
 _srch_cp(::Rev, ::CodeUnitSingle, str::T, cp::AbsChar, pos, len) where {T<:Str} =
-    @preserve str _srch_codeunit(Rev(), _pnt(str), cp%codeunit(T), pos)
+    @preserve str _srch_codeunit(Rev(), pointer(str), cp%codeunit(T), pos)
 
 function _srch_cp(::Fwd, cus, str, cp, pos, len)
     @inbounds while pos <= len
@@ -413,21 +413,23 @@ end
 
 # This should work for compatible CSEs, like ASCII & Latin, ASCII & UTF8, etc.
 # See equals trait
-_srch_strings(::Fwd, ::Union{ByteCompare,WidenCompare}, str, needle, ch, nxtsub, pos, slen, tlen) =
-    @preserve str needle _srch_str_bloom(Fwd(), str, _pnt(str), _pnt(needle), ch, pos, slen, tlen)
+_srch_strings(::Fwd, ::Union{ByteCompare,WidenCompare}, str, needle,
+              ch, nxtsub, pos, slen, tlen) =
+                  @preserve str needle _srch_str_bloom(Fwd(), str, pointer(str), pointer(needle),
+                                                       ch, pos, slen, tlen)
 
 _occurs_in(needle, hay) = first(find(First, needle, hay)) != 0
 
 # Avoid type piracy
-occurs_in(needle::AbstractString, hay::Str)       = _occurs_in(needle, hay)
-occurs_in(needle::Str, hay::AbstractString)       = _occurs_in(needle, hay)
-occurs_in(needle::Str, hay::Str)                  = _occurs_in(needle, hay)
-occurs_in(needle::Char, hay::Str)                 = _occurs_in(needle, hay)
-occurs_in(needle::Regex, hay::Str)                = _occurs_in(needle, hay)
-occurs_in(needle::CodePoint, hay::AbstractString) = _occurs_in(needle, hay)
+occurs_in(needle::AbstractString, hay::Str) = _occurs_in(needle, hay)
+occurs_in(needle::Str, hay::AbstractString) = _occurs_in(needle, hay)
+occurs_in(needle::Chr, hay::AbstractString) = _occurs_in(needle, hay)
+occurs_in(needle::Char, hay::Str)           = _occurs_in(needle, hay)
+occurs_in(needle::Str, hay::Str)            = _occurs_in(needle, hay)
+occurs_in(needle::Regex, hay::Str)          = _occurs_in(needle, hay)
 
-in(chr::CodePoint, str::AbstractString) = _occurs_in(chr, str)
-in(chr::AbsChar,   str::Str)            = _occurs_in(chr, str)
-in(pat::Str, str::AbstractString)       = _occurs_in(pat, str)
-in(pat::AbstractString, str::Str)       = _occurs_in(pat, str)
-in(pat::Str, str::Str)                  = _occurs_in(pat, str)
+in(chr::Chr, str::AbstractString) = _occurs_in(chr, str)
+in(chr::AbsChar,   str::Str)      = _occurs_in(chr, str)
+in(pat::Str, str::AbstractString) = _occurs_in(pat, str)
+in(pat::AbstractString, str::Str) = _occurs_in(pat, str)
+in(pat::Str, str::Str)            = _occurs_in(pat, str)

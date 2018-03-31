@@ -11,14 +11,14 @@ Licensed under MIT License, see LICENSE.md
     text_width(ch::Char) = charwidth(ch)
 
     import Base: is_assigned_char, normalize_string, isnumber
-    Base.is_assigned_char(ch::CodePoint) = is_assigned(ch)
+    Base.is_assigned_char(ch::Chr) = is_assigned(ch)
     Base.normalize_string(str::Str, opt::Symbol) = normalize(str, opt)
     Base.strwidth(str::Str) = text_width(str)
-    Base.charwidth(ch::CodePoint) = text_width(ch)
-    isnumber(val::CodePoint) = is_numeric(val)
+    Base.charwidth(ch::Chr) = text_width(ch)
+    isnumber(val::Chr) = is_numeric(val)
 else
     Base.Unicode.normalize(str::Str, opt::Symbol) = normalize(str, opt)
-    Base.Unicode.isassigned(ch::CodePoint) = is_assigned(ch)
+    Base.Unicode.isassigned(ch::Chr) = is_assigned(ch)
     is_graphic(ch::Char) = is_graphic(codepoint(ch))
     is_alphanumeric(ch::Char) = is_alphanumeric(codepoint(ch))
 end
@@ -27,11 +27,11 @@ end
 
 ## character column width function ##
 
-text_width(ch::UInt8)     = Int(ifelse(ch < 0x7f, ch > 0x1f, ch > 0x9f & ch != 0xad))
-text_width(ch::UInt16)    = utf8proc_charwidth(ch)
-text_width(ch::UInt32)    = utf8proc_charwidth(ch)
-text_width(ch::CodePoint) = text_width(codepoint(ch))
-text_width(ch::ASCIIChr)  = Int(32 <= codepoint(ch) <= 126)
+text_width(ch::UInt8)    = Int(ifelse(ch < 0x7f, ch > 0x1f, ch > 0x9f & ch != 0xad))
+text_width(ch::UInt16)   = utf8proc_charwidth(ch)
+text_width(ch::UInt32)   = utf8proc_charwidth(ch)
+text_width(ch::Chr)      = text_width(codepoint(ch))
+text_width(ch::ASCIIChr) = Int(32 <= codepoint(ch) <= 126)
 
 text_width(str::Str) = mapreduce(text_width, +, 0, str)
 text_width(str::Str{Union{ASCIICSE,Latin_CSEs}}) = length(str)
@@ -39,20 +39,20 @@ text_width(str::Str{Union{ASCIICSE,Latin_CSEs}}) = length(str)
 ############################################################################
 
 @inline _cat(ch::CodeUnitTypes) = ch <= 0x10ffff ? utf8proc_cat(ch) : Cint(30)
-@inline _cat(ch::CodePoint)     = _cat(codepoint(ch))
+@inline _cat(ch::Chr)     = _cat(codepoint(ch))
 
 # returns code in 0:30 giving Unicode category
-@inline category_code(ch::Union{CodePoint,CodeUnitTypes}) = _cat(ch)
+@inline category_code(ch::Union{Chr,CodeUnitTypes}) = _cat(ch)
 
 # more human-readable representations of the category code
 @inline category_abbrev(ch::CodeUnitTypes) = ch <= 0x10ffff ? utf8proc_cat_abbr(ch) : "In"
-@inline category_abbrev(ch::CodePoint)     = category_abbrev(codepoint(ch))
+@inline category_abbrev(ch::Chr)           = category_abbrev(codepoint(ch))
 
 category_string(ch::CodeUnitTypes) = category_strings[_cat(ch) + 1]
-category_string(ch::CodePoint)     = category_string(codepoint(ch))
+category_string(ch::Chr)           = category_string(codepoint(ch))
 
 is_assigned(ch::CodeUnitTypes) = category_code(ch) != Uni.CN
-is_assigned(ch::CodePoint) = is_assigned(codepoint(ch))
+is_assigned(ch::Chr)           = is_assigned(codepoint(ch))
 
 _cat_mask(a) = a
 @inline _cat_mask(a, b) = (1%UInt << a%UInt) | (1%UInt << b%UInt)
@@ -119,30 +119,30 @@ const _isnumeric_a = _isdigit
 @inline _isgraph_u(ch)   = _check_mask(ch, _isgraph_mask)
 
 ############################################################################
-# Fallback definitions for all CodePoint types
+# Fallback definitions for all Chr types
 
 @inline is_control(ch::CodeUnitTypes)   = _iscntrl(ch)
 @inline is_digit(ch::CodeUnitTypes)     = _isdigit(ch)
 @inline is_hex_digit(ch::CodeUnitTypes) = _isxdigit(ch)
 
-@inline is_control(ch::CodePoint)   = is_control(codepoint(ch))
-@inline is_digit(ch::CodePoint)     = is_digit(codepoint(ch))
-@inline is_hex_digit(ch::CodePoint) = is_hex_digit(codepoint(ch))
+@inline is_control(ch::Chr)   = is_control(codepoint(ch))
+@inline is_digit(ch::Chr)     = is_digit(codepoint(ch))
+@inline is_hex_digit(ch::Chr) = is_hex_digit(codepoint(ch))
 
-@inline is_ascii(ch::Unsigned)    = ch <= 0x7f
-@inline is_ascii(ch::CodePoint)   = is_ascii(codepoint(ch))
-@inline is_ascii(ch::ASCIIChr)    = true
+@inline is_ascii(ch::Chr)          = is_ascii(codepoint(ch))
+@inline is_ascii(ch::Unsigned)     = ch <= 0x7f
+@inline is_ascii(ch::ASCIIChr)     = true
 
-@inline is_latin(ch::Unsigned)    = ch <= 0xff
-@inline is_latin(ch::CodePoint)   = is_latin(codepoint(ch))
+@inline is_latin(ch::AbstractChar) = is_latin(codepoint(ch))
+@inline is_latin(ch::Unsigned)     = ch <= 0xff
 
-@inline is_bmp(ch::Unsigned)      = ch <= 0xffff && !is_surrogate_codeunit(ch)
-@inline is_bmp(ch::UInt8)         = true
-@inline is_bmp(ch::CodePoint)     = is_bmp(codepoint(ch))
+@inline is_bmp(ch::AbstractChar)   = is_bmp(codepoint(ch))
+@inline is_bmp(ch::Unsigned)       = ch <= 0xffff && !is_surrogate_codeunit(ch)
+@inline is_bmp(ch::UInt8)          = true
 
-@inline is_unicode(ch::Unsigned)  = ch <= 0x10ffff && !is_surrogate_codeunit(ch)
-@inline is_unicode(ch::UInt8)     = true
-@inline is_unicode(ch::CodePoint) = is_unicode(codepoint(ch))
+@inline is_unicode(ch::AbstractChar) = is_unicode(codepoint(ch))
+@inline is_unicode(ch::Unsigned)     = ch <= 0x10ffff && !is_surrogate_codeunit(ch)
+@inline is_unicode(ch::UInt8)        = true
 
 const _catfuns =
     ((:numeric,      :numeric),
@@ -165,7 +165,7 @@ for (nnam, fnam) in _catfuns
     @eval $(fnam_al)(ch) = is_ascii(ch) ? $(fnam_a)(ch) : $(Symbol(string(namroot, "_l")))(ch)
     @eval $(fnam_ch)(ch) = is_latin(ch) ? $(fnam_al)(ch) : $(Symbol(string(namroot, "_u")))(ch)
     @eval $(isnam)(ch::CodeUnitTypes)  = $(fnam_ch)(ch)
-    @eval $(isnam)(ch::CodePoint)      = $(fnam_ch)(codepoint(ch))
+    @eval $(isnam)(ch::Chr)            = $(fnam_ch)(codepoint(ch))
     @eval $(isnam)(ch::ASCIIChr)       = $(fnam_a)(codepoint(ch))
     @eval $(isnam)(ch::LatinChars)     = $(fnam_al)(codepoint(ch))
 end
@@ -173,11 +173,76 @@ end
 ############################################################################
 
 @static if isdefined(Base, :ismalformed)
-    Base.ismalformed(ch::CodePoint) = false
-    Base.isoverlong(ch::CodePoint) = false
+    Base.ismalformed(ch::Chr) = false
+    Base.isoverlong(ch::Chr) = false
     is_malformed(ch) = ismalformed(ch)
     is_overlong(ch) = isoverlong(ch)
 else
     is_malformed(ch) = false
     is_overlong(ch) = false
+end
+
+function is_latin(str::MaybeSub{String})
+    (siz = sizeof(str)) == 0 && return true
+    @preserve str begin
+        pnt = pointer(str)
+        fin = pnt + siz
+        while pnt < fin
+            cu = get_codeunit(pnt)
+            # cu must be 1) 0-0x7f, or 2) 0xc2 or 0xc3 followed by 0x80-0xbf
+            (cu < 0x7f ||
+             ((cu - 0xc2) < 0x02 &&
+              (pnt += 1) < fin && is_valid_continuation(get_codeunit(pnt)))) ||
+              return false
+            pnt += 1
+        end
+        true
+    end
+end
+
+@inline function check_3byte(cu, pnt)
+    b2 = get_codeunit(pnt-1)
+    b3 = get_codeunit(pnt)
+    is_valid_continuation(b2) && is_valid_continuation(b3) &&
+        !is_surrogate_codeunit(((cu & 0x0f)%UInt32 << 12) | ((b2 & 0x3f)%UInt32 << 6) | (b3 & 0x3f))
+end
+
+function is_bmp(str::MaybeSub{String})
+    (siz = sizeof(str)) == 0 && return true
+    @preserve str begin
+        pnt = pointer(str)
+        fin = pnt + siz
+        while pnt < fin
+            cu = get_codeunit(pnt)
+            # cu must be 1) 0-0x7f, or 2) 0xc2 or 0xc3 followed by 0x80-0xbf
+            # c2-df -> de,df
+            (cu < 0x7f ||
+             ((cu - 0xc2) < 0x1e && (pnt += 1) < fin && checkcont(pnt)) ||
+             ((cu - 0xe0) < 0x0f && (pnt += 2) < fin && check_3byte(cu, pnt))) ||
+             return false
+             pnt += 1
+        end
+        true
+    end
+end
+
+function is_latin(str::AbstractString)
+    @inbounds for ch in str
+        is_latin(ch) || return false
+    end
+    true
+end
+
+function is_bmp(str::AbstractString)
+    @inbounds for ch in str
+        is_bmp(ch) || return false
+    end
+    true
+end
+
+function is_unicode(str::AbstractString)
+    @inbounds for ch in str
+        is_unicode(ch) || return false
+    end
+    true
 end

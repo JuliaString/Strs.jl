@@ -136,25 +136,25 @@ codeunits(s::AbstractString) = CodeUnits(s)
 
 ## end of codeunits support ============================================================
 
-size(cp::CodePoint) = ()
-ndims(cp::CodePoint) = 0
-ndims(::Type{<:CodePoint}) = 0
-length(cp::CodePoint) = 1
-lastindex(cp::CodePoint) = 1
-getindex(cp::CodePoint) = cp
-first(cp::CodePoint) = cp
-last(cp::CodePoint) = cp
-start(cp::CodePoint) = false
-next(cp::CodePoint, state) = (cp, true)
-done(cp::CodePoint, state) = state
-isempty(cp::CodePoint) = false
-in(x::CodePoint, y::CodePoint) = x == y
--(x::CodePoint, y::CodePoint) = Int(x) - Int(y)
--(x::CodePoint, y::Integer) = CodePoint((Int32(x) - Int32(y))%UInt32)
-+(x::CodePoint, y::Integer) = CodePoint((Int32(x) + Int32(y))%UInt32)
-+(x::Integer, y::CodePoint) = y + x
-show(io::IO, cp::CodePoint)  = show(io, Char(cp))
-print(io::IO, cp::CodePoint) = print(io, Char(cp))
+size(cp::Chr) = ()
+ndims(cp::Chr) = 0
+ndims(::Type{<:Chr}) = 0
+length(cp::Chr) = 1
+lastindex(cp::Chr) = 1
+getindex(cp::Chr) = cp
+first(cp::Chr) = cp
+last(cp::Chr) = cp
+start(cp::Chr) = false
+next(cp::Chr, state) = (cp, true)
+done(cp::Chr, state) = state
+isempty(cp::Chr) = false
+in(x::Chr, y::Chr) = x == y
+-(x::Chr, y::Chr) = Int(x) - Int(y)
+-(x::Chr, y::Integer) = Chr((Int32(x) - Int32(y))%UInt32)
++(x::Chr, y::Integer) = Chr((Int32(x) + Int32(y))%UInt32)
++(x::Integer, y::Chr) = y + x
+show(io::IO, cp::Chr)  = show(io, Char(cp))
+print(io::IO, cp::Chr) = print(io, Char(cp))
 
 codepoint(v::Char) = v%UInt32
 
@@ -182,8 +182,8 @@ const is_uppercase    = isupper
 # These are deprecated in v0.7
 for sym in (:bin, :oct, :dec, :hex)
     @eval import Base:$sym
-    @eval ($sym)(x::CodePoint, p::Int) = ($sym)(codepoint(x), p, false)
-    @eval ($sym)(x::CodePoint)         = ($sym)(codepoint(x), 1, false)
+    @eval ($sym)(x::Chr, p::Int) = ($sym)(codepoint(x), p, false)
+    @eval ($sym)(x::Chr)         = ($sym)(codepoint(x), 1, false)
 end
 
 function repeat(ch::Char, cnt::Integer)
@@ -196,8 +196,8 @@ end
     throw(UnicodeError(UTF_ERR_INVALID_INDEX, Int(i), codeunit(s, i)))
 
 function thisind(str::String, pos::Integer)
-    @boundscheck 0 < pos <= _len(str) || boundserr(str, pos)
-    pnt = _pnt(str) + pos - 1
+    @boundscheck 0 < pos <= ncodeunits(str) || boundserr(str, pos)
+    pnt = pointer(str) + pos - 1
     pos - (checkcont(pnt) ? (checkcont(pnt - 1) ? (checkcont(pnt - 2) ? 3 : 2) : 1) : 0)
 end
 

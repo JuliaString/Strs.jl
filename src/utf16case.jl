@@ -36,7 +36,7 @@ end
 
 function lowercase(str::Str{UTF16CSE})
     @preserve str begin
-        pnt = beg = _pnt(str)
+        pnt = beg = pointer(str)
         fin = beg + sizeof(str)
         while pnt < fin
             ch = get_codeunit(pnt)
@@ -46,7 +46,7 @@ function lowercase(str::Str{UTF16CSE})
              : (is_ascii(ch)
                 ? _isupper_a(ch)
                 : (is_latin(ch) ? _isupper_l(ch) : _isupper_u(ch)))) &&
-                    return _lower(UTF16Str, beg, prv-beg, _len(str))
+                    return _lower(UTF16Str, beg, prv-beg, ncodeunits(str))
             pnt += 2
         end
     end
@@ -88,7 +88,7 @@ end
 
 function uppercase(str::UTF16Str)
     @preserve str begin
-        pnt = beg = _pnt(str)
+        pnt = beg = pointer(str)
         fin = beg + sizeof(str)
         while pnt < fin
             ch = get_codeunit(pnt)
@@ -96,7 +96,7 @@ function uppercase(str::UTF16Str)
             (ch > 0xd7ff # May be surrogate pair
              ? _islower_u(ch > 0xdfff ? ch%UInt32 : get_supplementary(ch, get_codeunit(pnt += 2)))
              : _can_upper_ch(ch)) &&
-                 return _upper(UTF16Str, beg, prv-beg, _len(str))
+                 return _upper(UTF16Str, beg, prv-beg, ncodeunits(str))
             pnt += 2
         end
     end

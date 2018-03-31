@@ -78,9 +78,9 @@ end
 utf_trail(c::UInt8) = (0xe5000000 >>> ((c & 0xf0) >> 3)) & 0x3
 
 @inline function _lastindex(::CodeUnitMulti, str::MS_UTF8)
-    (len = _len(str)) > 1 || return len
+    (len = ncodeunits(str)) > 1 || return len
     @preserve str begin
-        pnt = _pnt(str) + len - 1
+        pnt = pointer(str) + len - 1
         len - (checkcont(pnt) ? (checkcont(pnt - 1) ? checkcont(pnt - 2) + 2 : 1) : 0)
     end
 end
@@ -211,14 +211,14 @@ end
 
 is_unicode(str::MS_UTF8) = true
 
-is_unicode(str::String) = @preserve str _check_utf8_al(_len(str), _pnt(str)) >= 0
-is_unicode(str::SubString{String}) = @preserve str _check_utf8(_len(str), _pnt(str)) >= 0
+is_unicode(str::String) = @preserve str _check_utf8_al(ncodeunits(str), pointer(str)) >= 0
+is_unicode(str::SubString{String}) = @preserve str _check_utf8(ncodeunits(str), pointer(str)) >= 0
 
 """
 Return index of first invalid codeunit (negative),
 0 if all ASCII, or index of first non-ASCII codeunit
 """
-check_utf8(str) = @preserve str _check_utf8(_len(str), _pnt(str))
+check_utf8(str) = @preserve str _check_utf8(ncodeunits(str), pointer(str))
 
 @inline _check_utf8(len, pnt)    = _check_utf8(pnt, pnt, pnt + len)
 @inline _check_utf8_al(len, pnt) = _check_utf8(pnt, pnt, pnt + len)
@@ -293,12 +293,12 @@ function _nextcpfun(::CodeUnitMulti, ::Type{UTF8CSE}, pnt)
 end
 
 # Gets next codepoint
-@propagate_inbounds function _next(::CodeUnitMulti, ::Type{T},
-                                   str::MS_UTF8, pos::Int) where {T<:CodePoint}
-    len = _len(str)
+@propagate_inbounds function _next(::CodeUnitMulti, ::Type{T}, str::MS_UTF8,
+                                   pos::Int) where {T<:Chr}
+    len = ncodeunits(str)
     @boundscheck 0 < pos <= len || boundserr(str, pos)
     @preserve str begin
-        pnt = _pnt(str) + pos - 1
+        pnt = pointer(str) + pos - 1
         ch = get_codeunit(pnt)
         if ch < 0x80
             T(ch), pos + 1
@@ -326,7 +326,7 @@ end
 ## overload methods for efficiency ##
 
 @inline _isvalid_char_pos(::CodeUnitMulti, ::Type{UTF8CSE}, str, pos::Integer) =
-    !is_valid_continuation(get_codeunit(_pnt(str) + pos - 1))
+    !is_valid_continuation(get_codeunit(pointer(str) + pos - 1))
 
 function _thisind(::CodeUnitMulti, str::MaybeSub{T}, len, pnt,
                   pos::Integer) where {T<:Union{Str{<:UTF8CSE},String}}
@@ -336,10 +336,10 @@ end
 
 @propagate_inbounds function _nextind(::CodeUnitMulti, str::MS_UTF8, pos::Integer)
     pos == 0 && return 1
-    numcu = _len(str)
+    numcu = ncodeunits(str)
     @boundscheck 1 <= pos <= numcu || boundserr(str, pos)
     @preserve str begin
-        pnt = _pnt(str) + pos - 1
+        pnt = pointer(str) + pos - 1
         cu = get_codeunit(pnt)
         pos + (cu < 0x80 ? 1
                : (cu < 0xc0
@@ -351,9 +351,9 @@ end
 
 @propagate_inbounds function _prevind(::CodeUnitMulti, str::MS_UTF8, pos::Integer)
     (pos -= 1) == 0 && return 0
+    numcu = ncodeunits(str)
     @preserve str begin
-        numcu, pnt = _lenpnt(str)
-        pnt += pos
+        pnt = pointer(str) + pos
         pos == numcu &&
             return pos - (checkcont(pnt-1) ? (checkcont(pnt-2) ? checkcont(pnt-3) + 2 : 1) : 0)
         @boundscheck 0 < pos < numcu || boundserr(str, pos+1)
@@ -373,7 +373,7 @@ end
     @boundscheck 0 <= pos <= siz || boundserr(str, pos)
     siz == 0 && return Int(nchar != 0)
     @preserve str begin
-        beg = _pnt(str)
+        beg = pointer(str)
         # Get starting position
         if pos == 0
             nchar <= 1 && return nchar
@@ -409,7 +409,7 @@ end
     @boundscheck 0 < pos <= numcu+1 || boundserr(str, pos)
     numcu == 0 && return Int(nchar == 0)
     @preserve str begin
-        beg = _pnt(str)
+        beg = pointer(str)
         if pos > numcu
             (nchar -= 1) < 0 && return pos
             pos = numcu
@@ -430,10 +430,10 @@ end
 @propagate_inbounds function getindex(str::MS_UTF8, rng::UnitRange{Int})
     isempty(rng) && return SubString(empty_utf8, 1, 0)
     beg = first(rng)
-    len = _len(str)
+    len = ncodeunits(str)
     @boundscheck 1 <= beg <= len || boundserr(str, beg)
     @preserve str begin
-        pnt = _pnt(str)
+        pnt = pointer(str)
         ch = get_codeunit(pnt, beg)
         is_valid_continuation(ch) && unierror(UTF_ERR_INVALID_INDEX, beg, ch)
         lst = last(rng)
@@ -544,11 +544,11 @@ convert(::Type{UTF8Str}, s::ASCIIStr) = Str(UTF8CSE, s.data)
 convert(::Type{SubString{UTF8Str}}, s::SubString{ASCIIStr}) =
     SubString(convert(UTF8Str, s.string), s.offset + 1, s.offset + s.ncodeunits)
 
-function convert(::Type{UTF8Str}, dat::Vector{UInt8})
+function convert(::Type{<:Str{UTF8CSE}}, dat::Vector{UInt8})
     # handle zero length string quickly
     isempty(dat) && return empty_utf8
     # get number of bytes to allocate
-    len, flags, num4byte, num3byte, num2byte, latinbyte = unsafe_check_string(dat, 1, _len(dat))
+    len, flags, num4byte, num3byte, num2byte, latinbyte = unsafe_check_string(dat, 1, length(dat))
     # Copy, but eliminate over-long encodings and surrogate pairs
     if flags & (UTF_LONG | UTF_SURROGATE) == 0
         siz = sizeof(dat)
@@ -560,7 +560,7 @@ function convert(::Type{UTF8Str}, dat::Vector{UInt8})
     end
 end
 
-function convert(::Type{UTF8Str}, str::String)
+function convert(::Type{<:Str{UTF8CSE}}, str::String)
     # handle zero length string quickly
     isempty(str) && return empty_utf8
     # get number of bytes to allocate
@@ -570,10 +570,10 @@ function convert(::Type{UTF8Str}, str::String)
     Str(UTF8CSE,
         (flags & (UTF_LONG | UTF_SURROGATE) == 0
          ? str
-         : _transcode_utf8(_pnt(str), len + latinbyte + num2byte + num3byte*2 + num4byte*3)))
+         : _transcode_utf8(pointer(str), len + latinbyte + num2byte + num3byte*2 + num4byte*3)))
 end
 
-function convert(::Type{UTF8Str}, str::AbstractString)
+function convert(::Type{<:Str{UTF8CSE}}, str::AbstractString)
     # handle zero length string quickly
     isempty(str) && return empty_utf8
     # get number of bytes to allocate
@@ -652,28 +652,28 @@ function _transcode_utf8(pnt::Ptr{T}, len) where {T<:WideCodeUnit}
 end
 _transcode_utf8(dat::Vector{<:WideCodeUnit}, len) = _transcode_utf8(pointer(dat), len)
 
-function convert(::Type{UTF8Str}, str::MS_UTF16)
+function convert(::Type{<:Str{UTF8CSE}}, str::MS_UTF16)
     # handle zero length string quickly
-    isempty(str) && return empty_utf8
+    (siz = ncodeunits(str)) == 0 && return empty_utf8
     @preserve str begin
-        siz, pnt = _lenpnt(str)
+        pnt = pointer(str)
         len, flags, num4byte, num3byte, num2byte, latinbyte = count_chars(UTF16Str, pnt, siz)
         if flags == 0
-            buf = _cvtsize(UInt8, pnt, len)
+            Str(UTF8CSE, _cvtsize(UInt8, pnt, len))
         elseif num4byte == 0
-            buf = _encode_utf8(pnt, len + latinbyte + num2byte + num3byte*2)
+            Str(UTF8CSE, _encode_utf8(pnt, len + latinbyte + num2byte + num3byte*2))
         else
-            buf = _transcode_utf8(pnt, len + latinbyte + num2byte + num3byte*2 + num4byte*3)
+            Str(UTF8CSE, _transcode_utf8(pnt, len + latinbyte + num2byte + num3byte*2 + num4byte*3))
         end
-        Str(UTF8CSE, buf)
     end
 end
 
-function convert(::Type{UTF8Str}, str::MaybeSub{T}) where {C<:Union{UCS2_CSEs,UTF32_CSEs},T<:Str{C}}
+function convert(::Type{<:Str{UTF8CSE}},
+                 str::MaybeSub{T}) where {C<:Union{UCS2_CSEs,UTF32_CSEs},T<:Str{C}}
     # handle zero length string quickly
-    isempty(str) && return empty_utf8
+    (siz = ncodeunits(str)) == 0 && return empty_utf8
     @preserve str begin
-        siz, pnt = _lenpnt(str)
+        pnt = pointer(str)
         len, flags, num4byte, num3byte, num2byte, latinbyte = count_chars(T, pnt, siz)
         Str(UTF8CSE, (flags == 0
                       ? _cvtsize(UInt8, pnt, len)

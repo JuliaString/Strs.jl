@@ -65,12 +65,9 @@ function show(io::IO, m::RegexMatchStr)
         for i = 1:length(m.captures)
             # If the capture group is named, show the name.
             # Otherwise show its index.
-            capture_name = get(idx_to_capture_name, i, i)
-            print(io, capture_name, "=")
+            print(io, get(idx_to_capture_name, i, i), "=")
             show(io, m.captures[i])
-            if i < length(m.captures)
-                print(io, ", ")
-            end
+            i < length(m.captures) && print(io, ", ")
         end
     end
     print(io, ")")

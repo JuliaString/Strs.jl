@@ -461,11 +461,11 @@ function searchlines(lines, v, rev=false)
     t = 0
     if rev
     for text in lines
-        t += searchres(fnd(Rev, v, text))
+        t += searchres(fnd(Last, v, text))
     end
     else
     for text in lines
-        t += searchres(fnd(Fwd, v, text))
+        t += searchres(fnd(First, v, text))
     end
     end
     t
@@ -476,25 +476,25 @@ function searchlines(lines::Vector{UniStr}, v, rev=false)
     if rev
     for text in lines
         if typeof(text) == ASCIIStr
-            t += searchres(fnd(Rev, v, text::ASCIIStr))
+            t += searchres(fnd(Last, v, text::ASCIIStr))
         elseif typeof(text) == _LatinStr
-            t += searchres(fnd(Rev, v, text::_LatinStr))
+            t += searchres(fnd(Last, v, text::_LatinStr))
         elseif typeof(text) == _UCS2Str
-            t += searchres(fnd(Rev, v, text::_UCS2Str))
+            t += searchres(fnd(Last, v, text::_UCS2Str))
         else
-            t += searchres(fnd(Rev, v, text::_UTF32Str))
+            t += searchres(fnd(Last, v, text::_UTF32Str))
         end
     end
     else
     for text in lines
         if typeof(text) == ASCIIStr
-            t += searchres(fnd(Fwd, v, text::ASCIIStr))
+            t += searchres(fnd(First, v, text::ASCIIStr))
         elseif typeof(text) == _LatinStr
-            t += searchres(fnd(Fwd, v, text::_LatinStr))
+            t += searchres(fnd(First, v, text::_LatinStr))
         elseif typeof(text) == _UCS2Str
-            t += searchres(fnd(Fwd, v, text::_UCS2Str))
+            t += searchres(fnd(First, v, text::_UCS2Str))
         else
-            t += searchres(fnd(Fwd, v, text::_UTF32Str))
+            t += searchres(fnd(First, v, text::_UTF32Str))
         end
     end
     end

@@ -1,7 +1,7 @@
 #=
 Constructors for Str strings
 
-Copyright 2017 Gandalf Software, Inc., Scott P. Jones
+Copyright 2017-2018 Gandalf Software, Inc., Scott P. Jones
 Licensed under MIT License, see LICENSE.md
 =#
 
@@ -29,9 +29,9 @@ end
 
 @inline function safe_copy(::Type{Vector{T}}, ::Type{C}, str) where {T<:CodeUnitTypes,C<:CSE}
     @preserve str buf begin
-        len, pnt = _lenpnt(str)
+        len = ncodeunits(str)
         buf, out = _allocate(T, len)
-        _memcpy(out, pnt, len)
+        _memcpy(out, pointer(str), len)
         Str(C, buf)
     end
 end
@@ -54,11 +54,11 @@ function _str(str::AbstractString)
     end
 end
 
-function _str(str::T) where {T<:Union{Vector{UInt8}, BinaryStrings, String}}
+function _str(str::T) where {T<:Union{Vector{UInt8}, Str{<:Binary_CSEs}, String}}
     # handle zero length string quickly
     (siz = sizeof(str)) == 0 && return empty_ascii
     @preserve str begin
-        pnt = _pnt(str)
+        pnt = pointer(str)
         len, flags, num4byte, num3byte, num2byte, latin1byte = unsafe_check_string(pnt, 1, siz)
         if flags == 0
             buf, out = _allocate(UInt8, len)
@@ -85,8 +85,21 @@ function _str_cpy(::Type{T}, str, len) where {T}
     end
 end
 
-"""Encode as a possibly smaller type"""
-function _str_encode(str::T, len, flags) where {T<:Str}
+convert(::Type{Str}, str::AbstractString) = _str(str)
+convert(::Type{Str}, str::String)         = _str(str)
+convert(::Type{Str}, str::Str)            = str
+
+convert(::Type{<:Str{C}}, str::AbstractString) where {C} = convert(C, _str(str))
+convert(::Type{<:Str{C}}, str::Str{C}) where {C} = str
+
+convert(::Type{UniStr}, str::AbstractString) = _str(str)
+convert(::Type{UniStr}, str::String)         = _str(str)
+convert(::Type{UniStr}, str::Str{<:Union{ASCIICSE,SubSet_CSEs}}) = str
+
+function convert(::Type{UniStr}, str::T) where {T<:Str}
+    # handle zero length string quickly
+    is_empty(str) && return empty_ascii
+    len, flags = count_chars(T, pointer(str), ncodeunits(str))
     if flags == 0
         Str(ASCIICSE, codeunit(T) == UInt8 ? str.data : _str_cpy(UInt8, str, len))
     elseif (flags & ~UTF_LATIN1) == 0
@@ -98,29 +111,12 @@ function _str_encode(str::T, len, flags) where {T<:Str}
     end
 end
 
-function convert(::Type{<:Str}, str::AbstractString)
-    # handle zero length string quickly
-    is_empty(str) && return empty_ascii
-    len, flags = unsafe_check_string(str)
-    _str_encode(str, len, flags)
-end
-#convert(::Type{<:Str{Text1CSE}}, str::String) =
-#    Str{Text1CSE,Nothing,Nothing,Nothing}(str,nothing,nothing,nothing)
+convert(::Type{<:Str{C}}, str::String) where {C} = convert(C, _str(str))
 
-# This needs to be optimized
-convert(::Type{T},  str::String) where {C<:CSE,T<:Str{C}} =
-    convert(T, unsafe_str(str))
+convert(::Type{<:Str{Text1CSE}}, str::String) = Str(Text1CSE, str)
+convert(::Type{<:Str{BinaryCSE}}, str::String) = Str(BinaryCSE, str)
 
-convert(::Type{UniStr}, str::AbstractString) = _str(str)
-convert(::Type{UniStr}, str::String)         = _str(str)
-convert(::Type{UniStr}, str::Str{<:Union{ASCIICSE,SubSet_CSEs}}) = str
-
-function convert(::Type{UniStr}, str::T) where {T<:Str}
-    # handle zero length string quickly
-    is_empty(str) && return empty_ascii
-    len, flags = count_chars(T, _pnt(str), _len(str))
-    _str_encode(str, len, flags)
-end
+convert(::Type{String}, str::Str{<:Union{Text1CSE,BinaryCSE}}) = str.data
 
 """Convert to a UniStr if valid Unicode, otherwise return a Text1Str"""
 function unsafe_str(str::Union{Vector{UInt8}, T, SubString{T}};
@@ -131,24 +127,24 @@ function unsafe_str(str::Union{Vector{UInt8}, T, SubString{T}};
                     ) where {T <: Union{BinaryStr, Text1Str, String}}
     # handle zero length string quickly
     (siz = sizeof(str)) == 0 && return empty_ascii
-    pnt = _pnt(str)
+    pnt = pointer(str)
     len, flags, num4byte, num3byte, num2byte, latin1byte, invalids =
         unsafe_check_string(pnt, 1, siz;
                             accept_long_null  = accept_long_null,
                             accept_surrogates = accept_surrogates,
                             accept_long_char  = accept_long_char,
                             accept_invalids   = accept_invalids)
-    if invalids != 0
-        safe_copy(T, Text1CSE, str)
-    elseif flags == 0
+    if flags == 0
         # Don't allow this to be aliased to a mutable Vector{UInt8}
         safe_copy(T, ASCIICSE, str)
-   elseif num4byte != 0
+    elseif invalids != 0
+        safe_copy(T, Text1CSE, str)
+    elseif num4byte != 0
         Str(_UTF32CSE, _encode_utf32(pnt, len))
     elseif num2byte + num3byte != 0
         Str(_UCS2CSE, _encode_utf16(pnt, len))
     else
-        Str(latin1byte == 0 ? ASCIICSE : _LatinCSE, _encode_ascii_latin(_pnt(str), len))
+        Str(latin1byte == 0 ? ASCIICSE : _LatinCSE, _encode_ascii_latin(pointer(str), len))
     end
 end
 
@@ -162,7 +158,7 @@ function unsafe_str(str::T;
                                       AbstractVector{<:Union{AbsChar,CodeUnitTypes}}}}
     # handle zero length string quickly
     is_empty(str) && return empty_ascii
-    len, flags, num4byte, num3byte, num2byte, latin1, invalids =
+    len, flags, num4byte, num3byte, num2byte, latin1byte, invalids =
         unsafe_check_string(str;
                             accept_long_null  = accept_long_null,
                             accept_surrogates = accept_surrogates,
@@ -170,7 +166,7 @@ function unsafe_str(str::T;
                             accept_invalids   = accept_invalids)
     if flags == 0
         Str(ASCIICSE, _cvtsize(UInt8, str, len))
-    elseif invalids
+    elseif invalids != 0
         # Todo: Make sure this handles different sorts of SubStrings effectively
         siz = sizeof(eltype(T))
         C = siz == 4 ? Text4CSE : (siz == 2 ? Text2CSE : Text1CSE)

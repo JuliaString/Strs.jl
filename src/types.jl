@@ -58,7 +58,9 @@ const charsets = vcat(_cpname1, _cpname2, _cpname4)
 for nam in vcat(charsets,
                 :Binary,   # really, no character set at all, not text
                 :UniPlus)  # valid Unicode, plus unknown characters (for String)
-    @eval const $(symstr(nam, "CharSet")) = CharSet{$(quotesym(nam))}
+    charset = symstr(nam, "CharSet")
+    @eval const $charset = CharSet{$(quotesym(nam))}
+    @eval export $charset
 end
 
 # These are to indicate string types that must have at least one character of the type,
@@ -96,13 +98,13 @@ const _CSE{U} = Union{CharSet{U}, Encoding{U}} where {U}
 
 print(io::IO, ::S) where {S<:_CSE{U}} where {U} =
     print(io, U)
-print(io::IO, ::CSE{CS,E}) where {S,U,CS<:CharSet{S},E<:Encoding{U}} =
-    print(io, "CSE{", string(S), ",", string(U), "}()")
 
 show(io::IO, ::Type{CharSet{S}}) where {S}   = print(io, "CharSet{", string(S), "}")
 show(io::IO, ::Type{Encoding{S}}) where {S}  = print(io, "Encoding{", string(S), "}")
 show(io::IO, ::Type{CSE{CS,E}}) where {S,T,CS<:CharSet{S},E<:Encoding{T}} =
     print(io, "CSE{", string(S), ", ", string(T), "}")
+print(io::IO, ::T) where {S,U,CS<:CharSet{S},E<:Encoding{U},T<:CSE{CS,E}} =
+    (show(io, T); print(io, "()"))
 
 const CodeUnitTypes = Union{UInt8, UInt16, UInt32}
 
@@ -146,29 +148,26 @@ end
 
 # This needs to be redone, with character sets and the code unit as part of the type
 
-abstract type CodePoint <: AbstractChar end
-
-for (names, siz) in ((_cpname1, 8), (_cpname2, 16), (_cpname4, 32)), nam in names
+for (names, typ) in ((_cpname1, UInt8), (_cpname2, UInt16), (_cpname4, UInt32)), nam in names
     chrnam = symstr(nam, "Chr")
-    @eval primitive type $chrnam <: CodePoint $siz end
+    @eval const $chrnam = Chr{$(symstr(nam, "CharSet")), $typ}
     @eval export $chrnam
+    @eval show(io::IO, ::Type{$chrnam}) = print(io, $(quotesym(chrnam)))
 end
-primitive type _LatinChr <: CodePoint 8 end
 
-# Define all of the function for mapping CodePoint types to a CharSet
-for nam in charsets
-    csnam = symstr(nam, "CharSet")
-    @eval charset(::Type{$(symstr(nam, "Chr"))}) = $csnam
-    @eval export $csnam
-end
+const _LatinChr = Chr{LatinSubSet, UInt8}
+show(io::IO, ::Type{_LatinChr}) = print(io, :_LatinChr)
+
+codepoint(ch::Chr) = ch.v
+basetype(::Type{<:Chr{CS,B}}) where {CS,B} = B
+charset(::Type{<:Chr{CS,B}}) where {CS,B} = CS
+typemin(::Type{T}) where {CS,B,T<:Chr{CS,B}} = Chr(CS, typemin(B))
+typemax(::Type{T}) where {CS,B,T<:Chr{CS,B}} = Chr(CS, typemax(B))
 
 # Handle a few quirks
 charset(::Type{<:AbstractChar}) = UTF32CharSet
-charset(::Type{UInt8})     = BinaryCharSet  # UInt8 instead of "BinaryChr"
-charset(::Type{Char})      = UniPlusCharSet # Char instead of "UniPlusChr"
-charset(::Type{_LatinChr}) = LatinSubSet    # LatinSubSet instead of "_LatinCharSet"
-
-export BinaryCharSet, UniPlusCharSet
+charset(::Type{UInt8})          = BinaryCharSet  # UInt8 instead of "BinaryChr"
+charset(::Type{Char})           = UniPlusCharSet # Char instead of "UniPlusChr"
 
 const LatinChars   = Union{LatinChr, _LatinChr}
 const ByteChars    = Union{ASCIIChr, LatinChr, _LatinChr, Text1Chr}
@@ -228,6 +227,11 @@ typemin(::T) where {T<:Str} = empty_str(T)
 const UniStr = Union{ASCIIStr, _LatinStr, _UCS2Str, _UTF32Str}
 show(io::IO, ::Type{UniStr}) = print(io, :UniStr)
 
+# Display BinaryCSE as if String
+show(io::IO, str::T) where {T<:Str{BinaryCSE}} = show(io, str.data)
+show(io::IO, str::SubString{T}) where {T<:Str{BinaryCSE}} =
+    @inbounds show(io, SubString(str.string.data, str.offset+1, str.offset+lastindex(str)))
+
 _allocate(len) = Base._string_n((len+STR_KEEP_NUL-1)%Csize_t)
 
 function _allocate(::Type{T}, len) where {T <: CodeUnitTypes}
@@ -239,38 +243,22 @@ end
 
 # These should be done via traits
 const Binary_CSEs   = Union{Text1CSE, BinaryCSE}
-const Raw_CSEs      = Union{Text1CSE, Text2CSE, Text4CSE}
 const Latin_CSEs    = Union{LatinCSE, _LatinCSE}
 const UTF8_CSEs     = Union{UTF8CSE,  UniPlusCSE}
 const UCS2_CSEs     = Union{UCS2CSE,  _UCS2CSE}
 const UTF32_CSEs    = Union{UTF32CSE, _UTF32CSE}
-const Unicode_CSEs  = Union{UTF8CSE, UTF16CSE, UTF32_CSEs}
 const SubSet_CSEs   = Union{_LatinCSE, _UCS2CSE, _UTF32CSE}
 
-const Byte_CSEs     = Union{ASCIICSE, Binary_CSEs, Latin_CSEs, UTF8CSE}
-const Word_CSEs     = Union{Text2CSE, UCS2_CSEs, UTF16CSE} # 16-bit characters
-const Quad_CSEs     = Union{Text4CSE, UTF32_CSEs}          # 32-bit code units
-const Wide_CSEs     = Union{UTF16CSE, UCS2_CSEs, UTF32_CSEs}
-const WordQuad_CSEs = Union{Text2CSE,Text4CSE,UCS2CSE,UTF16CSE,UTF32CSE}
-
-const ASCIIStrings  = Str{ASCIICSE}
-const BinaryStrings = Str{<:Binary_CSEs}
-const RawStrings    = Str{<:Raw_CSEs}
-const LatinStrings  = Str{<:Latin_CSEs}
-const UCS2Strings   = Str{<:UCS2_CSEs}
-const UTF32Strings  = Str{<:UTF32_CSEs}
-
-const ByteStr = Str{<:Byte_CSEs}
-const WordStr = Str{<:Word_CSEs}
-const QuadStr = Str{<:Quad_CSEs}
-const WideStr = Str{<:Wide_CSEs}
+const Byte_CSEs     = Union{Text1CSE, BinaryCSE, ASCIICSE, LatinCSE, _LatinCSE, UTF8CSE}
+const Word_CSEs     = Union{Text2CSE, UCS2CSE, _UCS2CSE, UTF16CSE} # 16-bit characters
+const Quad_CSEs     = Union{Text4CSE, UTF32CSE, _UTF32CSE}         # 32-bit code units
 
 basecse(::Type{C}) where {C<:CSE} = C
 basecse(::Type{_LatinCSE}) = LatinCSE
 basecse(::Type{_UCS2CSE})  = UCS2CSE
 basecse(::Type{_UTF32CSE}) = UTF32CSE
 
-const AbsChar = @static isdefined(Base, :AbstractChar) ? AbstractChar : Union{Char, CodePoint}
+const AbsChar = @static isdefined(Base, :AbstractChar) ? AbstractChar : Union{Char, Chr}
 
 ## Get the character set / encoding used by a string type
 cse(::Type{<:AbstractString}) = UniPlusCSE     # allows invalid sequences
@@ -287,7 +275,7 @@ encoding(::Type{T}) where {T<:AbstractString} = encoding(cse(T)) # Default unles
 encoding(::Type{C}) where {CS,E,C<:CSE{CS,E}} = E
 encoding(str::AbstractString) = encoding(cse(str))
 
-promote_rule(::Type{T}, ::Type{T}) where {T<:CodePoint} = T
+promote_rule(::Type{T}, ::Type{T}) where {T<:Chr} = T
 promote_rule(::Type{Text2Chr}, ::Type{Text1Chr}) = Text2Chr
 promote_rule(::Type{Text4Chr}, ::Type{Text1Chr}) = Text4Chr
 promote_rule(::Type{Text4Chr}, ::Type{Text2Chr}) = Text4Chr
@@ -298,31 +286,36 @@ promote_rule(::Type{UTF32Chr}, ::Type{UCS2Chr}) = UTF32Chr
 promote_rule(::Type{T}, ::Type{<:ByteChars}) where {T<:WideChars} = T
 
 promote_rule(::Type{T}, ::Type{T}) where {T<:Str} = T
-promote_rule(::Type{T}, ::Type{<:Str{Text1CSE}}) where {T<:Str{Text2CSE}} = T
-promote_rule(::Type{T}, ::Type{<:Str{Text1CSE}}) where {T<:Str{Text4CSE}} = T
-promote_rule(::Type{T}, ::Type{<:Str{Text2CSE}}) where {T<:Str{Text4CSE}} = T
 
-promote_rule(::Type{String}, ::Type{<:Str{ASCIICSE}}) = String
-promote_rule(::Type{T}, ::Type{<:Str{ASCIICSE}}) where {T<:Str{<:CSE}} = T
-promote_rule(::Type{T}, ::Type{<:Str{Latin_CSEs}}) where {T<:Str{<:Union{UTF8CSE, Wide_CSEs}}} = T
-promote_rule(::Type{T}, ::Type{<:Str{UCS2_CSEs}}) where {T<:Str{UTF32_CSEs}} = T
+promote_rule(::Type{Text2CSE}, ::Type{Text1CSE}) = Text2CSE
+promote_rule(::Type{Text4CSE}, ::Type{Text1CSE}) = Text4CSE
+promote_rule(::Type{Text4CSE}, ::Type{Text2CSE}) = Text4CSE
 
-promote_rule(::Type{T}, ::Type{<:Str{_LatinCSE}}) where {T<:Str{LatinCSE}} = T
-promote_rule(::Type{T}, ::Type{<:Str{_UCS2CSE}})  where {T<:Str{UCS2CSE}} = T
-promote_rule(::Type{T}, ::Type{<:Str{_UTF32CSE}}) where {T<:Str{UTF32CSE}} = T
+promote_rule(::Type{T}, ::Type{ASCIICSE}) where {T<:CSE} = T
+promote_rule(::Type{T},
+             ::Type{<:Latin_CSEs}) where {T<:Union{UTF8CSE,UTF16CSE,UCS2_CSEs,UTF32_CSEs}} = T
+promote_rule(::Type{T}, ::Type{<:UCS2_CSEs}) where {T<:UTF32_CSEs} = T
+
+promote_rule(::Type{LatinCSE}, ::Type{_LatinCSE}) = LatinCSE
+promote_rule(::Type{UCS2CSE}, ::Type{_UCS2CSE})   = UCS2CSE
+promote_rule(::Type{UTF32CSE}, ::Type{_UTF32CSE}) = UTF32CSE
+
+promote_rule(::Type{String}, ::Type{<:Str}) = String
+
+promote_rule(::Type{<:Str{S}}, ::Type{<:Str{T}}) where {S,T} = Str{promote_rule(S,T)}
 
 sizeof(s::Str) = sizeof(s.data) + 1 - STR_KEEP_NUL
 
 """Codeunits of string as a Vector"""
 _data(s::Vector{UInt8}) = s
-_data(s::String)  = s
-_data(s::ByteStr) = @static V6_COMPAT ? Vector{UInt8}(s.data) : unsafe_wrap(Vector{UInt8}, s.data)
+_data(s::String)        = s
+_data(s::Str{<:Byte_CSEs}) =
+    @static V6_COMPAT ? Vector{UInt8}(s.data) : unsafe_wrap(Vector{UInt8}, s.data)
 
 """Pointer to codeunits of string"""
-_pnt(s)          = pointer(s)
-_pnt(s::ByteStr) = pointer(s.data)
-_pnt(s::WordStr) = reinterpret(Ptr{UInt16}, pointer(s.data))
-_pnt(s::QuadStr) = reinterpret(Ptr{UInt32}, pointer(s.data))
+pointer(s::Str{<:Byte_CSEs}) = pointer(s.data)
+pointer(s::Str{<:Word_CSEs}) = reinterpret(Ptr{UInt16}, pointer(s.data))
+pointer(s::Str{<:Quad_CSEs}) = reinterpret(Ptr{UInt32}, pointer(s.data))
 
 const CHUNKSZ = sizeof(UInt64) # used for fast processing of strings
 
@@ -330,19 +323,17 @@ _pnt64(s::Union{String,Vector{UInt8}}) = reinterpret(Ptr{UInt64}, pointer(s))
 _pnt64(s::Str) = reinterpret(Ptr{UInt64}, pointer(s.data))
 
 """Length of string in codeunits"""
-_len(s) = sizeof(s)
-_len(s::WordStr) = sizeof(s) >>> 1
-_len(s::QuadStr) = sizeof(s) >>> 2
+ncodeunits(s::Str)              = sizeof(s)
+ncodeunits(s::Str{<:Word_CSEs}) = sizeof(s) >>> 1
+ncodeunits(s::Str{<:Quad_CSEs}) = sizeof(s) >>> 2
 
 # For convenience
-@inline _lenpnt(s) = _len(s), _pnt(s)
-
 @inline _calcpnt(str, siz) = (pnt = _pnt64(str) - CHUNKSZ;  (pnt, pnt + siz))
 
 @inline _mask_bytes(n) = (1%UInt << ((n & (CHUNKSZ - 1)) << 3)) - 0x1
 
-Base.need_full_hex(c::CodePoint) = is_hex_digit(c)
-Base.escape_nul(c::CodePoint) = ('0' <= c <= '7') ? "\\x00" : "\\0"
+Base.need_full_hex(c::Chr) = is_hex_digit(c)
+Base.escape_nul(c::Chr) = ('0' <= c <= '7') ? "\\x00" : "\\0"
 
 # Support for SubString of Str
 
@@ -353,9 +344,37 @@ Base.SubString(str::Str{C}, off::Int) where {C<:SubSet_CSEs} =
 Base.SubString(str::Str{C}, off::Int, fin::Int) where {C<:SubSet_CSEs} =
     SubString(Str(basecse(C), str), off, fin)
 
-# Todo: clean these up, avoid so many definitions
-_pnt(s::SubString{<:WordStr}) = reinterpret(Ptr{UInt16}, pointer(s))
-_pnt(s::SubString{<:QuadStr}) = reinterpret(Ptr{UInt32}, pointer(s))
+# pointer conversions of ASCII/UTF8/UTF16/UTF32 strings:
+pointer(str::Str, pos::Integer) = bytoff(pointer(str), pos - 1)
 
-_len(s::SubString{<:WordStr}) = sizeof(s) >>> 1
-_len(s::SubString{<:QuadStr}) = sizeof(s) >>> 2
+# pointer conversions of SubString of ASCII/UTF8/UTF16/UTF32:
+pointer(x::SubString{<:Str}) = bytoff(pointer(x.string), x.offset)
+pointer(x::SubString{<:Str}, pos::Integer) = bytoff(pointer(x.string), x.offset + pos - 1)
+
+# CodePoints iterator
+
+struct CodePoints{T}
+    xs::T
+end
+
+"""
+    codepoints(str)
+
+An iterator that generates the code points of a string
+
+# Examples
+```jldoctest
+julia> a = Str("abc\U1f596")
+
+julia> collect(a)
+
+julia> collect(codepoints(a))
+```
+"""
+codepoints(xs) = CodePoints(xs)
+eltype(::Type{<:CodePoints{S}}) where {S} = eltype(S)
+length(it::CodePoints) = length(it.xs)
+start(it::CodePoints) = start(it.xs)
+done(it::CodePoints, state) = done(it.xs, state)
+@propagate_inbounds next(it::CodePoints{T}, state) where {T<:Str} =
+    _next(CodePointStyle(T), eltype(T), it.xs, state)

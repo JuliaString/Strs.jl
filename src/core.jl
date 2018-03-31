@@ -13,12 +13,12 @@ _lastindex(::CodeUnitSingle, str) = (@_inline_meta(); ncodeunits(str))
 @propagate_inbounds function _getindex(::CodeUnitSingle, T, str, pos::Int)
     @_inline_meta()
     @boundscheck checkbounds(str, pos)
-    T(get_codeunit(_pnt(str), pos))
+    T(get_codeunit(pointer(str), pos))
 end
 
 @propagate_inbounds function _next(::CodeUnitSingle, T, str, pos)
     @_inline_meta()
-    @boundscheck 0 < pos <= _len(str) || boundserr(str, pos)
+    @boundscheck 0 < pos <= ncodeunits(str) || boundserr(str, pos)
     T(get_codeunit(str, pos)), pos + 1
 end
 
@@ -65,7 +65,7 @@ end
     len = ncodeunits(str)
     pos == len + 1 && return pos
     @boundscheck 0 < pos <= len || boundserr(str, pos)
-    @preserve str _thisind(cs, str, len, _pnt(str), pos)
+    @preserve str _thisind(cs, str, len, pointer(str), pos)
 end
 
 @propagate_inbounds function _prevind(::CodeUnitSingle, str, i)
@@ -175,14 +175,17 @@ end
 
 @propagate_inbounds function _collectstr(::CodeUnitSingle, ::Type{S},
                                          str::MaybeSub{T}) where {S,T<:Str}
-    len, pnt = _lenpnt(str)
+    len = ncodeunits(str)
     vec = create_vector(S, len)
     cpt = eltype(T)
-    if S == cpt
-        @inbounds unsafe_copyto!(reinterpret(Ptr{basetype(cpt)}, pointer(vec)), pnt, len)
-    else
-        @inbounds for i = 1:len
-            vec[i] = T(get_codeunit(pnt, i))
+    @preserve str begin
+        pnt = pointer(str)
+        if S == cpt
+            unsafe_copyto!(reinterpret(Ptr{basetype(cpt)}, pointer(vec)), pnt, len)
+        else
+            @inbounds for i = 1:len
+                vec[i] = T(get_codeunit(pnt, i))
+            end
         end
     end
     vec
@@ -244,18 +247,18 @@ Str(str::SubString{<:Str{C}}) where {C<:Byte_CSEs} =
     Str(C, unsafe_string(pointer(str.string, str.offset+1), str.ncodeunits))
 
 # don't make unnecessary copies when passing substrings to C functions
-cconvert(::Type{Ptr{UInt8}}, str::SubString{<:ByteStr}) = str
-cconvert(::Type{Ptr{Int8}},  str::SubString{<:ByteStr}) = str
+cconvert(::Type{Ptr{UInt8}}, str::SubString{<:Str{<:Byte_CSEs}}) = str
+cconvert(::Type{Ptr{Int8}},  str::SubString{<:Str{<:Byte_CSEs}}) = str
 
-unsafe_convert(::Type{Ptr{UInt8}}, s::SubString{<:ByteStr}) =
+unsafe_convert(::Type{Ptr{UInt8}}, s::SubString{<:Str{Byte_CSEs}}) =
     convert(Ptr{UInt8}, pointer(s.string)) + s.offset
-unsafe_convert(::Type{Ptr{Int8}}, s::SubString{<:ByteStr}) =
+unsafe_convert(::Type{Ptr{Int8}}, s::SubString{<:Str{Byte_CSEs}}) =
     convert(Ptr{Int8}, pointer(s.string)) + s.offset
 
 function _reverse(::CodeUnitSingle, ::Type{C}, len, str::Str{C}) where {C<:CSE}
     len < 2 && return str
     @preserve str begin
-        pnt = _pnt(str)
+        pnt = pointer(str)
         T = codeunit(C)
         buf, beg = _allocate(T, len)
         out = bytoff(beg, len)
@@ -269,7 +272,7 @@ end
 
 function _reverse(::CodeUnitMulti, ::Type{C}, len, str) where {C<:CSE}
     @inbounds ((t = nextind(str, 0)) > len || nextind(str, t) > len) && return str
-    @preserve str _reverse(CodeUnitMulti(), C, len, _pnt(str))
+    @preserve str _reverse(CodeUnitMulti(), C, len, pointer(str))
 end
 
 reverse(str::MaybeSub{T}) where {C<:CSE,T<:Str{C}} =

@@ -30,11 +30,12 @@ ends_with(str::AbstractString, chars::Chars) = !is_empty(str) && last(str) in ch
 end # if false
 
 starts_with(a::MaybeSub{<:Str{C}}, b::MaybeSub{<:Str{C}}) where {C<:CSE} =
-    (len = _len(b)) <= _len(a) && (@preserve a b _memcmp(_pnt(a), _pnt(b), len)) == 0
+    (len = ncodeunits(b)) <= ncodeunits(a) &&
+    (@preserve a b _memcmp(pointer(a), pointer(b), len)) == 0
 
 ends_with(a::MaybeSub{<:Str{C}}, b::MaybeSub{<:Str{C}}) where {C<:CSE} =
-    (lenb = _len(b)) <= (lena = _len(a)) &&
-    (@preserve a b _memcmp(_pnt(a) + lena - lenb, _pnt(b), lenb)) == 0
+    (lenb = ncodeunits(b)) <= (lena = ncodeunits(a)) &&
+    (@preserve a b _memcmp(pointer(a) + lena - lenb, pointer(b), lenb)) == 0
 
 @static if false
 function chop(s::AbstractString; head::Integer = 0, tail::Integer = 1)
@@ -82,11 +83,11 @@ function _lpad(cnt, pad, str)
 end
 lpad(str::MaybeSub{<:Str}, cnt::Integer, pad::AbstractString) =
     (cnt -= length(str)) <= 0 ? str : _lpad(cnt, pad, str)
-lpad(ch::CodePoint, cnt::Integer, pad::AbstractString) =
+lpad(ch::Chr, cnt::Integer, pad::AbstractString) =
     (cnt -= 1) <= 0 ? string(ch) : _lpad(cnt, pad, ch)
 lpad(str::MaybeSub{<:Str}, cnt::Integer, pad::AbsChar=' ') =
     (cnt -= length(str)) <= 0 ? str : string(pad^cnt, str)
-lpad(ch::CodePoint, cnt::Integer, pad::AbstractChar=' ') =
+lpad(ch::Chr, cnt::Integer, pad::AbstractChar=' ') =
     (cnt -= 1) <= 0 ? string(ch) : string(pad^cnt, ch)
 
 function _rpad(cnt, pad, str)
@@ -95,26 +96,30 @@ function _rpad(cnt, pad, str)
 end
 rpad(str::MaybeSub{<:Str}, cnt::Integer, pad::AbstractString) =
     (cnt -= length(str)) <= 0 ? str : _rpad(cnt, pad, str)
-rpad(ch::CodePoint, cnt::Integer, pad::AbstractString) =
+rpad(ch::Chr, cnt::Integer, pad::AbstractString) =
     (cnt -= 1) <= 0 ? string(ch) : _rpad(cnt, pad, ch)
 rpad(str::MaybeSub{<:Str}, cnt::Integer, pad::AbsChar=' ') =
     (cnt -= length(str)) <= 0 ? str : string(str, pad^cnt)
-rpad(ch::CodePoint, cnt::Integer, pad::AbsChar=' ') =
+rpad(ch::Chr, cnt::Integer, pad::AbsChar=' ') =
     (cnt -= 1) <= 0 ? string(ch) : string(ch, pad^cnt)
 
 const SetOfChars = Union{Tuple{Vararg{<:AbstractChar}},
                          AbstractVector{<:AbstractChar},
                          Set{<:AbstractChar}}
 
-split(str::MaybeSub{T}, splitter; limit::Integer=0, keep::Bool=true) where {T<:Str} =
-    _split(str, splitter, limit, keep, SubString{T}[])
-split(str::MaybeSub{T}, splitter::SetOfChars; limit::Integer=0, keep::Bool=true) where {T<:Str} =
-    _split(str, in(splitter), limit, keep, SubString{T}[])
+#=
+split(str::MaybeSub{T}, splitter;
+      limit::Integer=0, keepempty::Bool=true) where {T<:Str} =
+    _split(str, splitter, limit, keepempty, SubString{T}[])
+split(str::MaybeSub{T}, splitter::SetOfChars;
+      limit::Integer=0, keepempty::Bool=true) where {T<:Str} =
+    _split(str, in(splitter), limit, keepempty, SubString{T}[])
 split(str::MaybeSub{T}, splitter::AbstractChar;
-      limit::Integer=0, keep::Bool=true) where {T<:Str} =
-          _split(str, ==(splitter), limit, keep, SubString{T}[])
+      limit::Integer=0, keepempty::Bool=true) where {T<:Str} =
+          _split(str, ==(splitter), limit, keepempty, SubString{T}[])
+=#
 
-function _split(str::MaybeSub{T}, splitter, limit::Integer,
+function Base._split(str::MaybeSub{T}, splitter, limit::Integer,
                 keep_empty::Bool, strs::Array) where {T<:Str}
     pos = 1
     lst = lastindex(str)
@@ -136,17 +141,22 @@ function _split(str::MaybeSub{T}, splitter, limit::Integer,
     (keep_empty || pos <= lst) ? push!(strs, SubString(str, pos)) : strs
 end
 
+#=
 # a bit oddball, but standard behavior in Perl, Ruby & Python:
-split(str::MaybeSub{<:Str}) = split(str, _default_delims; limit=0, keep=false)
+split(str::MaybeSub{<:Str}) = split(str, _default_delims; limit=0, keepempty=false)
 
-rsplit(str::MaybeSub{T}, splitter; limit::Integer=0, keep::Bool=true) where {T<:Str} =
-    _rsplit(str, splitter, limit, keep, SubString{T}[])
-rsplit(str::MaybeSub{T}, splitter::SetOfChars; limit::Integer=0, keep::Bool=true) where {T<:Str} =
-    _rsplit(str, occurs_in(splitter), limit, keep, SubString{T}[])
-rsplit(str::MaybeSub{T}, splitter::AbstractChar; limit::Integer=0, keep::Bool=true) where {T<:Str} =
-    _rsplit(str, ==(splitter), limit, keep, SubString{T}[])
+rsplit(str::MaybeSub{T}, splitter;
+       limit::Integer=0, keepempty::Bool=true) where {T<:Str} =
+    _rsplit(str, splitter, limit, keepempty, SubString{T}[])
+rsplit(str::MaybeSub{T}, splitter::SetOfChars;
+       limit::Integer=0, keepempty::Bool=true) where {T<:Str} =
+    _rsplit(str, occurs_in(splitter), limit, keepempty, SubString{T}[])
+rsplit(str::MaybeSub{T}, splitter::AbstractChar;
+       limit::Integer=0, keepempty::Bool=true) where {T<:Str} =
+    _rsplit(str, ==(splitter), limit, keepempty, SubString{T}[])
+=#
 
-function _rsplit(str::MaybeSub{T}, splitter, limit::Integer,
+function Base._rsplit(str::MaybeSub{T}, splitter, limit::Integer,
                  keep_empty::Bool, strs::Array) where {T<:Str}
     res = find(Last, splitter, str)
     j, k = first(res), last(res)

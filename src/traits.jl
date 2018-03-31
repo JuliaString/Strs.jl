@@ -26,7 +26,7 @@ struct UnknownValidity <: ValidatedStyle end
 
 ValidatedStyle(::Type{<:AbstractChar}) = UnknownValidity()
 @static isdefined(Base, :AbstractChar) || (ValidatedStyle(::Type{Char}) = UnknownValidity())
-ValidatedStyle(::Type{<:CodePoint}) = AlwaysValid()
+ValidatedStyle(::Type{<:Chr}) = AlwaysValid()
 
 ValidatedStyle(::Type{<:AbstractString}) = UnknownValidity()
 ValidatedStyle(::Type{<:Str}) = AlwaysValid()
@@ -99,13 +99,12 @@ struct CharSetUnknown       <: CharSetStyle end
                                  
 CharSetStyle(A::AbstractString) = CharSetStyle(typeof(A))
 
-CharSetStyle(::Type{<:AbstractString}) = CharSetUnicode()
-CharSetStyle(::Type{String})           = CharSetUnicodePlus() # Encodes invalid characters also
-CharSetStyle(::Type{<:RawStrings})     = CharSetUnknown()
-CharSetStyle(::Type{Str{<:BinaryCSE}}) = CharSetBinary()
-CharSetStyle(::Type{Str{<:ASCIICSE}})  = CharSetASCIICompat()
-CharSetStyle(::Type{<:UCS2Strings})    = CharSetBMPCompat()
-CharSetStyle(::Type{<:LatinStrings})   = CharSetISOCompat()
+CharSetStyle(::Type{<:AbstractString})    = CharSetUnicodePlus()
+CharSetStyle(::Type{<:Str{<:Union{Text1CSE, Text2CSE, Text4CSE}}}) = CharSetUnknown()
+CharSetStyle(::Type{<:Str{BinaryCSE}})    = CharSetBinary()
+CharSetStyle(::Type{<:Str{ASCIICSE}})     = CharSetASCIICompat()
+CharSetStyle(::Type{<:Str{<:Latin_CSEs}}) = CharSetISOCompat()
+CharSetStyle(::Type{<:Str{<:UCS2_CSEs}})  = CharSetBMPCompat()
 
 CharSetStyle(A::AbstractChar)   = CharSetStyle(typeof(A))
 
@@ -166,19 +165,19 @@ is_valid(::Type{Str{<:CSE{CS}}}, str::T) where {T<:Str{<:CSE{CS}}} where {CS} =
 
 _isvalid(::AlwaysValid, v) = true
 
-_isvalid(::UnknownValidity, str::T) where {T<:Str} = _isvalid(T, _pnt(str), _len(str))
+_isvalid(::UnknownValidity, str::T) where {T<:Str} = _isvalid(T, pointer(str), ncodeunits(str))
 
 # By default, check that it is valid Unicode codepoint
 _isvalid(::UnknownValidity, v) = _isvalid(UnknownValidity(), UTF32CharSet, charset(v), v)
 
 is_valid(::Type{T}, str::T) where {T<:Str}       = _isvalid(ValidatedStyle(T), str)
-is_valid(::Type{T}, chr::T) where {T<:CodePoint} = _isvalid(ValidatedStyle(T), chr)
+is_valid(::Type{T}, chr::T) where {T<:Chr} = _isvalid(ValidatedStyle(T), chr)
 
 is_valid(str::T) where {T<:Str}       = _isvalid(ValidatedStyle(T), str)
-is_valid(chr::T) where {T<:CodePoint} = _isvalid(ValidatedStyle(T), chr)
+is_valid(chr::T) where {T<:Chr} = _isvalid(ValidatedStyle(T), chr)
 
 # Different character set
-function is_valid(::Type{S}, chr::T) where {S<:CodePoint, T<:CodePoint}
+function is_valid(::Type{S}, chr::T) where {S<:Chr, T<:Chr}
     CS = charset(S)
     CT = charset(T)
     CS == CT ? _isvalid(ValidatedStyle(T), chr) : _isvalid(ValidatedStyle(T), CS, CT, chr)
@@ -202,15 +201,15 @@ _isvalid_chr(::Type{BinaryCharSet}, v) = v <= typemax(UInt8)
 # Not totally sure about this, base Char is rather funky in v0.7
 _isvalid_chr(::Type{UniPlusCharSet}, v) = v <= typemax(UInt32)
 
-is_valid(::Type{T}, v::Unsigned) where {T<:CodePoint} =
+is_valid(::Type{T}, v::Unsigned) where {T<:Chr} =
     _isvalid_chr(charset(T), v)
-is_valid(::Type{T}, v::Signed) where {T<:CodePoint} =
+is_valid(::Type{T}, v::Signed) where {T<:Chr} =
     v >= 0 && _isvalid_chr(charset(T), v%Unsigned)
 
 is_valid(::Type{Char}, ch::Union{Text1Chr, ASCIIChr, LatinChars, UCS2Chr, UTF32Chr}) = true
 is_valid(::Type{Char}, ch::Text2Chr) = is_bmp(ch)
 is_valid(::Type{Char}, ch::Text4Chr) = is_unicode(ch)
-is_valid(::Type{T},    ch::Char) where {T<:CodePoint} = Base.isvalid(ch) && is_valid(T, ch%UInt32)
+is_valid(::Type{T},    ch::Char) where {T<:Chr} = Base.isvalid(ch) && is_valid(T, ch%UInt32)
 
 # For now, there is only support for immutable `Str`s, when mutable `Str`s are added.
 
@@ -301,12 +300,12 @@ CompareStyle(::Type{T}, ::Type{T}) where {T<:AbstractString} = ByteCompare()
 
 CompareStyle(A::AbstractString, B::AbstractString) = CompareStyle(typeof(A), typeof(B))
 
-Base.promote(::Type{NoCompare},    ::Type{<:CompareStyle})   = NoCompare
-Base.promote(::Type{ByteCompare},  ::Type{CodePointCompare}) = ByteCompare
-Base.promote(::Type{WordCompare},  ::Type{CodePointCompare}) = WordCompare
-Base.promote(::Type{UTF16Compare}, ::Type{CodePointCompare}) = UTF16Compare
-Base.promote(::Type{ASCIICompare}, ::Type{CodePointCompare}) = ASCIICompare
-Base.promote(::Type{WidenCompare}, ::Type{CodePointCompare}) = WidenCompare
+Base.promote_rule(::Type{NoCompare},    ::Type{<:CompareStyle})   = NoCompare
+Base.promote_rule(::Type{ByteCompare},  ::Type{CodePointCompare}) = ByteCompare
+Base.promote_rule(::Type{WordCompare},  ::Type{CodePointCompare}) = WordCompare
+Base.promote_rule(::Type{UTF16Compare}, ::Type{CodePointCompare}) = UTF16Compare
+Base.promote_rule(::Type{ASCIICompare}, ::Type{CodePointCompare}) = ASCIICompare
+Base.promote_rule(::Type{WidenCompare}, ::Type{CodePointCompare}) = WidenCompare
 
 """
     CanContain(Union{A, typeof(A)}, Union{B, typeof(B)})
@@ -326,14 +325,14 @@ CanContain(::Type{<:Binary_CSEs}, ::Type{<:Union{_UCS2CSE,_UTF32CSE}}) =
     NoCompare()
 CanContain(::Type{<:Binary_CSEs}, ::Type{<:Byte_CSEs}) =
     ByteCompare()
-CanContain(::Type{<:Binary_CSEs}, ::Type{<:WordQuad_CSEs}) =
+CanContain(::Type{<:Binary_CSEs}, ::Type{<:Union{Word_CSEs, Quad_CSEs}}) =
     WidenCompare()
 
 CanContain(::Type{ASCIICSE}, ::Type{<:SubSet_CSEs}) =
     NoCompare()
 CanContain(::Type{ASCIICSE}, ::Type{<:Union{Binary_CSEs, LatinCSE, UTF8_CSEs}}) =
     ByteCompare()
-CanContain(::Type{ASCIICSE}, ::Type{<:WordQuad_CSEs}) =
+CanContain(::Type{ASCIICSE}, ::Type{<:Union{Word_CSEs, Quad_CSEs}}) =
     WidenCompare()
 
 CanContain(::Type{<:Latin_CSEs}, ::Type{<:Union{_UCS2CSE,_UTF32CSE}}) =
@@ -342,7 +341,7 @@ CanContain(::Type{<:Latin_CSEs}, ::Type{<:Union{Binary_CSEs,ASCIICSE,Latin_CSEs}
     ByteCompare()
 CanContain(::Type{<:Latin_CSEs}, ::Type{<:UTF8_CSEs}) =
     ASCIICompare()
-CanContain(::Type{<:Latin_CSEs}, ::Type{<:WordQuad_CSEs}) =
+CanContain(::Type{<:Latin_CSEs}, ::Type{<:Union{Word_CSEs, Quad_CSEs}}) =
     WidenCompare()
 
 CanContain(::Type{<:UTF8_CSEs}, ::Type{<:Union{ASCIICSE,Binary_CSEs}}) =

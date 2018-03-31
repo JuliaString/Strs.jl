@@ -12,18 +12,18 @@ _lowercase(ch) = is_latin(ch) ? _lowercase_l(ch) : _lowercase_u(ch)
 _uppercase(ch) = is_latin(ch) ? _uppercase_l(ch) : _uppercase_u(ch)
 _titlecase(ch) = is_latin(ch) ? _uppercase_l(ch) : _titlecase_u(ch)
 
-lowercase(ch::T) where {T<:CodePoint} = T(_lowercase(codepoint(ch)))
-uppercase(ch::T) where {T<:CodePoint} = T(_uppercase(codepoint(ch)))
-titlecase(ch::T) where {T<:CodePoint} = T(_titlecase(codepoint(ch)))
+lowercase(ch::T) where {T<:Chr} = T(_lowercase(codepoint(ch)))
+uppercase(ch::T) where {T<:Chr} = T(_uppercase(codepoint(ch)))
+titlecase(ch::T) where {T<:Chr} = T(_titlecase(codepoint(ch)))
 
 lowercase(ch::ASCIIChr) = ifelse(_isupper_a(ch), ASCIIChr(ch + 0x20), ch)
 uppercase(ch::ASCIIChr) = ifelse(_islower_a(ch), ASCIIChr(ch - 0x20), ch)
 titlecase(ch::ASCIIChr) = uppercase(ch)
 
 function uppercase_first(str::MaybeSub{S}) where {C<:ASCIICSE,S<:Str{C}}
-    (len = _len(str)) == 0 && return str
+    (len = ncodeunits(str)) == 0 && return str
     @preserve str begin
-        pnt = _pnt(str)
+        pnt = pointer(str)
         ch = get_codeunit(pnt)
         _islower_a(ch) || return str
         out = _allocate(len)
@@ -34,9 +34,9 @@ function uppercase_first(str::MaybeSub{S}) where {C<:ASCIICSE,S<:Str{C}}
 end
 
 function lowercase_first(str::MaybeSub{S}) where {C<:ASCIICSE,S<:Str{C}}
-    (len = _len(str)) == 0 && return str
+    (len = ncodeunits(str)) == 0 && return str
     @preserve str begin
-        pnt = _pnt(str)
+        pnt = pointer(str)
         ch = get_codeunit(pnt)
         _isupper_a(ch) || return str
         out = _allocate(len)
@@ -86,9 +86,9 @@ function _upper(::Type{C}, beg::Ptr{UInt8}, off, len) where {C<:LatinCSE}
 end
 
 function uppercase(str::MaybeSub{S}) where {C<:ASCIICSE,S<:Str{C}}
-    (len = _len(str)) == 0 && return str
+    (len = ncodeunits(str)) == 0 && return str
     @preserve str begin
-        pnt = beg = _pnt(str)
+        pnt = beg = pointer(str)
         fin = beg + len
         while pnt < fin
             _islower_a(get_codeunit(pnt)) && return _upper(C, beg, pnt-beg, len)
@@ -99,9 +99,9 @@ function uppercase(str::MaybeSub{S}) where {C<:ASCIICSE,S<:Str{C}}
 end
 
 function lowercase(str::MaybeSub{S}) where {C<:ASCIICSE,S<:Str{C}}
-    (len = _len(str)) == 0 && return str
+    (len = ncodeunits(str)) == 0 && return str
     @preserve str begin
-        pnt = beg = _pnt(str)
+        pnt = beg = pointer(str)
         fin = beg + len
         while pnt < fin
             _isupper_a(get_codeunit(pnt)) && return _lower(C, beg, pnt-beg, len)
@@ -112,9 +112,9 @@ function lowercase(str::MaybeSub{S}) where {C<:ASCIICSE,S<:Str{C}}
 end
 
 function uppercase_first(str::MaybeSub{S}) where {C<:LatinCSE,S<:Str{C}}
-    (len = _len(str)) == 0 && return str
+    (len = ncodeunits(str)) == 0 && return str
     @preserve str begin
-        pnt = _pnt(str)
+        pnt = pointer(str)
         ch = get_codeunit(pnt)
         _can_upper(ch) || return str
         buf, out = _allocate(UInt8, len)
@@ -126,9 +126,9 @@ end
 
 # Special handling for characters that can't map into Latin1
 function uppercase_first(str::MaybeSub{S}) where {C<:_LatinCSE,S<:Str{C}}
-    (len = _len(str)) == 0 && return str
+    (len = ncodeunits(str)) == 0 && return str
     @preserve str begin
-        pnt = _pnt(str)
+        pnt = pointer(str)
         ch = get_codeunit(pnt)
         if _can_upper(ch)
             buf, out8 = _allocate(UInt8, len)
@@ -150,9 +150,9 @@ function uppercase_first(str::MaybeSub{S}) where {C<:_LatinCSE,S<:Str{C}}
 end
 
 function lowercase_first(str::MaybeSub{S}) where {C<:Latin_CSEs,S<:Str{C}}
-    (len = _len(str)) == 0 && return str
+    (len = ncodeunits(str)) == 0 && return str
     @preserve str begin
-        pnt = _pnt(str)
+        pnt = pointer(str)
         ch = get_codeunit(pnt)
         _isupper(ch) || return str
         buf, out = _allocate(UInt8, len)
@@ -227,9 +227,9 @@ function _widenupper(beg::Ptr{UInt8}, off, len)
 end
 
 function uppercase(str::MaybeSub{S}) where {C<:LatinCSE,S<:Str{C}}
-    (len = _len(str)) == 0 && return str
+    (len = ncodeunits(str)) == 0 && return str
     @preserve str begin
-        pnt = beg = _pnt(str)
+        pnt = beg = pointer(str)
         fin = beg + len
         while pnt < fin
             _can_upper(get_codeunit(pnt)) && return _upper(C, beg, pnt-beg, len)
@@ -240,9 +240,9 @@ function uppercase(str::MaybeSub{S}) where {C<:LatinCSE,S<:Str{C}}
 end
 
 function uppercase(str::MaybeSub{S}) where {C<:_LatinCSE,S<:Str{C}}
-    (len = _len(str)) == 0 && return str
+    (len = ncodeunits(str)) == 0 && return str
     @preserve str begin
-        pnt = beg = _pnt(str)
+        pnt = beg = pointer(str)
         fin = beg + len
         while pnt < fin
             ch = get_codeunit(pnt)
@@ -268,9 +268,9 @@ function _lower(::Type{C}, beg::Ptr{UInt8}, off, len) where {C<:Latin_CSEs}
 end
 
 function lowercase(str::MaybeSub{S}) where {C<:Latin_CSEs,S<:Str{C}}
-    (len = _len(str)) == 0 && return str
+    (len = ncodeunits(str)) == 0 && return str
     @preserve str begin
-        pnt = beg = _pnt(str)
+        pnt = beg = pointer(str)
         fin = beg + len
         while pnt < fin
             _isupper_al(get_codeunit(pnt)) && return _lower(C, beg, pnt-beg, len)
@@ -344,10 +344,10 @@ end
 function lowercase(str::MaybeSub{S}) where {C<:Union{UCS2_CSEs,UTF32_CSEs},S<:Str{C}}
     @preserve str begin
         CU = codeunit(C)
-        pnt = beg = _pnt(str)
+        pnt = beg = pointer(str)
         fin = beg + sizeof(str)
         while pnt < fin
-            _can_lower_ch(get_codeunit(pnt)) && return _lower(C, beg, pnt-beg, _len(str))
+            _can_lower_ch(get_codeunit(pnt)) && return _lower(C, beg, pnt-beg, ncodeunits(str))
             pnt += sizeof(CU)
         end
     end
@@ -381,10 +381,10 @@ end
 function uppercase(str::MaybeSub{S}) where {C<:Union{UCS2_CSEs,UTF32_CSEs},S<:Str{C}}
     @preserve str begin
         CU = codeunit(C)
-        pnt = beg = _pnt(str)
+        pnt = beg = pointer(str)
         fin = beg + sizeof(str)
         while pnt < fin
-            _can_upper_ch(get_codeunit(pnt)) && return _upper(C, beg, pnt-beg, _len(str))
+            _can_upper_ch(get_codeunit(pnt)) && return _upper(C, beg, pnt-beg, ncodeunits(str))
             pnt += sizeof(CU)
         end
         str

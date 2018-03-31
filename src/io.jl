@@ -1,5 +1,5 @@
 #=
-IO functions for Str and CodePoint types
+IO functions for Str and Chr types
 
 Copyright 2017-2018 Gandalf Software, Inc., Scott P. Jones
 Licensed under MIT License, see LICENSE.md
@@ -17,22 +17,22 @@ Licensed under MIT License, see LICENSE.md
 @inline print(io::IO, ch::UCS2Chr)  = _write_ucs2(io, codepoint(ch))
 @inline print(io::IO, ch::UTF32Chr) = write_utf8(io, codepoint(ch))
 
-## outputting Str strings and CodePoint characters ##
+## outputting Str strings and Chr characters ##
 
-write(io::IO, ch::CodePoint) = write(io, codepoint(ch))
+write(io::IO, ch::Chr) = write(io, codepoint(ch))
 
-write(io::IO, str::MaybeSub{T}) where {C<:CSE,T<:Str{C,Nothing}} =
+write(io::IO, str::MaybeSub{<:Str{<:CSE}}) =
     @preserve str unsafe_write(io, pointer(str), reinterpret(UInt, sizeof(str)))
 
 # optimized methods to avoid iterating over chars
-print(io::IO, str::MaybeSub{T}) where {T<:Str{<:Union{ASCIICSE,UTF8CSE},Nothing}} =
+print(io::IO, str::MaybeSub{T}) where {T<:Str{<:Union{Text1CSE,BinaryCSE,ASCIICSE,UTF8CSE}}} =
     (write(io, str); nothing)
 
 ## outputting Latin 1 strings ##
 
-function print(io::IO, str::MaybeSub{<:LatinStrings})
+function print(io::IO, str::MaybeSub{<:Str{<:Latin_CSEs}})
     @preserve str begin
-        pnt = _pnt(str)
+        pnt = pointer(str)
         fin = pnt + sizeof(str)
         # Skip and write out ASCII sequences together
         while pnt < fin
@@ -60,9 +60,10 @@ write(io::IO, ch::LatinChars) = write(io, ch%UInt8)
 
 ## outputting UCS2 strings as UTF-8 ##
 
-function print(io::IO, str::MaybeSub{<:UCS2Strings})
+function print(io::IO, str::MaybeSub{<:Str{<:UCS2_CSEs}})
     @preserve str begin
-        len, pnt = _lenpnt(str)
+        len = ncodeunits(str)
+        pnt = pointer(str)
         fin = bytoff(pnt, len)
         while pnt < fin
             _write_ucs2(io, get_codeunit(pnt))
@@ -76,7 +77,8 @@ end
 
 function print(io::IO, str::MaybeSub{<:Str{UTF16CSE}})
     @preserve str begin
-        siz, pnt = _lenpnt(str)
+        siz = ncodeunits(str)
+        pnt = pointer(str)
         # Skip and write out ASCII sequences together
         fin = pnt + siz
         while pnt < fin
@@ -99,9 +101,10 @@ end
 
 ## outputting UTF32 strings as UTF-8 ##
 
-function print(io::IO, str::MaybeSub{<:UTF32Strings})
+function print(io::IO, str::MaybeSub{<:Str{<:UTF32_CSEs}})
     @preserve str begin
-        len, pnt = _lenpnt(str)
+        len = ncodeunits(str)
+        pnt = pointer(str)
         fin = bytoff(pnt, len)
         while pnt < fin
             write_utf8(io, get_codeunit(pnt))

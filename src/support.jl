@@ -521,7 +521,7 @@ byte_string_classify(data) =
     ccall(:u8_isvalid, Int32, (Ptr{UInt8}, Int), data, length(data))
 byte_string_classify(data::Vector{UInt8}) =
     ccall(:u8_isvalid, Int32, (Ptr{UInt8}, Int), data, length(data))
-byte_string_classify(s::ByteStr) = byte_string_classify(s.data)
+byte_string_classify(s::Str{<:Byte_CSEs}) = byte_string_classify(s.data)
     # 0: neither valid ASCII nor UTF-8
     # 1: valid ASCII
     # 2: valid UTF-8
@@ -555,7 +555,7 @@ function _copy!(out, pnt::Ptr{T}, len) where {T}
     end
 end
 
-(*)(s1::Union{C1, S1}, ss::Union{C2, S2}...) where {C1<:CodePoint,C2<:CodePoint,S1<:Str,S2<:Str} =
+(*)(s1::Union{C1, S1}, ss::Union{C2, S2}...) where {C1<:Chr,C2<:Chr,S1<:Str,S2<:Str} =
     string(s1, ss...)
 
 thisind(str::MaybeSub{<:Str}, i::Integer) = thisind(str, Int(i))
@@ -579,7 +579,7 @@ end
 first(str::Str, n::Integer) = str[1:min(end, nextind(str, 0, n))]
 last(str::Str, n::Integer)  = str[max(1, prevind(str, ncodeunits(str)+1, n)):end]
 
-const Chrs = @static V6_COMPAT ? Union{Char,AbstractChar} : CodePoint
+const Chrs = @static V6_COMPAT ? Union{Char,AbstractChar} : Chr
 
 function repeat(ch::CP, cnt::Integer) where {CP <: Chrs}
     C = codepoint_cse(CP)
@@ -644,20 +644,27 @@ function _memcmp(apnt::Ptr{OthChr}, bpnt::Ptr{OthChr}, len)
 end
 
 # These should probably be handled by traits, or dispatched by getting the codeunit type for each
-_memcmp(a::Union{String, ByteStr},
-        b::Union{String, ByteStr, SubString{String}, SubString{<:ByteStr}}, siz) =
-    _memcmp(_pnt(a), _pnt(b), siz)
-_memcmp(a::SubString{<:Union{String, ByteStr}}, b::Union{String, ByteStr}, siz) =
-    _memcmp(_pnt(a), _pnt(b), siz)
-_memcmp(a::SubString{<:Union{String, ByteStr}}, b::SubString{<:Union{String, ByteStr}}, siz) =
-    _memcmp(_pnt(a), _pnt(b), siz)
+_memcmp(a::Union{String, Str{<:Byte_CSEs}},
+        b::Union{String, Str{<:Byte_CSEs}, SubString{String}, SubString{<:Str{<:Byte_CSEs}}}, siz) =
+    _memcmp(pointer(a), pointer(b), siz)
+_memcmp(a::SubString{<:Union{String, Str{<:Byte_CSEs}}}, b::Union{String, Str{<:Byte_CSEs}}, siz) =
+    _memcmp(pointer(a), pointer(b), siz)
+_memcmp(a::SubString{<:Union{String, Str{<:Byte_CSEs}}},
+        b::SubString{<:Union{String, Str{<:Byte_CSEs}}}, siz) =
+    _memcmp(pointer(a), pointer(b), siz)
 
-_memcmp(a::WordStr, b::MaybeSub{<:WordStr}, siz) = _memcmp(_pnt(a), _pnt(b), siz)
-_memcmp(a::QuadStr, b::MaybeSub{<:QuadStr}, siz) = _memcmp(_pnt(a), _pnt(b), siz)
-_memcmp(a::SubString{<:WordStr}, b::WordStr, siz) = _memcmp(_pnt(a), _pnt(b), siz)
-_memcmp(a::SubString{<:QuadStr}, b::QuadStr, siz) = _memcmp(_pnt(a), _pnt(b), siz)
-_memcmp(a::SubString{<:WordStr}, b::SubString{<:WordStr}, siz) = _memcmp(_pnt(a), _pnt(b), siz)
-_memcmp(a::SubString{<:QuadStr}, b::SubString{<:QuadStr}, siz) = _memcmp(_pnt(a), _pnt(b), siz)
+_memcmp(a::Str{<:Word_CSEs}, b::MaybeSub{<:Str{<:Word_CSEs}}, siz) =
+    _memcmp(pointer(a), pointer(b), siz)
+_memcmp(a::Str{<:Quad_CSEs}, b::MaybeSub{<:Str{<:Quad_CSEs}}, siz) =
+    _memcmp(pointer(a), pointer(b), siz)
+_memcmp(a::SubString{<:Str{<:Word_CSEs}}, b::Str{<:Word_CSEs}, siz) =
+    _memcmp(pointer(a), pointer(b), siz)
+_memcmp(a::SubString{<:Str{<:Quad_CSEs}}, b::Str{<:Quad_CSEs}, siz) =
+    _memcmp(pointer(a), pointer(b), siz)
+_memcmp(a::SubString{<:Str{<:Word_CSEs}}, b::SubString{<:Str{Word_CSEs}}, siz) =
+    _memcmp(pointer(a), pointer(b), siz)
+_memcmp(a::SubString{<:Str{<:Quad_CSEs}}, b::SubString{<:Str{Quad_CSEs}}, siz) =
+    _memcmp(pointer(a), pointer(b), siz)
 
 _memcpy(dst::Ptr{UInt8}, src::Ptr, siz) =
     ccall(:memcpy, Ptr{UInt8}, (Ptr{Cvoid}, Ptr{Cvoid}, UInt), dst, src, siz)
@@ -728,12 +735,13 @@ function repeat(str::T, cnt::Integer) where {C<:CSE,T<:Str{C}}
     cnt < 2 && return cnt == 1 ? str : (cnt == 0 ? empty_str(C) : repeaterr(cnt))
     CU = codeunit(T)
     @preserve str begin
-        len, pnt = _lenpnt(str)
+        len = ncodeunits(str)
         totlen = len * cnt
         buf, out = _allocate(CU, totlen)
         if len == 1 # common case: repeating a single codeunit string
-            _memset(out, get_codeunit(pnt), cnt)
+            _memset(out, get_codeunit(pointer(str)), cnt)
         else
+            pnt = pointer(str)
             fin = bytoff(out, totlen)
             siz = bytoff(CU, len)
             while out < fin
@@ -749,10 +757,10 @@ end
 # Definitions for C compatible strings, that don't allow embedded
 # '\0', and which are terminated by a '\0'
 
-containsnul(str::ByteStr) = containsnul(unsafe_convert(Ptr{Cchar}, str), sizeof(str))
+containsnul(str::Str{<:Byte_CSEs}) = containsnul(unsafe_convert(Ptr{Cchar}, str), sizeof(str))
 
 # Check 4 characters at a time
-function containsnul(str::WordStr)
+function containsnul(str::Str{<:Word_CSEs})
     (siz = sizeof(str)) == 0 && return true
     @preserve str begin
         pnt, fin = _calcpnt(str, siz)
@@ -766,7 +774,7 @@ function containsnul(str::WordStr)
     end
 end
 
-function containsnul(str::QuadStr)
+function containsnul(str::Str{<:Quad_CSEs})
     (siz = sizeof(str)) == 0 && return true
     @preserve str begin
         pnt, fin = _calcpnt(str, siz)
@@ -776,11 +784,3 @@ function containsnul(str::QuadStr)
         pnt - CHUNKSZ != fin && unsafe_load(reinterpret(Ptr{UInt32}, pnt)) == 0x00000
     end
 end
-
-# pointer conversions of ASCII/UTF8/UTF16/UTF32 strings:
-pointer(str::Str) = _pnt(str)
-pointer(str::Str, pos::Integer) = bytoff(_pnt(str), pos - 1)
-
-# pointer conversions of SubString of ASCII/UTF8/UTF16/UTF32:
-pointer(x::SubString{<:Str}) = bytoff(_pnt(x.string), x.offset)
-pointer(x::SubString{<:Str}, pos::Integer) = bytoff(_pnt(x.string), x.offset + pos - 1)

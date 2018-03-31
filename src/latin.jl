@@ -8,10 +8,10 @@ Based in part on code for ASCIIString that used to be in Julia
 
 ## overload methods for efficiency ##
 
-is_ascii(str::Str{_LatinCSE}) = false
-is_latin(str::LatinStrings)   = true
-is_bmp(str::LatinStrings)     = true
-is_unicode(str::LatinStrings) = true
+is_ascii(str::Str{C}) where {C<:_LatinCSE}    = false
+is_latin(str::Str{C}) where {C<:Latin_CSEs}   = true
+is_bmp(str::Str{C}) where {C<:Latin_CSEs}     = true
+is_unicode(str::Str{C}) where {C<:Latin_CSEs} = true
 
 const _UBS = Str{<:Union{ASCIICSE, Latin_CSEs}}
 
@@ -19,12 +19,12 @@ function string(collection::_UBS...)
     length(c) == 1 && return collection[1]
     len = 0
     for str in collection
-        len += _len(str)
+        len += ncodeunits(str)
     end
     buf, pnt = _allocate(len)
     for str in collection
-        len = _len(str)
-        _memcpy(pnt, _pnt(str), len)
+        len = ncodeunits(str)
+        _memcpy(pnt, pointer(str), len)
         pnt += len
     end
     Str(LatinCSE, buf)
@@ -32,9 +32,9 @@ end
 
 ## transcoding to Latin1 ##
 
-convert(::Type{T}, s::T) where {T<:LatinStrings} = s
-convert(::Type{T}, s::Str{<:_UBS}) where {T<:LatinStrings} = T(s.data)
-convert(::Type{T}, s::Str{UTF8CSE}) where {T<:LatinStrings} = convert(T, s.data)
+convert(::Type{T}, s::T) where {T<:Str{<:Latin_CSEs}} = s
+convert(::Type{T}, s::Str{<:_UBS}) where {T<:Str{<:Latin_CSEs}} = T(s.data)
+convert(::Type{T}, s::Str{UTF8CSE}) where {T<:Str{<:Latin_CSEs}} = convert(T, s.data)
 
 # Assumes that has already been checked for validity
 function _utf8_to_latin(pnt::Ptr{UInt8}, len)
@@ -68,20 +68,40 @@ function _latin_to_utf8(pnt::Ptr{UInt8}, len)
     buf
 end
 
-function convert(::Type{LatinStr}, str::String)
+# Fast conversion from LatinStr or _LatinStr to UTF8Str
+function convert(::Type{<:Str{UTF8CSE}}, str::Str{<:Latin_CSEs})
+    # handle zero length string quickly
+    (len = ncodeunits(str)) == 0 && return empty_utf8
+    @preserve str begin
+        pnt = pointer(str)
+        Str(UTF8CSE, (cnt = count_latin(len, pnt)) != 0 ? _latin_to_utf8(pnt, len + cnt) : str)
+    end
+end
+
+# Fast conversion from LatinStr or _LatinStr to String
+function convert(::Type{String}, str::Str{<:Latin_CSEs})
+    # handle zero length string quickly
+    (len = ncodeunits(str)) == 0 && return empty_string
+    @preserve str begin
+        pnt = pointer(str)
+        (cnt = count_latin(len, pnt)) != 0 ? _latin_to_utf8(pnt, len + cnt) : str.data
+    end
+end
+
+function convert(::Type{<:Str{LatinCSE}}, str::String)
     # handle zero length string quickly
     is_empty(str) && return empty_latin
     # get number of bytes to allocate
     len, flags, num4byte, num3byte, num2byte, latinbyte = unsafe_check_string(str, 1, sizeof(str))
     num4byte + num3byte + num2byte == 0 || unierror(UTF_ERR_INVALID_LATIN1)
-    Str(LatinCSE, flags == 0 ? str : _utf8_to_latin(_pnt(str), len))
+    Str(LatinCSE, flags == 0 ? str : @preserve str _utf8_to_latin(pointer(str), len))
 end
 
 _convert(::Type{_LatinCSE}, ch::UInt8) = _convert(ch <= 0x7f ? ASCIICSE : _LatinCSE, ch)
 convert(::Type{<:Str{_LatinCSE}}, ch::Unsigned) =
     ch < 0xff ? _convert(_LatinCSE, ch%UInt8) : unierror(UTF_ERR_LATIN1, ch)
 
-function convert(::Type{_LatinStr}, str::String)
+function convert(::Type{<:Str{_LatinCSE}}, str::String)
     # handle zero length string quickly
     is_empty(str) && return empty_ascii
     # get number of bytes to allocate
@@ -89,13 +109,14 @@ function convert(::Type{_LatinStr}, str::String)
         unsafe_check_string(str, 1, sizeof(str))
     num4byte + num3byte + num2byte == 0 || unierror(UTF_ERR_INVALID_LATIN1)
     Str(latinbyte == 0 ? ASCIICSE : _LatinCSE,
-        flags == 0 ? str : _utf8_to_latin(_pnt(str), len))
+        flags == 0 ? str : @preserve str _utf8_to_latin(pointer(str), len))
 end
 
-convert(::Type{LatinStr}, a::Vector{UInt8}) = _convert(LatinStr, a)
-convert(::Type{_LatinStr}, a::Vector{UInt8}) = _convert(is_ascii(a) ? ASCIIStr : _LatinStr, a)
+convert(::Type{<:Str{LatinCSE}}, a::Vector{UInt8}) = _convert(LatinStr, a)
+convert(::Type{<:Str{_LatinCSE}}, a::Vector{UInt8}) =
+    _convert(is_ascii(a) ? ASCIIStr : _LatinStr, a)
 
-function convert(::Type{T}, str::AbstractString) where {T<:LatinStrings}
+function convert(::Type{T}, str::AbstractString) where {T<:Str{Latin_CSEs}}
     # Might want to have invalids_as here
     len, flags = unsafe_check_string(str)
     (flags & ~(UTF_LONG | UTF_LATIN1)) == 0 || unierror(UTF_ERR_INVALID_LATIN1)
