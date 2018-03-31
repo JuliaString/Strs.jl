@@ -236,29 +236,34 @@ convert(::Type{<:Str{_UCS2CSE}}, ch::Unsigned) =
      ? (is_bmp(ch) ? _convert(_UCS2CSE, ch%UInt16) : unierror(UTF_ERR_INVALID, 0, ch))
      : _convert(_LatinCSE, ch%UInt8))
 
-function convert(::Type{<:Str{C}}, str::AbstractString) where {C<:UCS2_CSEs}
+function _convert_ucs2(::Type{C}, str::AbstractString) where {C}
     is_empty(str) && return empty_str(C)
     # Might want to have an invalids_as argument
-    len, flags, num4byte = unsafe_check_string(str)
+    len, flags, num4byte, num3byte = unsafe_check_string(str)
     num4byte == 0 || unierror(UTF_ERR_INVALID_UCS2)
     buf, pnt = _allocate(UInt16, len)
     @inbounds for ch in str
         set_codeunit!(pnt, ch%UInt16)
         pnt += 2
     end
-    Str(C, buf)
+    Str((C === _UCS2CSE && num3byte != 0) ? _UCS2CSE : UCS2CSE, buf)
 end
+convert(::Type{<:Str{UCS2CSE}}, str::AbstractString)  = _convert_ucs2(UCS2CSE, str)
+convert(::Type{<:Str{_UCS2CSE}}, str::AbstractString) = _convert_ucs2(_UCS2CSE, str)
 
-function convert(::Type{<:Str{C}}, str::String) where {C<:UCS2_CSEs}
+function _convert_ucs2(::Type{C}, str::String) where {C}
     # Might want to have an invalids_as argument
     # handle zero length string quickly
     (siz = sizeof(str)) == 0 && return empty_str(C)
     # Check that is correct UTF-8 encoding and get number of words needed
-    len, flags, num4byte = unsafe_check_string(str, 1, siz)
+    len, flags, num4byte, num3byte = unsafe_check_string(str, 1, siz)
     num4byte == 0 || unierror(UTF_ERR_INVALID_UCS2)
     # Optimize case where no characters > 0x7f
-    Str(C, flags == 0 ? _cvtsize(UInt16, str, len) : _encode_utf16(str, len))
+    Str((C === _UCS2CSE && num3byte != 0) ? _UCS2CSE : UCS2CSE,
+        flags == 0 ? _cvtsize(UInt16, str, len) : _encode_utf16(str, len))
 end
+convert(::Type{<:Str{UCS2CSE}}, str::String)  = _convert_ucs2(UCS2CSE, str)
+convert(::Type{<:Str{_UCS2CSE}}, str::String) = _convert_ucs2(_UCS2CSE, str)
 
 # handle zero length string quickly, just widen these
 convert(::Type{<:Str{C}},
@@ -404,8 +409,10 @@ function _cvt_utf8(::Type{T}, str::S) where {T<:Union{String, Str{UTF8CSE}}, S}
 end
 
 # Split this way to avoid ambiguity errors
-convert(::Type{String},  str::MaybeSub{<:Str{Union{Word_CSEs,Quad_CSEs}}}) = _cvt_utf8(String, str)
-convert(::Type{UTF8Str}, str::MaybeSub{<:Str{Union{Word_CSEs,Quad_CSEs}}}) = _cvt_utf8(UTF8Str, str)
+convert(::Type{String},  str::MaybeSub{<:Str{Union{Word_CSEs,Quad_CSEs}}}) =
+    _cvt_utf8(String, str)
+convert(::Type{<:Str{UTF8CSE}}, str::MaybeSub{<:Str{Union{Word_CSEs,Quad_CSEs}}}) =
+    _cvt_utf8(UTF8Str, str)
 
 """
 Converts an already validated UTF-32 encoded vector of `UInt32` to a `UTF16Str`
@@ -477,7 +484,7 @@ function _convert(pnt::Ptr{T}, len) where {T}
     buf, out
 end
 
-function convert(::Type{UTF16Str}, bytes::AbstractArray{UInt8})
+function convert(::Type{<:Str{UTF16CSE}}, bytes::AbstractArray{UInt8})
     is_empty(bytes) && return empty_utf16
     # Note: there are much better ways of detecting what the likely encoding is here,
     # this only deals with big or little-ending UTF-32
