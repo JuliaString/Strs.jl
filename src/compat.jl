@@ -1,21 +1,7 @@
 # This file contains code that was a part of Julia
 # License is MIT: see LICENSE.md
 
-# Handle some name changes between v0.6 and master
-const copyto! = copy!
-const unsafe_copyto! = unsafe_copy!
-const Nothing = Void
-const Cvoid = Void
-abstract type AbstractChar end
-export AbstractChar
-import Base: find, ind2chr, chr2ind
-
-# Handle changes in array allocation
-create_vector(T, len) = Vector{T}(len)
-
-# Add new short name for deprecated hex function
-outhex(v, p=1) = hex(v,p)
-
+export Unicode
 module Unicode
 export normalize, graphemes, isassigned
 const normalize  = Base.UTF8proc.normalize_string
@@ -23,11 +9,11 @@ const graphemes  = Base.UTF8proc.graphemes
 const isassigned = Base.UTF8proc.is_assigned_char
 end
 
+export Random
 module Random
-export rand, AbstractRNG, SamplerType
-const rand = Base.rand
+import Base.Random: rand!, rand
+export rand, rand!, AbstractRNG
 const AbstractRNG = Base.AbstractRNG
-const SamplerType = Base.SamplerType
 end
 
 ## Start of code from operators.jl =================================================
@@ -162,16 +148,13 @@ unsafe_crc32c(a, n, crc) = ccall(:jl_crc32c, UInt32, (UInt32, Ptr{UInt8}, Csize_
 
 sizeof(s::SubString{<:Str}) = s.endof == 0 ? 0 : nextind(s, s.endof) - 1
 
-Base.contains(hay::AbstractString, str::Str)     = _occurs_in(str, hay)
-Base.contains(hay::Str, str::AbstractString)     = _occurs_in(str, hay)
-Base.contains(hay::Str, str::Str)                = _occurs_in(str, hay)
-Base.contains(hay::AbstractString, chr::AbsChar) = _occurs_in(chr, hay)
-Base.contains(hay::AbstractString, pat::Regex)   = _occurs_in(pat, hay)
-const occurs_in = _occurs_in
+Base.contains(hay::AbstractString, str::Str)     = occurs_in(str, hay)
+Base.contains(hay::Str, str::AbstractString)     = occurs_in(str, hay)
+Base.contains(hay::Str, str::Str)                = occurs_in(str, hay)
+Base.contains(hay::AbstractString, chr::AbsChar) = occurs_in(chr, hay)
+Base.contains(hay::AbstractString, pat::Regex)   = occurs_in(pat, hay)
 
 const utf8crc = Base.crc32c
-
-import Base.UTF8proc: isgraphemebreak, isgraphemebreak!, graphemes
 
 import Base: isalnum, isgraph, islower, isupper
 const is_alphanumeric = isalnum

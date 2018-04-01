@@ -91,7 +91,8 @@ export BIG_ENDIAN, LITTLE_ENDIAN
 export found, find_result
 
 # From unicode.jl
-export is_assigned, is_grapheme_break, is_grapheme_break!
+export is_assigned, is_grapheme_break, is_grapheme_break!, graphemes,
+       category_code, category_abbrev, category_string
 
 symstr(s...) = Symbol(string(s...))
 quotesym(s...) = Expr(:quote, symstr(s...))
@@ -100,7 +101,7 @@ using Base: @_inline_meta, @propagate_inbounds, @_propagate_inbounds_meta
 
 import Base: containsnul, convert, getindex, length, map, pointer, collect, in, hash,
              reverse, sizeof, string, unsafe_convert, unsafe_load, write,
-             start, next, done, nextind, prevind, #reverseind,
+             start, next, done, nextind, prevind,
              typemin, typemax, rem, size, ndims, first, last, eltype,
              isless, isequal, ==, -, +, *, ^, cmp, promote_rule, one, repeat, filter,
              print, show, isimmutable, chop, chomp, replace, ascii, uppercase, lowercase,
@@ -127,6 +128,8 @@ for (oldname, newname) in ((:textwidth,      :text_width),
     if isdefined(Base, oldname)
         @eval import Base: $oldname
         @eval const $newname = $oldname
+    else
+        @eval function $newname end
     end
     @eval export $newname
 end
@@ -160,9 +163,31 @@ end
 
 export utf8crc, is_alphanumeric, is_graphic, is_lowercase, is_uppercase
 
+# Location of isgraphemebreak moved from Base.UTF8proc to Base.Unicode,
+# import and add new names with underscores
+
+@eval import Base.$(V6_COMPAT ? :UTF8proc : :Unicode): isgraphemebreak, isgraphemebreak!,
+             graphemes, category_code, category_abbrev, category_string
+
 @static if V6_COMPAT
-    include("compat.jl")
-else
+
+    # Handle some name changes between v0.6 and master
+    const copyto! = copy!
+    const unsafe_copyto! = unsafe_copy!
+    const Nothing = Void
+    const Cvoid = Void
+    abstract type AbstractChar end
+    export AbstractChar
+    import Base: find, ind2chr, chr2ind
+
+    # Handle changes in array allocation
+    create_vector(T, len) = Vector{T}(len)
+
+    # Add new short name for deprecated hex function
+    outhex(v, p=1) = hex(v,p)
+
+else # !V6_COMPAT
+
     using Random
 
     import Base.GC: @preserve
@@ -184,11 +209,7 @@ else
     const is_lowercase = islowercase
     const is_uppercase = isuppercase
 
-    # Location of isgraphemebreak moved from Base.UTF8proc to Base.Unicode,
-    # import and add new names with underscores
-
-    import Base.Unicode: isgraphemebreak, isgraphemebreak!, graphemes
-end
+end # !V6_COMPAT
 
 const is_grapheme_break  = isgraphemebreak
 const is_grapheme_break! = isgraphemebreak!
@@ -210,6 +231,7 @@ struct Each <: FindOp end
 struct All <: FindOp end
 
 include("types.jl")
+@static V6_COMPAT && include("compat.jl")
 include("chars.jl")
 include("access.jl")
 include("traits.jl")

@@ -98,8 +98,16 @@ codepoint_adj(::Type{T}, ch) where {T} = ifelse(ch < 0xd800, ch, ch+0x800)%T
 codepoint_adj(::Type{T}, ch) where {T<:Union{Text2Chr,Text4Chr}} = ch%T
 
 # returns a random valid Unicode scalar value in the correct range for the type of character
+@static if V6_COMPAT
+import Base.Random: rand!, rand, AbstractRNG
+rand(r::AbstractRNG, ::Type{T}) where {T<:Chr} =
+    codepoint_adj(T, rand(r, codepoint_rng(T)))
+rand!(rng::AbstractRNG, A::AbstractArray, r::UnitRange{<:Chr}) =
+    rand!(rng, A, Base.Random.RangeGenerator(r))
+else
 Random.rand(r::Random.AbstractRNG, ::Random.SamplerType{T}) where {T<:Chr} =
     codepoint_adj(T, rand(r, codepoint_rng(T)))
+end
 
 ==(x::Chr, y::AbsChar) = codepoint(x) == codepoint(y)
 ==(x::AbsChar, y::Chr) = codepoint(x) == codepoint(y)
