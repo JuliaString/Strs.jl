@@ -294,15 +294,17 @@ promote_rule(::Type{Text4CSE}, ::Type{Text2CSE}) = Text4CSE
 promote_rule(::Type{T}, ::Type{ASCIICSE}) where {T<:CSE} = T
 promote_rule(::Type{T},
              ::Type{<:Latin_CSEs}) where {T<:Union{UTF8CSE,UTF16CSE,UCS2_CSEs,UTF32_CSEs}} = T
-promote_rule(::Type{T}, ::Type{<:UCS2_CSEs}) where {T<:UTF32_CSEs} = T
 
-promote_rule(::Type{LatinCSE}, ::Type{_LatinCSE}) = LatinCSE
-promote_rule(::Type{UCS2CSE}, ::Type{_UCS2CSE})   = UCS2CSE
-promote_rule(::Type{UTF32CSE}, ::Type{_UTF32CSE}) = UTF32CSE
+promote_rule(::Type{T}, ::Type{_LatinCSE}) where {T<:Union{ASCIICSE,LatinCSE}} = LatinCSE
+
+promote_rule(::Type{T}, ::Type{_UCS2CSE}) where {T<:Union{ASCIICSE,Latin_CSEs,UCS2CSE}} = UCS2CSE
+promote_rule(::Type{T}, ::Type{_UTF32CSE}) where {T<:CSE} = UTF32CSE
+promote_rule(::Type{T}, ::Type{UTF32CSE}) where {T<:UCS2_CSEs} = UTF32CSE
 
 promote_rule(::Type{String}, ::Type{<:Str}) = String
 
-promote_rule(::Type{<:Str{S}}, ::Type{<:Str{T}}) where {S,T} = Str{promote_rule(S,T)}
+promote_rule(::Type{<:Str{S}}, ::Type{<:Str{T}}) where {S,T} =
+    (P = promote_rule(S,T)) === Union{} ? Union{} : Str{P}
 
 sizeof(s::Str) = sizeof(s.data) + 1 - STR_KEEP_NUL
 
