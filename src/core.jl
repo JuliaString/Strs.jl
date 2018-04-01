@@ -136,22 +136,8 @@ _index(cs::CodePointStyle, ::Rev, str, i, nchar) = _prevind(cs, str, i, nchar)
     (@_inline_meta(); _index(CodePointStyle(T), str, Int(ncodeunits(str) - i + 1)))
 
 @static if V6_COMPAT
-    @propagate_inbounds function _ind2chr(::CodeUnitSingle, str, i)
-        @_inline_meta()
-        @boundscheck checkbounds(str, i)
-        i
-    end
-    @propagate_inbounds function _chr2ind(::CodeUnitSingle, str, i)
-        @_inline_meta()
-        @boundscheck checkbounds(str, i)
-        i
-    end
-    # This is deprecated on v0.7, recommended change to length(str, 1, i)
-    @propagate_inbounds ind2chr(str::MaybeSub{T}, i::Int) where {T<:Str} =
-        _ind2chr(CodePointStyle(T), str, i)
-    # This is deprecated on v0.7, recommended change to nextind(str, 0, i)
-    @propagate_inbounds chr2ind(str::MaybeSub{T}, i::Int) where {T<:Str} =
-        _chr2ind(CodePointStyle(T), str, i)
+    @propagate_inbounds ind2chr(str::MaybeSub{T}, i::Int) where {T<:Str} = length(str, 1, i)
+    @propagate_inbounds chr2ind(str::MaybeSub{T}, i::Int) where {T<:Str} = nextind(str, 0, i)
 end
 
 @propagate_inbounds function is_valid(str::MaybeSub{T}, i::Integer) where {T<:Str}
@@ -192,7 +178,7 @@ end
 end
 
 function map(fun, str::MaybeSub{T}) where {C<:CSE, T<:Str{C}}
-    out = IOBuffer(sizehint=sizeof(str))
+    out = get_iobuffer(sizeof(str))
     CP = eltype(T)
     for ch in str
         retc = fun(ch)

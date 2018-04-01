@@ -6,28 +6,7 @@ Licensed under MIT License, see LICENSE.md
 Based initially on julia/test/strings/util.jl
 =#
 
-using Base: Chars, _default_delims
-
 # starts with and ends with predicates
-
-@static if false
-
-#Todo: Make fast version for Str, using CompareStyle & Contains
-
-function starts_with(a::AbstractString, b::AbstractString)
-    a, b = Iterators.Stateful(a), Iterators.Stateful(b)
-    all(splat(==), zip(a, b)) && is_empty(b)
-end
-starts_with(str::AbstractString, chars::Chars) = !is_empty(str) && first(str) in chars
-
-function ends_with(a::AbstractString, b::AbstractString)
-    a = Iterators.Stateful(Iterators.reverse(a))
-    b = Iterators.Stateful(Iterators.reverse(b))
-    all(splat(==), zip(a, b)) && is_empty(b)
-end
-ends_with(str::AbstractString, chars::Chars) = !is_empty(str) && last(str) in chars
-
-end # if false
 
 starts_with(a::MaybeSub{<:Str{C}}, b::MaybeSub{<:Str{C}}) where {C<:CSE} =
     (len = ncodeunits(b)) <= ncodeunits(a) &&
@@ -51,27 +30,6 @@ function chomp(str::MaybeSub{<:Str})
     end
     SubString(str, 1, thisind(str, len))
 end
-
-@static if false
-function lstrip(s::AbstractString, chars::Chars=_default_delims)
-    e = lastindex(s)
-    for (i, c) in pairs(s)
-        !(c in chars) && return SubString(s, i, e)
-    end
-    SubString(s, e+1, e)
-end
-
-function rstrip(s::AbstractString, chars::Chars=_default_delims)
-    for (i, c) in Iterators.reverse(pairs(s))
-        c in chars || return SubString(s, 1, i)
-    end
-    SubString(s, 1, 0)
-end
-
-strip(s::AbstractString) = lstrip(rstrip(s))
-strip(s::AbstractString, chars::Chars) = lstrip(rstrip(s, chars), chars)
-
-end # if false
 
 ## string padding functions ##
 
@@ -107,20 +65,7 @@ const SetOfChars = Union{Tuple{Vararg{<:AbstractChar}},
                          AbstractVector{<:AbstractChar},
                          Set{<:AbstractChar}}
 
-#=
-split(str::MaybeSub{T}, splitter;
-      limit::Integer=0, keepempty::Bool=true) where {T<:Str} =
-    _split(str, splitter, limit, keepempty, SubString{T}[])
-split(str::MaybeSub{T}, splitter::SetOfChars;
-      limit::Integer=0, keepempty::Bool=true) where {T<:Str} =
-    _split(str, in(splitter), limit, keepempty, SubString{T}[])
-split(str::MaybeSub{T}, splitter::AbstractChar;
-      limit::Integer=0, keepempty::Bool=true) where {T<:Str} =
-          _split(str, ==(splitter), limit, keepempty, SubString{T}[])
-=#
-
-function Base._split(str::MaybeSub{T}, splitter, limit::Integer,
-                keep_empty::Bool, strs::Array) where {T<:Str}
+function __split(str, splitter, limit, keep_empty, strs)
     pos = 1
     lst = lastindex(str)
     res = find(First, splitter, str)
@@ -141,20 +86,12 @@ function Base._split(str::MaybeSub{T}, splitter, limit::Integer,
     (keep_empty || pos <= lst) ? push!(strs, SubString(str, pos)) : strs
 end
 
-#=
-# a bit oddball, but standard behavior in Perl, Ruby & Python:
-split(str::MaybeSub{<:Str}) = split(str, _default_delims; limit=0, keepempty=false)
-
-rsplit(str::MaybeSub{T}, splitter;
-       limit::Integer=0, keepempty::Bool=true) where {T<:Str} =
-    _rsplit(str, splitter, limit, keepempty, SubString{T}[])
-rsplit(str::MaybeSub{T}, splitter::SetOfChars;
-       limit::Integer=0, keepempty::Bool=true) where {T<:Str} =
-    _rsplit(str, occurs_in(splitter), limit, keepempty, SubString{T}[])
-rsplit(str::MaybeSub{T}, splitter::AbstractChar;
-       limit::Integer=0, keepempty::Bool=true) where {T<:Str} =
-    _rsplit(str, ==(splitter), limit, keepempty, SubString{T}[])
-=#
+Base._split(str::MaybeSub{T}, splitter, limit::Integer,
+            keep_empty::Bool, strs::Array) where {T<:Str} =
+    __split(str, splitter, limit, keep_empty, strs)
+Base._split(str::MaybeSub{T}, splitter::AbstractVector{<:AbsChar}, limit::Integer,
+            keep_empty::Bool, strs::Array) where {T<:Str} =
+    __split(str, in(splitter), limit, keep_empty, strs)
 
 function Base._rsplit(str::MaybeSub{T}, splitter, limit::Integer,
                  keep_empty::Bool, strs::Array) where {T<:Str}
@@ -195,7 +132,8 @@ function replace(str::MaybeSub{T}, pat_repl::Pair; count::Integer=typemax(Int)) 
     # Just return the string if not found
     (j = first(res)) == 0 && return str
 
-    out = IOBuffer(sizehint=floor(Int, 1.2 * sizeof(str)))
+    out = get_iobuffer(floor(Int, 1.2 * sizeof(str)))
+
     while true
         k = last(res)
         if pos == 1 || pos <= k

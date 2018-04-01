@@ -184,9 +184,9 @@ mmhash128_8(str::AbstractString, seed::UInt32) = mmhash128_8_a(str, seed)
 function mmhash128_8_u(len, unaligned_pnt, seed::UInt32)
     # Should optimize handling of short (< 16 byte) unaligned strings
     ulp = reinterpret(UInt, unaligned_pnt)
-    pnt = reinterpret(Ptr{UInt64}, ulp & ~7)
-    fin = reinterpret(Ptr{UInt64}, (ulp + len + 7) & ~7) - 8
-    shft = (ulp & 7)%UInt<<3
+    pnt = reinterpret(Ptr{UInt64}, ulp & ~(7%UInt64))
+    fin = reinterpret(Ptr{UInt64}, (ulp + len + 0x7) & ~(7%UInt64)) - 8
+    shft = (ulp & 7%UInt)<<3
     # println("_mmhash128_8_u($len, $unaligned_pnt, $seed) => $pnt, $fin")
     h1 = h2 = seed%UInt64
     k1 = unsafe_load(pnt) # Pick up first 1-7 bytes
@@ -216,7 +216,7 @@ const mmhash128_u = @static sizeof(Int) == 8 ? mmhash128_8_u : mmhash128_4_u
 mmhash128(str::Union{String, Str}, seed::UInt32) =
     @preserve str mmhash128(sizeof(str), pointer(str), seed)
 
-is_aligned(pnt::Ptr) = (reinterpret(UInt, pnt) & (sizeof(UInt) - 1)) == 0
+is_aligned(pnt::Ptr) = (reinterpret(UInt, pnt) & (sizeof(UInt) - 1)%UInt) == 0
 
 # Check alignment of substrings first
 function mmhash128(str::SubString, seed::UInt32)

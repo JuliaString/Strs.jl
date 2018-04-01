@@ -186,6 +186,12 @@ export utf8crc, is_alphanumeric, is_graphic, is_lowercase, is_uppercase
     # Add new short name for deprecated hex function
     outhex(v, p=1) = hex(v,p)
 
+    function get_iobuffer(siz)
+        out = IOBuffer(Base.StringVector(siz), true, true)
+        out.size = 0
+        out
+    end
+
 else # !V6_COMPAT
 
     using Random
@@ -194,14 +200,13 @@ else # !V6_COMPAT
 
     function find end
 
-    export fnd
-    const fnd = find
-
     # Handle changes in array allocation
     create_vector(T, len)  = Vector{T}(undef, len)
 
     # Add new short name for deprecated hex function
     outhex(v, p=1) = string(v, base=16, pad=p)
+
+    get_iobuffer(siz) = IOBuffer(sizehint=siz)
 
     const utf8crc = Base._crc32c
 
@@ -213,6 +218,9 @@ end # !V6_COMPAT
 
 const is_grapheme_break  = isgraphemebreak
 const is_grapheme_break! = isgraphemebreak!
+
+export fnd
+const fnd = find
 
 # Operations for find/search operations
 

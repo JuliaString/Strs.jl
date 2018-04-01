@@ -9,13 +9,6 @@ const graphemes  = Base.UTF8proc.graphemes
 const isassigned = Base.UTF8proc.is_assigned_char
 end
 
-export Random
-module Random
-import Base.Random: rand!, rand
-export rand, rand!, AbstractRNG
-const AbstractRNG = Base.AbstractRNG
-end
-
 ## Start of code from operators.jl =================================================
 ##
 ## It is used to support the new string searching syntax on v0.6.2
@@ -83,6 +76,7 @@ const OccursIn = Fix2{typeof(in)}
 ## code unit access ##
 
 codeunit(str::AbstractString) = UInt8
+codeunit(::Type{<:AbstractString}) = UInt8
 ncodeunits(str::AbstractString) = sizeof(str)
 
 """
@@ -134,7 +128,11 @@ start(cp::Chr) = false
 next(cp::Chr, state) = (cp, true)
 done(cp::Chr, state) = state
 isempty(cp::Chr) = false
+in(x::AbsChar, y::Chr) = x == y
+in(x::Chr, y::AbsChar) = x == y
 in(x::Chr, y::Chr) = x == y
+-(x::AbsChar, y::Chr) = Int(x) - Int(y)
+-(x::Chr, y::AbsChar) = Int(x) - Int(y)
 -(x::Chr, y::Chr) = Int(x) - Int(y)
 -(x::Chr, y::Integer) = Chr((Int32(x) - Int32(y))%UInt32)
 +(x::Chr, y::Integer) = Chr((Int32(x) + Int32(y))%UInt32)
@@ -146,8 +144,14 @@ codepoint(v::Char) = v%UInt32
 
 unsafe_crc32c(a, n, crc) = ccall(:jl_crc32c, UInt32, (UInt32, Ptr{UInt8}, Csize_t), crc, a, n)
 
-sizeof(s::SubString{<:Str}) = s.endof == 0 ? 0 : nextind(s, s.endof) - 1
+function sizeof(str::SubString{T}) where {T<:Str}
+    is_multi(str) || return str.endof
+    str.endof == 0 && return 0
+    _nextind(CodeUnitMulti(), str.string, str.offset + str.endof) - str.offset - 1
+end
 
+occurs_in(str::String, hay::String) = contains(hay, str)
+occurs_in(chr::Char,   hay::String) = contains(hay, string(chr))
 Base.contains(hay::AbstractString, str::Str)     = occurs_in(str, hay)
 Base.contains(hay::Str, str::AbstractString)     = occurs_in(str, hay)
 Base.contains(hay::Str, str::Str)                = occurs_in(str, hay)
@@ -184,6 +188,8 @@ function thisind(str::String, pos::Integer)
     pos - (checkcont(pnt) ? (checkcont(pnt - 1) ? (checkcont(pnt - 2) ? 3 : 2) : 1) : 0)
 end
 
+typemin(::Type{String}) = ""
+
 macro preserve(args...)
     syms = args[1:end-1]
     for x in syms
@@ -205,3 +211,30 @@ end
 Base.SubString(str::AbstractString, rng::UnitRange) = SubString(str, first(rng), last(rng))
 
 Base.checkbounds(::Type{Bool}, s::AbstractString, i::Integer) = 1 <= i <= ncodeunits(s)
+
+const _Chars = Union{<:Chr,Tuple{Vararg{<:Chr}},AbstractVector{<:Chr},Set{<:Chr},Base.Chars}
+
+starts_with(str::AbstractString, chars::_Chars) = !is_empty(str) && first(str) in chars
+
+ends_with(str::AbstractString, chars::_Chars) = !is_empty(str) && last(str) in chars
+
+function Base.lstrip(s::AbstractString, chars::_Chars)
+    e = lastindex(s)
+    for (i, c) in pairs(s)
+        c in chars || return SubString(s, i, e)
+    end
+    SubString(s, e+1, e)
+end
+
+function Base.rstrip(s::AbstractString, chars::_Chars)
+    r = RevString(s)
+    i = start(r)
+    while !done(r,i)
+        c, j = next(r,i)
+        c in chars || return s[1:end-i+1]
+        i = j
+    end
+    s[1:0]
+end
+
+Base.strip(s::AbstractString, chars::_Chars) = lstrip(rstrip(s, chars), chars)
