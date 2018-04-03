@@ -254,6 +254,14 @@ end
 
 dispbench(totres) = dispbench(_stdout(), totres)
 
+function calchash(lines::Vector{<:AbstractString})
+    hashval = 0%UInt
+    for text in lines
+        hashval = hash(text, hashval)
+    end
+    hashval%UInt32 # Just show bottom 32-bits, for displaying better
+end
+
 function countlength(lines::Vector{<:AbstractString})
     cnt = 0
     for text in lines
@@ -278,7 +286,7 @@ function douppercase(lines::Vector{<:AbstractString})
     cnt
 end
 
-function iteratechars(text::AbstractString)
+@inline function iteratechars(text::AbstractString)
     cnt = 0
     for ch in text
         cnt += is_digit(ch)
@@ -286,7 +294,7 @@ function iteratechars(text::AbstractString)
     cnt
 end
 
-function iteratecps(text::AbstractString)
+@inline function iteratecps(text::AbstractString)
     cnt = 0
     for ch in codepoints(text)
         cnt += is_digit(ch)
@@ -294,7 +302,7 @@ function iteratecps(text::AbstractString)
     cnt
 end
 
-function iteratecus(text::AbstractString)
+@inline function iteratecus(text::AbstractString)
     cnt = 0
     for ch in codeunits(text)
         cnt += is_digit(ch)
@@ -326,7 +334,7 @@ function countsize(lines::Vector{<:AbstractString})
     cnt
 end
 
-function countcodeunits(text::AbstractString)
+@inline function countcodeunits(text::AbstractString)
     cnt = 0
     @inbounds for cu in codeunits(text)
         cnt += cu
@@ -359,7 +367,7 @@ function checktext(fun, lines::Vector{<:AbstractString})
     cnt
 end
 
-function iteratenextind(text)
+@inline function iteratenextind(text)
     cnt = 0
     len = ncodeunits(text)
     pos = 1
@@ -370,7 +378,7 @@ function iteratenextind(text)
     cnt
 end
 
-function iteratefunchars(fun, text)
+@inline function iteratefunchars(fun, text)
     cnt = 0
     for ch in text
         cnt += fun(ch)
@@ -378,7 +386,7 @@ function iteratefunchars(fun, text)
     cnt
 end
 
-function iteratefuncps(fun, text)
+@inline function iteratefuncps(fun, text)
     cnt = 0
     for ch in codepoints(text)
         cnt += fun(ch)
@@ -386,7 +394,7 @@ function iteratefuncps(fun, text)
     cnt
 end
 
-function iteratefuncus(fun, text)
+@inline function iteratefuncus(fun, text)
     cnt = 0
     for ch in codeunits(text)
         cnt += fun(ch)
@@ -410,21 +418,21 @@ function checkcp(fun, lines::Vector{<:AbstractString})
     cnt
 end
 
-function sumchars(text)
+@inline function sumchars(text)
     t = 0
     for ch in text
         t += UInt32(ch)
     end
     t
 end
-function sumcp(text)
+@inline function sumcp(text)
     t = 0
     for ch in codepoints(text)
         t += UInt32(ch)
     end
     t
 end
-function sumcu(text)
+@inline function sumcu(text)
     t = 0
     for ch in codeunits(text)
         t += UInt32(ch)
@@ -471,15 +479,29 @@ function searchlines(lines, v, rev=false)
     t
 end
 
+function searchlinescvt(lines, v, rev=false)
+    t = 0
+    if rev
+    for text in lines
+        t += searchres(fnd(Last, v, utf8(text)))
+    end
+    else
+    for text in lines
+        t += searchres(fnd(First, v, utf8(text)))
+    end
+    end
+    t
+end
+
 function searchlines(lines::Vector{UniStr}, v, rev=false)
     t = 0
     if rev
     for text in lines
-        if typeof(text) == ASCIIStr
+        if typeof(text) === ASCIIStr
             t += searchres(fnd(Last, v, text::ASCIIStr))
-        elseif typeof(text) == _LatinStr
+        elseif typeof(text) === _LatinStr
             t += searchres(fnd(Last, v, text::_LatinStr))
-        elseif typeof(text) == _UCS2Str
+        elseif typeof(text) === _UCS2Str
             t += searchres(fnd(Last, v, text::_UCS2Str))
         else
             t += searchres(fnd(Last, v, text::_UTF32Str))
@@ -487,11 +509,11 @@ function searchlines(lines::Vector{UniStr}, v, rev=false)
     end
     else
     for text in lines
-        if typeof(text) == ASCIIStr
+        if typeof(text) === ASCIIStr
             t += searchres(fnd(First, v, text::ASCIIStr))
-        elseif typeof(text) == _LatinStr
+        elseif typeof(text) === _LatinStr
             t += searchres(fnd(First, v, text::_LatinStr))
-        elseif typeof(text) == _UCS2Str
+        elseif typeof(text) === _UCS2Str
             t += searchres(fnd(First, v, text::_UCS2Str))
         else
             t += searchres(fnd(First, v, text::_UTF32Str))
@@ -510,8 +532,14 @@ searchchar(lines::Vector{T}, d=false) where {T} =
 searchchar(lines::Vector{T}, d=false) where {T<:Union{ASCIIStr,LatinStr,_LatinStr}} =
     searchlines(lines, eltype(T)(0x1a), d)
 
-searchstr(lines::Vector{String}, d=false) = searchlines(lines, "thy", d)
-searchstr(lines::Vector{T}, d=false) where {T} = searchlines(lines, T("thy"), d)
+searchstr(lines::Vector{String}, d=false) = searchlines(lines, "this is a test", d)
+searchstr(lines::Vector{T}, d=false) where {T} = searchlines(lines, T("this is a test"), d)
+
+searchreg(lines::Vector{<:AbstractString}, d=false) =
+    searchlinescvt(lines, r"this is a test", d)
+searchreg(lines::Vector{T}, d=false) where {T<:Str{<:Strs.Regex_CSEs}} =
+    searchlines(lines, r"this is a test", d)
+searchreg(lines::Vector{String}, d=false) = searchlines(lines, r"this is a test", d)
 
 rsearchchar(lines) = searchchar(lines, true)
 rsearchstr(lines) = searchstr(lines, true)
@@ -647,12 +675,14 @@ const tests =
     (
      (countsize,   "sizeof"),
      (countlength, "length"),
+     (calchash,     "hash\nstring"),
      (checknextind, "nextind\nchars"),
      (checkreverse, "reverse"),
      (checkrepeat1,  "repeat 1\nstring"),
      (checkrepeat10,  "repeat 10\nstring"),
      (searchstr,    "search\nstring"),
      (searchchar,    "search\nchar"),
+     (searchreg,     "search\nregex"),
 #     (rsearchstr,    "rsearch\nstring"),
 #     (rsearchchar,    "rsearch\nchar"),
 #     (checkrepeat1c,  "repeat 1\nchar"),
