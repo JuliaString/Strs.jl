@@ -11,7 +11,8 @@ const _trail_mask = 0xdc00_dc00_dc00_dc00
 const _hi_bit_16  = 0x8000_8000_8000_8000
 
 @inline _mask_surr(v)  = xor((v | v<<1 | v<<2 | v<<3 | v<<4 | v<<5) & _hi_bit_16, _hi_bit_16)
-@inline _get_masked(qpnt) = _mask_surr(xor(unsafe_load(qpnt), _trail_mask))
+@inline _get_masked(v::UInt64) = _mask_surr(xor(v, _trail_mask))
+@inline _get_masked(qpnt::Ptr{UInt64}) = _get_masked(unsafe_load(qpnt))
 @inline _get_lead(qpnt) = xor(_get_masked(qpnt), _hi_bit_16)
 
 @inline get_utf16(ch) = (0xd7c0 + (ch >> 10))%UInt16, (0xdc00 + (ch & 0x3ff))%UInt16
@@ -46,7 +47,6 @@ function _nextind(::CodeUnitMulti, str::MS_UTF16, pos::Int, nchar::Int)
     siz = ncodeunits(str)
     @boundscheck 0 <= pos <= siz || boundserr(str, pos)
     @preserve str begin
-        # Todo: handle unaligned for ARM32
         beg = pointer(str)
         pnt = bytoff(beg, pos - 1)
         fin = bytoff(beg, siz)
@@ -67,7 +67,6 @@ function _prevind(::CodeUnitMulti, str::MS_UTF16, pos::Int, nchar::Int)
     nchar < 0 && ncharerr(nchar)
     @boundscheck 0 < pos <= ncodeunits(str)+1 || boundserr(str, pos)
     @preserve str begin
-        # Todo: handle unaligned for ARM32
         beg = pointer(str)
         pnt = bytoff(beg, pos - 1)
         nchar == 0 && (is_surrogate_trail(get_codeunit(pnt)) ? index_error(str, pos) : return pos)
@@ -78,34 +77,6 @@ function _prevind(::CodeUnitMulti, str::MS_UTF16, pos::Int, nchar::Int)
             (nchar -= 1) > 0 || break
         end
         chrdiff(pnt + 2, beg)
-    end
-end
-
-function is_ascii(str::MaybeSub{<:Str{Union{Text2CSE, UCS2CSE, UTF16CSE}}})
-    (siz = sizeof(str)) == 0 && return true
-    @preserve str begin
-        # Todo: handle unaligned for ARM32
-        siz < CHUNKSZ &&
-            return ((unsafe_load(_pnt64(str)) & _mask_bytes(siz)) & _ascii_mask(UInt16)) == 0
-        pnt, fin = _calcpnt(str, siz)
-        while (pnt += CHUNKSZ) <= fin
-            (unsafe_load(pnt) & _ascii_mask(UInt16)) == 0 || return false
-        end
-        pnt - CHUNKSZ == fin || ((unsafe_load(pnt) & _mask_bytes(siz)) & _ascii_mask(UInt16)) == 0
-    end
-end
-
-function is_latin(str::MaybeSub{<:Str{Union{Text2CSE, UCS2CSE, UTF16CSE}}})
-    (siz = sizeof(str)) == 0 && return true
-    # Todo: handle unaligned for ARM32
-    @preserve str begin
-        siz < CHUNKSZ &&
-            return ((unsafe_load(_pnt64(str)) & _mask_bytes(siz)) & _latin_mask(UInt16)) == 0
-        pnt, fin = _calcpnt(str, siz)
-        while (pnt += CHUNKSZ) <= fin
-            (unsafe_load(pnt) & _latin_mask) == 0 || return false
-        end
-        pnt - CHUNKSZ == fin || ((unsafe_load(pnt) & _mask_bytes(siz)) & _latin_mask(UInt16)) == 0
     end
 end
 
@@ -124,11 +95,42 @@ function is_bmp(str::MS_UTF16)
     end
 end
 
+@inline function _check_bmp_utf16_al(pnt, cnt, v)
+    fin = pnt + cnt
+    v = _get_masked(v)
+    while (pnt += CHUNKSZ) < fin
+        v == 0 || return false
+        v = _get_masked(pnt)
+    end
+    ((cnt & CHUNKMSK) == 0 ? v : (v & _mask_bytes(cnt))) == 0
+end
+@inline _check_bmp_utf16_al(pnt, cnt) = _check_bmp_utf16_al(pnt, cnt, unsafe_load(pnt))
+
+@inline function _check_bmp_utf16_ul(beg, cnt)
+    align = reinterpret(UInt, beg)
+    pnt = reinterpret(Ptr{UInt64}, align & ~CHUNKMSK)
+    v = unsafe_load(pnt)
+    if (align &= CHUNKMSK) != 0
+        v &= ~_mask_bytes(align)
+        cnt += align
+    end
+    _check_bmp_utf16_al(pnt, cnt, v)
+end
+
+is_bmp(str::Str{UTF16CSE}) =
+    (cnt = sizeof(str)) == 0 ? true :
+    @preserve str _check_bmp_utf16_al(reinterpret(Ptr{UInt64}, pointer(str)), cnt)
+
+is_bmp(str::SubString{<:Str{UTF16CSE}}) =
+    (cnt = sizeof(str)) == 0 ? true : @preserve str _check_bmp_utf16_ul(pointer(str), cnt)
+
+is_bmp(str::MaybeSub{<:Str{<:UCS2_CSEs}}) = true
+
 is_ascii(str::Str{_UCS2CSE}) = false
 is_latin(str::Str{_UCS2CSE}) = false
+
 is_ascii(str::SubString{<:Str{_UCS2CSE}}) = is_ascii(Str{UCS2CSE}(str.data))
 is_latin(str::SubString{<:Str{_UCS2CSE}}) = is_latin(Str{UCS2CSE}(str.data))
-is_bmp(str::MaybeSub{<:Str{<:UCS2_CSEs}}) = true
 
 # Speed this up accessing 64 bits at a time
 @propagate_inbounds function _cnt_non_bmp(len, pnt::Ptr{UInt16})
