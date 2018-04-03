@@ -2,13 +2,17 @@
 
 [![Build Status](https://travis-ci.org/JuliaString/Strs.jl.svg?branch=master)](https://travis-ci.org/JuliaString/Strs.jl)
 
-[![Coverage Status](https://coveralls.io/repos/JuliaString/Strs.jl/badge.svg?branch=master&service=github)](https://coveralls.io/github/JuliaString/Strs.jl?branch=master)
+[![Coverage Status](https://coveralls.io/repos/github/JuliaString/Strs.jl/badge.svg?branch=master)](https://coveralls.io/github/JuliaString/Strs.jl?branch=master)
 
 [![codecov.io](http://codecov.io/github/JuliaString/Strs.jl/coverage.svg?branch=master)](http://codecov.io/github/JuliaString/Strs.jl?branch=master)
 
-The `Strs` package is very WIP at the moment (having been written over two weeks during Xmas break), and represents an attempt to give Julia better string handling than possible with Base `String` and `Char`.
+The `Strs` package is now working on both the release version (v0.6.2) and the latest master (v0.7.0-DEV).
+It represents an attempt to give Julia better string handling than possible with Base `String` and `Char`.
 
-Please understand that the code is being rapidly rewritten, as I come up with new ideas and learn better ways of using traits and making the code more generic, without losing any of the performance gains.
+I am now trying to make sure that all of the functionality in String and Char is implemented for
+Str and Chr, and to start optimizing the functions (although they are already substantially faster)
+
+I also am working on implementing full Regex support (although some changes might be needed in Base to make it work with the `r"..."` regex string macro and `Regex` type, because there are some fields missing that would be needed to handle arbitrary abstract string types).
 
 I would very much appreciate any constructive criticism, help implementing some of the ideas, ideas on how to make it perform better, bikeshedding on names and API, etc.
 Also, I'd love contributions of benchmark code and/or samples for different use cases of strings,
@@ -21,14 +25,17 @@ Extensions such as converting to and from non-Unicode encodings, such as Windows
 
 Subtypes that directly support things like substrings, caching hash values, and caching one or more versions of the string (such as the originally unmodified byte, 16-bit or 32-bit word stream, in the case where the input was not valid, or a valid UTF-8 (similar to the way Python can cache a UTF-8 version of a string) and/or UTF-16 encoded version, for better performance when interoperating with other languages such as JavaScript, Swift, Java, or OS APIs like Windows that expect UTF-16).
 
-There are iterators `codeunits` and `codepoints` to return those (although I may get rid of
-`codepoints`, and have the default iteration return the codepoints, and have a `chars` iterator instead to produce the `Char` type [which is not really what you'd want in most all cases anyway])
+Since things like `AbstractChar` and `CodeUnits` which I originally implemented for this package have now been added to `Base` (in master), I have moved support for those to a file to provide them for v0.6.2.
+There is a `codepoints` iterator, which iterates over the unsigned integer codepoints in a string
+(for strings with the `CodeUnitSingle` trait, it is basically the same as the `codeunits`
+iterator).
 
 Also in the works is using the new ability to add properties, in order to allow for different "views" of a string, no matter how it is stored internally, for example a `mystring.utf8` view, or a `mystring.utf16` view (that can use the internal cached copy if available, as an optimization).
 
 Currently, there are the following types:
 
-* `Str`, which is the general, parameterized type.
+* `Str`, which is the general, parameterized string type, and
+* `Chr`, the general, parameterized character type.
 
 * `BinaryStr` for storing non-textual data as a sequence of bytes.
 
@@ -51,3 +58,33 @@ Currently, there are the following types:
 
 The only real difference in handling `LatinStr` and `_LatinStr`, is that uppercasing the characters `'µ': (Unicode U+00b5 (category Ll: Letter, lowercase)` and `'ÿ': Unicode U+00ff (category Ll: Letter, lowercase)` produces the BMP characters `'Μ': Unicode U+039c (category Lu: Letter, uppercase)` and `'Ÿ': Unicode U+0178 (category Lu: Letter, uppercase)` respectively in `_LatinStr`, because it is just an optimization for storing the full Unicode character set, not the ANSI/ISO 8859-1 character set that ise used for the first 256 code points of Unicode.
 Those three internal types should never be used directly, as indicated by the leading `_` in the name.
+
+For all of the built-in `Str` types, there is a corresponding built-in character set encoding, i.e. `BinaryCSE`, `LatinCSE`, `UTF8CSE`, etc.
+There are also a number of similar built-in character sets defined (*CharSet), and character types (*Chr).
+The `cse` function returns the character set encoding for a string type or a string.
+`charset` returns the character set, and `encoding` returns the encoding.
+For example, `cse(UTF8Str)` returns `UTF8CSE`, `charset(UTF8Str)` returns `CharSet{UTF32}`,
+`encoding(UTF8Str)` return `Encoding{UTF8}()`
+
+There is a new API that I am working on for indexing and searching, (however there is a problem on v0.7 due to the deprecation for `find` being overbroad, and causing a type of type piracy, deprecating methods of types not in Base):
+
+`find(First, ...)` replaces `findfirst`
+`find(Last, ...)`  replaces `findlast`
+`find(Next, ...)`  replaces `findnext`
+`find(Prev, ...)`  replaces `findprev`
+
+`index(str, pos)`  replaces `thisind(str, pos)`
+`index(Next, ...`  replaces `nextind(...)`
+`index(Prev, ...`  replaces `prevind(...)`
+
+Also there are more readable function names that always separate words with `_`, and avoid hard to understand abbreviations:
+`is*`              -> `is_*` (for `ascii`, `digit`, `space`, `alpha`, `numeric`, `valid`,
+		                  `defined`, `empty`, `assigned`)
+`iscntrl`          -> `is_control`
+`isgraph`          -> `is_graphic`
+`isprint`          -> `is_printable`
+`ispunct`          -> `is_punctuation`
+`isalnum`          -> `is_alphanumeric`
+`isgraphemebreak`  -> `is_grapheme_break`
+`isgraphemebreak!` -> `is_grapheme_break!`
+
