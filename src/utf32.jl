@@ -217,17 +217,19 @@ end
 const UniRawChar = Union{UInt32, Int32, Text4Chr, Char}
 
 function convert(::Type{<:Str{C}}, dat::AbstractVector{<:UniRawChar}) where {C<:UTF32_CSEs}
-    (len = length(dat)) == 0 && empty_str(C)
+    (len = length(dat)) == 0 && empty_str(UTF32CSE)
     buf, pnt = _allocate(UInt32, len)
+    C === _UTF32CSE && (msk = 0%UInt32)
     @preserve buf begin
         fin = bytoff(pnt, len)
         pos = 0
         while pnt < fin
             @inbounds ch = dat[pos += 1]%UInt32
+            C === _UTF32CSE && (msk |= ch)
             set_codeunit!(pnt, check_valid(ch, pos))
             pnt += sizeof(UInt32)
         end
-        Str(C, buf)
+        Str((C === _UTF32CSE && msk > 0xffff) ? _UTF32CSE : UTF32CSE, buf)
     end
 end
 

@@ -12,7 +12,7 @@
     abc = ST("abc")
     abcd = ST("abcd")
 
-    @testset "padding (lpad and rpad)" begin
+    V6_COMPAT || @testset "padding (lpad and rpad)" begin
         str1 = ST("foo")
         str2 = ST("αβ")
         pad1 = ST("123")
@@ -39,7 +39,7 @@
     end
 
     # string manipulation
-    @testset "lstrip/rstrip/strip" begin
+    V6_COMPAT || @testset "lstrip/rstrip/strip" begin
         @test strip(ST("")) == ""
         @test strip(ST(" ")) == ""
         @test strip(ST("  ")) == ""
@@ -69,7 +69,7 @@
         end
     end
 
-    @testset "rsplit/split" begin
+    V6_COMPAT || @testset "rsplit/split" begin
         @test split(foobarbaz, cvtchar(C, 'x')) == [foobarbaz]
         @test split(foobarbaz, comma) == [foo,bar,baz]
         @test split(foobarbaz, ST(",")) == [foo,bar,baz]
@@ -155,7 +155,7 @@
         @test split(ST("α β γ"), ST("β")) == rsplit(ST("α β γ"), ST("β")) == ["α "," γ"]
     end
 
-    @testset "replace" begin
+    V6_COMPAT || @testset "replace" begin
         @test replace(ST("\u2202"), '*' => '\0') == "\u2202"
 
         @test replace(foobar, 'o' => '0') == "f00bar"
@@ -274,7 +274,7 @@
 
     end # replace tests
 
-    @testset "chomp/chop" begin
+    V6_COMPAT || @testset "chomp/chop" begin
         @test chomp(ST("foo\n")) == "foo"
         @test chomp(ST("fo∀\n")) == "fo∀"
         @test chomp(ST("foo\r\n")) == "foo"
@@ -306,7 +306,7 @@
         @test isa(chop(ST("foo")), SubString)
     end
 
-    @testset "bytes2hex and hex2bytes" begin
+    V6_COMPAT || @testset "bytes2hex and hex2bytes" begin
         hex_str = "d7a8fbb307d7809469ca9abcb0082e4f8d5651e46d3cdb762d02d0bf37c9e592"
         bin_val = hex2bytes(hex_str)
 
@@ -351,7 +351,7 @@
     end
 
     # b"" should be immutable
-    let testb() = b"0123"
+    V6_COMPAT || let testb() = b"0123"
         b = testb()
         @test eltype(b) === UInt8
         @test b isa AbstractVector

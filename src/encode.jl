@@ -96,6 +96,30 @@ convert(::Type{UniStr}, str::AbstractString) = _str(str)
 convert(::Type{UniStr}, str::String)         = _str(str)
 convert(::Type{UniStr}, str::Str{<:Union{ASCIICSE,SubSet_CSEs}}) = str
 
+convert(::Type{<:Str{C}}, vec::AbstractVector{UInt8}) where {C<:Union{BinaryCSE,Text1CSE}} =
+    Str(C, _str_cpy(UInt8, vec, length(vec)))
+convert(::Type{<:Str{Text2CSE}}, vec::AbstractVector{UInt16}) =
+    Str(Text2CSE, _str_cpy(UInt16, vec, length(vec)))
+convert(::Type{<:Str{Text4CSE}}, vec::AbstractVector{UInt32}) =
+    Str(Text4CSE, _str_cpy(UInt32, vec, length(vec)))
+
+(::Type{Str})(str::AbstractString) = _str(str)
+(::Type{Str})(str::String)         = _str(str)
+(::Type{Str})(str::Str)            = str
+
+(::Type{UniStr})(str::AbstractString) = _str(str)
+(::Type{UniStr})(str::String)         = _str(str)
+(::Type{UniStr})(str::Str{<:Union{ASCIICSE,SubSet_CSEs}}) = str
+
+#=
+(::Type{<:Str{C}})(vec::AbstractVector{UInt8}) where {C<:Union{BinaryCSE,Text1CSE}} =
+    Str(C, _str_cpy(UInt8, vec, length(vec)))
+(::Type{<:Str{Text2CSE}})(vec::AbstractVector{UInt16}) =
+    Str(Text2CSE, _str_cpy(UInt16, vec, length(vec)))
+(::Type{<:Str{Text4CSE}})(vec::AbstractVector{UInt32}) =
+    Str(Text4CSE, _str_cpy(UInt32, vec, length(vec)))
+=#
+
 function convert(::Type{UniStr}, str::T) where {T<:Str}
     # handle zero length string quickly
     is_empty(str) && return empty_ascii
@@ -117,6 +141,35 @@ convert(::Type{<:Str{Text1CSE}}, str::String) = Str(Text1CSE, str)
 convert(::Type{<:Str{BinaryCSE}}, str::String) = Str(BinaryCSE, str)
 
 convert(::Type{String}, str::Str{<:Union{Text1CSE,BinaryCSE}}) = str.data
+
+function convert(::Type{String}, vec::AbstractVector{<:Chr})
+    out = get_iobuffer(sizeof(vec))
+    @inbounds for ch in vec
+        print(out, ch)
+    end
+    String(take!(out))
+end
+
+function convert(::Type{String}, vec::AbstractVector{<:Union{Text1Chr,ASCIIChr}})
+    @preserve buf begin
+        buf, pnt = _allocate(UInt8, length(vec))
+        @inbounds for byt in vec
+            set_codeunit!(pnt, byt)
+            pnt += 1
+        end
+        buf
+    end
+end
+
+function Str(vec::AbstractVector{T}) where {CS,BT,T<:Chr{CS,BT}}
+    C = codepoint_cse(T)
+    buf, pnt = _allocate(BT, length(vec))
+    @inbounds for ch in vec
+        set_codeunit!(pnt, ch%BT)
+        pnt += sizeof(BT)
+    end
+    Str(C, buf)
+end
 
 """Convert to a UniStr if valid Unicode, otherwise return a Text1Str"""
 function unsafe_str(str::Union{Vector{UInt8}, T, SubString{T}};
@@ -186,6 +239,7 @@ function unsafe_str(str::T;
     end
 end
 
+#=
 function Str(v::Vector{UInt8})
     len = length(v)
     buf = _allocate(siz)
@@ -204,8 +258,10 @@ function Str(v::Vector{UInt32})
     _memcpy(pnt, pointer(v), len)
     Str(Text4CSE, buf)
 end
+=#
 
 # Fallback constructors for Str types, from any AbstractString
+(::Type{T})(vec::S) where {T<:Str, S<:AbstractVector} = convert(T, vec)
 (::Type{T})(str::S) where {T<:Str, S<:AbstractString} = convert(T, str)
 (::Type{T})(str::S) where {T<:Str, S<:Str} = convert(T, str)
 (::Type{T})(str::T) where {T<:Str} = str

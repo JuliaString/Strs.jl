@@ -565,9 +565,8 @@ thisind(str::MaybeSub{<:Str}, i::Integer) = thisind(str, Int(i))
 @inline write(::Type{UTF16CSE}, io, ch) = write_utf16(io, codepoint(ch))
 
 function filter(fun, str::MaybeSub{T}) where {C<:CSE,T<:Str{C}}
-    out = IOBuffer(StringVector(lastindex(str)), true, true)
-    truncate(out, 0)
-    for ch in codepoints(str)
+    out = get_iobuffer(sizeof(str))
+    @inbounds for ch in codepoints(str)
         fun(ch) && write(C, out, ch)
     end
     Str{C}(String(take!(out)))
@@ -676,7 +675,7 @@ _memcpy(a::Ptr{OthChr}, b::Ptr{OthChr}, len) =
 @inline _memset(pnt::Ptr{UInt8}, ch::UInt8, cnt) =
     ccall(:memset, Ptr{UInt8}, (Ptr{UInt8}, Cint, Csize_t), pnt, ch, cnt)
 @inline _memset(pnt::Ptr{WidChr}, ch::WidChr, cnt) =
-    ccall(:wmemset, Ptr{WidChr}, (Ptr{WidChr}, Cint, Csize_t), pnt, ch, cnt)
+    ccall(:wmemset, Ptr{WidChr}, (Ptr{WidChr}, Cuint, Csize_t), pnt, ch, cnt)
 
 @inline function _memset(pnt::Ptr{OthChr}, ch::OthChr, cnt)
     fin = bytoff(pnt, cnt)
@@ -690,11 +689,13 @@ end
 @inline get_utf8_16(ch) =
     (ch >>> 6) | ((ch & 0x3f)%UInt16<<8) | 0x80c0
 @inline get_utf8_32(ch) =
-    (ch & 0xc0000 << 6) | (ch & 0x3f000 << 4) | (ch & 0xfc0 << 2) | (ch & 0x3f) | 0x808080f0
+    (ch & 0xc0000 >>> 18) | (ch & 0x3f000 >>> 4) |
+    (ch & 0xfc0 << 10) | (ch & 0x3f)<<24 | 0x808080f0
 @inline get_utf16_32(ch) =
     (0xd7c0 + (ch >>> 10))%UInt16 << 6 | (0xdc00 + (ch & 0x3ff))%UInt32
 
 @inline function _repeat_chr(::Type{T}, ch, cnt) where {T<:CodeUnitTypes}
+    #println("_repeat_chr($T, $ch, $cnt)")
     buf, pnt = _allocate(T, cnt)
     _memset(pnt, ch%T, cnt)
     buf

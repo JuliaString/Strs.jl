@@ -23,7 +23,7 @@ const _hi_bit_16  = 0x8000_8000_8000_8000
         len += count_ones(v)
         v = _get_lead(pnt)
     end
-    len + count_ones((cnt & (CHUNKSZ-1)) == 0 ? v : (v & _mask_bytes(cnt)))
+    len + count_ones((cnt & CHUNKMSK) == 0 ? v : (v & _mask_bytes(cnt)))
 end
 
 _length_al(::CodeUnitMulti, ::Type{UTF16CSE}, beg::Ptr{UInt16}, cnt::Int) =
@@ -31,9 +31,9 @@ _length_al(::CodeUnitMulti, ::Type{UTF16CSE}, beg::Ptr{UInt16}, cnt::Int) =
 
 function _length(::CodeUnitMulti, ::Type{UTF16CSE}, beg::Ptr{UInt16}, cnt::Int)
     align = reinterpret(UInt, beg)
-    pnt = reinterpret(Ptr{UInt64}, align & ~(CHUNKSZ-1))
+    pnt = reinterpret(Ptr{UInt64}, align & ~CHUNKMSK)
     v = _get_lead(pnt)
-    if (align &= (CHUNKSZ-1)) != 0
+    if (align &= CHUNKMSK) != 0
         msk = _mask_bytes(align)
         v = (v & ~msk) | (msk & _trail_mask)
         cnt += (align>>>1)

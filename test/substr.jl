@@ -315,7 +315,7 @@ function teststr(T)
     @test nextind(ss, 5, 1) == 6
     @test_throws BoundsError nextind(ss, 6, 1)
 
-    @testset "reverseind of empty strings" begin
+    V6_COMPAT || @testset "reverseind of empty strings" begin
         for s in ("",
                   SubString(T(""), 1, 0),
                   SubString(T("ab"), 1, 0),

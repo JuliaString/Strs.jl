@@ -1,7 +1,7 @@
 # This file includes code that was formerly a part of Julia.
 # License is MIT: LICENSE.md
 
-@testset "string escaping & unescaping" begin
+V6_COMPAT || @testset "string escaping & unescaping" begin
     cx = Any[
         0x00000000      '\0'        "\\0"
         0x00000001      '\x01'      "\\x01"
@@ -150,7 +150,7 @@ end
     @test join("HELLO",'-') == "H-E-L-L-O"
     @test join(1:5, ", ", " and ") == "1, 2, 3, 4 and 5"
     @test join(["apples", "bananas", "pineapples"], ", ", " and ") == "apples, bananas and pineapples"
-    @test_throws MethodError join(1, 2, 3, 4)
+    V6_COMPAT || @test_throws MethodError join(1, 2, 3, 4)
 end
 
 # issue #9178 `join` calls `done()` twice on the iterables
@@ -173,7 +173,7 @@ myio = IOBuffer()
 join(myio, "", "", 1)
 @test isempty(take!(myio))
 
-@testset "unescape_string ArgumentErrors" begin
+V6_COMPAT || @testset "unescape_string ArgumentErrors" begin
     @test_throws ArgumentError unescape_string(IOBuffer(), string('\\',"xZ"))
     @test_throws ArgumentError unescape_string(IOBuffer(), string('\\',"777"))
 end

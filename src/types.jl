@@ -320,6 +320,7 @@ pointer(s::Str{<:Word_CSEs}) = reinterpret(Ptr{UInt16}, pointer(s.data))
 pointer(s::Str{<:Quad_CSEs}) = reinterpret(Ptr{UInt32}, pointer(s.data))
 
 const CHUNKSZ = sizeof(UInt64) # used for fast processing of strings
+const CHUNKMSK = (CHUNKSZ-1)%UInt64
 
 _pnt64(s::Union{String,Vector{UInt8}}) = reinterpret(Ptr{UInt64}, pointer(s))
 _pnt64(s::Str) = reinterpret(Ptr{UInt64}, pointer(s.data))
@@ -332,7 +333,7 @@ ncodeunits(s::Str{<:Quad_CSEs}) = sizeof(s) >>> 2
 # For convenience
 @inline _calcpnt(str, siz) = (pnt = _pnt64(str) - CHUNKSZ;  (pnt, pnt + siz))
 
-@inline _mask_bytes(n) = (1%UInt << ((n & (CHUNKSZ - 1)) << 3)) - 0x1
+@inline _mask_bytes(n) = (1%UInt << ((n & CHUNKMSK) << 3)) - 0x1
 
 Base.need_full_hex(c::Chr) = is_hex_digit(c)
 Base.escape_nul(c::Chr) = ('0' <= c <= '7') ? "\\x00" : "\\0"

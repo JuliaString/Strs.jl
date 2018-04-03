@@ -204,7 +204,7 @@ _isvalid_chr(::Type{UniPlusCharSet}, v) = v <= typemax(UInt32)
 is_valid(::Type{T}, v::Unsigned) where {T<:Chr} =
     _isvalid_chr(charset(T), v)
 is_valid(::Type{T}, v::Signed) where {T<:Chr} =
-    v >= 0 && _isvalid_chr(charset(T), v%Unsigned)
+    0 <= v <= typemax(UInt32) && _isvalid_chr(charset(T), v%UInt32)
 
 is_valid(::Type{Char}, ch::Union{Text1Chr, ASCIIChr, LatinChars, UCS2Chr, UTF32Chr}) = true
 is_valid(::Type{Char}, ch::Text2Chr) = is_bmp(ch)

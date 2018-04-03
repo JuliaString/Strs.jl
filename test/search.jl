@@ -90,7 +90,8 @@ end
                     test2ch(Last,  C, str, zip(pats, res))
                 end
             end
-            @testset "find(Rev, ==(ch)...)" begin
+            
+            @static V6_COMPAT || @testset "find(Rev, ==(ch)...)" begin
                 let pats = ('H', 'l', 'l', 'l', 'l', ','),
                     pos  = (1, 5, 4, 3, 2, 5),
                     res  = (1, 4, 4, 3, 0, 0)
@@ -104,7 +105,7 @@ end
                       (("H", 2, 0:-1), ("l", 4, 4:4), ("l", 5, 11:11),
                        ("l", 12, 0:-1), (".", 14, 0:-1), ("\n", 14, 14:14)))
             end
-            @testset "find Rev single-char string" begin
+            @static V6_COMPAT || @testset "find Rev single-char string" begin
                 test2(Last,  P, str,
                       (("x", 0:-1), ("H", 1:1), ("l", 11:11), ("\n", 14:14)))
                 test3(Rev,  P, str,
@@ -132,7 +133,7 @@ end
                     test2(Last, P, fbb, zip(pats, res))
                 end
             end
-            @testset "find Rev two-char string" begin
+            @static V6_COMPAT || @testset "find Rev two-char string" begin
                 let pats = ("fo", "oo", "o,", ",b", ",b", "az"),
                     pos  = (1,    2,    1,    6,    3,    10),
                     res  = (0:-1, 0:-1, 0:-1, 4:5,  0:-1, 0:-1)
@@ -147,7 +148,7 @@ end
                 i = 1
                 while i <= ncodeunits(str)
                     @test fnd(Fwd, emptyP, str, i) == i:i-1
-                    @test fnd(Rev, emptyP, str, i) == i:i-1
+                    V6_COMPAT || @test fnd(Rev, emptyP, str, i) == i:i-1
                     i = nextind(str, i)
                 end
             end
@@ -193,6 +194,7 @@ end
             str = T(u8str)
             lst = nextind(str, lastindex(str))
             C = eltype(P)
+            @static if !V6_COMPAT
             @testset "BoundsError" begin
                 for ch = ('z', '∀', 'ε', 'a'), ind = (0, lst+1)
                     @eval @test_throws BoundsError fnd(Fwd, cvtchar($C, $ch), $str, $ind)
@@ -222,17 +224,20 @@ end
                    @test fnd(Fwd, ==(ch), str, lst) == 0
                 end
             end
+            end
 
+            @static if !V6_COMPAT
             @testset "find(Last, ==(chr),..." begin
                 test2ch(Last, C, str,
                         zip(('z', '\0', '\u80', '∄', '∀', '∃', 'x', 'δ', 'ε'),
                             (  0,    0,      0,   0,   1,  13,  43,  33,  54)))
             end
-            @testset "find(Rev, ==(chr),..." begin
+            V6_COMPAT || @testset "find(Rev, ==(chr),..." begin
                 test3ch(Rev, C, str,
                         zip(('∀', '∃', '∃', '∃', 'x', 'x', 'δ', 'δ', 'ε', 'ε'),
                             (1, 16, 13, 12, 42, 25, 32, 16, 53, 4), # first entry was 0, second 14
                             (1, 13, 13,  0, 26,  0, 17,  0,  5, 0))) # first entry was 0 -> 1
+            end
             end
 
             @testset "find First/Last 1-char string,..." begin
@@ -241,7 +246,7 @@ end
                     rev = (0:-1, 0:-1, 1:1, 13:13, 43:43, 54:54)
 
                     test2(First, P, str, zip(pat, fwd))
-                    test2(Last, P, str, zip(pat, rev))
+                    V6_COMPAT || test2(Last, P, str, zip(pat, rev))
                 end
             end
             @testset "find Fwd/Rev 1-char string,..." begin
@@ -252,7 +257,7 @@ end
                     resr = ( 1:1, 0:-1,26:26, 0:-1,   5:5,  0:-1)
 
                     test3(Fwd, P, str, zip(pat, posf, resf))
-                    test3(Rev, P, str, zip(pat, posr, resr))
+                    V6_COMPAT || test3(Rev, P, str, zip(pat, posr, resr))
                 end
             end
 
@@ -261,7 +266,7 @@ end
                 i = 1
                 while i <= ncodeunits(str)
                     @test fnd(Fwd, empty, str, i) == i:i-1
-                    @test fnd(Rev, empty, str, i) == i:i-1
+                    V6_COMPAT || @test fnd(Rev, empty, str, i) == i:i-1
                     i = nextind(str, i)
                 end
             end
@@ -278,8 +283,10 @@ end
                         b = T(last(s))
                         @eval @test fnd(First, $a, $b) == $resf
                         @eval @test fnd(First, $a, $a) == $resf
-                        @eval @test fnd(Last,  $a, $b) == $resl
-                        @eval @test fnd(Last,  $a, $a) == $resf
+                        @static if !V6_COMPAT
+                            @eval @test fnd(Last,  $a, $b) == $resl
+                            @eval @test fnd(Last,  $a, $a) == $resf
+                        end
                     end
                 end
             end
@@ -307,9 +314,9 @@ end
             @testset "issue #15723" begin
                 str = T("(⨳(")
                 test2ch(First, C, T("⨳("), zip(('(',), (4,)))
-                test2ch(Last,  C, str, zip(('(',), (5,)))
                 test3ch(Fwd, C, str, zip(('(',), (2,), (5,)))
-                test3ch(Rev, C, str, zip(('(',), (2,), (1,)))
+                V6_COMPAT || test2ch(Last,  C, str, zip(('(',), (5,)))
+                V6_COMPAT || test3ch(Rev, C, str, zip(('(',), (2,), (1,)))
             end
             @testset "occurs_in with a String and Char needle" begin
                 str = T("foo")

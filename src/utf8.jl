@@ -115,7 +115,7 @@ const hi_mask = 0x8080_8080_8080_8080
         len += count_ones(v)
         v = msk_lead(unsafe_load(pnt))
     end
-    len + count_ones(cnt & (CHUNKSZ-1) == 0 ? v : (v & _mask_bytes(cnt)))
+    len + count_ones(cnt & CHUNKMSK == 0 ? v : (v & _mask_bytes(cnt)))
 end
 
 _length_al(::CodeUnitMulti, ::Type{UTF8CSE}, beg::Ptr{UInt8}, cnt::Int) =
@@ -123,9 +123,9 @@ _length_al(::CodeUnitMulti, ::Type{UTF8CSE}, beg::Ptr{UInt8}, cnt::Int) =
 
 function _length(::CodeUnitMulti, ::Type{UTF8CSE}, beg::Ptr{UInt8}, cnt::Int)
     align = reinterpret(UInt, beg)
-    pnt = reinterpret(Ptr{UInt64}, align & ~(CHUNKSZ-1))
+    pnt = reinterpret(Ptr{UInt64}, align & ~CHUNKMSK)
     v = unsafe_load(pnt)
-    if (align &= (CHUNKSZ-1)) != 0
+    if (align &= CHUNKMSK) != 0
         msk = _mask_bytes(align)
         v = (v & ~msk) | (msk & hi_mask)
         cnt += align
@@ -157,7 +157,7 @@ function is_ascii(vec::Vector{T}) where {T<:CodeUnitTypes}
         pnt = pointer(vec)
         fin = pnt + siz
         # Check first code units
-        while (reinterpret(UInt, pnt) & (CHUNKSZ-1)) != 0
+        while (reinterpret(UInt, pnt) & CHUNKMSK) != 0
             unsafe_load(pnt) > 0x7f && return false
             (pnt += sizeof(T)) < fin || return true
         end
