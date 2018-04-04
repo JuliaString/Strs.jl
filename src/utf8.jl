@@ -587,12 +587,11 @@ function convert(::Type{<:Str{UTF8CSE}}, ch::Unsigned)
     Str(UTF8CSE, buf)
 end
 
-convert(::Type{UTF8Str}, s::Str{UTF8CSE}) = s
-convert(::Type{UTF8Str}, s::ASCIIStr) = Str(UTF8CSE, s.data)
-
+@static if !V6_COMPAT
 # Note: this will have to change back to s.endof for v0.6!
-convert(::Type{SubString{UTF8Str}}, s::SubString{ASCIIStr}) =
+convert(::Type{SubString{<:Str{UTF8CSE}}}, s::SubString{<:Str{ASCIICSE}}) =
     SubString(convert(UTF8Str, s.string), s.offset + 1, s.offset + s.ncodeunits)
+end
 
 function convert(::Type{<:Str{UTF8CSE}}, dat::Vector{UInt8})
     # handle zero length string quickly
@@ -608,19 +607,6 @@ function convert(::Type{<:Str{UTF8CSE}}, dat::Vector{UInt8})
     else
         Str(UTF8CSE, _transcode_utf8(dat, len + latinbyte + num2byte + num3byte*2 + num4byte*3))
     end
-end
-
-function convert(::Type{<:Str{UTF8CSE}}, str::String)
-    # handle zero length string quickly
-    isempty(str) && return empty_utf8
-    # get number of bytes to allocate
-    len, flags, num4byte, num3byte, num2byte, latinbyte = unsafe_check_string(str, 1, sizeof(str))
-    # Copy, but eliminate over-long encodings and surrogate pairs
-    # Speed this up if no surrogates, long encodings
-    Str(UTF8CSE,
-        (flags & (UTF_LONG | UTF_SURROGATE) == 0
-         ? str
-         : _transcode_utf8(pointer(str), len + latinbyte + num2byte + num3byte*2 + num4byte*3)))
 end
 
 function convert(::Type{<:Str{UTF8CSE}}, str::AbstractString)
@@ -645,6 +631,22 @@ function convert(::Type{<:Str{UTF8CSE}}, str::AbstractString)
     end
     Str(UTF8CSE, buf)
 end
+
+function convert(::Type{<:Str{UTF8CSE}}, str::String)
+    # handle zero length string quickly
+    isempty(str) && return empty_utf8
+    # get number of bytes to allocate
+    len, flags, num4byte, num3byte, num2byte, latinbyte = unsafe_check_string(str, 1, sizeof(str))
+    # Copy, but eliminate over-long encodings and surrogate pairs
+    # Speed this up if no surrogates, long encodings
+    Str(UTF8CSE,
+        (flags & (UTF_LONG | UTF_SURROGATE) == 0
+         ? str
+         : _transcode_utf8(pointer(str), len + latinbyte + num2byte + num3byte*2 + num4byte*3)))
+end
+
+convert(::Type{<:Str{UTF8CSE}}, s::Str{ASCIICSE}) = Str(UTF8CSE, s.data)
+convert(::Type{<:Str{UTF8CSE}}, s::Str{UTF8CSE}) = s
 
 const WideCodeUnit = Union{UInt16, UInt32}
 

@@ -114,3 +114,46 @@ function print(io::IO, str::MaybeSub{<:Str{<:UTF32_CSEs}})
     nothing
 end
 
+function sprint(f::Function, ::Type{T}, args...;
+                context=nothing, sizehint::Integer=0) where {T<:Union{String, Str}}
+    s = IOBuffer(sizehint=sizehint)
+    if context !== nothing
+        f(IOContext(s, context), args...)
+        S = get(context, :type, String)
+        S(resize!(s.data, s.size))
+    else
+        f(s, args...)
+        T(resize!(s.data, s.size))
+    end
+end
+
+IOBuffer(str::T) where {T<:Str} =
+    IOContext(IOBuffer(unsafe_wrap(Vector{UInt8}, str.data)), :type=T)
+IOBuffer(s::SubString{T}) where {T<:Str} =
+    IOContext(IOBuffer(view(unsafe_wrap(Vector{UInt8}, s.string.data),
+                            s.offset + 1 : s.offset + sizeof(s))), :type=T)
+
+#=
+function join(io::IO, strings, delim, last)
+    a = Iterators.Stateful(strings)
+    isempty(a) && return
+    print(io, popfirst!(a))
+    for str in a
+        print(io, isempty(a) ? last : delim)
+        print(io, str)
+    end
+end
+
+function join(io::IO, strings, delim)
+    a = Iterators.Stateful(strings)
+    for str in a
+        print(io, str)
+        !isempty(a) && print(io, delim)
+    end
+end
+join(io::IO, strings) = join(io, strings, "")
+
+join(strings) = sprint(join, strings)
+join(strings, delim) = sprint(join, strings, delim)
+join(strings, delim, last) = sprint(join, strings, delim, last)
+=#
