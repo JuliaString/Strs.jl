@@ -128,10 +128,10 @@ function sprint(f::Function, ::Type{T}, args...;
 end
 
 IOBuffer(str::T) where {T<:Str} =
-    IOContext(IOBuffer(unsafe_wrap(Vector{UInt8}, str.data)), :type=T)
+    IOContext(IOBuffer(unsafe_wrap(Vector{UInt8}, str.data)), (:type => T))
 IOBuffer(s::SubString{T}) where {T<:Str} =
     IOContext(IOBuffer(view(unsafe_wrap(Vector{UInt8}, s.string.data),
-                            s.offset + 1 : s.offset + sizeof(s))), :type=T)
+                            s.offset + 1 : s.offset + sizeof(s))), (:type => T))
 
 #=
 function join(io::IO, strings, delim, last)
