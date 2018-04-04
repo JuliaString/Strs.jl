@@ -9,47 +9,12 @@ Based in part on code for UTF32String that used to be in Julia
 
 # UTF-32 basic functions
 
-function is_ascii(str::MS_UTF32)
-    (siz = sizeof(str)) == 0 && return true
-    @preserve str begin
-        pnt, fin = _calcpnt(str, siz)
-        while (pnt += CHUNKSZ) <= fin
-            (unsafe_load(pnt) & _ascii_mask(UInt32)) == 0 || return false
-        end
-        pnt - CHUNKSZ == fin || unsafe_load(reinterpret(Ptr{UInt32}, pnt)) <= 0x7f
-    end
-end
-
-function is_latin(str::MS_UTF32)
-    (siz = sizeof(str)) == 0 && return true
-    @preserve str begin
-        pnt, fin = _calcpnt(str, siz)
-        while (pnt += CHUNKSZ) <= fin
-            (unsafe_load(pnt) & _latin_mask(UInt32)) == 0 || return false
-        end
-        pnt - CHUNKSZ == fin || unsafe_load(reinterpret(Ptr{UInt32}, pnt)) <= 0xff
-    end
-end
-
-const _bmp_mask_32   = 0xffff0000_ffff0000
-function is_bmp(str::MS_UTF32)
-    (siz = sizeof(str)) == 0 && return true
-    @preserve str begin
-        pnt, fin = _calcpnt(str, siz)
-        while (pnt += CHUNKSZ) <= fin
-            (unsafe_load(pnt) & _bmp_mask_32) == 0 || return false
-        end
-        pnt- CHUNKSZ  == fin || unsafe_load(reinterpret(Ptr{UInt32}, pnt)) <= 0xffff
-    end
-end
-
 is_unicode(str::MS_UTF32)  = true
 
 is_ascii(str::MS_SubUTF32)   = false
 is_latin(str::MS_SubUTF32)   = false
 is_bmp(str::MS_SubUTF32)     = false
 is_unicode(str::MS_SubUTF32) = true
-
 
 # Speed this up by accessing 64 bits or more at a time
 function _cnt_non_bmp(len, pnt::Ptr{UInt32})

@@ -60,7 +60,7 @@ The only real difference in handling `LatinStr` and `_LatinStr`, is that upperca
 Those three internal types should never be used directly, as indicated by the leading `_` in the name.
 
 For all of the built-in `Str` types, there is a corresponding built-in character set encoding, i.e. `BinaryCSE`, `LatinCSE`, `UTF8CSE`, etc.
-There are also a number of similar built-in character sets defined (*CharSet), and character types (*Chr).
+There are also a number of similar built-in character sets defined (`*CharSet`), and character types (`*Chr`).
 The `cse` function returns the character set encoding for a string type or a string.
 `charset` returns the character set, and `encoding` returns the encoding.
 For example, `cse(UTF8Str)` returns `UTF8CSE`, `charset(UTF8Str)` returns `CharSet{UTF32}`,
@@ -68,23 +68,29 @@ For example, `cse(UTF8Str)` returns `UTF8CSE`, `charset(UTF8Str)` returns `CharS
 
 There is a new API that I am working on for indexing and searching, (however there is a problem on v0.7 due to the deprecation for `find` being overbroad, and causing a type of type piracy, deprecating methods of types not in Base):
 
-`find(First, ...)` replaces `findfirst`
-`find(Last, ...)`  replaces `findlast`
-`find(Next, ...)`  replaces `findnext`
-`find(Prev, ...)`  replaces `findprev`
+* `find(First, ...)` replaces `findfirst`
+* `find(Last, ...)`  replaces `findlast`
+* `find(Next, ...)`  replaces `findnext`
+* `find(Prev, ...)`  replaces `findprev`
 
-`index(str, pos)`  replaces `thisind(str, pos)`
-`index(Next, ...`  replaces `nextind(...)`
-`index(Prev, ...`  replaces `prevind(...)`
+* `index(str, pos)`  replaces `thisind(str, pos)`
+* `index(Next, ...`  replaces `nextind(...)`
+* `index(Prev, ...`  replaces `prevind(...)`
 
 Also there are more readable function names that always separate words with `_`, and avoid hard to understand abbreviations:
-`is*`              -> `is_*` (for `ascii`, `digit`, `space`, `alpha`, `numeric`, `valid`,
-		                  `defined`, `empty`, `assigned`)
-`iscntrl`          -> `is_control`
-`isgraph`          -> `is_graphic`
-`isprint`          -> `is_printable`
-`ispunct`          -> `is_punctuation`
-`isalnum`          -> `is_alphanumeric`
-`isgraphemebreak`  -> `is_grapheme_break`
-`isgraphemebreak!` -> `is_grapheme_break!`
 
+* `is*`              -> `is_*` (for `ascii`, `digit`, `space`, `alpha`, `numeric`, `valid`,
+		                  `defined`, `empty`, `assigned`)
+* `iscntrl`          -> `is_control`
+* `isgraph`          -> `is_graphic`
+* `isprint`          -> `is_printable`
+* `ispunct`          -> `is_punctuation`
+* `isalnum`          -> `is_alphanumeric`
+* `isgraphemebreak`  -> `is_grapheme_break`
+* `isgraphemebreak!` -> `is_grapheme_break!`
+* `occursin`         -> `occurs_in`
+* `textwidth`        -> `text_width`
+* `lowercasefirst`   -> `lowercase_first`
+* `uppercasefirst`   -> `uppercase_first`
+* `startswith`       -> `starts_with`
+* `endswith`         -> `ends_with`
