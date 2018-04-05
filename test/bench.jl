@@ -194,6 +194,28 @@ print_time_ratio(val) = print_time_ratio(_stdout(), val)
 print_ratio(val) = pwc(val < .95 ? :red : val > 1.05 ? :green : :normal, f"\%12.3f(val)")
 print_ratio_rev(val) = pwc(val < .95 ? :green : val > 1.05 ? :red : :normal, f"\%12.3f(val)")
 
+function display_results(io, xres)
+    # (fname, stats, sizes, res)
+    (fname, stats, sizes, selstat, selsiz, res) = xres
+    show(io, (fname, stats))
+    show(io, (fname, selstat))
+    t1 = res[1][3]
+    numchars = selstat.len
+    pr"\(io)\n\n\%-12.12s(res[1][1])\%6.3f(sizes[1]/stats.len)"
+    for rn in res[i]
+        pr"\(io)\n\%-12.12s(rn[1])\%6.3f(sizes[i]/stats.len)"
+    end
+    println(io)
+    for i = 1:length(res)
+        pr"\(io)\%10.3f(t1[i][3]/numchars)"
+        for rn in res[i]
+            print_time_ratio(io, t1[i][3]/rn[3])
+        end
+    end
+    println(io)
+    # pwc(:yellow, io, f"\%10.3f(rn[3]/numchars)")
+end
+
 function dispres(io, xres)
     # (fname, stats, sizes, res)
     (fname, stats, sizes, selstat, selsiz, res) = xres
@@ -253,6 +275,15 @@ function dispbench(io, totres)
 end
 
 dispbench(totres) = dispbench(_stdout(), totres)
+
+function display_benchmark(io, totres)
+    for res in totres[1]
+        display_results(io, res)
+        print(io, divline)
+    end
+end
+
+display_benchmark(totres) = displaybench(_stdout(), totres)
 
 function calchash(lines::Vector{<:AbstractString})
     hashval = 0%UInt
@@ -356,6 +387,93 @@ function checkstr(fun, lines::Vector{<:AbstractString})
         cnt += fun(text)
     end
     cnt
+end
+
+function checkcvt(::Type{T}, lines::Vector{<:AbstractString}) where {T}
+    cnt = 0
+    for text in lines
+        cnt += sizeof(convert(T, text))
+    end
+    cnt
+end
+
+@inline get_vec(::Type{C}, text::Union{Str,String}) where {C} =
+    unsafe_wrap(Vector{C}, pointer(text), ncodeunits(text))
+
+function _trans_1(C, T, lines)
+    cnt = 0
+    for text in lines
+        cnt += sizeof(transcode(T, get_vec(C, text)))
+    end
+    cnt
+end
+
+function _trans_2(C, T, lines)
+    cnt = 0
+    if C === T
+        for text in lines
+            cnt += sizeof(text)
+        end
+    else
+        for text in lines
+            cnt += sizeof(transcode(T, transcode(String, get_vec(C, text))))
+        end
+    end
+    cnt
+end
+
+@inline cvt_8_to_16(text) =
+    copyto!(Vector{UInt16}(undef, sizeof(text)), unsafe_wrap(Vector{UInt8}, text.data))
+
+function _trans_3(T, lines)
+    cnt = 0
+    for text in lines
+        S = typeof(text)
+        if S === ASCIIStr
+            cnt += sizeof(transcode(T, text.data))
+        elseif S === _LatinStr
+            str = transcode(String, cvt_8_to_16(text))
+            cnt += T === String ? sizeof(str) : sizeof(transcode(T, str))
+        elseif S === _UCS2Str
+            if T === String
+                cnt += sizeof(transcode(T, get_vec(UInt16, text)))
+            elseif T === UInt16
+                cnt += sizeof(text)
+            else
+                cnt += sizeof(transcode(T, transcode(String, get_vec(UInt16, text))))
+            end
+        elseif T === String
+            cnt += sizeof(transcode(T, get_vec(UInt32, text)))
+        elseif T === UInt32
+            cnt += sizeof(text)
+        else
+            cnt += sizeof(transcode(T, transcode(String, get_vec(UInt32, text))))
+        end
+    end
+    cnt
+end
+
+function _trans_4(lines)
+    cnt = 0
+    for text in lines
+        cnt += sizeof(transcode(String, cvt_8_to_16(text)))
+    end
+    cnt
+end
+
+function _trans_5(T, lines)
+    cnt = 0
+    for text in lines
+        cnt += sizeof(transcode(T, transcode(String, cvt_8_to_16(text))))
+    end
+    cnt
+end
+
+function checktrans(::Type{T}, lines::Vector{S}) where {T, S<:AbstractString}
+    S == UniStr && return _trans_3(T, lines)
+    S === LatinStr && return T === String ? _trans_4(lines) : _trans_5(T, lines)
+    C = (S === String ? UInt8 : codeunit(S))
+    (T === String || C === UInt8) ? _trans_1(C, T, lines) : _trans_2(C, T, lines)
 end
 
 function checktext(fun, lines::Vector{<:AbstractString})
@@ -601,6 +719,15 @@ repeat10(str) = repeat(str, 10)
 repeat1c(str)  = @inbounds repeat(str[1], 1)
 repeat10c(str) = @inbounds repeat(str[1], 10)
 
+check_to_utf8(l)  = checktrans(String, l) # from vector to String
+check_to_utf16(l) = checktrans(UInt16, l) # from String to UTF16 vector
+check_to_utf32(l) = checktrans(UInt32, l) # from String to UTF32 vector
+
+check_cvt_utf8(l)  = checkcvt(UTF8Str, l)
+check_cvt_utf16(l) = checkcvt(UTF16Str, l)
+check_cvt_utf32(l) = checkcvt(UTF32Str, l)
+check_cvt_uni(l)   = checkcvt(UniStr, l)
+
 countsklength(l)  = checkstr(sklength, l)
 countoldlength(l) = checkstr(oldlength, l)
 checktextwidth(l) = checkstr(text_width, l)
@@ -677,6 +804,13 @@ const tests =
      (countlength, "length"),
      (calchash,     "hash\nstring"),
      (checknextind, "nextind\nchars"),
+     (check_to_utf8,   "transcode\nto utf8"),
+     (check_cvt_utf8,  "convert\nto utf8"),
+     (check_to_utf16,  "transcode\nto utf16"),
+     (check_cvt_utf16, "convert\nto utf16"),
+     (check_to_utf32,  "transcode\nto utf32"),
+     (check_cvt_utf32, "convert\nto utf32"),
+     (check_cvt_uni,   "convert\nto UniStr"),
      (checkreverse, "reverse"),
      (checkrepeat1,  "repeat 1\nstring"),
      (checkrepeat10,  "repeat 10\nstring"),
