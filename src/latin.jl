@@ -16,13 +16,13 @@ is_unicode(str::Str{C}) where {C<:Latin_CSEs} = true
 const _UBS = Str{<:Union{ASCIICSE, Latin_CSEs}}
 
 function string(collection::_UBS...)
-    length(c) == 1 && return collection[1]
+    length(collection) == 1 && return collection[1]
     len = 0
-    for str in collection
+    @inbounds for str in collection
         len += ncodeunits(str)
     end
     buf, pnt = _allocate(len)
-    for str in collection
+    @inbounds for str in collection
         len = ncodeunits(str)
         _memcpy(pnt, pointer(str), len)
         pnt += len

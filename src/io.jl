@@ -153,7 +153,107 @@ function join(io::IO, strings, delim)
 end
 join(io::IO, strings) = join(io, strings, "")
 
-join(strings) = sprint(join, strings)
-join(strings, delim) = sprint(join, strings, delim)
-join(strings, delim, last) = sprint(join, strings, delim, last)
 =#
+function _join(::Type{C}, strings) where {C}
+    length(strings) == 1 && return strings[1]
+    len = 0
+    @inbounds for str in collection
+        len += ncodeunits(str)
+    end
+    buf, pnt = _allocate(codeunit(C), len)
+    @inbounds for str in collection
+        len = ncodeunits(str)
+        _memcpy(pnt, pointer(str), len)
+        pnt += len
+    end
+    Str(C, buf)
+end
+
+function _joincvt(::Type{C}, strings) where {C}
+    io = IOBuffer()
+    @inbounds for str in collection
+        write(C, io, str)
+    end
+    Str(C, take!(io))
+end
+
+function _joincvt(::Type{C}, strings, delim::T) where {C,T}
+    io = IOBuffer()
+    # Could speed this up in the common case where delim === 
+    delbuf = (T <: AbstractString && cse(delim) === C) ? delim : convert(Str{C}, delim)
+    @inbounds for str in collection
+        write(C, io, str)
+        (numstr -= 1) == 0 || write(C, io, delbuf)
+    end
+    Str(C, take!(io))
+end
+
+function _join(::Type{C}, strings, delim::T) where {C,T}
+    numstr = length(str)
+    numstr == 1 && return strings[1]
+
+    @preserve delim begin
+        # Could speed this up in the common case where delim === 
+        delbuf = (T <: AbstractString && cse(delim) === C) ? delim : convert(Str{C}, delim)
+        delpnt = pointer(delbuf)
+        dellen = ncodeunits(delbuf)
+        len = 0
+        @inbounds for str in collection
+            len += ncodeunits(str) + dellen
+        end
+        len -= dellen
+
+        buf, pnt = _allocate(codeunit(C), len)
+        @inbounds for str in collection
+            len = ncodeunits(str)
+            _memcpy(pnt, pointer(str), len)
+            pnt += len
+            if (numstr -= 1) == 0
+                _memcpy(pnt, delpnt, dellen)
+                pnt += dellen
+            end
+        end
+        Str(C, buf)
+    end
+end
+
+@inline function calc_type(strings)
+    C = Union{}
+    for str in strings
+        C = promote_type(C, cse(str))
+    end
+    C
+end
+
+join(strings::AbstractVector{<:MaybeSub{<:Str}}) =
+    _joincvt(calc_type(strings), strings)
+join(strings::AbstractVector{<:MaybeSub{T}}) where {C<:Union{ASCIICSE, Latin_CSEs},T<:Str{C}} =
+    _join(C, strings)
+join(strings::AbstractVector{<:MaybeSub{T}}) where {C<:Word_CSEs,T<:Str{C}} =
+    _join(C, strings)
+join(strings::AbstractVector{<:MaybeSub{T}}) where {C<:Quad_CSEs,T<:Str{C}} =
+    _join(C, strings)
+
+join(strings::AbstractVector{<:MaybeSub{<:Str}}, delim) =
+    _joincvt(_calc_type(strings), strings, delim)
+join(strings::AbstractVector{<:MaybeSub{T}},
+     delim) where {C<:Union{Text1CSE, BinaryCSE, ASCIICSE, Latin_CSEs},T<:Str{C}} =
+    _join(C, strings, delim)
+join(strings::AbstractVector{<:MaybeSub{T}}, d) where {C<:Word_CSEs,T<:Str{C}} =
+    _join(C, strings, delim)
+join(strings::AbstractVector{<:MaybeSub{T}}, d) where {C<:Quad_CSEs,T<:Str{C}} =
+    _join(C, strings, delim)
+
+join(strings::AbstractVector{<:MaybeSub{<:Str}}, delim, last) =
+    _joincvt(calc_type(strings), strings, delim, last)
+join(strings::AbstractVector{<:MaybeSub{T}},
+     delim, last) where {C<:Union{Text1CSE, BinaryCSE, ASCIICSE, Latin_CSEs},T<:Str{C}} =
+         _join(C, strings, delim, last)
+join(strings::AbstractVector{<:MaybeSub{T}},
+     delim, last) where {C<:Word_CSEs,T<:Str{C}} =
+         _join(C, strings, delim, last)
+join(strings::AbstractVector{<:MaybeSub{T}},
+     delim, last) where {C<:Quad_CSEs,T<:Str{C}} =
+         _join(C, strings, delim, last)
+
+
