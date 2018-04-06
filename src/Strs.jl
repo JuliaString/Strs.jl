@@ -105,7 +105,7 @@ import Base: containsnul, convert, getindex, length, map, pointer, collect, in, 
              typemin, typemax, rem, size, ndims, first, last, eltype,
              isless, isequal, ==, -, +, *, ^, cmp, promote_rule, one, repeat, filter,
              print, show, isimmutable, chop, chomp, replace, ascii, uppercase, lowercase,
-             lstrip, rstrip, strip, lpad, rpad, split, rsplit, join
+             lstrip, rstrip, strip, lpad, rpad, split, rsplit, join, IOBuffer
 
 # Conditionally import names that are only in v0.6 or in master
 for sym in (:codeunit, :codeunits, :ncodeunits,
