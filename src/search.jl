@@ -413,9 +413,9 @@ end
 
 # This should work for compatible CSEs, like ASCII & Latin, ASCII & UTF8, etc.
 # See equals trait
-_srch_strings(::Fwd, ::Union{ByteCompare,WidenCompare}, str, needle,
-              ch, nxtsub, pos, slen, tlen) =
-                  @preserve str needle _srch_str_bloom(Fwd(), str, pointer(str), pointer(needle),
+_srch_strings(::Type{D}, ::Union{ByteCompare,WidenCompare}, str, needle,
+              ch, nxtsub, pos, slen, tlen) where {D<:Direction} =
+                  @preserve str needle _srch_str_bloom(D(), str, pointer(str), pointer(needle),
                                                        ch, pos, slen, tlen)
 
 _occurs_in(needle, hay) = first(find(First, needle, hay)) != 0
