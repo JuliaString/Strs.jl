@@ -389,7 +389,15 @@ function checkstr(fun, lines::Vector{<:AbstractString})
     cnt
 end
 
-function checkcvt(::Type{T}, lines::Vector{<:AbstractString}) where {T}
+function checkuni(lines::Vector{<:AbstractString})
+    cnt = 0
+    for text in lines
+        cnt += sizeof(UniStr(text))
+    end
+    cnt
+end
+
+function checkcvt(::Type{T}, lines) where {T}
     cnt = 0
     for text in lines
         cnt += sizeof(convert(T, text))
@@ -397,83 +405,13 @@ function checkcvt(::Type{T}, lines::Vector{<:AbstractString}) where {T}
     cnt
 end
 
-@inline get_vec(::Type{C}, text::Union{Str,String}) where {C} =
-    unsafe_wrap(Vector{C}, pointer(text), ncodeunits(text))
-
-function _trans_1(C, T, lines)
+function checktrans(::Type{T}, lines) where {T}
+    #println("checktrans($T, $(eltype(lines))")
     cnt = 0
     for text in lines
-        cnt += sizeof(transcode(T, get_vec(C, text)))
+        cnt += sizeof(transcode(T, text))
     end
     cnt
-end
-
-function _trans_2(C, T, lines)
-    cnt = 0
-    if C === T
-        for text in lines
-            cnt += sizeof(text)
-        end
-    else
-        for text in lines
-            cnt += sizeof(transcode(T, transcode(String, get_vec(C, text))))
-        end
-    end
-    cnt
-end
-
-@inline cvt_8_to_16(text) =
-    copyto!(Vector{UInt16}(undef, sizeof(text)), unsafe_wrap(Vector{UInt8}, text.data))
-
-function _trans_3(T, lines)
-    cnt = 0
-    for text in lines
-        S = typeof(text)
-        if S === ASCIIStr
-            cnt += sizeof(transcode(T, text.data))
-        elseif S === _LatinStr
-            str = transcode(String, cvt_8_to_16(text))
-            cnt += T === String ? sizeof(str) : sizeof(transcode(T, str))
-        elseif S === _UCS2Str
-            if T === String
-                cnt += sizeof(transcode(T, get_vec(UInt16, text)))
-            elseif T === UInt16
-                cnt += sizeof(text)
-            else
-                cnt += sizeof(transcode(T, transcode(String, get_vec(UInt16, text))))
-            end
-        elseif T === String
-            cnt += sizeof(transcode(T, get_vec(UInt32, text)))
-        elseif T === UInt32
-            cnt += sizeof(text)
-        else
-            cnt += sizeof(transcode(T, transcode(String, get_vec(UInt32, text))))
-        end
-    end
-    cnt
-end
-
-function _trans_4(lines)
-    cnt = 0
-    for text in lines
-        cnt += sizeof(transcode(String, cvt_8_to_16(text)))
-    end
-    cnt
-end
-
-function _trans_5(T, lines)
-    cnt = 0
-    for text in lines
-        cnt += sizeof(transcode(T, transcode(String, cvt_8_to_16(text))))
-    end
-    cnt
-end
-
-function checktrans(::Type{T}, lines::Vector{S}) where {T, S<:AbstractString}
-    S == UniStr && return _trans_3(T, lines)
-    S === LatinStr && return T === String ? _trans_4(lines) : _trans_5(T, lines)
-    C = (S === String ? UInt8 : codeunit(S))
-    (T === String || C === UInt8) ? _trans_1(C, T, lines) : _trans_2(C, T, lines)
 end
 
 function checktext(fun, lines::Vector{<:AbstractString})
@@ -535,6 +473,8 @@ function checkcp(fun, lines::Vector{<:AbstractString})
     end
     cnt
 end
+
+checkjoin(lines) = sizeof(join(lines))
 
 @inline function sumchars(text)
     t = 0
@@ -719,15 +659,6 @@ repeat10(str) = repeat(str, 10)
 repeat1c(str)  = @inbounds repeat(str[1], 1)
 repeat10c(str) = @inbounds repeat(str[1], 10)
 
-check_to_utf8(l)  = checktrans(String, l) # from vector to String
-check_to_utf16(l) = checktrans(UInt16, l) # from String to UTF16 vector
-check_to_utf32(l) = checktrans(UInt32, l) # from String to UTF32 vector
-
-check_cvt_utf8(l)  = checkcvt(UTF8Str, l)
-check_cvt_utf16(l) = checkcvt(UTF16Str, l)
-check_cvt_utf32(l) = checkcvt(UTF32Str, l)
-check_cvt_uni(l)   = checkcvt(UniStr, l)
-
 countsklength(l)  = checkstr(sklength, l)
 countoldlength(l) = checkstr(oldlength, l)
 checktextwidth(l) = checkstr(text_width, l)
@@ -795,6 +726,38 @@ function wrap(f, lines, io, cnts::LineCounts, t, msg, fast=true, basetime=0%UInt
     end
 end
 
+function mintime(::Type{T}, f, lines) where {T}
+    m = typemax(UInt)
+    for i=1:10
+        ns = time_ns()
+        f(T, lines)
+        t = time_ns() - ns
+        t < m && (m = t)
+    end
+    m
+end
+
+function wrap(::Type{T}, f, lines, io, cnts::LineCounts, t, msg,
+              fast=true, basetime=0%UInt) where {T}
+    tst = ""
+    try
+        res = f(T, lines)
+        tim = fast ? mintime(T, f, lines) : round(UInt64, 1e9 * @belapsed ($f)($lines))
+        push!(t, (msg, res, tim))
+        pr"\(io)\%-22s(replace(msg, '\n' => ' ')*':') \%12d(res)"
+        pr"\(io) \%12.3f(tim/1000000)"
+        pr"\(io) \%12.3f(tim/cnts.lines)"
+        pr"\(io) \%12.3f(tim/cnts.chars)"
+        pr"\(io) \%12.3f(tim/cnts.bytes)"
+        basetime != 0 && print_ratio(basetime/tim)
+        pr"\(io)\n"
+    catch ex
+        typeof(ex) == InterruptException && rethrow()
+        push!(t, (msg, 0, 0%UInt))
+        println(io, sprint(showerror, ex, catch_backtrace()))
+    end
+end
+
 # For each set of lines: save number of characters (should be the same for all)
 # For each test (currently just counting via Char iteration, length)
 
@@ -804,13 +767,7 @@ const tests =
      (countlength, "length"),
      (calchash,     "hash\nstring"),
      (checknextind, "nextind\nchars"),
-     (check_to_utf8,   "transcode\nto utf8"),
-     (check_cvt_utf8,  "convert\nto utf8"),
-     (check_to_utf16,  "transcode\nto utf16"),
-     (check_cvt_utf16, "convert\nto utf16"),
-     (check_to_utf32,  "transcode\nto utf32"),
-     (check_cvt_utf32, "convert\nto utf32"),
-     (check_cvt_uni,   "convert\nto UniStr"),
+     (checkjoin,    "join\nlines"),
      (checkreverse, "reverse"),
      (checkrepeat1,  "repeat 1\nstring"),
      (checkrepeat10,  "repeat 10\nstring"),
@@ -884,15 +841,57 @@ function testperf(lines::Vector{T}, io, cnts, docnam, basetime, fast) where {T<:
         wrap(tst, lines, io, cnts, t, nam, fast,
              basetime == nothing ? 0%UInt : basetime[pos += 1][3])
     end
-    #=
-    if T != String
-        wrap(countsize2,  lines, io, cnts, t, "iteration\ncodeunits")
-        #wrap(countcps,    lines, io, cnts, t, "iteration\ncp")
-        wrap(sumcodepnts, lines, io, cnts, t, "sum\ncp")
-    end
-    =#
     pr"\n"
     docnam, cnts.bytes, t, ""
+end
+
+function testcvt(::Type{S}, vec, io, numlines, numchars, siz, docnam,
+                 basetime) where {S}
+    tr = checktrans
+    cv = checkcvt
+    #println(typeof(vec))
+
+    # Test performance
+    pr_ul(io, f"""\%-22s(docnam) \%12s("Result") \%12s("ms total") """)
+    pr_ul(io, f"""\%12s("ns/line") \%12s("ns/char") \%12s("ns/byte")\n""")
+    t = []
+    # Just run everything once
+    try
+        if S === String
+            tr(UInt16, vec[1])
+            tr(UInt32, vec[1])
+            tr(String, vec[2])
+            tr(String, vec[3])
+        else
+            cv(S, vec[1])
+            cv(S, vec[4])
+            cv(S, vec[5])
+        end
+    catch ex
+        typeof(ex) == InterruptException && rethrow()
+        str = f"Failed test: \(sprint(showerror, ex, catch_backtrace()))"
+        println("File: ", docnam, ": ", str)
+        return docnam, 0, t, str
+    end
+    if S === String
+        wrap(UInt16, tr, vec[1], io, LineCounts(numlines, numchars, siz[1]), t,
+             "transcode to UTF16", true, 0%UInt)
+        wrap(UInt32, tr, vec[1], io, LineCounts(numlines, numchars, siz[1]), t,
+             "transcode to UTF32", true, 0%UInt)
+        wrap(String, tr, vec[2], io, LineCounts(numlines, numchars, siz[2]), t,
+             "transcode UInt16", true, 0%UInt)
+        wrap(String, tr, vec[3], io, LineCounts(numlines, numchars, siz[3]), t,
+             "transcode UInt32", true, 0%UInt)
+    else
+        wrap(S, cv, vec[1], io, LineCounts(numlines, numchars, siz[1]), t,
+             "convert String", true, basetime[1 + (codeunit(S) === UInt32)][3])
+        wrap(S, cv, vec[4], io, LineCounts(numlines, numchars, siz[2]), t,
+             "convert UInt16", true, basetime[3][3])
+        wrap(S, cv, vec[5], io, LineCounts(numlines, numchars, siz[3]), t,
+             "convert UInt32", true, basetime[4][3])
+    end
+    pr"\n"
+    docnam, siz, t, ""
 end
 
 function sumsizes1(lines)
@@ -1207,7 +1206,22 @@ function benchdir(io = _stdout();  dir::Any=nothing, fast::Bool=true)
             res[i] = testperf(sel[i], io, LineCounts(numlines, numchars, selsiz[i]),
                               names[i], basetime, fast)
         end
-        push!(totres, (fname, stats, sizes, selstat, selsiz, res))
+
+        # Now test the performance of conversions for each
+        v16 = [transcode(UInt16, s) for s in sel[1]]
+        v32 = [transcode(UInt32, s) for s in sel[1]]
+        cvtsel = (sel[1], v16, v32,
+                  [convert(Text2Str, v) for v in v16],
+                  [convert(Text4Str, v) for v in v32])
+        cvtsiz = [sum(sizeof, enclines) for enclines in cvtsel]
+
+        cvtres = create_vector(Any, length(list))
+        cvtres[1] = testcvt(list[1], cvtsel, io, numlines, numchars, cvtsiz, names[1], nothing)
+        basetime = cvtres[1][3]
+        for i = 2:length(list)
+            cvtres[i] = testcvt(list[i], cvtsel, io, numlines, numchars, cvtsiz, names[i], basetime)
+        end
+        push!(totres, (fname, stats, sizes, selstat, selsiz, res, cvtres))
 
         push!(totnames, names)
         push!(totlines, enc)
