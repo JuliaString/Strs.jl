@@ -186,7 +186,7 @@ function map(fun, str::MaybeSub{T}) where {C<:CSE, T<:Str{C}}
             "map($fun, str::AbstractString) requires $fun to return AbstractChar; " *
             "try map($fun, collect(str)) or a comprehension instead"))
         is_valid(CP, retc) || codepoint_error(CP, retc)
-        write(C, out, retc)
+        _write(C, out, retc)
     end
     Str{C}(String(take!(out)))
 end

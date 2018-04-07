@@ -89,7 +89,7 @@ convert(::Type{Str}, str::AbstractString) = _str(str)
 convert(::Type{Str}, str::String)         = _str(str)
 convert(::Type{Str}, str::Str)            = str
 
-convert(::Type{<:Str{C}}, str::AbstractString) where {C} = convert(C, _str(str))
+convert(::Type{<:Str{C}}, str::AbstractString) where {C} = convert(Str{C}, _str(str))
 convert(::Type{<:Str{C}}, str::Str{C}) where {C} = str
 
 convert(::Type{UniStr}, str::AbstractString) = _str(str)
@@ -111,15 +111,6 @@ convert(::Type{<:Str{Text4CSE}}, vec::AbstractVector{UInt32}) =
 (::Type{UniStr})(str::String)         = _str(str)
 (::Type{UniStr})(str::Str{<:Union{ASCIICSE,SubSet_CSEs}}) = str
 
-#=
-(::Type{<:Str{C}})(vec::AbstractVector{UInt8}) where {C<:Union{BinaryCSE,Text1CSE}} =
-    Str(C, _str_cpy(UInt8, vec, length(vec)))
-(::Type{<:Str{Text2CSE}})(vec::AbstractVector{UInt16}) =
-    Str(Text2CSE, _str_cpy(UInt16, vec, length(vec)))
-(::Type{<:Str{Text4CSE}})(vec::AbstractVector{UInt32}) =
-    Str(Text4CSE, _str_cpy(UInt32, vec, length(vec)))
-=#
-
 function convert(::Type{UniStr}, str::T) where {T<:Str}
     # handle zero length string quickly
     is_empty(str) && return empty_ascii
@@ -140,7 +131,13 @@ convert(::Type{<:Str{C}}, str::String) where {C} = convert(C, _str(str))
 convert(::Type{<:Str{Text1CSE}}, str::String) = Str(Text1CSE, str)
 convert(::Type{<:Str{BinaryCSE}}, str::String) = Str(BinaryCSE, str)
 
-convert(::Type{String}, str::Str{<:Union{Text1CSE,BinaryCSE}}) = str.data
+convert(::Type{<:Str{LatinCSE}}, str::Str{_LatinCSE}) = Str(LatinCSE, str.data)
+convert(::Type{<:Str{UCS2CSE}},  str::Str{_UCS2CSE})  = Str(UCS2CSE,  str.data)
+convert(::Type{<:Str{UTF32CSE}}, str::Str{_UTF32CSE}) = Str(UTF32CSE, str.data)
+
+convert(::Type{<:Str{LatinCSE}}, str::Str{ASCIICSE}) = Str(LatinCSE, str.data)
+
+convert(::Type{String}, str::Str{<:Union{ASCIICSE,Text1CSE,BinaryCSE}}) = str.data
 
 function convert(::Type{String}, vec::AbstractVector{<:Chr})
     out = get_iobuffer(sizeof(vec))

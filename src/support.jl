@@ -560,14 +560,10 @@ end
 
 thisind(str::MaybeSub{<:Str}, i::Integer) = thisind(str, Int(i))
 
-@inline write(::Type{<:CSE}, io, ch)    = write(io, codepoint(ch))
-@inline write(::Type{UTF8CSE}, io, ch)  = write_utf8(io, codepoint(ch))
-@inline write(::Type{UTF16CSE}, io, ch) = write_utf16(io, codepoint(ch))
-
 function filter(fun, str::MaybeSub{T}) where {C<:CSE,T<:Str{C}}
     out = get_iobuffer(sizeof(str))
     @inbounds for ch in codepoints(str)
-        fun(ch) && write(C, out, ch)
+        fun(ch) && _write(C, out, ch)
     end
     Str{C}(String(take!(out)))
 end
