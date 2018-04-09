@@ -580,17 +580,30 @@ _transcode_utf8(dat::Vector{UInt8}, len) = _transcode_utf8(pointer(dat), len)
 
 # Single character conversion
 function convert(::Type{<:Str{UTF8CSE}}, ch::Unsigned)
-    is_unicode(ch) || unierror(UTF_ERR_INVALID, 0, ch)
-    len = ch <= 0x7f ? 1 : (ch < 0x800 ? 2 : (ch > 0xffff ? 4 : 3))
-    buf = _allocate(len)
-    _encode_char_utf8(buf, ch, 0)
+    if ch <= 0x7f
+        buf = _allocate(1)
+        @inbounds buf[1] = ch%UInt8
+    elseif ch <= 0x7ff
+        buf = _allocate(2)
+        @inbounds buf[1], buf[2] = get_utf8_2(ch)
+    elseif ch - 0xd800 < 0x800
+        unierror(UTF_ERR_INVALID, 0, ch)
+    elseif ch <= 0xffff
+        buf = _allocate(3)
+        @inbounds buf[1], buf[2], buf[3] = get_utf8_3(ch)
+    elseif ch <= 0x10ffff
+        buf = _allocate(4)
+        @inbounds buf[1], buf[2], buf[3], buf[4] = get_utf8_4(ch)
+    else
+        unierror(UTF_ERR_INVALID, 0, ch)
+    end
     Str(UTF8CSE, buf)
 end
 
 @static if !V6_COMPAT
 # Note: this will have to change back to s.endof for v0.6!
 convert(::Type{SubString{<:Str{UTF8CSE}}}, s::SubString{<:Str{ASCIICSE}}) =
-    SubString(convert(UTF8Str, s.string), s.offset + 1, s.offset + s.ncodeunits)
+    SubString(Str(UTF8CSE, s.string), s.offset + 1, s.offset + s.ncodeunits)
 end
 
 function convert(::Type{<:Str{UTF8CSE}}, dat::Vector{UInt8})
@@ -623,10 +636,9 @@ function convert(::Type{<:Str{UTF8CSE}}, str::AbstractString)
         end
     else
         # Copy, but eliminate over-long encodings and surrogate pairs
-        
-        buf, pnt = _allocate(UInt8, len + latinbyte + num2byte + num3byte*2 + num4byte*3)
+        buf, out = _allocate(UInt8, len + latinbyte + num2byte + num3byte*2 + num4byte*3)
         for ch in str
-            pnt = _encode_char_utf8(pnt, ch)
+            out = _encode_char_utf8(out, codepoint(ch))
         end
     end
     Str(UTF8CSE, buf)
