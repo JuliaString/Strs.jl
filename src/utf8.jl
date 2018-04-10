@@ -610,7 +610,9 @@ function convert(::Type{<:Str{UTF8CSE}}, dat::Vector{UInt8})
     # handle zero length string quickly
     isempty(dat) && return empty_utf8
     # get number of bytes to allocate
-    len, flags, num4byte, num3byte, num2byte, latinbyte = unsafe_check_string(dat, 1, length(dat))
+    len, flags, num4byte, num3byte, num2byte, latinbyte =
+        @preserve dat fast_check_string(pointer(dat), length(dat))
+    #=
     # Copy, but eliminate over-long encodings and surrogate pairs
     if flags & (UTF_LONG | UTF_SURROGATE) == 0
         siz = sizeof(dat)
@@ -618,8 +620,9 @@ function convert(::Type{<:Str{UTF8CSE}}, dat::Vector{UInt8})
         unsafe_copyto!(pointer(buf), pointer(dat), siz)
         Str(UTF8CSE, buf)
     else
-        Str(UTF8CSE, _transcode_utf8(dat, len + latinbyte + num2byte + num3byte*2 + num4byte*3))
-    end
+    =#
+    Str(UTF8CSE, _transcode_utf8(dat, len + latinbyte + num2byte + num3byte*2 + num4byte*3))
+    #end
 end
 
 function convert(::Type{<:Str{UTF8CSE}}, str::AbstractString)
@@ -648,7 +651,8 @@ function convert(::Type{<:Str{UTF8CSE}}, str::String)
     # handle zero length string quickly
     isempty(str) && return empty_utf8
     # get number of bytes to allocate
-    len, flags, num4byte, num3byte, num2byte, latinbyte = unsafe_check_string(str, 1, sizeof(str))
+    len, flags, num4byte, num3byte, num2byte, latinbyte =
+        @preserve str fast_check_string(pointer(str), sizeof(str))
     # Copy, but eliminate over-long encodings and surrogate pairs
     # Speed this up if no surrogates, long encodings
     Str(UTF8CSE,

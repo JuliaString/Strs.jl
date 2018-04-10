@@ -397,6 +397,74 @@ function unsafe_check_string(str::T;
     _ret_check(totalchar, flags, invalids, latin1byte, num2byte, num3byte, num4byte)
 end
 
+@inline function skipascii(beg::Ptr{UInt8}, fin::Ptr{UInt8})
+    align = reinterpret(UInt, beg)
+    pnt = reinterpret(Ptr{UInt64}, align & ~CHUNKMSK)
+    v = unsafe_load(pnt)
+    (align &= CHUNKMSK) != 0 && (v &= ~_mask_bytes(align))
+    while (pnt += CHUNKSZ) < fin
+        if (v &= hi_mask) != 0
+            # find first byte that is not ASCII
+            return (pnt - CHUNKSZ - beg) + (trailing_zeros(v)>>>3)
+        end
+        v = unsafe_load(pnt)
+    end
+    (pnt - CHUNKSZ - beg) +
+        trailing_zeros((pnt == fin ? (v | ~_mask_bytes(pnt - fin)) : v) & hi_mask)
+end
+
+function fast_check_string(beg::Ptr{UInt8}, len)
+    pnt = beg
+    fin = pnt + len
+    flags = 0%UInt
+    asciichar = latin1byte = num2byte = num3byte = num4byte = 0
+    while pnt < fin
+        ch = get_codeunit(pnt)
+        if ch < 0x80
+            cnt = skipascii(pnt, fin)
+            asciichar += cnt
+            pnt += cnt
+            continue
+        # Check UTF-8 encoding
+        elseif ch < 0xe0
+            # 2-byte UTF-8 sequence (i.e. characters 0x80-0x7ff)
+            (pnt += 1) < fin || unierror(UTF_ERR_SHORT, pnt - beg, ch)
+            ch > 0xc1 || checkcont(pnt) || unierror(UTF_ERR_INVALID, pnt - beg, ch)
+            ch > 0xc3 ? (num2byte += 1) : (latin1byte += 1)
+        elseif ch < 0xf0
+            # 3-byte UTF-8 sequence (i.e. characters 0x800-0xffff)
+            (pnt += 2) < fin || unierror(UTF_ERR_SHORT, pnt - beg - 1, ch)
+            b2 = get_codeunit(pnt - 1)
+            (is_valid_continuation(b2) && checkcont(pnt)) ||
+                unierror(UTF_ERR_INVALID, pnt - beg - 1, ch)
+            if ch == 0xe0 # Might be overlong
+                b2 < 0x90 && unierror(UTF_ERR_LONG, pnt - beg - 1, get_utf8_3byte(pnt))
+            elseif ch == 0xed # Might be surrogate pair
+                b2 > 0x8f && unierror(UTF_ERR_SURROGATE, pnt - beg - 1, get_utf8_3byte(pnt))
+            end
+            num3byte += 1
+        elseif ch < 0xf5
+            # 4-byte UTF-8 sequence (i.e. characters > 0xffff)
+            (pnt += 3) < fin && unierror(UTF_ERR_SHORT, pnt - beg - 2, ch)
+            b2 = get_codeunit(pnt - 2)
+            println(ch,", ",b2,", ",get_codeunit(pnt-1),", ",get_codeunit(pnt))
+            (is_valid_continuation(b2) && checkcont(pnt-1) && checkcont(pnt)) ||
+                unierror(UTF_ERR_INVALID, pnt - beg - 2, ch)
+            if ch == 0xf0
+                b2 < 0x90 && unierror(UTF_ERR_LONG, pnt - beg - 2, get_utf8_4byte(pnt))
+            elseif ch == 0xf4
+                b2 > 0x8f && unierror(UTF_ERR_INVALID, pnt - beg - 2, get_utf8_4byte(pnt))
+            end
+            num4byte += 1
+        else
+            unierror(UTF_ERR_INVALID, pnt - beg + 1, ch)
+        end
+        pnt += 1
+    end
+    _ret_check(asciichar+latin1byte+num2byte+num3byte+num4byte,
+               flags, 0, latin1byte, num2byte, num3byte, num4byte)
+end
+
 """
 Calculate the total number of characters, as well as number of
 latin1, 2-byte, 3-byte, and 4-byte sequences in a validated UTF-8 string

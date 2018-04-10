@@ -258,7 +258,7 @@ function _convert_ucs2(::Type{C}, str::String) where {C}
     # handle zero length string quickly
     (siz = sizeof(str)) == 0 && return empty_str(C)
     # Check that is correct UTF-8 encoding and get number of words needed
-    len, flags, num4byte, num3byte = unsafe_check_string(str, 1, siz)
+    len, flags, num4byte, num3byte = @preserve str fast_check_string(pointer(str), siz)
     num4byte == 0 || unierror(UTF_ERR_INVALID_UCS2)
     # Optimize case where no characters > 0x7f
     Str((C === _UCS2CSE && num3byte != 0) ? _UCS2CSE : UCS2CSE,
@@ -330,9 +330,9 @@ end
 
 function convert(::Type{<:Str{UTF16CSE}}, str::String)
     # handle zero length string quickly
-    is_empty(str) && return empty_utf16
+    (siz = sizeof(str)) == 0 && return empty_utf16
     # Check that is correct UTF-8 encoding and get number of words needed
-    len, flags, num4byte = unsafe_check_string(str, 1, sizeof(str))
+    len, flags, num4byte = @preserve str fast_check_string(pointer(str), siz)
     # Optimize case where no characters > 0x7f
     Str(UTF16CSE, flags == 0 ? _cvtsize(UInt16, str, len) : _encode_utf16(str, len + num4byte))
 end
