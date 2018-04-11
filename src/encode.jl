@@ -126,7 +126,7 @@ function convert(::Type{UniStr}, str::T) where {T<:Str}
     end
 end
 
-convert(::Type{<:Str{C}}, str::String) where {C} = convert(C, _str(str))
+#convert(::Type{<:Str{C}}, str::String) where {C} = convert(C, _str(str))
 
 convert(::Type{<:Str{Text1CSE}}, str::String) = Str(Text1CSE, str)
 convert(::Type{<:Str{BinaryCSE}}, str::String) = Str(BinaryCSE, str)

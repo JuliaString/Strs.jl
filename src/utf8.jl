@@ -10,11 +10,6 @@ Based in part on code for UTF8String that used to be in Julia
 
 # UTF-8 support functions
 
-const MS_UTF8     = MaybeSub{<:Str{UTF8CSE}}
-const MS_UTF16    = MaybeSub{<:Str{UTF16CSE}}
-const MS_UTF32    = MaybeSub{<:Str{UTF32CSE}}
-const MS_SubUTF32 = MaybeSub{<:Str{_UTF32CSE}}
-
 @inline checkcont(pnt) = is_valid_continuation(get_codeunit(pnt))
 
 # Get rest of character ch from 2-byte UTF-8 sequence at pnt - 1
@@ -647,18 +642,20 @@ function convert(::Type{<:Str{UTF8CSE}}, str::AbstractString)
     Str(UTF8CSE, buf)
 end
 
-function convert(::Type{<:Str{UTF8CSE}}, str::String)
+function convert(::Type{<:Str{UTF8CSE}}, str::T) where {T<:MS_ByteStr}
     # handle zero length string quickly
-    isempty(str) && return empty_utf8
-    # get number of bytes to allocate
-    len, flags, num4byte, num3byte, num2byte, latinbyte =
-        @preserve str fast_check_string(pointer(str), sizeof(str))
-    # Copy, but eliminate over-long encodings and surrogate pairs
-    # Speed this up if no surrogates, long encodings
-    Str(UTF8CSE,
-        (flags & (UTF_LONG | UTF_SURROGATE) == 0
-         ? str
-         : _transcode_utf8(pointer(str), len + latinbyte + num2byte + num3byte*2 + num4byte*3)))
+    (siz = sizeof(str)) == 0 && return empty_utf8
+    @preserve str begin
+        pnt = pointer(str)
+        # get number of bytes to allocate
+        len, flags, num4byte, num3byte, num2byte, latinbyte = fast_check_string(pnt, siz)
+        # Copy, but eliminate over-long encodings and surrogate pairs
+        # Speed this up if no surrogates, long encodings
+        Str(UTF8CSE,
+            (flags & (UTF_LONG | UTF_SURROGATE) == 0
+             ? _copysub(str)
+             : _transcode_utf8(pnt, len + latinbyte + num2byte + num3byte*2 + num4byte*3)))
+    end
 end
 
 convert(::Type{<:Str{UTF8CSE}}, s::Str{ASCIICSE}) = Str(UTF8CSE, s.data)

@@ -45,8 +45,8 @@ function convert(::Type{<:Str{UTF32CSE}}, str::AbstractString)
 end
 convert(::Type{_UTF32Str}, str::AbstractString) = Str(str)
 
-# This needs to handle the fact that the String type can contain invalid data!
-function convert(::Type{<:Str{UTF32CSE}}, str::String)
+# This needs to handle the fact that the String type can contain invalid data
+function convert(::Type{<:Str{UTF32CSE}}, str::MS_ByteStr)
     # handle zero length string quickly
     (siz = sizeof(str)) == 0 && return empty_str(UTF32CSE)
     @preserve str begin
@@ -142,9 +142,9 @@ end
 # This can rely on the fact that an ASCIIStr, LatinStr, UCS2Str is always valid
 convert(::Type{<:Str{UTF32CSE}},
         str::MaybeSub{Str{C}}) where {C<:Union{ASCIICSE,Latin_CSEs,UCS2_CSEs}} =
-    ((siz = sizeof(str)) == 0
+    ((len = ncodeunits(str)) == 0
      ? empty_str(UTF32CSE)
-     : @preserve str Str(UTF32CSE, _cvtsize(UInt32, pointer(str), siz)))
+     : @preserve str Str(UTF32CSE, _cvtsize(UInt32, pointer(str), len)))
 
 # This can rely on the fact that a UTF16Str is always valid
 function convert(::Type{<:Str{UTF32CSE}}, str::MS_UTF16)

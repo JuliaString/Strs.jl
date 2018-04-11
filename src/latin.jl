@@ -88,7 +88,7 @@ function convert(::Type{String}, str::Str{<:Latin_CSEs})
     end
 end
 
-function convert(::Type{<:Str{LatinCSE}}, str::String)
+function convert(::Type{<:Str{LatinCSE}}, str::MS_ByteStr)
     # handle zero length string quickly
     (siz = sizeof(str)) == 0 && return empty_latin
     @preserve str begin
@@ -96,7 +96,7 @@ function convert(::Type{<:Str{LatinCSE}}, str::String)
         # get number of bytes to allocate
         len, flags, num4byte, num3byte, num2byte, latinbyte = fast_check_string(pnt, siz)
         num4byte + num3byte + num2byte == 0 || unierror(UTF_ERR_INVALID_LATIN1)
-        Str(LatinCSE, flags == 0 ? str : _utf8_to_latin(pnt, len))
+        Str(LatinCSE, flags == 0 ? _copysub(str) : _utf8_to_latin(pnt, len))
     end
 end
 
@@ -104,7 +104,7 @@ _convert(::Type{_LatinCSE}, ch::UInt8) = _convert(ch <= 0x7f ? ASCIICSE : _Latin
 convert(::Type{<:Str{_LatinCSE}}, ch::Unsigned) =
     ch < 0xff ? _convert(_LatinCSE, ch%UInt8) : unierror(UTF_ERR_LATIN1, ch)
 
-function convert(::Type{<:Str{_LatinCSE}}, str::String)
+function convert(::Type{<:Str{_LatinCSE}}, str::MS_ByteStr)
     # handle zero length string quickly
     (siz = sizeof(str)) == 0 && return empty_ascii
     @preserve str begin
@@ -112,7 +112,8 @@ function convert(::Type{<:Str{_LatinCSE}}, str::String)
         # get number of bytes to allocate
         len, flags, num4byte, num3byte, num2byte, latinbyte = fast_check_string(pnt, siz)
         num4byte + num3byte + num2byte == 0 || unierror(UTF_ERR_INVALID_LATIN1)
-        Str(latinbyte == 0 ? ASCIICSE : _LatinCSE, flags == 0 ? str : _utf8_to_latin(pnt, len))
+        Str(latinbyte == 0 ? ASCIICSE : _LatinCSE,
+            flags == 0 ? _copysub(str) : _utf8_to_latin(pnt, len))
     end
 end
 

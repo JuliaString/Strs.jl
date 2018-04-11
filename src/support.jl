@@ -403,14 +403,12 @@ end
     v = unsafe_load(pnt)
     (align &= CHUNKMSK) != 0 && (v &= ~_mask_bytes(align))
     while (pnt += CHUNKSZ) < fin
-        if (v &= hi_mask) != 0
-            # find first byte that is not ASCII
-            return (pnt - CHUNKSZ - beg) + (trailing_zeros(v)>>>3)
-        end
+        # find first byte that is not ASCII
+        (v &= hi_mask) == 0 || return Int(pnt - CHUNKSZ - beg + (trailing_zeros(v)>>>3))
         v = unsafe_load(pnt)
     end
-    (pnt - CHUNKSZ - beg) +
-        trailing_zeros((pnt == fin ? (v | ~_mask_bytes(pnt - fin)) : v) & hi_mask)
+    Int(pnt - CHUNKSZ - beg +
+        (trailing_zeros((pnt == fin ? v : (v | ~_mask_bytes(fin - pnt - CHUNKSZ))) & hi_mask)>>>3))
 end
 
 function fast_check_string(beg::Ptr{UInt8}, len)
@@ -429,7 +427,7 @@ function fast_check_string(beg::Ptr{UInt8}, len)
         elseif ch < 0xe0
             # 2-byte UTF-8 sequence (i.e. characters 0x80-0x7ff)
             (pnt += 1) < fin || unierror(UTF_ERR_SHORT, pnt - beg, ch)
-            ch > 0xc1 || checkcont(pnt) || unierror(UTF_ERR_INVALID, pnt - beg, ch)
+            (ch > 0xc1 && checkcont(pnt)) || unierror(UTF_ERR_INVALID, pnt - beg, ch)
             ch > 0xc3 ? (num2byte += 1) : (latin1byte += 1)
         elseif ch < 0xf0
             # 3-byte UTF-8 sequence (i.e. characters 0x800-0xffff)
@@ -438,22 +436,22 @@ function fast_check_string(beg::Ptr{UInt8}, len)
             (is_valid_continuation(b2) && checkcont(pnt)) ||
                 unierror(UTF_ERR_INVALID, pnt - beg - 1, ch)
             if ch == 0xe0 # Might be overlong
-                b2 < 0x90 && unierror(UTF_ERR_LONG, pnt - beg - 1, get_utf8_3byte(pnt))
+                b2 < 0xa0 && unierror(UTF_ERR_LONG, pnt - beg - 1, get_utf8_3byte(pnt, ch))
             elseif ch == 0xed # Might be surrogate pair
-                b2 > 0x8f && unierror(UTF_ERR_SURROGATE, pnt - beg - 1, get_utf8_3byte(pnt))
+                b2 > 0x9f && unierror(UTF_ERR_SURROGATE, pnt - beg - 1, get_utf8_3byte(pnt, ch))
             end
             num3byte += 1
         elseif ch < 0xf5
             # 4-byte UTF-8 sequence (i.e. characters > 0xffff)
-            (pnt += 3) < fin && unierror(UTF_ERR_SHORT, pnt - beg - 2, ch)
+            (pnt += 3) < fin || unierror(UTF_ERR_SHORT, pnt - beg - 2, ch)
             b2 = get_codeunit(pnt - 2)
-            println(ch,", ",b2,", ",get_codeunit(pnt-1),", ",get_codeunit(pnt))
+            #println(ch,", ",b2,", ",get_codeunit(pnt-1),", ",get_codeunit(pnt))
             (is_valid_continuation(b2) && checkcont(pnt-1) && checkcont(pnt)) ||
                 unierror(UTF_ERR_INVALID, pnt - beg - 2, ch)
             if ch == 0xf0
-                b2 < 0x90 && unierror(UTF_ERR_LONG, pnt - beg - 2, get_utf8_4byte(pnt))
+                b2 < 0x90 && unierror(UTF_ERR_LONG, pnt - beg - 2, get_utf8_4byte(pnt, ch))
             elseif ch == 0xf4
-                b2 > 0x8f && unierror(UTF_ERR_INVALID, pnt - beg - 2, get_utf8_4byte(pnt))
+                b2 > 0x8f && unierror(UTF_ERR_INVALID, pnt - beg - 2, get_utf8_4byte(pnt, ch))
             end
             num4byte += 1
         else
@@ -606,6 +604,18 @@ is_valid(::Type{<:Str{ASCIICSE}}, s::String) = is_ascii(s)
 is_valid(::Type{<:Str{UCS2CSE}}, s::String)  = is_bmp(s)
 is_valid(::Type{<:Str{LatinCSE}}, s::String) = is_latin(s)
 
+_copysub(str::String) = str
+_copysub(str::Str)    = str.data
+function _copysub(str::SubString)
+    @preserve str begin
+        pnt = pointer(str)
+        len = ncodeunits(str)
+        buf, out = _allocate(eltype(pnt), len)
+        _memcpy(out, pnt, len)
+        buf
+    end
+end
+
 function _cvtsize(::Type{T}, dat, len) where {T <: CodeUnitTypes}
     buf, pnt = _allocate(T, len)
     @inbounds for i = 1:len
@@ -615,12 +625,16 @@ function _cvtsize(::Type{T}, dat, len) where {T <: CodeUnitTypes}
     buf
 end
 
-# Function barrier here, to allow specialization
-function _copy!(out, pnt::Ptr{T}, len) where {T}
-    @inbounds for i in 1:len
-        set_codeunit!(out, i, get_codeunit(pnt))
-        pnt += sizeof(T)
+function _cvtsize(::Type{T}, pnt::Ptr{S}, len) where {S<:CodeUnitTypes,T<:CodeUnitTypes}
+    buf, out = _allocate(T, len)
+    fin = bytoff(pnt, len)
+    #println("buf=$buf, out=$out, pnt=$pnt, fin=$fin, len=$len")
+    while pnt < fin
+        set_codeunit!(out, get_codeunit(pnt))
+        out += sizeof(T)
+        pnt += sizeof(S)
     end
+    buf
 end
 
 (*)(s1::Union{C1, S1}, ss::Union{C2, S2}...) where {C1<:Chr,C2<:Chr,S1<:Str,S2<:Str} =

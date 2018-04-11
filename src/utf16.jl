@@ -238,7 +238,7 @@ convert(::Type{<:Str{_UCS2CSE}}, ch::Unsigned) =
      ? (is_bmp(ch) ? _convert(_UCS2CSE, ch%UInt16) : unierror(UTF_ERR_INVALID, 0, ch))
      : _convert(_LatinCSE, ch%UInt8))
 
-function _convert_ucs2(::Type{C}, str::AbstractString) where {C}
+function convert(::Type{<:Str{C}}, str::AbstractString) where {C<:UCS2_CSEs}
     is_empty(str) && return empty_str(C)
     # Might want to have an invalids_as argument
     len, flags, num4byte, num3byte = unsafe_check_string(str)
@@ -250,22 +250,21 @@ function _convert_ucs2(::Type{C}, str::AbstractString) where {C}
     end
     Str((C === _UCS2CSE && num3byte != 0) ? _UCS2CSE : UCS2CSE, buf)
 end
-convert(::Type{<:Str{UCS2CSE}}, str::AbstractString)  = _convert_ucs2(UCS2CSE, str)
-convert(::Type{<:Str{_UCS2CSE}}, str::AbstractString) = _convert_ucs2(_UCS2CSE, str)
 
-function _convert_ucs2(::Type{C}, str::String) where {C}
+function convert(::Type{<:Str{C}}, str::MS_ByteStr) where {C<:UCS2_CSEs}
     # Might want to have an invalids_as argument
     # handle zero length string quickly
     (siz = sizeof(str)) == 0 && return empty_str(C)
-    # Check that is correct UTF-8 encoding and get number of words needed
-    len, flags, num4byte, num3byte = @preserve str fast_check_string(pointer(str), siz)
-    num4byte == 0 || unierror(UTF_ERR_INVALID_UCS2)
-    # Optimize case where no characters > 0x7f
-    Str((C === _UCS2CSE && num3byte != 0) ? _UCS2CSE : UCS2CSE,
-        flags == 0 ? _cvtsize(UInt16, str, len) : _encode_utf16(str, len))
+    @preserve str begin
+        pnt = pointer(str)
+        # Check that is correct UTF-8 encoding and get number of words needed
+        len, flags, num4byte, num3byte = fast_check_string(pnt, siz)
+        num4byte == 0 || unierror(UTF_ERR_INVALID_UCS2)
+        # Optimize case where no characters > 0x7f
+        Str((C === _UCS2CSE && num3byte != 0) ? _UCS2CSE : UCS2CSE,
+            flags == 0 ? _cvtsize(UInt16, pnt, len) : _encode_utf16(pnt, len))
+    end
 end
-convert(::Type{<:Str{UCS2CSE}}, str::String)  = _convert_ucs2(UCS2CSE, str)
-convert(::Type{<:Str{_UCS2CSE}}, str::String) = _convert_ucs2(_UCS2CSE, str)
 
 # handle zero length string quickly, just widen these
 convert(::Type{<:Str{C}},
@@ -328,24 +327,26 @@ function convert(::Type{<:Str{UTF16CSE}}, str::AbstractString)
     Str(UTF16CSE, buf)
 end
 
-function convert(::Type{<:Str{UTF16CSE}}, str::String)
+function convert(::Type{<:Str{UTF16CSE}}, str::MS_ByteStr)
     # handle zero length string quickly
     (siz = sizeof(str)) == 0 && return empty_utf16
-    # Check that is correct UTF-8 encoding and get number of words needed
-    len, flags, num4byte = @preserve str fast_check_string(pointer(str), siz)
-    # Optimize case where no characters > 0x7f
-    Str(UTF16CSE, flags == 0 ? _cvtsize(UInt16, str, len) : _encode_utf16(str, len + num4byte))
+    @preserve str begin
+        pnt = pointer(str)
+        # Check that is correct UTF-8 encoding and get number of words needed
+        len, flags, num4byte = fast_check_string(pnt, siz)
+        # Optimize case where no characters > 0x7f
+        Str(UTF16CSE, flags == 0 ? _cvtsize(UInt16, pnt, len) : _encode_utf16(pnt, len + num4byte))
+    end
 end
 
 function convert(::Type{<:Str{UTF16CSE}}, str::MS_UTF8)
     # handle zero length string quickly
-    is_empty(str) && return empty_utf16
+    (siz = sizeof(str)) == 0 && return empty_utf16
     @preserve str begin
         pnt = pointer(str)
-        len, flags, num4byte = count_chars(UTF8Str, pnt, ncodeunits(str))
+        len, flags, num4byte = count_chars(UTF8Str, pnt, siz)
         # Optimize case where no characters > 0x7f
-        Str(UTF16CSE,
-            flags == 0 ? _cvtsize(UInt16, pnt, len) : _encode_utf16(pnt, len + num4byte))
+        Str(UTF16CSE, flags == 0 ? _cvtsize(UInt16, pnt, len) : _encode_utf16(pnt, len + num4byte))
     end
 end
 
@@ -390,7 +391,7 @@ function _encode_utf16(pnt::Ptr{UInt8}, len)
 end
 
 _encode_utf16(dat::Vector{UInt8}, len) = @preserve dat _encode_utf16(pointer(dat), len)
-_encode_utf16(str::String, len)        = @preserve str _encode_utf16(pointer(str), len)
+_encode_utf16(str::MS_ByteStr, len)    = @preserve str _encode_utf16(pointer(str), len)
 
 @inline _cvt_16_to_utf8(::Type{<:Str{UTF16CSE}}, pnt, len)     = _transcode_utf8(pnt, len)
 @inline _cvt_16_to_utf8(::Type{<:Str{<:UCS2_CSEs}}, pnt, len)  = _encode_utf8(pnt, len)
