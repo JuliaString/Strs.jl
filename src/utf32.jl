@@ -174,7 +174,7 @@ end
 function convert(::Type{<:Str{C}}, str::MaybeSub{Str{<:UTF32_CSEs}}) where {C<:UCS2_CSEs}
     # Might want to have an invalids_as argument
     # handle zero length string quickly
-    (len = ncodeunits(str)) == 0 && return empty_str(UCS2CSE)
+    (len = ncodeunits(str)) == 0 && return empty_str(C === UCS2CSE ? C : ASCIICSE)
     # Check if conversion is valid
     is_bmp(str) || unierror(UTF_ERR_INVALID_UCS2)
     @preserve str Str(UCS2CSE, _cvtsize(UInt16, pointer(str), len))
@@ -182,8 +182,8 @@ end
 
 const UniRawChar = Union{UInt32, Int32, Text4Chr, Char}
 
-function convert(::Type{<:Str{C}}, dat::AbstractVector{<:UniRawChar}) where {C<:UTF32_CSEs}
-    (len = length(dat)) == 0 && empty_str(UTF32CSE)
+function convert(::Type{<:Str{C}}, dat::AbstractArray{<:UniRawChar}) where {C<:UTF32_CSEs}
+    (len = length(dat)) == 0 && return empty_str(C === UTF32CSE ? C : ASCIICSE)
     buf, pnt = _allocate(UInt32, len)
     C === _UTF32CSE && (msk = 0%UInt32)
     @preserve buf begin
@@ -195,12 +195,19 @@ function convert(::Type{<:Str{C}}, dat::AbstractVector{<:UniRawChar}) where {C<:
             set_codeunit!(pnt, check_valid(ch, pos))
             pnt += sizeof(UInt32)
         end
-        Str((C === _UTF32CSE && msk > 0xffff) ? _UTF32CSE : UTF32CSE, buf)
+        (C === UTF32CSE || msk > 0xffff) && return Str(C, buf)
+        msk > 0xff && return Str(_UCS2CSE, _cvtsize(UInt16, pnt, len))
+        Str(msk > 0x7f ? _LatinCSE : ASCIICSE, _cvtsize(UInt8, pnt, len))
     end
 end
 
+function convert(::Type{<:Str{UTF32CSE}}, dat::Vector{<:Union{UInt32,Int32,Text4Chr}})
+    is_valid(UTF32Str, dat) || unierror(UTF_ERR_INVALID)
+    @preserve dat Str(UTF32CSE, _copysub(pointer(dat), length(dat)))
+end
+
 # Not sure this is valid anymore, want to avoid type piracy
-convert(::Type{T}, v::AbstractVector{<:UniRawChar}) where {T<:AbstractString} =
+convert(::Type{T}, v::AbstractArray{<:UniRawChar}) where {T<:AbstractString} =
     convert(T, convert(UTF32Str, v))
 
 # To do, make this more generic, add a function that can create a vector & fill it from an Str
@@ -210,6 +217,12 @@ function convert(::Type{Vector{UInt32}}, str::MaybeSub{<:Str{<:Quad_CSEs}})
     @preserve str _memcpy(pointer(vec), pointer(str), len)
     vec
 end
+
+convert(::Type{<:Str{Text4CSE}}, str::MaybeSub{<:Str{C}}
+        ) where {C<:Union{ASCIICSE,Text1CSE,BinaryCSE,Latin_CSEs, UCS2_CSEs}} =
+            @preserve str Str(Text4CSE, _cvtsize(UInt32, pointer(str), ncodeunits(str)))
+
+convert(::Type{<:Str{Text4CSE}}, str::MaybeSub{<:Str{<:UTF32_CSEs}}) = Str(Text4CSE, _copysub(str))
 
 # I don't think this will work for Char anymore, broken by #24999
 unsafe_convert(::Type{Ptr{T}}, str::MaybeSub{Str{<:Quad_CSEs}}) where {T<:UniRawChar} =
@@ -242,9 +255,17 @@ function convert(::Type{T}, bytes::AbstractArray{UInt8}) where {C<:UTF32_CSEs,T<
     end
 end
 
-function is_valid(::Type{<:Str{<:UTF32_CSEs}}, str::Vector{<:UniRawChar})
+function is_valid(::Type{<:Str{UTF32CSE}}, str::Vector{<:UniRawChar})
     @inbounds for c in str
         ch = c%UInt32
+        (!is_surrogate_codeunit(ch) && ch <= 0x10ffff) || return false
+    end
+    true
+end
+function is_valid(::Type{<:Str{_UTF32CSE}}, str::Vector{<:UniRawChar})
+    @inbounds for c in str
+             ch = c%UInt32
+             
         (!is_surrogate_codeunit(ch) && ch <= 0x10ffff) || return false
     end
     true
