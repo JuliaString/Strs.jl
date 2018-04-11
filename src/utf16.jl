@@ -470,6 +470,42 @@ function convert(::Type{<:Str{UTF16CSE}}, dat::AbstractVector{UInt16})
     Str(UTF16CSE, flags == 0 ? _cvtsize(UInt16, dat, len) : _encode_utf16(dat, len + num4byte))
 end
 
+function _convert_utf16(str, len)
+    len == 0 && return empty_utf16
+    @preserve str begin
+        pnt = pointer(str)
+        len, flags = fast_check_string(pnt, len)
+        Str(UTF16CSE, _copysub(pnt, len))
+    end
+end
+convert(::Type{<:Str{UTF16CSE}}, dat::Vector{UInt16}) =
+    _convert_utf16(dat, length(dat))
+convert(::Type{<:Str{UTF16CSE}}, str::MaybeSub{<:Str{Text2CSE}}) =
+    _convert_utf16(str, ncodeunits(str))
+
+cvt_ucs2(::Type{UCS2CSE}, pnt::Ptr{UInt16}, len, lc, nc) = Str(UCS2CSE, _copysub(pnt, len))
+cvt_ucs2(::Type{UCS2CSE}, pnt::Ptr{UInt32}, len, lc, nc) = Str(UCS2CSE, _cvtsize(UInt16, pnt, len))
+
+function cvt_ucs2(::Type{_UCS2CSE}, pnt::Ptr{UInt16}, len, lc, nc)
+    nc == 0 || return Str(C, _copysub(pnt, len))
+    Str(lc == 0 ? ASCIICSE : _LatinCSE, _cvtsize(UInt8, pnt, len))
+end
+function cvt_ucs2(::Type{_UCS2CSE}, pnt::Ptr{UInt32}, len, lc, nc)
+    nc == 0 || return Str(C, _cvtsize(UInt16, pnt, len))
+    Str(lc == 0 ? ASCIICSE : _LatinCSE, _cvtsize(UInt8, pnt, len))
+end
+
+function convert(::Type{<:Str{C}},
+                 str::MaybeSub{<:Str{T}}) where {C<:UCS2_CSEs,T<:Union{Text2CSE,Text4CSE}}
+    (len = ncodeunits(str)) == 0 && return C === _UCS2CSE ? empty_ascii : empty_ucs2
+    @preserve str begin
+        pnt = pointer(str)
+        len, flags, num4byte, num3byte, num2byte, latin1byte = fast_check_string(pnt, len)
+        num4byte == 0 || unierror(UTF_ERR_INVALID_UCS2)
+        cvt_ucs2(C, pnt, len, latin1byte, num2byte+num3byte)
+    end
+end
+
 _convert(pnt::Ptr{T}, len, T1) where {T<:Union{UInt16,UInt16_U,UInt16_S,UInt16_US}} =
     ((ch = unsafe_load(pnt)) == 0xfffe
      ? _convert(reinterpret(Ptr{T1}, pnt + 2), len - 1)
