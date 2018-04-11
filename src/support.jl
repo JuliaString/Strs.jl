@@ -397,6 +397,188 @@ function unsafe_check_string(str::T;
     _ret_check(totalchar, flags, invalids, latin1byte, num2byte, num3byte, num4byte)
 end
 
+@inline function skipascii(beg::Ptr{UInt8}, fin::Ptr{UInt8})
+    align = reinterpret(UInt, beg)
+    pnt = reinterpret(Ptr{UInt64}, align & ~CHUNKMSK)
+    v = unsafe_load(pnt)
+    (align &= CHUNKMSK) != 0 && (v &= ~_mask_bytes(align))
+    while (pnt += CHUNKSZ) < fin
+        # find first byte that is not ASCII
+        (v &= hi_mask) == 0 || return Int(pnt - CHUNKSZ - beg + (trailing_zeros(v)>>>3))
+        v = unsafe_load(pnt)
+    end
+    Int(pnt - CHUNKSZ - beg +
+        (trailing_zeros((pnt == fin ? v : (v | ~_mask_bytes(fin - pnt - CHUNKSZ))) & hi_mask)>>>3))
+end
+
+function fast_check_string(beg::Ptr{UInt8}, len)
+    pnt = beg
+    fin = pnt + len
+    flags = 0%UInt
+    asciichar = latin1byte = num2byte = num3byte = num4byte = 0
+    while pnt < fin
+        ch = get_codeunit(pnt)
+        if ch < 0x80
+            cnt = skipascii(pnt, fin)
+            asciichar += cnt
+            pnt += cnt
+            continue
+        # Check UTF-8 encoding
+        elseif ch < 0xe0
+            # 2-byte UTF-8 sequence (i.e. characters 0x80-0x7ff)
+            (pnt += 1) < fin || unierror(UTF_ERR_SHORT, pnt - beg, ch)
+            (ch > 0xc1 && checkcont(pnt)) || unierror(UTF_ERR_INVALID, pnt - beg, ch)
+            ch > 0xc3 ? (num2byte += 1) : (latin1byte += 1)
+        elseif ch < 0xf0
+            # 3-byte UTF-8 sequence (i.e. characters 0x800-0xffff)
+            (pnt += 2) < fin || unierror(UTF_ERR_SHORT, pnt - beg - 1, ch)
+            b2 = get_codeunit(pnt - 1)
+            (is_valid_continuation(b2) && checkcont(pnt)) ||
+                unierror(UTF_ERR_INVALID, pnt - beg - 1, ch)
+            if ch == 0xe0 # Might be overlong
+                b2 < 0xa0 && unierror(UTF_ERR_LONG, pnt - beg - 1, get_utf8_3byte(pnt, ch))
+            elseif ch == 0xed # Might be surrogate pair
+                b2 > 0x9f && unierror(UTF_ERR_SURROGATE, pnt - beg - 1, get_utf8_3byte(pnt, ch))
+            end
+            num3byte += 1
+        elseif ch < 0xf5
+            # 4-byte UTF-8 sequence (i.e. characters > 0xffff)
+            (pnt += 3) < fin || unierror(UTF_ERR_SHORT, pnt - beg - 2, ch)
+            b2 = get_codeunit(pnt - 2)
+            #println(ch,", ",b2,", ",get_codeunit(pnt-1),", ",get_codeunit(pnt))
+            (is_valid_continuation(b2) && checkcont(pnt-1) && checkcont(pnt)) ||
+                unierror(UTF_ERR_INVALID, pnt - beg - 2, ch)
+            if ch == 0xf0
+                b2 < 0x90 && unierror(UTF_ERR_LONG, pnt - beg - 2, get_utf8_4byte(pnt, ch))
+            elseif ch == 0xf4
+                b2 > 0x8f && unierror(UTF_ERR_INVALID, pnt - beg - 2, get_utf8_4byte(pnt, ch))
+            end
+            num4byte += 1
+        else
+            unierror(UTF_ERR_INVALID, pnt - beg + 1, ch)
+        end
+        pnt += 1
+    end
+    _ret_check(asciichar+latin1byte+num2byte+num3byte+num4byte,
+               flags, 0, latin1byte, num2byte, num3byte, num4byte)
+end
+
+const _bmp_mask = 0xd800_d800_d800_d800
+@inline _mask_allsurr(v)  = xor((v | v<<1 | v<<2 | v<<3 | v<<4) & _hi_bit_16, _hi_bit_16)
+
+@inline _get_bmp_mask(v::UInt64) = _mask_allsurr(xor(v, _bmp_mask))
+
+const msk_ascii_16 = 0xff80ff80ff80ff80
+const msk_latin_16 = 0xff00ff00ff00ff00
+const msk_num2b_16 = 0xf800f800f800f800
+
+# v -> 1111 1yyy l000 0000 1111 1yyy l000 0000 1111 1yyy l000 0000 1111 1yyy l000 0000
+
+@inline function countmask(v, cnta, cntl, cnt2, cnt3)
+    # First mask off ASCII bits: 0xff80ff80ff80ff80, count all 0 words (0-4)
+    # Then mask off Latin1 bits: 0xff00ff00ff00ff00, count all 0 words (0-4)
+    # Then mask off num2byte:    0xf800f800f800f800, count all 0 words (0-4)
+    va = v & msk_ascii_16
+    vl = v & msk_latin_16
+    v2 = v & msk_num2b_16
+    println("v=$v, 0x$(hex(va)), 0x$(hex(vl)), 0x$(hex(v2)), $cnta, $cntl, $cnt2, $cnt3")
+    cnta, cntl, cnt2, cnt3
+end
+
+@inline function skipbmp(beg::Ptr{UInt16}, fin, cnta, cntl, cnt2, cnt3)
+    align = reinterpret(UInt, beg)
+    pnt = reinterpret(Ptr{UInt64}, align & ~CHUNKMSK)
+    v = unsafe_load(pnt)
+    (align &= CHUNKMSK) != 0 && (v &= ~_mask_bytes(align))
+    while (pnt += CHUNKSZ) < fin
+        # If vm is 0, it means there are non-BMP characters present
+        if (vm = _get_bmp_mask(v)) == 0
+            # Get how many characters are before the non-BMP character
+            cnt = (leading_zeros(vm)>>>3)&~1
+            v &= _mask_bytes(cnt)
+            return pnt - CHUNKSZ + cnt, countmask(v, cnta, cntl, cnt2, cnt3)...
+        end
+        cnta, cntl, cnt2, cnt3 = countmask(v, cnta, cntl, cnt2, cnt3)
+        v = unsafe_load(pnt)
+    end
+    v = (pnt == fin ? v : (v & _mask_bytes(fin - pnt - CHUNKSZ)))
+    if (vm = _get_bmp_mask(v)) == 0
+        # Get how many characters are before the non-BMP character
+        cnt = (leading_zeros(vm)>>>3)&~1
+        v &= _mask_bytes(cnt)
+        fin = pnt - CHUNKSZ + cnt
+    end
+    fin, countmask(v, cnta, cntl, cnt2, cnt3)...
+end
+
+# Check for valid UTF-16
+function fast_check_string(beg::Ptr{UInt16}, len)
+    pnt = beg
+    fin = bytoff(pnt, len)
+    flags = 0%UInt
+    asciichar = latin1byte = num2byte = num3byte = num4byte = 0
+    while pnt < fin
+        ch = get_codeunit(pnt)
+        #=
+        if !is_surrogate_codepoint(ch)
+            pnt, asciichar, latin1byte, num2byte, num3byte =
+                skipbmp(pnt, fin, asciichar, latin1byte, num2byte, num3byte)
+        =#
+        if ch <= 0x7f
+            asciichar += 1
+        elseif ch <= 0xff
+            latin1byte += 1
+        elseif ch < 0x7ff
+            num2byte += 1
+        elseif !is_surrogate_codeunit(ch)
+            num3byte += 1
+        elseif !is_surrogate_lead(ch)
+            unierror(UTF_ERR_NOT_LEAD, Int((pnt - beg)>>>1), ch)
+        elseif (pnt += 2) >= fin
+            unierror(UTF_ERR_SHORT, Int((pnt - beg - 2)>>>1), ch)
+        elseif !is_surrogate_trail((c2 = get_codeunit(pnt)))
+            unierror(UTF_ERR_NOT_TRAIL, Int((pnt - beg)>>>1), c2)
+        else
+            pnt += 2
+            num4byte += 1
+        end
+        pnt += 2
+    end
+    _ret_check(asciichar+latin1byte+num2byte+num3byte+num4byte,
+               flags, 0, latin1byte, num2byte, num3byte, num4byte)
+end
+
+# Check for valid UTF-32
+function fast_check_string(beg::Ptr{UInt32}, len)
+    pnt = beg
+    fin = bytoff(pnt, len)
+    flags = 0%UInt
+    asciichar = latin1byte = num2byte = num3byte = num4byte = 0
+    while pnt < fin
+        ch = get_codeunit(pnt)
+        if ch <= 0x7f
+            asciichar += 1
+        elseif ch <= 0xff
+            latin1byte += 1
+        elseif ch <= 0x7ff
+            num2byte += 1
+        elseif ch <= 0xd7ff
+            num3byte += 1
+        elseif ch <= 0xdfff
+            unierror(UTF_ERR_SURROGATE, (pnt-beg+4)>>>2, ch)
+        elseif ch <= 0xffff
+            num3byte += 1
+        elseif ch <= 0x10ffff
+            num4byte += 1
+        else
+            unierror(UTF_ERR_INVALID, (pnt-beg+4)>>>2, ch)
+        end
+        pnt += 4
+    end
+    _ret_check(asciichar+latin1byte+num2byte+num3byte+num4byte,
+               flags, 0, latin1byte, num2byte, num3byte, num4byte)
+end
+
 """
 Calculate the total number of characters, as well as number of
 latin1, 2-byte, 3-byte, and 4-byte sequences in a validated UTF-8 string
@@ -538,6 +720,16 @@ is_valid(::Type{<:Str{ASCIICSE}}, s::String) = is_ascii(s)
 is_valid(::Type{<:Str{UCS2CSE}}, s::String)  = is_bmp(s)
 is_valid(::Type{<:Str{LatinCSE}}, s::String) = is_latin(s)
 
+function _copysub(pnt::Ptr{T}, len) where {T<:CodeUnitTypes}
+    buf, out = _allocate(eltype(pnt), len)
+    _memcpy(out, pnt, len)
+    buf
+end
+_copysub(str::String)    = str
+_copysub(str::Str)       = str.data
+_copysub(str::SubString) = @preserve str _copysub(pointer(str), ncodeunits(str))
+_copysub(vec::Vector)    = @preserve vec _copysub(pointer(vec), length(vec))
+
 function _cvtsize(::Type{T}, dat, len) where {T <: CodeUnitTypes}
     buf, pnt = _allocate(T, len)
     @inbounds for i = 1:len
@@ -547,12 +739,16 @@ function _cvtsize(::Type{T}, dat, len) where {T <: CodeUnitTypes}
     buf
 end
 
-# Function barrier here, to allow specialization
-function _copy!(out, pnt::Ptr{T}, len) where {T}
-    @inbounds for i in 1:len
-        set_codeunit!(out, i, get_codeunit(pnt))
-        pnt += sizeof(T)
+function _cvtsize(::Type{T}, pnt::Ptr{S}, len) where {S<:CodeUnitTypes,T<:CodeUnitTypes}
+    buf, out = _allocate(T, len)
+    fin = bytoff(pnt, len)
+    #println("buf=$buf, out=$out, pnt=$pnt, fin=$fin, len=$len")
+    while pnt < fin
+        set_codeunit!(out, get_codeunit(pnt))
+        out += sizeof(T)
+        pnt += sizeof(S)
     end
+    buf
 end
 
 (*)(s1::Union{C1, S1}, ss::Union{C2, S2}...) where {C1<:Chr,C2<:Chr,S1<:Str,S2<:Str} =

@@ -59,7 +59,7 @@ function _str(str::T) where {T<:Union{Vector{UInt8}, Str{<:Binary_CSEs}, String}
     (siz = sizeof(str)) == 0 && return empty_ascii
     @preserve str begin
         pnt = pointer(str)
-        len, flags, num4byte, num3byte, num2byte, latin1byte = unsafe_check_string(pnt, 1, siz)
+        len, flags, num4byte, num3byte, num2byte, latin1byte = fast_check_string(pnt, siz)
         if flags == 0
             buf, out = _allocate(UInt8, len)
             _memcpy(out, pnt, len)
@@ -126,7 +126,7 @@ function convert(::Type{UniStr}, str::T) where {T<:Str}
     end
 end
 
-convert(::Type{<:Str{C}}, str::String) where {C} = convert(C, _str(str))
+#convert(::Type{<:Str{C}}, str::String) where {C} = convert(C, _str(str))
 
 convert(::Type{<:Str{Text1CSE}}, str::String) = Str(Text1CSE, str)
 convert(::Type{<:Str{BinaryCSE}}, str::String) = Str(BinaryCSE, str)
@@ -177,24 +177,26 @@ function unsafe_str(str::Union{Vector{UInt8}, T, SubString{T}};
                     ) where {T <: Union{BinaryStr, Text1Str, String}}
     # handle zero length string quickly
     (siz = sizeof(str)) == 0 && return empty_ascii
-    pnt = pointer(str)
-    len, flags, num4byte, num3byte, num2byte, latin1byte, invalids =
-        unsafe_check_string(pnt, 1, siz;
-                            accept_long_null  = accept_long_null,
-                            accept_surrogates = accept_surrogates,
-                            accept_long_char  = accept_long_char,
-                            accept_invalids   = accept_invalids)
-    if flags == 0
-        # Don't allow this to be aliased to a mutable Vector{UInt8}
-        safe_copy(T, ASCIICSE, str)
-    elseif invalids != 0
-        safe_copy(T, Text1CSE, str)
-    elseif num4byte != 0
-        Str(_UTF32CSE, _encode_utf32(pnt, len))
-    elseif num2byte + num3byte != 0
-        Str(_UCS2CSE, _encode_utf16(pnt, len))
-    else
-        Str(latin1byte == 0 ? ASCIICSE : _LatinCSE, _encode_ascii_latin(pointer(str), len))
+    @preserve str begin
+        pnt = pointer(str)
+        len, flags, num4byte, num3byte, num2byte, latin1byte, invalids =
+            unsafe_check_string(pnt, 1, siz;
+                                accept_long_null  = accept_long_null,
+                                accept_surrogates = accept_surrogates,
+                                accept_long_char  = accept_long_char,
+                                accept_invalids   = accept_invalids)
+        if flags == 0
+            # Don't allow this to be aliased to a mutable Vector{UInt8}
+            safe_copy(T, ASCIICSE, str)
+        elseif invalids != 0
+            safe_copy(T, Text1CSE, str)
+        elseif num4byte != 0
+            Str(_UTF32CSE, _encode_utf32(pnt, len))
+        elseif num2byte + num3byte != 0
+            Str(_UCS2CSE, _encode_utf16(pnt, len))
+        else
+            Str(latin1byte == 0 ? ASCIICSE : _LatinCSE, _encode_ascii_latin(pointer(str), len))
+        end
     end
 end
 
@@ -235,27 +237,6 @@ function unsafe_str(str::T;
         Str(latin1byte == 0 ? ASCIICSE : _LatinCSE, _encode_ascii_latin(str, len))
     end
 end
-
-#=
-function Str(v::Vector{UInt8})
-    len = length(v)
-    buf = _allocate(siz)
-    _memcpy(pointer(buf), pointer(v), siz)
-    Str(Text1CSE, buf)
-end
-function Str(v::Vector{UInt16})
-    len = length(v)
-    buf, pnt = _allocate(UInt16, siz)
-    _memcpy(pnt, pointer(v), siz)
-    Str(Text2CSE, buf)
-end
-function Str(v::Vector{UInt32})
-    len = length(v)
-    buf, pnt = _allocate(UInt32, siz)
-    _memcpy(pnt, pointer(v), len)
-    Str(Text4CSE, buf)
-end
-=#
 
 # Fallback constructors for Str types, from any AbstractString
 (::Type{T})(vec::S) where {T<:Str, S<:AbstractVector} = convert(T, vec)

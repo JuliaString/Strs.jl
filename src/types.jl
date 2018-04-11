@@ -258,6 +258,12 @@ basecse(::Type{_LatinCSE}) = LatinCSE
 basecse(::Type{_UCS2CSE})  = UCS2CSE
 basecse(::Type{_UTF32CSE}) = UTF32CSE
 
+const MS_UTF8     = MaybeSub{<:Str{UTF8CSE}}
+const MS_UTF16    = MaybeSub{<:Str{UTF16CSE}}
+const MS_UTF32    = MaybeSub{<:Str{UTF32CSE}}
+const MS_SubUTF32 = MaybeSub{<:Str{_UTF32CSE}}
+const MS_ByteStr  = MaybeSub{<:Union{String,Str{BinaryCSE},Str{Text1CSE}}}
+
 const AbsChar = @static isdefined(Base, :AbstractChar) ? AbstractChar : Union{Char, Chr}
 
 ## Get the character set / encoding used by a string type
