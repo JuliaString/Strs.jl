@@ -463,37 +463,28 @@ convert(::Type{<:Str{UTF16CSE}}, str::MaybeSub{<:Str{<:UCS2_CSEs}}) = Str(UTF16C
 
 unsafe_convert(::Type{Ptr{UInt16}}, s::MS_UTF16) = pointer(s)
 
-function convert(::Type{<:Str{UTF16CSE}}, dat::AbstractVector{UInt16})
+function convert(::Type{<:Str{UTF16CSE}}, dat::AbstractArray{UInt16})
     is_empty(dat) && return empty_utf16
     len, flags, num4byte = unsafe_check_string(dat, 1, lastindex(dat))
     # Optimize case where no surrogate characters
     Str(UTF16CSE, flags == 0 ? _cvtsize(UInt16, dat, len) : _encode_utf16(dat, len + num4byte))
 end
 
-function _convert_utf16(str, len)
-    len == 0 && return empty_utf16
-    @preserve str begin
-        pnt = pointer(str)
-        len, flags = fast_check_string(pnt, len)
-        Str(UTF16CSE, _copysub(pnt, len))
-    end
+function convert(::Type{<:Str{UTF16CSE}}, dat::Vector{UInt16})
+    (len = length(dat)) == 0 && return empty_utf16
+    @preserve dat fast_check_string(pointer(dat), len)
+    Str(UTF16CSE, _copysub(dat))
 end
-convert(::Type{<:Str{UTF16CSE}}, dat::Vector{UInt16}) =
-    _convert_utf16(dat, length(dat))
-convert(::Type{<:Str{UTF16CSE}}, str::MaybeSub{<:Str{Text2CSE}}) =
-    _convert_utf16(str, ncodeunits(str))
 
-cvt_ucs2(::Type{UCS2CSE}, pnt::Ptr{UInt16}, len, lc, nc) = Str(UCS2CSE, _copysub(pnt, len))
-cvt_ucs2(::Type{UCS2CSE}, pnt::Ptr{UInt32}, len, lc, nc) = Str(UCS2CSE, _cvtsize(UInt16, pnt, len))
+function convert(::Type{<:Str{UTF16CSE}}, str::MaybeSub{<:Str{Text2CSE}})
+    (len = ncodeunits(str)) == 0 && return empty_utf16
+    @preserve str fast_check_string(pointer(str), len)
+    Str(UTF16CSE, _copysub(str))
+end
 
-function cvt_ucs2(::Type{_UCS2CSE}, pnt::Ptr{UInt16}, len, lc, nc)
-    nc == 0 || return Str(C, _copysub(pnt, len))
-    Str(lc == 0 ? ASCIICSE : _LatinCSE, _cvtsize(UInt8, pnt, len))
-end
-function cvt_ucs2(::Type{_UCS2CSE}, pnt::Ptr{UInt32}, len, lc, nc)
-    nc == 0 || return Str(C, _cvtsize(UInt16, pnt, len))
-    Str(lc == 0 ? ASCIICSE : _LatinCSE, _cvtsize(UInt8, pnt, len))
-end
+convert(::Type{<:Str{Text2CSE}},
+        str::MaybeSub{<:Str{C}}) where {C<:Union{ASCIICSE,Text1CSE,BinaryCSE,Latin_CSEs}} =
+            @preserve str Str(Text2CSE, _cvtsize(UInt16, pointer(str), ncodeunits(str)))
 
 function convert(::Type{<:Str{C}},
                  str::MaybeSub{<:Str{T}}) where {C<:UCS2_CSEs,T<:Union{Text2CSE,Text4CSE}}
@@ -502,7 +493,9 @@ function convert(::Type{<:Str{C}},
         pnt = pointer(str)
         len, flags, num4byte, num3byte, num2byte, latin1byte = fast_check_string(pnt, len)
         num4byte == 0 || unierror(UTF_ERR_INVALID_UCS2)
-        cvt_ucs2(C, pnt, len, latin1byte, num2byte+num3byte)
+        (C === UCS2CSE || (num2byte+num3byte) != 0) &&
+            return Str(C, T===Text2CSE ? _copysub(str) : _cvtsize(UInt16, pnt, len))
+        Str(latin1byte == 0 ? ASCIICSE : _LatinCSE, _cvtsize(UInt8, pnt, len))
     end
 end
 

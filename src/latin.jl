@@ -108,7 +108,7 @@ function convert(::Type{<:Str{LatinCSE}}, str::MS_ByteStr)
         # get number of bytes to allocate
         len, flags, num4byte, num3byte, num2byte, latinbyte = fast_check_string(pnt, siz)
         num4byte + num3byte + num2byte == 0 || unierror(UTF_ERR_INVALID_LATIN1)
-        Str(LatinCSE, flags == 0 ? _copysub(pnt, len) : _utf8_to_latin(pnt, len))
+        Str(LatinCSE, flags == 0 ? _copysub(str) : _utf8_to_latin(pnt, len))
     end
 end
 
@@ -125,7 +125,7 @@ function convert(::Type{<:Str{_LatinCSE}}, str::MS_ByteStr)
         len, flags, num4byte, num3byte, num2byte, latinbyte = fast_check_string(pnt, siz)
         num4byte + num3byte + num2byte == 0 || unierror(UTF_ERR_INVALID_LATIN1)
         Str(latinbyte == 0 ? ASCIICSE : _LatinCSE,
-            flags == 0 ? _copysub(pnt, len) : _utf8_to_latin(pnt, len))
+            flags == 0 ? _copysub(str) : _utf8_to_latin(pnt, len))
     end
 end
 
