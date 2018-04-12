@@ -536,9 +536,9 @@ function fast_check_string(beg::Ptr{UInt16}, len)
             unierror(UTF_ERR_NOT_LEAD, Int((pnt - beg)>>>1), ch)
         elseif (pnt += 2) >= fin
             unierror(UTF_ERR_SHORT, Int((pnt - beg - 2)>>>1), ch)
-        elseif !is_surrogate_trail((c2 = get_codeunit(pnt)))
-            unierror(UTF_ERR_NOT_TRAIL, Int((pnt - beg)>>>1), c2)
         else
+            c2 = get_codeunit(pnt)
+            is_surrogate_trail(c2) || unierror(UTF_ERR_NOT_TRAIL, Int((pnt - beg)>>>1), c2)
             pnt += 2
             num4byte += 1
         end

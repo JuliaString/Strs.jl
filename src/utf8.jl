@@ -658,6 +658,23 @@ function convert(::Type{<:Str{UTF8CSE}}, str::T) where {T<:MS_ByteStr}
     end
 end
 
+function convert(::Type{<:Str{UTF8CSE}},
+                 str::MaybeSub{T}) where {C<:Union{Text2CSE,Text4CSE},T<:Str{C}}
+    # handle zero length string quickly
+    (len = ncodeunits(str)) == 0 && return empty_utf8
+    @preserve str begin
+        pnt = pointer(str)
+        # get number of bytes to allocate
+        len, flags, num4byte, num3byte, num2byte, latinbyte = fast_check_string(pnt, len)
+        # Copy, but eliminate over-long encodings and surrogate pairs
+        # Speed this up if no surrogates, long encodings
+        Str(UTF8CSE,
+            flags == 0
+             ? _cvtsize(UInt8, pnt, len)
+             : _transcode_utf8(pnt, len + latinbyte + num2byte + num3byte*2 + num4byte*3))
+    end
+end
+
 convert(::Type{<:Str{UTF8CSE}}, s::Str{ASCIICSE}) = Str(UTF8CSE, s.data)
 convert(::Type{<:Str{UTF8CSE}}, s::Str{UTF8CSE}) = s
 
