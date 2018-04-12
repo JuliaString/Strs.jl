@@ -58,6 +58,18 @@ function convert(::Type{<:Str{UTF32CSE}}, str::MS_ByteStr)
     end
 end
 
+function convert(::Type{<:Str{UTF32CSE}}, str::MaybeSub{<:Str{Text2Str}})
+    # handle zero length string quickly
+    (len = ncodeunits(str)) == 0 && return empty_utf32
+    @preserve str begin
+        pnt = pointer(str)
+        # Validate and get number of characters to create
+        cnt = fast_check_string(pnt, len)
+        Str(UTF32CSE,
+            cnt == len ? _cvtsize(UInt32, pnt, cnt) : _transcode_utf16_to_utf32(pnt, cnt))
+    end
+end
+
 @inline function get_cp(pnt)
     ch = get_codeunit(pnt)%UInt32
     # Handle ASCII characters
