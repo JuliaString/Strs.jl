@@ -58,13 +58,13 @@ function convert(::Type{<:Str{UTF32CSE}}, str::MS_ByteStr)
     end
 end
 
-function convert(::Type{<:Str{UTF32CSE}}, str::MaybeSub{<:Str{Text2Str}})
+function convert(::Type{<:Str{UTF32CSE}}, str::MaybeSub{<:Str{Text2CSE}})
     # handle zero length string quickly
     (len = ncodeunits(str)) == 0 && return empty_utf32
     @preserve str begin
         pnt = pointer(str)
         # Validate and get number of characters to create
-        cnt = fast_check_string(pnt, len)
+        cnt, flags = fast_check_string(pnt, len)
         Str(UTF32CSE,
             cnt == len ? _cvtsize(UInt32, pnt, cnt) : _transcode_utf16_to_utf32(pnt, cnt))
     end
@@ -131,10 +131,11 @@ function _transcode_utf16_to_utf32(pnt, len)
     buf, out = _allocate(UInt32, len)
     fin = bytoff(out, len)
     @inbounds while out < fin
-        ch = get_codeunit(pnt)
-        is_surrogate_lead(ch) && (ch = get_supplementary(ch, get_codeunit(pnt += sizeof(UInt16))))
-        set_codeunit!(out, ch)
+        ch = get_codeunit(pnt)%UInt32
         pnt += sizeof(UInt16)
+        is_surrogate_lead(ch) &&
+            (ch = get_supplementary(ch, get_codeunit(pnt)) ; pnt += sizeof(UInt16))
+        set_codeunit!(out, ch)
         out += sizeof(UInt32)
     end
     buf
