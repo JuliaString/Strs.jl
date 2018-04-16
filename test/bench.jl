@@ -654,6 +654,14 @@ function oldlength(s::UTF16Str)
     cnt
 end
 
+function checksplit(lines)
+    cnt = 0
+    for text in lines
+        cnt += length(split(text, " "))
+    end
+    cnt
+end
+
 repeat1(str)  = repeat(str, 1)
 repeat10(str) = repeat(str, 10)
 repeat1c(str)  = @inbounds repeat(str[1], 1)
@@ -768,6 +776,7 @@ const tests =
      (calchash,     "hash\nstring"),
      (checknextind, "nextind\nchars"),
      (checkjoin,    "join\nlines"),
+     (checksplit,   "split\nline"),
      (checkreverse, "reverse"),
      (checkrepeat1,  "repeat 1\nstring"),
      (checkrepeat10,  "repeat 10\nstring"),
