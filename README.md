@@ -18,6 +18,8 @@ I would very much appreciate any constructive criticism, help implementing some 
 Also, I'd love contributions of benchmark code and/or samples for different use cases of strings,
 or pointers to such (such as a way to get lots of tweets, to test mixed text and emojis, for example).
 
+## Architecture and Operations
+
 The general philosophy of the architecture is as follows: have a single easy to use type that can replace `String` that conforms to the recommendations of the Unicode Organization (which internally uses 4 types and is implemented currently as a Julia Union, and has O(1) indexing to characters, not just code units), as well as types to represent binary strings, raw unvalidated strings (made up of 1, 2, or 4 byte codepoints), as well as types for validated ASCII, Latin1, UCS2 (16-bit, BMP [Basic Multilingual Plane]), UTF-8, UTF-16, and UTF-32 encoded strings.
 
 Operations on multi code unit encodings such as UTF-8 & UTF-16 will be moved to a `UnicodeStr` package.
@@ -32,6 +34,8 @@ iterator).
 
 Also in the works is using the new ability to add properties, in order to allow for different "views" of a string, no matter how it is stored internally, for example a `mystring.utf8` view, or a `mystring.utf16` view (that can use the internal cached copy if available, as an optimization).
 
+
+## Types
 Currently, there are the following types:
 
 * `Str`, which is the general, parameterized string type, and
@@ -65,6 +69,8 @@ The `cse` function returns the character set encoding for a string type or a str
 `charset` returns the character set, and `encoding` returns the encoding.
 For example, `cse(UTF8Str)` returns `UTF8CSE`, `charset(UTF8Str)` returns `CharSet{UTF32}`,
 `encoding(UTF8Str)` return `Encoding{UTF8}()`
+
+## Functions
 
 There is a new API that I am working on for indexing and searching, (however there is a problem on v0.7 due to the deprecation for `find` being overbroad, and causing a type of type piracy, deprecating methods of types not in Base):
 
