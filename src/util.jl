@@ -61,11 +61,11 @@ rpad(str::MaybeSub{<:Str}, cnt::Integer, pad::AbsChar=' ') =
 rpad(ch::Chr, cnt::Integer, pad::AbsChar=' ') =
     (cnt -= 1) <= 0 ? string(ch) : string(ch, pad^cnt)
 
-const SetOfChars = Union{Tuple{Vararg{<:AbstractChar}},
-                         AbstractVector{<:AbstractChar},
-                         Set{<:AbstractChar}}
+const SetOfChars = Union{Tuple{Vararg{<:AbsChar}},AbstractVector{<:AbsChar},Set{<:AbsChar}}
 
-function __split(str, splitter, limit, keep_empty, strs)
+import Base: split, rsplit, _split, _rsplit
+
+function _split(str::MaybeSub{<:Str}, splitter, limit::Integer, keep_empty::Bool, strs::Vector)
     pos = 1
     lst = lastindex(str)
     res = find(First, splitter, str)
@@ -86,15 +86,9 @@ function __split(str, splitter, limit, keep_empty, strs)
     (keep_empty || pos <= lst) ? push!(strs, SubString(str, pos)) : strs
 end
 
-Base._split(str::MaybeSub{T}, splitter, limit::Integer,
-            keep_empty::Bool, strs::Array) where {T<:Str} =
-    __split(str, splitter, limit, keep_empty, strs)
-Base._split(str::MaybeSub{T}, splitter::AbstractVector{<:AbsChar}, limit::Integer,
-            keep_empty::Bool, strs::Array) where {T<:Str} =
-    __split(str, in(splitter), limit, keep_empty, strs)
 
-function Base._rsplit(str::MaybeSub{T}, splitter, limit::Integer,
-                 keep_empty::Bool, strs::Array) where {T<:Str}
+function _rsplit(str::MaybeSub{T}, splitter, limit::Integer,
+                 keep_empty::Bool, strs::Vector) where {T<:Str}
     res = find(Last, splitter, str)
     j, k = first(res), last(res)
     pos = lastindex(str)
@@ -107,6 +101,37 @@ function Base._rsplit(str::MaybeSub{T}, splitter, limit::Integer,
     (keep_empty || pos > 0) && pushfirst!(strs, SubString(str, 1, pos))
     strs
 end
+
+function checkkeep(keepempty, keep, fun)
+    keep === nothing && return keepempty
+    @static V6_COMPAT ||
+        Base.depwarn("The `keep` keyword argument is deprecated; use `keepempty` instead", fun)
+    keep
+end
+
+splitarr(::Type{C}) where {C} = SubString{Str{basecse(C),Nothing,Nothing,Nothing}}[]
+
+split(str::MaybeSub{<:Str{C}}, splitter;
+      limit::Integer=0, keepempty::Bool=true, keep::Union{Nothing,Bool}=nothing) where {C<:CSE} =
+    _split(str, splitter, limit, checkkeep(keepempty, keep, :split), splitarr(C))
+
+split(str::MaybeSub{<:Str{C}}, splitter::AbstractChar;
+      limit::Integer=0, keepempty::Bool=true, keep::Union{Nothing,Bool}=nothing) where {C<:CSE} =
+    _split(str, isequal(splitter), limit, checkkeep(keepempty, keep, :split), splitarr(C))
+
+split(str::MaybeSub{<:Str{C}}, splitter::SetOfChars;
+      limit::Integer=0, keepempty::Bool=true, keep::Union{Nothing,Bool}=nothing) where {C<:CSE} =
+    _split(str, in(splitter), limit, checkkeep(keepempty, keep, :split), splitarr(C))
+
+rsplit(str::MaybeSub{<:Str{C}}, splitter;
+       limit::Integer=0, keepempty::Bool=true, keep::Union{Nothing,Bool}=nothing) where {C<:CSE} =
+    _rsplit(str, splitter, limit, checkkeep(keepempty, keep, :rsplit), splitarr(C))
+rsplit(str::MaybeSub{<:Str{C}}, splitter::AbstractChar;
+       limit::Integer=0, keepempty::Bool=true, keep::Union{Nothing,Bool}=nothing) where {C<:CSE} =
+    _rsplit(str, isequal(splitter), limit, checkkeep(keepempty, keep, :rsplit), splitarr(C))
+rsplit(str::MaybeSub{<:Str{C}}, splitter::SetOfChars;
+       limit::Integer=0, keepempty::Bool=true, keep::Union{Nothing,Bool}=nothing) where {C<:CSE} =
+    _rsplit(str, in(splitter), limit, checkkeep(keepempty, keep, :rsplit), splitarr(C))
 
 _replace(io, repl, str, r, pattern) =
     print(io, repl)

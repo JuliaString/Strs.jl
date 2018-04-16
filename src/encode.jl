@@ -117,7 +117,7 @@ function convert(::Type{UniStr}, str::T) where {T<:Str}
     len, flags = count_chars(T, pointer(str), ncodeunits(str))
     if flags == 0
         Str(ASCIICSE, codeunit(T) == UInt8 ? str.data : _str_cpy(UInt8, str, len))
-    elseif (flags & ~UTF_LATIN1) == 0
+    elseif (flags & ~(UTF_LATIN1%UInt)) == 0
         Str(_LatinCSE, codeunit(T) == UInt8 ? str.data : _str_cpy(UInt8, str, len))
     elseif (flags & UTF_UNICODE4) == 0
         Str(_UCS2CSE, codeunit(T) == UInt16 ? str.data : _str_cpy(UInt16, str, len))
