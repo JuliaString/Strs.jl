@@ -8,14 +8,14 @@ Based in part on code for ASCIIString that used to be in Julia
 
 ## overload methods for efficiency ##
 
-is_ascii(str::Str{C}) where {C<:_LatinCSE}    = false
-is_latin(str::Str{C}) where {C<:Latin_CSEs}   = true
-is_bmp(str::Str{C}) where {C<:Latin_CSEs}     = true
-is_unicode(str::Str{C}) where {C<:Latin_CSEs} = true
+is_ascii(str::MaybeSub{<:Str{C}}) where {C<:_LatinCSE}    = false
+is_latin(str::MaybeSub{<:Str{C}}) where {C<:Latin_CSEs}   = true
+is_bmp(str::MaybeSub{<:Str{C}}) where {C<:Latin_CSEs}     = true
+is_unicode(str::MaybeSub{<:Str{C}}) where {C<:Latin_CSEs} = true
 
-const _UBS = Str{<:Union{ASCIICSE, Latin_CSEs}}
+const _UBS = Union{ASCIICSE, Latin_CSEs}
 
-function string(collection::_UBS...)
+function string(collection::MaybeSub{<:Str{_UBS}}...)
     length(collection) == 1 && return collection[1]
     len = 0
     @inbounds for str in collection
