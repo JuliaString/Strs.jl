@@ -87,7 +87,7 @@ end
 
 convert(::Type{Str}, str::AbstractString) = _str(str)
 convert(::Type{Str}, str::String)         = _str(str)
-convert(::Type{Str}, str::Str)            = str
+convert(::Type{Str}, str::Str) = str
 
 convert(::Type{<:Str{C}}, str::AbstractString) where {C} = convert(Str{C}, _str(str))
 convert(::Type{<:Str{C}}, str::Str{C}) where {C} = str
@@ -105,7 +105,7 @@ convert(::Type{<:Str{Text4CSE}}, vec::AbstractVector{UInt32}) =
 
 (::Type{Str})(str::AbstractString) = _str(str)
 (::Type{Str})(str::String)         = _str(str)
-(::Type{Str})(str::Str)            = str
+(::Type{Str})(str::Str) = str
 
 (::Type{UniStr})(str::AbstractString) = _str(str)
 (::Type{UniStr})(str::String)         = _str(str)
@@ -135,7 +135,7 @@ convert(::Type{<:Str{LatinCSE}}, str::Str{_LatinCSE}) = Str(LatinCSE, str.data)
 convert(::Type{<:Str{UCS2CSE}},  str::Str{_UCS2CSE})  = Str(UCS2CSE,  str.data)
 convert(::Type{<:Str{UTF32CSE}}, str::Str{_UTF32CSE}) = Str(UTF32CSE, str.data)
 
-convert(::Type{<:Str{LatinCSE}}, str::Str{ASCIICSE}) = Str(LatinCSE, str.data)
+convert(::Type{<:Str{LatinCSE}}, str::Str{ASCIICSE})  = Str(LatinCSE, str.data)
 
 convert(::Type{String}, str::Str{<:Union{ASCIICSE,Text1CSE,BinaryCSE}}) = str.data
 
@@ -178,7 +178,7 @@ function unsafe_str(str::Union{Vector{UInt8}, T, SubString{T}};
     # handle zero length string quickly
     (siz = sizeof(str)) == 0 && return empty_ascii
     @preserve str begin
-        pnt = pointer(str)
+        pnt = pointer(str)::Ptr{UInt8}
         len, flags, num4byte, num3byte, num2byte, latin1byte, invalids =
             unsafe_check_string(pnt, 1, siz;
                                 accept_long_null  = accept_long_null,
@@ -195,19 +195,18 @@ function unsafe_str(str::Union{Vector{UInt8}, T, SubString{T}};
         elseif num2byte + num3byte != 0
             Str(_UCS2CSE, _encode_utf16(pnt, len))
         else
-            Str(latin1byte == 0 ? ASCIICSE : _LatinCSE, _encode_ascii_latin(pointer(str), len))
+            Str(latin1byte == 0 ? ASCIICSE : _LatinCSE, _encode_ascii_latin(pnt, len))
         end
     end
 end
 
 """Convert to a UniStr if valid Unicode, otherwise return a Text1Str/Text2Str/Text4Str"""
-function unsafe_str(str::T;
+function unsafe_str(str::Union{MaybeSub{<:AbstractString},AbstractArray{T}};
                     accept_long_null  = false,
                     accept_surrogates = false,
                     accept_long_char  = false,
                     accept_invalids   = true
-                    ) where {T<:Union{AbstractString,SubString{<:AbstractString},
-                                      AbstractVector{<:Union{AbsChar,CodeUnitTypes}}}}
+                    ) where {T<:Union{AbstractChar,CodeUnitTypes}}
     # handle zero length string quickly
     is_empty(str) && return empty_ascii
     len, flags, num4byte, num3byte, num2byte, latin1byte, invalids =
