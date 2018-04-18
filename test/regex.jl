@@ -61,7 +61,8 @@ target = """71.163.72.113 - - [30/Jul/2014:16:40:55 -0700] "GET emptymind.org/th
         # Named subpatterns
         let m = match(r"(?<a>.)(.)(?<b>.)", T("xyz"))
             @test (m[:a], m[2], m["b"]) == ("x", "y", "z")
-            @test sprint(show, m) == "RegexMatchStr(\"xyz\", a=\"x\", 2=\"y\", b=\"z\")"
+            typ = T === Strs._LatinStr ? ASCIIStr : T
+            @test sprint(show, m) == "StrRegexMatch{$typ}(\"xyz\", a=\"x\", 2=\"y\", b=\"z\")"
         end
         # Backcapture reference in substitution string
         @static if !V6_COMPAT
