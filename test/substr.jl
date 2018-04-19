@@ -87,7 +87,11 @@ function testuni(T)
     @test_throws BoundsError getindex(u, 0:1)
     @test_throws BoundsError getindex(u, 7:7)
     @test reverseind(u, 1) == 4
-    @test_broken typeof(Base.cconvert(Ptr{Int8}, u)) == SubString{String}
+    if T === String
+        @test typeof(Base.cconvert(Ptr{Int8}, u)) == SubString{String}
+    else
+        @test typeof(Base.cconvert(Ptr{Int8}, u)) == String
+    end
     @test Base.cconvert(Ptr{Int8}, u) == u
 
 
