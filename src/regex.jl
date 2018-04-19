@@ -35,6 +35,11 @@ cvt_match(::Type{String}, co)   = (UInt32(co) & ~PCRE.NO_UTF_CHECK)
     (options & ~PCRE.EXECUTE_MASK) == 0 ? cvt_match(C, options) :
     throw(ArgumentError("invalid regex match options: $options"))
 
+function finalize!(re)
+    re.regex == C_NULL || PCRE.free_re(re.regex)
+    re.match_data == C_NULL || PCRE.free_match_data(re.match_data)
+end
+
 mutable struct StrRegex{T<:AbstractString}
     pattern::T
     compile_options::UInt32
@@ -49,10 +54,7 @@ mutable struct StrRegex{T<:AbstractString}
         re = compile(new{T}(pattern,
                             compile_opts(T, compile_options), match_opts(T, match_options),
                             C_NULL, C_NULL, Csize_t[], C_NULL))
-        finalizer(re) do re
-            re.regex == C_NULL || PCRE.free_re(re.regex)
-            re.match_data == C_NULL || PCRE.free_match_data(re.match_data)
-        end
+        @static V6_COMPAT ? finalizer(re, finalize!) : finalizer(finalize!, re)
         re
     end
 end
