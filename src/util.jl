@@ -133,17 +133,16 @@ rsplit(str::MaybeSub{<:Str{C}}, splitter::SetOfChars;
        limit::Integer=0, keepempty::Bool=true, keep::Union{Nothing,Bool}=nothing) where {C<:CSE} =
     _rsplit(str, in(splitter), limit, checkkeep(keepempty, keep, :rsplit), splitarr(C))
 
-_replace(io, repl, str, r, pattern) =
-    print(io, repl)
-_replace(io, repl::Function, str, r, pattern) =
-    print(io, repl(SubString(str, first(r), last(r))))
-_replace(io, repl::Function, str, r, pattern::Function) =
-    print(io, repl(str[first(r)]))
+#=
+_replace(io, repl, str, r, pattern) = print(io, repl)
+_replace(io, repl::Function, str, r, pattern) = print(io, repl(SubString(str, first(r), last(r))))
+_replace(io, repl::Function, str, r, pattern::Function) = print(io, repl(str[first(r)]))
+=#
 
 replace(str::MaybeSub{<:Str}, pat_repl::Pair{<:AbstractChar}; count::Integer=typemax(Int)) =
     replace(str, ==(first(pat_repl)) => last(pat_repl); count=count)
 replace(str::MaybeSub{<:Str}, pat_repl::Pair{<:SetOfChars}; count::Integer=typemax(Int)) =
-    replace(str, in(first(pat_repl)) => last(pat_repl), count=count)
+    replace(str, in(first(pat_repl)) => last(pat_repl); count=count)
 
 # Todo: this is using print, but it should be changed to make sure that everything is done via
 # writes (i.e. no translation to UTF-8)
@@ -164,7 +163,7 @@ function replace(str::MaybeSub{T}, pat_repl::Pair; count::Integer=typemax(Int)) 
         if pos == 1 || pos <= k
             print(out, SubString(str, pos, thisind(str, j - 1)))
             #unsafe_write(out, pointer(str, pos), UInt(j - pos))
-            _replace(out, repl, str, res, pattern)
+            Base._replace(out, repl, str, res, pattern)
         end
         if k < j
             pos = j
