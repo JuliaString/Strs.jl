@@ -426,7 +426,6 @@ occurs_in(needle::Str, hay::AbstractString) = _occurs_in(needle, hay)
 occurs_in(needle::Chr, hay::AbstractString) = _occurs_in(needle, hay)
 occurs_in(needle::Char, hay::Str)           = _occurs_in(needle, hay)
 occurs_in(needle::Str, hay::Str)            = _occurs_in(needle, hay)
-occurs_in(needle::Regex, hay::Str)          = _occurs_in(needle, hay)
 
 in(chr::Chr, str::AbstractString) = _occurs_in(chr, str)
 in(chr::AbsChar,   str::Str)      = _occurs_in(chr, str)

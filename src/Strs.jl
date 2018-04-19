@@ -52,16 +52,19 @@ representation, to store the following information:
 
 NotValidated, Invalid, NoASCII, Latin, BMP, UTF32, Hash present, Short
 
-2 bits: 00 -> Valid, 01 -> Invalid, 1x -> NotValidated
+2 bits: 00 -> Valid, 01 -> Invalid, 10 -> NotValidated, 11 means?
 1 bit:  0  -> Some ASCII, 1 -> no ASCII (bit flipped from others so that 0 -> ASCIIStr)
 1 bit:  0  -> No Latin1,  1 -> some Latin1
 1 bit:  0  -> ByteWise,   1 -> WordWise
 1 bit:  0/1 Hash present
 1 bit:  0/1 Short
+1 bit:  ?
 
 Extra byte for wordwise:
-1 bit:  0  -> No BMP,   1 -> some BMP
-1 bit:  0  -> All BMP,   1 -> some non-BMP
+1 bit:  0  -> None > 0x7ff, 1 -> some > 0x7ff (for UTF8 conversions?)
+1 bit:  0  -> No BMP,   1 -> some BMP (0x800-0xd7ff,0xe000-0xffff)
+1 bit:  0  -> Only BMP, 1 -> some non-BMP (0x10000-0x10ffff)
+Have at least 5 bits for other information.
 
 So: ASCIIStr would be: Valid, All ASCII, ... i.e. 0 + short/hash bits
     _LatinStr would be: Valid, maybe no ascii, Latin1, no bmp, no non-bmp
@@ -105,7 +108,7 @@ import Base: containsnul, convert, getindex, length, map, pointer, collect, in, 
              typemin, typemax, rem, size, ndims, first, last, eltype,
              isless, isequal, ==, -, +, *, ^, cmp, promote_rule, one, repeat, filter,
              print, show, isimmutable, chop, chomp, replace, ascii, uppercase, lowercase,
-             lstrip, rstrip, strip, lpad, rpad, split, rsplit, join, IOBuffer
+             lstrip, rstrip, strip, lpad, rpad, split, rsplit, join, IOBuffer, IteratorSize
 
 # Conditionally import names that are only in v0.6 or in master
 for sym in (:codeunit, :codeunits, :ncodeunits,
