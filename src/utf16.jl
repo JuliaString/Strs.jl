@@ -365,7 +365,7 @@ Returns:
 function _encode_utf16(pnt::Ptr{UInt8}, len)
     buf, out = _allocate(UInt16, len)
     fin = out + (len<<1)
-    @inbounds while out < fin
+    while out < fin
         ch = get_codeunit(pnt)%UInt16
         # Handle ASCII characters
         if ch <= 0x7f
@@ -432,7 +432,7 @@ Returns:
 function _encode_utf16(dat::Ptr{UInt32}, len)
     buf, pnt = _allocate(UInt16, len)
     fin = pnt + (len<<1)
-    @inbounds while pnt < fin
+    while pnt < fin
         ch = get_codeunit(dat)
         dat += 4
         if ch > 0x0ffff
@@ -453,7 +453,7 @@ end
 function convert(::Type{Vector{UInt16}}, str::Str{<:Word_CSEs})
     len = ncodeunits(str)
     vec = create_vector(UInt16, len)
-    @inbounds unsafe_copyto!(pointer(vec), pointer(str), len)
+    unsafe_copyto!(pointer(vec), pointer(str), len)
     vec
 end
 

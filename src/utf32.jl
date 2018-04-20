@@ -105,7 +105,7 @@ end
 function _transcode_utf8_to_utf32(pnt, len)
     buf, out = _allocate(UInt32, len)
     fin = bytoff(out, len)
-    @inbounds while out < fin
+    while out < fin
         ch = get_codeunit(pnt)%UInt32
         # Handle ASCII characters
         if ch <= 0x7f
@@ -268,23 +268,24 @@ function convert(::Type{T}, bytes::AbstractArray{UInt8}) where {C<:UTF32_CSEs,T<
     end
 end
 
-function is_valid(::Type{<:Str{UTF32CSE}}, str::Vector{<:UniRawChar})
+function is_valid(::Type{<:Str{UTF32CSE}}, str::AbstractArray{<:UniRawChar})
     @inbounds for c in str
         ch = c%UInt32
         (!is_surrogate_codeunit(ch) && ch <= 0x10ffff) || return false
     end
     true
 end
-function is_valid(::Type{<:Str{_UTF32CSE}}, str::Vector{<:UniRawChar})
+function is_valid(::Type{<:Str{_UTF32CSE}}, str::AbstractArray{<:UniRawChar})
+    msk = 0%UInt32
     @inbounds for c in str
-             ch = c%UInt32
-             
+        ch = c%UInt32
+        msk |= ch
         (!is_surrogate_codeunit(ch) && ch <= 0x10ffff) || return false
     end
-    true
+    msk > 0xffff
 end
 
-is_valid(vec::Vector{Char}) = is_unicode(vec)
+is_valid(vec::AbstractArray{Char}) = is_unicode(vec)
 
 function map(fun, str::MS_UTF32)
     @preserve str buf begin
