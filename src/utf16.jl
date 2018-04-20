@@ -223,7 +223,7 @@ end
     # output surrogate pair
     c1, c2 = get_utf16(ch)
     set_codeunit!(pnt,     c1)
-    set_codeunit!(pnt + 1, c2)
+    set_codeunit!(pnt + 2, c2)
     Str(C, buf)
 end
 

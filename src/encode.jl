@@ -101,18 +101,18 @@ function convert(::Type{<:Str{C}}, rng::UnitRange{<:CodeUnitTypes}) where {C<:CS
     isvalid(C, b) || unierror(UTF_ERR_INVALID, 1, b)
     isvalid(C, e) || unierror(UTF_ERR_INVALID, length(rng), e)
     # Need to calculate allocation length
-    Str(C, _str_cpy(C, rng, utf_length(C, b%UInt32, e%UInt32)))
+    Str(C, _str_cpy(C, rng, Int(e - b) + 1))
 end
 
 function convert(::Type{<:Str{C}}, rng::UnitRange{<:CodeUnitTypes}
-                 ) where {C<:ASCIICSE,Latin_CSEs,UTF8CSE,UTF16CSE,UCS2_CSEs,UTF32_CSEs}
+                 ) where {C<:Union{ASCIICSE,Latin_CSEs,UCS2_CSEs,UTF32_CSEs}}
     isempty(rng) && return empty_str(C)
     b, e = rng.start, rng.stop
     isvalid(C, b) || unierror(UTF_ERR_INVALID, 1, b)
     isvalid(C, e) || unierror(UTF_ERR_INVALID, length(rng), e)
     # If contains range 0xd800-0xdfff, then also invalid
     isempty(intersect(b%UInt32:e%UInt32, 0xd800:0xdfff)) || unierror(UTF_ERR_INVALID, 0, rng)
-    Str(C, _str_cpy(C, rng, utf_length(C, b%UInt32, e%UInt32)))
+    Str(C, _str_cpy(C, rng, Int(e - b) + 1))
 end
 
 function convert(::Type{<:Str{C}}, rng::UnitRange{T}) where {C<:CSE,T<:AbstractChar}
@@ -126,6 +126,54 @@ function convert(::Type{<:Str{C}}, rng::UnitRange{T}) where {C<:CSE,T<:AbstractC
     Str(C, _str_cpy(C, rng, utf_length(C, b%UInt32, e%UInt32)))
 end
 
+function convert(::Type{<:Str{C}}, rng::UnitRange{<:CodeUnitTypes}
+                 ) where {C<:Union{UTF8CSE,UTF16CSE}}
+    isempty(rng) && return empty_str(C)
+    b, e = rng.start, rng.stop
+    isvalid(C, b) || unierror(UTF_ERR_INVALID, 1, b)
+    isvalid(C, e) || unierror(UTF_ERR_INVALID, length(rng), e)
+    # If contains range 0xd800-0xdfff, then also invalid
+    isempty(intersect(b%UInt32:e%UInt32, 0xd800:0xdfff)) || unierror(UTF_ERR_INVALID, 0, rng)
+    len = utf_length(C, b%UInt32, e%UInt32)
+    buf, out = allocate(codeunit(T), len)
+    if C === UTF8CSE
+        while b <= min(e, 0x7f)
+            set_codeunit!(out, b)
+            out += 1
+            b += 0x01
+        end
+        while b <= min(e, 0x7ff)
+            out = output_utf8_2byte!(out, b)
+            b += 0x01
+        end
+        while b <= min(e, 0xffff)
+            out = output_utf8_3byte!(out, b)
+            b += 0x01
+        end
+        while b <= e
+            out = output_utf8_4byte!(out, b)
+            b += 0x01
+        end
+    else
+        while b <= min(e, 0xffff)
+            set_codeunit!(out, b)
+            out += 2
+            b += 0x01
+        end
+        while b <= e
+            c1, c2 = get_utf16(ch)
+            set_codeunit!(out,     c1)
+            set_codeunit!(out + 2, c2)
+            out += 4
+            b += 0x01
+        end
+    end
+    Str(C, buf)
+end
+
+convert(::Type{S}, rng::UnitRange{T}) where {T<:AbstractChar,S<:Str{Union{UTF8CSE,UTF16CSE}}} =
+    convert(S, (rng.start%UInt32):(rng.stop%UInt32))
+
 convert(::Type{Str}, str::AbstractString) = _str(str)
 convert(::Type{Str}, str::String)         = _str(str)
 convert(::Type{Str}, str::Str) = str
@@ -136,6 +184,12 @@ convert(::Type{<:Str{C}}, str::Str{C}) where {C} = str
 convert(::Type{UniStr}, str::AbstractString) = _str(str)
 convert(::Type{UniStr}, str::String)         = _str(str)
 convert(::Type{UniStr}, str::Str{<:Union{ASCIICSE,SubSet_CSEs}}) = str
+
+function convert(::Type{T},
+                 vec::AbstractArray{UInt8}) where {C<:Union{UTF8CSE,ASCIICSE},T<:Str{C}}
+    is_valid(T, vec) || unierror(UTF_ERR_INVALID)
+    Str(C, _str_cpy(UInt8, vec, length(vec)))
+end
 
 convert(::Type{<:Str{C}}, vec::AbstractArray{UInt8}) where {C<:Union{BinaryCSE,Text1CSE}} =
     Str(C, _str_cpy(UInt8, vec, length(vec)))

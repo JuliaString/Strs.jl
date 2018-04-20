@@ -586,8 +586,8 @@ latin1, 2-byte, 3-byte, and 4-byte sequences in a validated UTF-8 string
 function count_chars(::Type{UTF8Str}, ::Type{S}, pnt::Ptr{S}, pos, len) where {S<:CodeUnitTypes}
     totalchar = latin1byte = num2byte = num3byte = num4byte = 0
     fin = bytoff(pnt, len)
-    pnt = bytoff(pnt, pos)
-    while pnt <= fin
+    pnt = bytoff(pnt, pos - 1)
+    while pnt < fin
         ch = get_codeunit(pnt)
         pnt += 1
         totalchar += 1
@@ -616,8 +616,8 @@ latin1, 2-byte, 3-byte, and 4-byte sequences in a validated UTF-16, UCS2, or UTF
 function count_chars(::Type{T}, ::Type{S}, pnt::Ptr{S}, pos, len) where {S<:CodeUnitTypes,T<:Str}
     totalchar = latin1byte = num2byte = num3byte = num4byte = 0
     fin = bytoff(pnt, len)
-    pnt = bytoff(pnt, pos)
-    while pnt <= fin
+    pnt = bytoff(pnt, pos - 1)
+    while pnt < fin
         ch = get_codeunit(pnt)%UInt32
         pnt += sizeof(S)
         totalchar += 1
@@ -711,12 +711,16 @@ byte_string_classify(s::Str{<:Byte_CSEs}) = byte_string_classify(s.data)
     # 1: valid ASCII
     # 2: valid UTF-8
 
-is_valid(::Type{ASCIIStr},  s::Vector{UInt8}) = is_ascii(s)
-is_valid(::Type{UTF8Str},   s::Vector{UInt8}) = byte_string_classify(s) != 0
+is_unicode(arr::AbstractArray{<:CodeUnitTypes}) =
+    (try check_string(arr) ; catch ; return false ; end ; true)
+
+is_valid(::Type{<:Str{ASCIICSE}},  s::Vector{UInt8}) = is_ascii(s)
+is_valid(::Type{<:Str{UTF8CSE}},   s::Vector{UInt8}) = byte_string_classify(s) != 0
 is_valid(::Type{<:Str{LatinCSE}},  s::Vector{UInt8}) = true
 # This should be optimized, stop at first character > 0x7f
 is_valid(::Type{<:Str{_LatinCSE}}, s::Vector{UInt8}) = !is_ascii(s)
 
+is_valid(::Type{<:Str{UTF8CSE}},   s::AbstractArray{UInt8}) = is_unicode(s)
 is_valid(::Type{UniStr}, s::String) = is_unicode(s)
 is_valid(::Type{<:Str{C}}, s::String) where {C<:Union{UTF8CSE,UTF16CSE,UTF32CSE}} = is_unicode(s)
 is_valid(::Type{<:Str{ASCIICSE}}, s::String) = is_ascii(s)
@@ -747,7 +751,7 @@ function _cvtsize(::Type{T}, pnt::Ptr{S}, len) where {S<:CodeUnitTypes,T<:CodeUn
     fin = bytoff(pnt, len)
     #println("buf=$buf, out=$out, pnt=$pnt, fin=$fin, len=$len")
     while pnt < fin
-        set_codeunit!(out, get_codeunit(pnt))
+        set_codeunit!(out, get_codeunit(pnt)%T)
         out += sizeof(T)
         pnt += sizeof(S)
     end

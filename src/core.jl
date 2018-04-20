@@ -51,7 +51,7 @@ _nextcp(::Type{T}, pnt) where {T} = _nextcpfun(CodePointStyle(T), T, pnt)
         0 <  i <= lim || boundserr(str, i)
         0 <= j <  lim || boundserr(str, j)
     end
-    (cnt = j - i + 1) <= 1 ? Int(cnt > 0) :
+    (cnt = j - i + 1) <= 0 ? 0 :
         @preserve str _length(cs, cse(str), bytoff(pointer(str), i - 1), cnt)
 end
 
