@@ -133,12 +133,6 @@ rsplit(str::MaybeSub{<:Str{C}}, splitter::SetOfChars;
        limit::Integer=0, keepempty::Bool=true, keep::Union{Nothing,Bool}=nothing) where {C<:CSE} =
     _rsplit(str, in(splitter), limit, checkkeep(keepempty, keep, :rsplit), splitarr(C))
 
-#=
-_replace(io, repl, str, r, pattern) = print(io, repl)
-_replace(io, repl::Function, str, r, pattern) = print(io, repl(SubString(str, first(r), last(r))))
-_replace(io, repl::Function, str, r, pattern::Function) = print(io, repl(str[first(r)]))
-=#
-
 replace(str::MaybeSub{<:Str}, pat_repl::Pair{<:AbstractChar}; count::Integer=typemax(Int)) =
     replace(str, ==(first(pat_repl)) => last(pat_repl); count=count)
 replace(str::MaybeSub{<:Str}, pat_repl::Pair{<:SetOfChars}; count::Integer=typemax(Int)) =

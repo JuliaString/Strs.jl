@@ -102,8 +102,6 @@ Strs.lastindex(x::CharStr) = lastindex(x.chars)
 Strs.ncodeunits(x::CharStr) = lastindex(x.chars)
 Strs.codeunit(x::CharStr) = Char
 
-const IS_WORKING = false
-
 function testbasic(::Type{ST}, ::Type{C}) where {ST, C}
     emptystr = ST("")
     a_str    = ST("a")
@@ -874,7 +872,8 @@ end
     # codeunit vectors
 
     let s = ST("∀x∃y"), u = codeunits(s)
-        IS_WORKING && @test u isa Base.CodeUnits{UInt8,String}
+        # IS_WORKING
+        ST === String && @test u isa Base.CodeUnits{UInt8,String}
         @test length(u) == ncodeunits(s) == 8
         @test sizeof(u) == sizeof(s)
         @test eltype(u) === UInt8
@@ -887,7 +886,7 @@ end
         @test collect(u) == b"∀x∃y"
     end
 
-    if IS_WORKING
+    if ST === String # IS_WORKING
     # PR #25535
     let v = [0x40,0x41,0x42]
         @test ST(view(v, 2:3)) == "AB"

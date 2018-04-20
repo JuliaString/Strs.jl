@@ -50,7 +50,7 @@ codepoint_size(::Type{T}) where {T<:Union{String,Str}} = sizeof(eltype(T))
 
 get_codeunit(dat, pos) = codeunit(dat, pos)
 get_codeunit(pnt::Ptr{<:CodeUnitTypes}, pos) = unsafe_load(pnt, pos)
-get_codeunit(dat::AbstractVector{<:CodeUnitTypes}, pos) = dat[pos]
+get_codeunit(dat::AbstractArray{<:CodeUnitTypes}, pos) = dat[pos]
 get_codeunit(str::MaybeSub{<:Str}, pos::Integer) = @preserve str get_codeunit(pointer(str), pos)
 
 get_codeunit(dat) = get_codeunit(dat, 1)
@@ -59,11 +59,11 @@ get_codeunit(pnt::Ptr{<:CodeUnitTypes}) = unsafe_load(pnt)
 codeunit(str::Str, pos::Integer) = get_codeunit(str, pos)
 
 set_codeunit!(pnt::Ptr{<:CodeUnitTypes}, pos, ch) = unsafe_store!(pnt, ch, pos)
-set_codeunit!(dat::AbstractVector{<:CodeUnitTypes}, pos, ch) = (dat[pos] = ch)
+set_codeunit!(dat::AbstractArray{<:CodeUnitTypes}, pos, ch) = (dat[pos] = ch)
 set_codeunit!(dat::String, pos, ch) = unsafe_store!(pointer(dat), pos, ch)
 
 set_codeunit!(pnt::Ptr{<:CodeUnitTypes}, ch) = unsafe_store!(pnt, ch)
-set_codeunit!(dat::AbstractVector{<:CodeUnitTypes}, ch) = (dat[1] = ch)
+set_codeunit!(dat::AbstractArray{<:CodeUnitTypes}, ch) = (dat[1] = ch)
 set_codeunit!(dat::String, ch) = set_codeunit!(dat, 1, ch)
 
 convert(::Type{T}, v::S) where {T<:Integer, S<:Chr} = convert(T, codepoint(v))::T

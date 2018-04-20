@@ -212,7 +212,7 @@ Base.SubString(str::AbstractString, rng::UnitRange) = SubString(str, first(rng),
 
 Base.checkbounds(::Type{Bool}, s::AbstractString, i::Integer) = 1 <= i <= ncodeunits(s)
 
-const _Chars = Union{<:Chr,Tuple{Vararg{<:Chr}},AbstractVector{<:Chr},Set{<:Chr},Base.Chars}
+const _Chars = Union{<:Chr,Tuple{Vararg{<:Chr}},AbstractArray{<:Chr},Set{<:Chr},Base.Chars}
 
 starts_with(str::AbstractString, chars::_Chars) = !is_empty(str) && first(str) in chars
 
