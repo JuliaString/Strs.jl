@@ -154,7 +154,7 @@ function unsafe_check_string(dat::T, pos, endpos;
                              accept_surrogates = false,
                              accept_long_char  = false,
                              accept_invalids   = false
-                             ) where {T<:Union{AbstractVector{UInt8}, Ptr{UInt8}, String}}
+                             ) where {T<:Union{AbstractArray{UInt8}, Ptr{UInt8}, String}}
     flags = 0%UInt
     totalchar = latin1byte = num2byte = num3byte = num4byte = invalids = 0
     @inbounds while pos <= endpos
@@ -284,7 +284,7 @@ function unsafe_check_string(dat::T, pos, endpos;
     _ret_check(totalchar, flags, invalids, latin1byte, num2byte, num3byte, num4byte)
 end
 
-function unsafe_check_string(dat::Union{AbstractVector{T}, Ptr{T}}, pos, endpos;
+function unsafe_check_string(dat::Union{AbstractArray{T}, Ptr{T}}, pos, endpos;
                              accept_long_null  = false,
                              accept_surrogates = false,
                              accept_long_char  = false,
@@ -321,7 +321,7 @@ function unsafe_check_string(dat::Union{AbstractVector{T}, Ptr{T}}, pos, endpos;
                 if !is_surrogate_trail(ch)
                     accept_invalids || unierror(UTF_ERR_NOT_TRAIL, pos, ch)
                     invalids += 1
-                elseif typeof(dat) <: AbstractVector{UInt16} # fix this test!
+                elseif typeof(dat) <: AbstractArray{UInt16} # fix this test!
                     num4byte += 1
                 elseif accept_surrogates
                     flags |= UTF_SURROGATE
@@ -583,26 +583,27 @@ end
 Calculate the total number of characters, as well as number of
 latin1, 2-byte, 3-byte, and 4-byte sequences in a validated UTF-8 string
 """
-function count_chars(::Type{UTF8Str}, ::Type{S}, dat::Union{AbstractVector{S}, Ptr{S}},
-                     pos, len) where {S<:CodeUnitTypes}
+function count_chars(::Type{UTF8Str}, ::Type{S}, pnt::Ptr{S}, pos, len) where {S<:CodeUnitTypes}
     totalchar = latin1byte = num2byte = num3byte = num4byte = 0
-    @inbounds while pos <= len
-        ch = get_codeunit(dat, pos)
+    fin = bytoff(pnt, len)
+    pnt = bytoff(pnt, pos - 1)
+    while pnt < fin
+        ch = get_codeunit(pnt)
+        pnt += 1
         totalchar += 1
-        if ch < 0x80 # ASCII characters
-            pos += 1
-        elseif ch < 0xc4 # 2-byte Latin 1 characters (0x80-0xff)
-            latin1byte += 1
-            pos += 2
-        elseif ch < 0xe0 # 2-byte BMP sequence (i.e. characters 0x100-0x7ff)
-            pos += 2
-            num2byte += 1
-        elseif ch < 0xf0 # 3-byte BMP sequence (0x800-0xffff)
-            pos += 3
-            num3byte += 1
-        else # 4-byte non-BMP sequence (0x10000 - 0x10ffff)
-            pos += 4
-            num4byte += 1
+        if ch > 0x7f # non-ASCII characters
+            pnt += 1
+            if ch < 0xc4 # 2-byte Latin 1 characters (0x80-0xff)
+                latin1byte += 1
+            elseif ch < 0xe0 # 2-byte BMP sequence (i.e. characters 0x100-0x7ff)
+                num2byte += 1
+            elseif ch < 0xf0 # 3-byte BMP sequence (0x800-0xffff)
+                pnt += 1
+                num3byte += 1
+            else # 4-byte non-BMP sequence (0x10000 - 0x10ffff)
+                pnt += 2
+                num4byte += 1
+            end
         end
     end
     _ret_check(totalchar, 0%UInt, 0, latin1byte, num2byte, num3byte, num4byte)
@@ -612,29 +613,31 @@ end
 Calculate the total number of characters, as well as number of
 latin1, 2-byte, 3-byte, and 4-byte sequences in a validated UTF-16, UCS2, or UTF-32 string
 """
-function count_chars(::Type{T}, ::Type{S}, dat::Union{AbstractVector{S}, Ptr{S}},
-                     pos, endpos) where {S<:CodeUnitTypes, T<:Str}
+function count_chars(::Type{T}, ::Type{S}, pnt::Ptr{S}, pos, len) where {S<:CodeUnitTypes,T<:Str}
     totalchar = latin1byte = num2byte = num3byte = num4byte = 0
-    @inbounds while pos <= endpos
-        ch = get_codeunit(dat, pos)%UInt32
-        pos += 1
+    fin = bytoff(pnt, len)
+    pnt = bytoff(pnt, pos - 1)
+    while pnt < fin
+        ch = get_codeunit(pnt)%UInt32
+        pnt += sizeof(S)
         totalchar += 1
-        if ch <= 0x7f # ASCII characters
-        elseif ch <= 0xff # 2-byte Latin 1 characters (0x80-0xff)
-            latin1byte += 1
-        elseif ch <= 0x7ff # 2-byte BMP sequence (i.e. characters 0x100-0x7ff)
-            num2byte += 1
-        elseif T == UTF16Str
-            if is_surrogate_lead(ch)
-                pos += 1
-                num4byte += 1
-            else
+        if ch > 0x7f # non-ASCII characters
+            if ch <= 0xff # 2-byte Latin 1 characters (0x80-0xff)
+                latin1byte += 1
+            elseif ch <= 0x7ff # 2-byte BMP sequence (i.e. characters 0x100-0x7ff)
+                num2byte += 1
+            elseif T == UTF16Str
+                if is_surrogate_lead(ch)
+                    pnt += sizeof(S)
+                    num4byte += 1
+                else
+                    num3byte += 1
+                end
+            elseif ch <= 0xffff # 3-byte BMP sequence (0x800-0xffff)
                 num3byte += 1
+            else # 4-byte non-BMP sequence (0x10000 - 0x10ffff)
+                num4byte += 1
             end
-        elseif ch <= 0xffff # 3-byte BMP sequence (0x800-0xffff)
-            num3byte += 1
-        else # 4-byte non-BMP sequence (0x10000 - 0x10ffff)
-            num4byte += 1
         end
     end
     _ret_check(totalchar, 0%UInt, 0, latin1byte, num2byte, num3byte, num4byte)
@@ -708,12 +711,16 @@ byte_string_classify(s::Str{<:Byte_CSEs}) = byte_string_classify(s.data)
     # 1: valid ASCII
     # 2: valid UTF-8
 
-is_valid(::Type{ASCIIStr},  s::Vector{UInt8}) = is_ascii(s)
-is_valid(::Type{UTF8Str},   s::Vector{UInt8}) = byte_string_classify(s) != 0
+is_unicode(arr::AbstractArray{<:CodeUnitTypes}) =
+    (try check_string(arr) ; catch ; return false ; end ; true)
+
+is_valid(::Type{<:Str{ASCIICSE}},  s::Vector{UInt8}) = is_ascii(s)
+is_valid(::Type{<:Str{UTF8CSE}},   s::Vector{UInt8}) = byte_string_classify(s) != 0
 is_valid(::Type{<:Str{LatinCSE}},  s::Vector{UInt8}) = true
 # This should be optimized, stop at first character > 0x7f
 is_valid(::Type{<:Str{_LatinCSE}}, s::Vector{UInt8}) = !is_ascii(s)
 
+is_valid(::Type{<:Str{UTF8CSE}},   s::AbstractArray{UInt8}) = is_unicode(s)
 is_valid(::Type{UniStr}, s::String) = is_unicode(s)
 is_valid(::Type{<:Str{C}}, s::String) where {C<:Union{UTF8CSE,UTF16CSE,UTF32CSE}} = is_unicode(s)
 is_valid(::Type{<:Str{ASCIICSE}}, s::String) = is_ascii(s)
@@ -744,7 +751,7 @@ function _cvtsize(::Type{T}, pnt::Ptr{S}, len) where {S<:CodeUnitTypes,T<:CodeUn
     fin = bytoff(pnt, len)
     #println("buf=$buf, out=$out, pnt=$pnt, fin=$fin, len=$len")
     while pnt < fin
-        set_codeunit!(out, get_codeunit(pnt))
+        set_codeunit!(out, get_codeunit(pnt)%T)
         out += sizeof(T)
         pnt += sizeof(S)
     end

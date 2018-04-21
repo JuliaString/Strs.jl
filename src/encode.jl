@@ -85,6 +85,95 @@ function _str_cpy(::Type{T}, str, len) where {T}
     end
 end
 
+utf_length(::Type{<:CSE}, b, e) = Int(e - b) + 1
+
+utf_length(l) = l < 0x80 ? l : ifelse(l < 0x800, l*2-0x80, l*3-0x880)
+
+# Must have either 1,2,3 byte characters, or 3,4 byte characters
+utf_length(::Type{UTF8CSE}, b, e) = utf_length(e) - utf_length(b)
+
+utf_length(::Type{UTF16CSE}, b, e) =
+    e <= 0xffff ? (e-b+1) : ifelse(b > 0xffff, (e-b+1)*2, (e*2-b-0xfffe))
+
+function convert(::Type{<:Str{C}}, rng::UnitRange{<:CodeUnitTypes}) where {C<:CSE}
+    isempty(rng) && return empty_str(C)
+    b, e = rng.start, rng.stop
+    isvalid(C, b) || unierror(UTF_ERR_INVALID, 1, b)
+    isvalid(C, e) || unierror(UTF_ERR_INVALID, length(rng), e)
+    # Need to calculate allocation length
+    Str(C, _str_cpy(C, rng, Int(e - b) + 1))
+end
+
+function convert(::Type{<:Str{C}}, rng::UnitRange{<:CodeUnitTypes}
+                 ) where {C<:Union{ASCIICSE,Latin_CSEs,UCS2_CSEs,UTF32_CSEs}}
+    isempty(rng) && return empty_str(C)
+    b, e = rng.start, rng.stop
+    isvalid(C, b) || unierror(UTF_ERR_INVALID, 1, b)
+    isvalid(C, e) || unierror(UTF_ERR_INVALID, length(rng), e)
+    # If contains range 0xd800-0xdfff, then also invalid
+    isempty(intersect(b%UInt32:e%UInt32, 0xd800:0xdfff)) || unierror(UTF_ERR_INVALID, 0, rng)
+    Str(C, _str_cpy(C, rng, Int(e - b) + 1))
+end
+
+function convert(::Type{<:Str{C}}, rng::UnitRange{T}) where {C<:CSE,T<:AbstractChar}
+    isempty(rng) && return empty_str(C)
+    b, e = rng.start, rng.stop
+    isvalid(C, b) || unierror(UTF_ERR_INVALID, 1, b)
+    isvalid(C, e) || unierror(UTF_ERR_INVALID, length(rng), e)
+    # If contains range 0xd800-0xdfff, then also invalid
+    isempty(intersect(b%UInt32:e%UInt32, 0xd800:0xdfff)) || unierror(UTF_ERR_INVALID, 0, rng)
+    # get counts in range
+    Str(C, _str_cpy(C, rng, utf_length(C, b%UInt32, e%UInt32)))
+end
+
+function convert(::Type{<:Str{C}}, rng::UnitRange{<:CodeUnitTypes}
+                 ) where {C<:Union{UTF8CSE,UTF16CSE}}
+    isempty(rng) && return empty_str(C)
+    b, e = rng.start, rng.stop
+    isvalid(C, b) || unierror(UTF_ERR_INVALID, 1, b)
+    isvalid(C, e) || unierror(UTF_ERR_INVALID, length(rng), e)
+    # If contains range 0xd800-0xdfff, then also invalid
+    isempty(intersect(b%UInt32:e%UInt32, 0xd800:0xdfff)) || unierror(UTF_ERR_INVALID, 0, rng)
+    len = utf_length(C, b%UInt32, e%UInt32)
+    buf, out = allocate(codeunit(T), len)
+    if C === UTF8CSE
+        while b <= min(e, 0x7f)
+            set_codeunit!(out, b)
+            out += 1
+            b += 0x01
+        end
+        while b <= min(e, 0x7ff)
+            out = output_utf8_2byte!(out, b)
+            b += 0x01
+        end
+        while b <= min(e, 0xffff)
+            out = output_utf8_3byte!(out, b)
+            b += 0x01
+        end
+        while b <= e
+            out = output_utf8_4byte!(out, b)
+            b += 0x01
+        end
+    else
+        while b <= min(e, 0xffff)
+            set_codeunit!(out, b)
+            out += 2
+            b += 0x01
+        end
+        while b <= e
+            c1, c2 = get_utf16(ch)
+            set_codeunit!(out,     c1)
+            set_codeunit!(out + 2, c2)
+            out += 4
+            b += 0x01
+        end
+    end
+    Str(C, buf)
+end
+
+convert(::Type{S}, rng::UnitRange{T}) where {T<:AbstractChar,S<:Str{Union{UTF8CSE,UTF16CSE}}} =
+    convert(S, (rng.start%UInt32):(rng.stop%UInt32))
+
 convert(::Type{Str}, str::AbstractString) = _str(str)
 convert(::Type{Str}, str::String)         = _str(str)
 convert(::Type{Str}, str::Str) = str
@@ -96,11 +185,17 @@ convert(::Type{UniStr}, str::AbstractString) = _str(str)
 convert(::Type{UniStr}, str::String)         = _str(str)
 convert(::Type{UniStr}, str::Str{<:Union{ASCIICSE,SubSet_CSEs}}) = str
 
-convert(::Type{<:Str{C}}, vec::AbstractVector{UInt8}) where {C<:Union{BinaryCSE,Text1CSE}} =
+function convert(::Type{T},
+                 vec::AbstractArray{UInt8}) where {C<:Union{UTF8CSE,ASCIICSE},T<:Str{C}}
+    is_valid(T, vec) || unierror(UTF_ERR_INVALID)
     Str(C, _str_cpy(UInt8, vec, length(vec)))
-convert(::Type{<:Str{Text2CSE}}, vec::AbstractVector{UInt16}) =
+end
+
+convert(::Type{<:Str{C}}, vec::AbstractArray{UInt8}) where {C<:Union{BinaryCSE,Text1CSE}} =
+    Str(C, _str_cpy(UInt8, vec, length(vec)))
+convert(::Type{<:Str{Text2CSE}}, vec::AbstractArray{UInt16}) =
     Str(Text2CSE, _str_cpy(UInt16, vec, length(vec)))
-convert(::Type{<:Str{Text4CSE}}, vec::AbstractVector{UInt32}) =
+convert(::Type{<:Str{Text4CSE}}, vec::AbstractArray{UInt32}) =
     Str(Text4CSE, _str_cpy(UInt32, vec, length(vec)))
 
 (::Type{Str})(str::AbstractString) = _str(str)
@@ -139,7 +234,7 @@ convert(::Type{<:Str{LatinCSE}}, str::Str{ASCIICSE})  = Str(LatinCSE, str.data)
 
 convert(::Type{String}, str::Str{<:Union{ASCIICSE,Text1CSE,BinaryCSE}}) = str.data
 
-function convert(::Type{String}, vec::AbstractVector{<:Chr})
+function convert(::Type{String}, vec::AbstractArray{<:Chr})
     out = get_iobuffer(sizeof(vec))
     @inbounds for ch in vec
         print(out, ch)
@@ -147,7 +242,7 @@ function convert(::Type{String}, vec::AbstractVector{<:Chr})
     String(take!(out))
 end
 
-function convert(::Type{String}, vec::AbstractVector{<:Union{Text1Chr,ASCIIChr}})
+function convert(::Type{String}, vec::AbstractArray{<:Union{Text1Chr,ASCIIChr}})
     @preserve buf begin
         buf, pnt = _allocate(UInt8, length(vec))
         @inbounds for byt in vec
@@ -158,7 +253,7 @@ function convert(::Type{String}, vec::AbstractVector{<:Union{Text1Chr,ASCIIChr}}
     end
 end
 
-function Str(vec::AbstractVector{T}) where {CS,BT,T<:Chr{CS,BT}}
+function Str(vec::AbstractArray{T}) where {CS,BT,T<:Chr{CS,BT}}
     C = codepoint_cse(T)
     buf, pnt = _allocate(BT, length(vec))
     @inbounds for ch in vec
@@ -238,7 +333,7 @@ function unsafe_str(str::Union{MaybeSub{<:AbstractString},AbstractArray{T}};
 end
 
 # Fallback constructors for Str types, from any AbstractString
-(::Type{T})(vec::S) where {T<:Str, S<:AbstractVector} = convert(T, vec)
+(::Type{T})(vec::S) where {T<:Str, S<:AbstractArray} = convert(T, vec)
 (::Type{T})(str::S) where {T<:Str, S<:AbstractString} = convert(T, str)
 (::Type{T})(str::S) where {T<:Str, S<:Str} = convert(T, str)
 (::Type{T})(str::T) where {T<:Str} = str

@@ -10,6 +10,14 @@ import Strs: check_string, UTF_ERR_SHORT, UnicodeError, codepoint_adj, codepoint
 
 const IndexError = isdefined(Base, :StringIndexError) ? StringIndexError : UnicodeError
 
+# Add definitions not present in v0.6.2 for GenericString
+@static if V6_COMPAT
+    Strs.ncodeunits(s::GenericString) = ncodeunits(s.string)
+    Strs.codeunit(s::GenericString) = codeunit(s.string)
+    Strs.codeunit(s::GenericString, i::Integer) = codeunit(s.string, i)
+end
+const CodeUnits = @static V6_COMPAT ? Strs.CodeUnits : Base.CodeUnits
+
 # Should test GenericString also, once overthing else is working
 const UnicodeStringTypes = (String, UTF8Str, )
     # (String, UTF16Str, UTF32Str, UniStr, UTF8Str)

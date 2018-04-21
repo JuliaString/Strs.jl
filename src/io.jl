@@ -383,40 +383,40 @@ end
     C
 end
 
-join(io::IO, strings::AbstractVector{<:MaybeSub{<:Str}}) =
+join(io::IO, strings::AbstractArray{<:MaybeSub{<:Str}}) =
     (_joinio(io, calc_type(strings), strings) ; nothing)
-join(io::IO, strings::AbstractVector{<:MaybeSub{<:Str}}, delim) =
+join(io::IO, strings::AbstractArray{<:MaybeSub{<:Str}}, delim) =
     (_joinio(io, calc_type(strings), strings, delim) ; nothing)
-join(io::IO, strings::AbstractVector{<:MaybeSub{<:Str}}, delim, last) =
+join(io::IO, strings::AbstractArray{<:MaybeSub{<:Str}}, delim, last) =
     (_joinio(io, calc_type(strings), strings, delim, last) ; nothing)
 
-join(strings::AbstractVector{<:MaybeSub{<:Str}}) =
+join(strings::AbstractArray{<:MaybeSub{<:Str}}) =
     _joincvt(calc_type(strings), strings)
-join(strings::AbstractVector{<:MaybeSub{T}}) where {C<:Union{ASCIICSE, Latin_CSEs},T<:Str{C}} =
+join(strings::AbstractArray{<:MaybeSub{T}}) where {C<:Union{ASCIICSE, Latin_CSEs},T<:Str{C}} =
     _join(C, strings)
-join(strings::AbstractVector{<:MaybeSub{T}}) where {C<:Word_CSEs,T<:Str{C}} =
+join(strings::AbstractArray{<:MaybeSub{T}}) where {C<:Word_CSEs,T<:Str{C}} =
     _join(C, strings)
-join(strings::AbstractVector{<:MaybeSub{T}}) where {C<:Quad_CSEs,T<:Str{C}} =
+join(strings::AbstractArray{<:MaybeSub{T}}) where {C<:Quad_CSEs,T<:Str{C}} =
     _join(C, strings)
 
-join(strings::AbstractVector{<:MaybeSub{<:Str}}, delim) =
+join(strings::AbstractArray{<:MaybeSub{<:Str}}, delim) =
     _joincvt(_calc_type(strings), strings, delim)
-join(strings::AbstractVector{<:MaybeSub{T}},
+join(strings::AbstractArray{<:MaybeSub{T}},
      delim) where {C<:Union{Text1CSE, BinaryCSE, ASCIICSE, Latin_CSEs},T<:Str{C}} =
     _join(C, strings, delim)
-join(strings::AbstractVector{<:MaybeSub{T}}, d) where {C<:Word_CSEs,T<:Str{C}} =
+join(strings::AbstractArray{<:MaybeSub{T}}, d) where {C<:Word_CSEs,T<:Str{C}} =
     _join(C, strings, delim)
-join(strings::AbstractVector{<:MaybeSub{T}}, d) where {C<:Quad_CSEs,T<:Str{C}} =
+join(strings::AbstractArray{<:MaybeSub{T}}, d) where {C<:Quad_CSEs,T<:Str{C}} =
     _join(C, strings, delim)
 
-join(strings::AbstractVector{<:MaybeSub{<:Str}}, delim, last) =
+join(strings::AbstractArray{<:MaybeSub{<:Str}}, delim, last) =
     _joincvt(calc_type(strings), strings, delim, last)
-join(strings::AbstractVector{<:MaybeSub{T}},
+join(strings::AbstractArray{<:MaybeSub{T}},
      delim, last) where {C<:Union{Text1CSE, BinaryCSE, ASCIICSE, Latin_CSEs},T<:Str{C}} =
          _join(C, strings, delim, last)
-join(strings::AbstractVector{<:MaybeSub{T}},
+join(strings::AbstractArray{<:MaybeSub{T}},
      delim, last) where {C<:Word_CSEs,T<:Str{C}} =
          _join(C, strings, delim, last)
-join(strings::AbstractVector{<:MaybeSub{T}},
+join(strings::AbstractArray{<:MaybeSub{T}},
      delim, last) where {C<:Quad_CSEs,T<:Str{C}} =
          _join(C, strings, delim, last)

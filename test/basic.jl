@@ -102,8 +102,6 @@ Strs.lastindex(x::CharStr) = lastindex(x.chars)
 Strs.ncodeunits(x::CharStr) = lastindex(x.chars)
 Strs.codeunit(x::CharStr) = Char
 
-const IS_WORKING = false
-
 function testbasic(::Type{ST}, ::Type{C}) where {ST, C}
     emptystr = ST("")
     a_str    = ST("a")
@@ -874,7 +872,7 @@ end
     # codeunit vectors
 
     let s = ST("∀x∃y"), u = codeunits(s)
-        IS_WORKING && @test u isa Base.CodeUnits{UInt8,String}
+        @test u isa CodeUnits{UInt8,ST}
         @test length(u) == ncodeunits(s) == 8
         @test sizeof(u) == sizeof(s)
         @test eltype(u) === UInt8
@@ -887,7 +885,7 @@ end
         @test collect(u) == b"∀x∃y"
     end
 
-    if IS_WORKING
+    if !V6_COMPAT # ST === String # IS_WORKING
     # PR #25535
     let v = [0x40,0x41,0x42]
         @test ST(view(v, 2:3)) == "AB"
@@ -897,6 +895,7 @@ end
     let rng = MersenneTwister(1),
         strs = [ST("∀εa∀aε"*String(rand(rng, Char, 100))*"∀εa∀aε"), ST(rand(rng, Char, 200))]
         for s in strs, i in 1:ncodeunits(s)+1, j in 0:ncodeunits(s)
+            length(s,i,j) == length(GenericString(s),i,j) || println("length(\"$s\",$i,$j)")
             @test length(s,i,j) == length(GenericString(s),i,j)
         end
         for i in 0:10, j in 1:100,

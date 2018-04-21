@@ -246,8 +246,9 @@ struct StrRegexMatchIterator{R<:RegexTypes,T<:AbstractString}
     string::T
     overlap::Bool
 
-    StrRegexMatchIterator(regex::RegexTypes, string::AbstractString, ovr::Bool=false) =
-        new{typeof(regex),typeof(string)}(regex, string, ovr)
+    StrRegexMatchIterator{R,T}(regex::R, string::T, ovr::Bool=false
+                               ) where {R<:RegexTypes,T<:AbstractString} =
+        new{R,T}(regex, string, ovr)
 end
 compile(itr::StrRegexMatchIterator) = (compile(itr.regex); itr)
 eltype(::Type{StrRegexMatchIterator}) = StrRegexMatch
