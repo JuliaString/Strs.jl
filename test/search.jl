@@ -10,9 +10,13 @@ const u8map = [1, 4, 5, 7, 8, 9, 10, 11, 12, 13, 16, 17, 19, 20, 21, 22, 23, 24,
                25, 26, 27, 28, 29, 30, 31, 32, 33, 35, 36, 39, 40, 41, 42, 43, 44,
                45, 46, 47, 48, 49, 50, 51, 52, 53, 54]
 
+pattype(P, p::AbstractString) = P(p)
+pattype(P, p::Regex) = p
+pattype(P, p::StrRegex) = p
+
 function test2(dir, P, str, list)
     for (p, res) in list
-        pat = typeof(p) == Regex ? p : P(p)
+        pat = pattype(P, p)
         (r = fnd(dir, pat, str)) == res ||
             println("fnd($dir, $(typeof(pat)):\"$pat\", $(typeof(str)):\"$str\") => $r != $res")
         @test fnd(dir, pat, str) == res
@@ -21,7 +25,7 @@ end
 
 function test3(dir, P, str, list)
     for (p, beg, res) in list
-        pat = typeof(p) == Regex ? p : P(p)
+        pat = pattype(P, p)
         (r = fnd(dir, pat, str, beg)) == res ||
             println("fnd($dir, $(typeof(pat)):\"$pat\", $(typeof(str)):\"$str\", $beg) => $r != $res")
         @test fnd(dir, pat, str, beg) == res

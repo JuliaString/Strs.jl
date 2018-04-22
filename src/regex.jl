@@ -13,13 +13,14 @@ import Base: Regex, match, compile, eachmatch
 
 export StrRegex, StrRegexMatch, StrRegex
 
-const Regex_CSEs = Union{ASCIICSE,Latin_CSEs,Binary_CSEs}
+const Binary_Regex_CSEs = Union{ASCIICSE,Latin_CSEs,Binary_CSEs}
+const Regex_CSEs = Union{Binary_Regex_CSEs,UTF8CSE,UniPlusCSE}
 
 # Default is to act as if validated UTF8
 cvt_compile(::Type{<:CSE}, co) = UInt32(co) | PCRE.NO_UTF_CHECK | PCRE.UTF
 cvt_match(::Type{<:CSE}, co)   = UInt32(co) | PCRE.NO_UTF_CHECK
 
-cvt_compile(::Type{Regex_CSEs}, co) = UInt32(co) & ~PCRE.UTF
+cvt_compile(::Type{Binary_Regex_CSEs}, co) = UInt32(co) & ~PCRE.UTF
 
 cvt_compile(::Type{<:Str{C}}, co) where {C<:CSE} = cvt_compile(C, co)
 cvt_match(::Type{<:Str{C}}, co) where {C<:CSE}   = cvt_match(C, co)
@@ -35,33 +36,73 @@ cvt_match(::Type{String}, co)   = (UInt32(co) & ~PCRE.NO_UTF_CHECK)
     (options & ~PCRE.EXECUTE_MASK) == 0 ? cvt_match(C, options) :
     throw(ArgumentError("invalid regex match options: $options"))
 
-function finalize!(re)
-    re.regex == C_NULL || PCRE.free_re(re.regex)
-    re.match_data == C_NULL || PCRE.free_match_data(re.match_data)
-end
+match_type(::Type{UTF8CSE})       = 1
+match_type(::Type{UniPlusCSE})    = 1
+match_type(::Type{UTF16CSE})      = 2
+match_type(::Type{<:UTF32_CSEs})  = 3
+match_type(::Type{ASCIICSE})      = 4
+match_type(::Type{<:Binary_CSEs}) = 4
+match_type(::Type{<:Latin_CSEs})  = 4
+match_type(::Type{Text2CSE})      = 5
+match_type(::Type{<:UCS2_CSEs})   = 5
+match_type(::Type{Text4CSE})      = 6
+
+function finalize! end
 
 mutable struct StrRegex{T<:AbstractString}
     pattern::T
     compile_options::UInt32
     match_options::UInt32
-    regex::Ptr{Cvoid}
-    extra::Ptr{Cvoid}
+    regex::Ptr{Cvoid} # Current compiled regex
+    match_type::Int
     ovec::Vector{Csize_t}
     match_data::Ptr{Cvoid}
 
-    function StrRegex(pattern::T,
-                      compile_options::Integer, match_options::Integer) where {T<:AbstractString}
-        re = compile(new{T}(pattern,
+    # There are 6 combinations of CodeUnit size (8,16,32) and UTF/no-UTF
+    # 1 - UTF8
+    # 2 - UTF16
+    # 3 - UTF32/_UTF32
+    # 4 - Text1/ASCII/Binary - Latin/_Latin need (*UCP), but not (*UTF)
+    # 5 - Text2 - UCS2/_UCS2 need (*UCP), but not (*UTF)
+    # 6 - Text4
+    table::NTuple{6, Ptr{Cvoid}}
+
+    function StrRegex(pattern::T, compile_options::Integer, match_options::Integer
+                      ) where {T<:AbstractString}
+        re = compile(cse(T),
+                     new{T}(pattern,
                             compile_opts(T, compile_options), match_opts(T, match_options),
-                            C_NULL, C_NULL, Csize_t[], C_NULL))
+                            C_NULL, 0, Csize_t[], C_NULL,
+                            (C_NULL, C_NULL, C_NULL, C_NULL, C_NULL, C_NULL)))
         @static V6_COMPAT ? finalizer(re, finalize!) : finalizer(finalize!, re)
         re
     end
 end
 
+function update_table(t, re, n)
+    if n < 4
+        (n == 1 ? (re, t[2], t[3], t[4], t[5], t[6])
+         : n == 2 ? (t[1], re, t[3], t[4], t[5], t[6]) : (t[1], t[2], re, t[4], t[5], t[6]))
+    else
+        (n == 4 ? (t[1], t[2], t[3], re, t[5], t[6])
+         : n == 5 ? (t[1], t[2], t[3], t[4], re, t[6]) : (t[1], t[2], t[3], t[4], t[5], re))
+    end
+end
+
+function finalize!(re)
+    if re.regex != C_NULL
+        for reg in re.table
+            reg == C_NULL || PCRE.free_re(reg)
+        end
+        re.regex = C_NULL
+        re.table = (C_NULL, C_NULL, C_NULL, C_NULL, C_NULL, C_NULL)
+    end
+    re.match_data == C_NULL || PCRE.free_match_data(re.match_data)
+end
+
 const RegexTypes = Union{Regex, StrRegex}
 
-function _update_compiler_opts(flags)
+function _update_compile_opts(flags)
     options = DEFAULT_COMPILER_OPTS
     for f in flags
         options |= f=='i' ? PCRE.CASELESS  :
@@ -78,19 +119,16 @@ StrRegex(pattern::AbstractString) =
 StrRegex(pattern::AbstractString, flags::AbstractString) =
     StrRegex(pattern, _update_compile_opts(flags), DEFAULT_MATCH_OPTS)
 
+#=
 Regex(pattern::MaybeSub{<:Str}, co, mo) = StrRegex(pattern, co, mo)
 Regex(pattern::MaybeSub{<:Str}, flags::AbstractString) = StrRegex(pattern, flags)
 Regex(pattern::MaybeSub{<:Str}) = StrRegex(pattern)
+=#
 
-function compile(regex::StrRegex)
-    if regex.regex == C_NULL
-        regex.regex = PCRE.compile(regex.pattern, regex.compile_options)
-        PCRE.jit_compile(regex.regex)
-        regex.match_data = PCRE.create_match_data(regex.regex)
-        regex.ovec = PCRE.get_ovec(regex.match_data)
-    end
-    regex
-end
+# Yes, this is type piracy, but it is needed to make all string types work together easily
+Regex(pattern::AbstractString, co::Integer, mo::Integer) = StrRegex(pattern, co, mo)
+Regex(pattern::AbstractString, flags::AbstractString) = StrRegex(pattern, flags)
+Regex(pattern::AbstractString) = StrRegex(pattern)
 
 export @R_str
 
@@ -150,14 +188,23 @@ end
 
 getindex(m::StrRegexMatch, name::AbstractString) = m[Symbol(name)]
 
-"""
-Check if the compile flags match the current search
+function compile(::Type{C}, regex::StrRegex) where {C<:Regex_CSEs}
+    (nm = match_type(C)) == regex.match_type && return
+    regex.match_type = nm
+    if (re = regex.table[nm]) == C_NULL
+        regex.compile_options = cvtcomp = cvt_compile(C, regex.compile_options)
+        regex.regex = re = PCRE.compile(regex.pattern, cvtcomp)
+        regex.table = update_table(regex.table, re, nm)
+        PCRE.jit_compile(re)
+    end
+    if regex.match_data == C_NULL
+        regex.match_data = PCRE.create_match_data(re)
+        regex.ovec = PCRE.get_ovec(regex.match_data)
+    end
+    regex
+end
 
-If not, free up old compilation, and recompile
-For better performance, the StrRegex object should hold spots for 5 compiled regexes,
-for 8-bit, UTF-8, 16-bit, UTF-16, and 32-bit code units
-"""
-function check_compile(::Type{C}, regex::RegexTypes) where {C<:Union{CSE,String}}
+function compile(::Type{C}, regex::Regex) where {C<:Regex_CSEs}
     re = regex.regex
     # ASCII is compatible with all (current) types, don't recompile
     C == ASCIICSE && re != C_NULL && return
@@ -166,20 +213,20 @@ function check_compile(::Type{C}, regex::RegexTypes) where {C<:Union{CSE,String}
     if cvtcomp != oldopt
         regex.compile_options = cvtcomp
         re == C_NULL || (PCRE.free_re(re); regex.regex = re = C_NULL)
-        regex.match_data == C_NULL ||
-            (PCRE.free_match_data(regex.match_data); regex.match_data = C_NULL)
     end
     if re == C_NULL
         regex.regex = re = PCRE.compile(regex.pattern, cvtcomp)
         PCRE.jit_compile(re)
+    end
+    if regex.match_data == C_NULL
         regex.match_data = PCRE.create_match_data(re)
         regex.ovec = PCRE.get_ovec(regex.match_data)
     end
-    nothing
+    regex
 end
 
 function _match(::Type{C}, re, str, idx, add_opts) where {C<:CSE}
-    check_compile(C, re)
+    compile(C, re)
     PCRE.exec(re.regex, str, idx-1, cvt_match(C, re.match_options | add_opts), re.match_data) ||
         return nothing
     ovec = re.ovec
@@ -206,7 +253,7 @@ match(re::StrRegex, str::MaybeSub{<:Str{C}}, idx::Integer, add_opts::UInt32=UInt
     _match(basecse(C), re, str, Int(idx), add_opts)
 
 @inline function __find(::Type{C}, re, str, idx) where {C}
-    check_compile(C, re)
+    compile(C, re)
     (PCRE.exec(re.regex, str, idx, cvt_match(C, re.match_options), re.match_data)
      ? ((Int(re.ovec[1]) + 1) : prevind(str, Int(re.ovec[2]) + 1)) : _not_found)
 end
@@ -225,12 +272,10 @@ find(::Type{Fwd}, re::RegexTypes, str::MaybeSub{<:AbstractString}, idx::Integer)
 
 find(::Type{Fwd}, re::RegexTypes, str::MaybeSub{<:Str{C}}, idx::Integer) where {C<:Regex_CSEs} =
     _find(C, re, str, idx)
-find(::Type{Fwd}, re::RegexTypes, str::MaybeSub{<:Str{UTF8CSE}}, idx::Integer) =
-    _find(UTF8CSE, re, str, idx)
 find(::Type{Fwd}, re::RegexTypes, str::MaybeSub{<:Str{_LatinCSE}}, idx::Integer) =
     _find(LatinCSE, re, str, idx)
 find(::Type{Fwd}, re::RegexTypes, str::MaybeSub{String}, idx::Integer) =
-    _find(UTF8CSE, re, str, idx)
+    _find(UniPlusCSE, re, str, idx)
 
 find(::Type{First}, re::RegexTypes, str::MaybeSub{<:AbstractString}) =
     find(Fwd, re, str, 1)
@@ -239,7 +284,7 @@ find(::Type{First}, re::RegexTypes, str::MaybeSub{<:Str{C}}) where {C<:Regex_CSE
 find(::Type{First}, re::RegexTypes, str::MaybeSub{<:Str{_LatinCSE}}) =
     _find(LatinCSE, re, str)
 find(::Type{First}, re::RegexTypes, str::MaybeSub{String}) =
-    _find(UTF8CSE, re, str)
+    _find(UniPlusCSE, re, str)
 
 struct StrRegexMatchIterator{R<:RegexTypes,T<:AbstractString}
     regex::R
@@ -284,25 +329,21 @@ eachmatch(re::StrRegex, str::AbstractString; overlap = false) =
 
 ## comparison ##
 
-function ==(a::RegexTypes, b::RegexTypes)
+==(a::RegexTypes, b::RegexTypes) =
     a.pattern == b.pattern &&
-        a.compile_options == b.compile_options &&
-        a.match_options == b.match_options
-end
+    a.compile_options == b.compile_options &&
+    a.match_options == b.match_options
 
 ## hash ##
-const hashre_seed = UInt === UInt64 ? 0x67e195eb8555e72d : 0xe32373e4
-function hash(r::StrRegex, h::UInt)
-    h += hashre_seed
-    h = hash(r.pattern, h)
-    h = hash(r.compile_options, h)
-    h = hash(r.match_options, h)
-end
+hash(r::StrRegex, h::UInt) =
+    hash(r.match_options,
+         hash(r.compile_options,
+              hash(r.pattern, h + UInt === UInt64 ? 0x67e195eb8555e72d : 0xe32373e4)))
 
 _occurs_in(r::RegexTypes, s::AbstractString, off::Integer) =
-    (compile(r) ; PCRE.exec(r.regex, UTF8Str(s), off, r.match_options, r.match_data))
-_occurs_in(r::RegexTypes, s::MaybeSub{<:Str}, off::Integer) =
-    (compile(r) ; PCRE.exec(r.regex, s, off, r.match_options, r.match_data))
+    (compile(UTF8CSE, r) ; PCRE.exec(r.regex, UTF8Str(s), off, r.match_options, r.match_data))
+_occurs_in(r::RegexTypes, s::MaybeSub{<:Str{C}}, off::Integer) where {C<:Regex_CSEs} =
+    (compile(C, r) ; PCRE.exec(r.regex, s, off, r.match_options, r.match_data))
 
 occurs_in(needle::StrRegex, hay::AbstractString; off::Integer=0) = _occurs_in(needle, hay, off)
 occurs_in(needle::Regex, hay::Str; off::Integer=0)               = _occurs_in(needle, hay, off)
