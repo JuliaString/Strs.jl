@@ -63,9 +63,9 @@ rpad(ch::Chr, cnt::Integer, pad::AbsChar=' ') =
 
 const SetOfChars = Union{Tuple{Vararg{<:AbsChar}},AbstractVector{<:AbsChar},Set{<:AbsChar}}
 
-import Base: split, rsplit, _split, _rsplit
+import Base: split, rsplit
 
-function _split(str::MaybeSub{<:Str}, splitter, limit::Integer, keep_empty::Bool, strs::Vector)
+function __split(str, splitter, limit::Integer, keep_empty::Bool, strs::Vector)
     pos = 1
     lst = lastindex(str)
     res = find(First, splitter, str)
@@ -87,8 +87,7 @@ function _split(str::MaybeSub{<:Str}, splitter, limit::Integer, keep_empty::Bool
 end
 
 
-function _rsplit(str::MaybeSub{T}, splitter, limit::Integer,
-                 keep_empty::Bool, strs::Vector) where {T<:Str}
+function __rsplit(str, splitter, limit::Integer, keep_empty::Bool, strs::Vector)
     res = find(Last, splitter, str)
     j, k = first(res), last(res)
     pos = lastindex(str)
@@ -111,36 +110,36 @@ end
 
 splitarr(::Type{C}) where {C} = SubString{Str{basecse(C),Nothing,Nothing,Nothing}}[]
 
+Base._split(str::MaybeSub{<:Str}, splitter, limit, keepempty, vec) =
+    __split(str, splitter, limit, keepempty, vec)
+Base._rsplit(str::MaybeSub{<:Str}, splitter, limit, keepempty, vec) =
+    __rsplit(str, splitter, limit, keepempty, vec)
+
 split(str::MaybeSub{<:Str{C}}, splitter;
       limit::Integer=0, keepempty::Bool=true, keep::Union{Nothing,Bool}=nothing) where {C<:CSE} =
-    _split(str, splitter, limit, checkkeep(keepempty, keep, :split), splitarr(C))
+    __split(str, splitter, limit, checkkeep(keepempty, keep, :split), splitarr(C))
 
 split(str::MaybeSub{<:Str{C}}, splitter::AbstractChar;
       limit::Integer=0, keepempty::Bool=true, keep::Union{Nothing,Bool}=nothing) where {C<:CSE} =
-    _split(str, isequal(splitter), limit, checkkeep(keepempty, keep, :split), splitarr(C))
+    __split(str, isequal(splitter), limit, checkkeep(keepempty, keep, :split), splitarr(C))
 
 split(str::MaybeSub{<:Str{C}}, splitter::SetOfChars;
       limit::Integer=0, keepempty::Bool=true, keep::Union{Nothing,Bool}=nothing) where {C<:CSE} =
-    _split(str, in(splitter), limit, checkkeep(keepempty, keep, :split), splitarr(C))
+    __split(str, in(splitter), limit, checkkeep(keepempty, keep, :split), splitarr(C))
 
 rsplit(str::MaybeSub{<:Str{C}}, splitter;
        limit::Integer=0, keepempty::Bool=true, keep::Union{Nothing,Bool}=nothing) where {C<:CSE} =
-    _rsplit(str, splitter, limit, checkkeep(keepempty, keep, :rsplit), splitarr(C))
+    __rsplit(str, splitter, limit, checkkeep(keepempty, keep, :rsplit), splitarr(C))
 rsplit(str::MaybeSub{<:Str{C}}, splitter::AbstractChar;
        limit::Integer=0, keepempty::Bool=true, keep::Union{Nothing,Bool}=nothing) where {C<:CSE} =
-    _rsplit(str, isequal(splitter), limit, checkkeep(keepempty, keep, :rsplit), splitarr(C))
+    __rsplit(str, isequal(splitter), limit, checkkeep(keepempty, keep, :rsplit), splitarr(C))
 rsplit(str::MaybeSub{<:Str{C}}, splitter::SetOfChars;
        limit::Integer=0, keepempty::Bool=true, keep::Union{Nothing,Bool}=nothing) where {C<:CSE} =
-    _rsplit(str, in(splitter), limit, checkkeep(keepempty, keep, :rsplit), splitarr(C))
-
-replace(str::MaybeSub{<:Str}, pat_repl::Pair{<:AbstractChar}; count::Integer=typemax(Int)) =
-    replace(str, ==(first(pat_repl)) => last(pat_repl); count=count)
-replace(str::MaybeSub{<:Str}, pat_repl::Pair{<:SetOfChars}; count::Integer=typemax(Int)) =
-    replace(str, in(first(pat_repl)) => last(pat_repl); count=count)
+    __rsplit(str, in(splitter), limit, checkkeep(keepempty, keep, :rsplit), splitarr(C))
 
 # Todo: this is using print, but it should be changed to make sure that everything is done via
 # writes (i.e. no translation to UTF-8)
-function replace(str::MaybeSub{T}, pat_repl::Pair; count::Integer=typemax(Int)) where {T<:Str}
+function __replace(str, pat_repl::Pair; count::Integer=typemax(Int))
     pattern, repl = pat_repl
     count == 0 && return str
     count < 0 && throw(DomainError(count, "`count` must be non-negative."))
@@ -167,10 +166,16 @@ function replace(str::MaybeSub{T}, pat_repl::Pair; count::Integer=typemax(Int)) 
             pos = k = nextind(str, k)
         end
         (count -= 1) > 0 || break
-        k > lst && break
         res = find(Fwd, pattern, str, k)
         (j = first(res)) == 0 && break
     end
     print(out, SubString(str, pos))
-    convert(T, String(take!(out)))
+    convert(Str{basecse(str),Nothing,Nothing,Nothing}, String(take!(out)))
 end
+
+replace(str::MaybeSub{<:Str}, pat_repl::Pair; count::Integer=typemax(Int)) =
+    __replace(str, pat_repl; count=count)
+replace(str::MaybeSub{<:Str}, pat_repl::Pair{<:AbstractChar}; count::Integer=typemax(Int)) =
+    __replace(str, ==(first(pat_repl)) => last(pat_repl); count=count)
+replace(str::MaybeSub{<:Str}, pat_repl::Pair{<:SetOfChars}; count::Integer=typemax(Int)) =
+    __replace(str, in(first(pat_repl)) => last(pat_repl); count=count)

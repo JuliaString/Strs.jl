@@ -10,13 +10,9 @@ const u8map = [1, 4, 5, 7, 8, 9, 10, 11, 12, 13, 16, 17, 19, 20, 21, 22, 23, 24,
                25, 26, 27, 28, 29, 30, 31, 32, 33, 35, 36, 39, 40, 41, 42, 43, 44,
                45, 46, 47, 48, 49, 50, 51, 52, 53, 54]
 
-pattype(P, p::AbstractString) = P(p)
-pattype(P, p::Regex) = p
-pattype(P, p::StrRegex) = p
-
 function test2(dir, P, str, list)
     for (p, res) in list
-        pat = pattype(P, p)
+        pat = P(p)
         (r = fnd(dir, pat, str)) == res ||
             println("fnd($dir, $(typeof(pat)):\"$pat\", $(typeof(str)):\"$str\") => $r != $res")
         @test fnd(dir, pat, str) == res
@@ -25,7 +21,7 @@ end
 
 function test3(dir, P, str, list)
     for (p, beg, res) in list
-        pat = pattype(P, p)
+        pat = P(p)
         (r = fnd(dir, pat, str, beg)) == res ||
             println("fnd($dir, $(typeof(pat)):\"$pat\", $(typeof(str)):\"$str\", $beg) => $r != $res")
         @test fnd(dir, pat, str, beg) == res
@@ -159,35 +155,6 @@ end
 
             @test fnd(First, emptyP, emptyT) == 1:0
             @test fnd(Last, emptyP, emptyT) == 1:0
-
-            @testset "Regex" begin
-                # string forward search with a single-char regex
-                let pats = (r"x", r"H", r"l", r"\n"),
-                    res  = (0:-1, 1:1, 3:3, 14:14)
-                    test2(First, P, str, zip(pats, res))
-                end
-                let pats = (r"H", r"l", r"l", r"l", r"\n"),
-                    pos  = (  2,    4,    5,   12,    14), # Was 15 for fndnext
-                    res  = (0:-1, 4:4,11:11, 0:-1, 14:14)
-                    test3(Fwd, P, str, zip(pats, pos, res))
-                end
-                i = 1
-                while i <= ncodeunits(str)
-                    @test fnd(Fwd, r"."s, str, i) == i:i
-                    # string forward search with a zero-char regex
-                    @test fnd(Fwd, r"", str, i) == i:i-1
-                    i = nextind(str, i)
-                end
-                let pats = (r"xx", r"fo", r"oo", r"o,", r",b", r"az"),
-                    res  = ( 0:-1,   1:2,   2:3,   3:4,   4:5, 10:11)
-                    test2(First, P, fbb, zip(pats, res))
-                end
-                let pats = (r"fo", r"oo", r"o,", r",b", r",b", r"az"),
-                    pos  = (    3,     4,     5,     6,    10,    11),
-                    res  = ( 0:-1,  0:-1,  0:-1,   8:9,  0:-1,  0:-1) # was 12 for fndnext
-                    test3(Fwd, P, fbb, zip(pats, pos, res))
-                end
-            end
         end
     end
 end
@@ -295,26 +262,6 @@ end
                 end
             end
 
-            @testset "Regex" begin
-                let pats = (r"z", r"∄", r"∀", r"∃", r"x", r"ε"),
-                    res  = (0:-1, 0:-1, 1:1, 13:13,26:26,  5:5)
-                    test2(First, P, str, zip(pats, res))
-                end
-                let pats = (r"∀", r"∃", r"x", r"x", r"ε", r"ε"),
-                    pos  = (   4,   16,   27,   44,    7,   54), # was 56 for fndnext
-                    res  = (0:-1, 0:-1,43:43, 0:-1,54:54,54:54)  # was 0:-1 for last
-                    test3(Fwd, P, str, zip(pats, pos, res))
-                end
-                @test fnd(First, r"∀", str)  == fnd(First, r"\u2200", str)
-                @test fnd(Fwd, r"∀", str, 4) == fnd(Fwd, r"\u2200", str, 4)
-                i = 1
-                while i <= ncodeunits(str)
-                    @test fnd(Fwd, r"."s, str, i) == i:i
-                    # string forward search with a zero-char regex
-                    @test fnd(Fwd, r"", str, i) == i:i-1
-                    i = nextind(str, i)
-                end
-            end
             @testset "issue #15723" begin
                 str = T("(⨳(")
                 test2ch(First, C, T("⨳("), zip(('(',), (4,)))
@@ -322,6 +269,7 @@ end
                 V6_COMPAT || test2ch(Last,  C, str, zip(('(',), (5,)))
                 V6_COMPAT || test3ch(Rev, C, str, zip(('(',), (2,), (1,)))
             end
+
             @testset "occurs_in with a String and Char needle" begin
                 str = T("foo")
                 @test occurs_in(P("o"), str)

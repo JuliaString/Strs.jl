@@ -46,5 +46,3 @@ include("basic.jl")
 @testset "SubStrings"        begin include("substr.jl")  end
 @testset "Utility functions" begin include("util.jl")    end
 @testset "IO functions"      begin include("io.jl")      end
-
-include("regex.jl")

@@ -178,8 +178,12 @@ convert(::Type{Str}, str::AbstractString) = _str(str)
 convert(::Type{Str}, str::String)         = _str(str)
 convert(::Type{Str}, str::Str) = str
 
-convert(::Type{<:Str{C}}, str::AbstractString) where {C} = convert(Str{C}, _str(str))
-convert(::Type{<:Str{C}}, str::Str{C}) where {C} = str
+convert(::Type{<:Str{C}}, str::AbstractString) where {C<:CSE} = convert(Str{C}, _str(str))
+convert(::Type{<:Str{C}}, str::Str{C}) where {C<:CSE} = str
+
+convert(::Type{<:Str{RawUTF8CSE}}, str::Str{ASCIICSE}) = Str(RawUTF8CSE, str.data)
+convert(::Type{<:Str{RawUTF8CSE}}, str::Str{UTF8CSE})  = Str(RawUTF8CSE, str.data)
+convert(::Type{<:Str{RawUTF8CSE}}, str::String)        = Str(RawUTF8CSE, str)
 
 convert(::Type{UniStr}, str::AbstractString) = _str(str)
 convert(::Type{UniStr}, str::String)         = _str(str)

@@ -79,6 +79,13 @@ utf_trail(c::UInt8) = (0xe5000000 >>> ((c & 0xf0) >> 3)) & 0x3
         len - (checkcont(pnt) ? (checkcont(pnt - 1) ? checkcont(pnt - 2) + 2 : 1) : 0)
     end
 end
+@inline function _lastindex(::CodeUnitMulti, str::MaybeSub{<:Str{RawUTF8CSE}})
+    (len = ncodeunits(str)) > 1 || return len
+    @preserve str begin
+        pnt = pointer(str) + len - 1
+        len - (checkcont(pnt) ? (checkcont(pnt - 1) ? checkcont(pnt - 2) + 2 : 1) : 0)
+    end
+end
 
 #=
 _cont(byt, n) = (byt >>> n)%UInt8 != 0x80
@@ -167,7 +174,7 @@ is_ascii(vec::Vector{T}) where {T<:CodeUnitTypes} =
     (cnt = sizeof(vec)) == 0 ? true :
     @preserve str _check_mask_ul(pointer(vec), cnt, _ascii_mask(T))
 
-is_ascii(str::Str{C}) where {C<:Union{UTF8CSE,LatinCSE,Binary_CSEs,UTF16CSE,UCS2CSE,
+is_ascii(str::Str{C}) where {C<:Union{UTF8_CSEs,LatinCSE,Binary_CSEs,UTF16CSE,UCS2CSE,
                                       Text2CSE,Text4CSE,UTF32CSE}} =
     (cnt = sizeof(str)) == 0 ? true :
     @preserve str _check_mask_al(reinterpret(Ptr{UInt64}, pointer(str)), cnt,
@@ -359,7 +366,12 @@ end
     end
 end
 
-done(str::Str{UTF8CSE}, i::Int) = i > sizeof(str.data)
+_next(::CodeUnitMulti, ::Type{T}, str::Str{RawUTF8CSE}, pos::Int) where {T} =
+    next(str.data, pos)
+_next(::CodeUnitMulti, ::Type{T}, str::SubString{<:Str{RawUTF8CSE}}, pos::Int) where {T} =
+    next(SubString(str.string.data, s.offset + pos, s.offset + ncodeunits(s)), 1)
+
+done(str::Str{<:UTF8_CSEs}, i::Int) = i > sizeof(str.data)
 
 length(it::CodePoints{<:AbstractString}, i::Int) = length(it.xs)
 
@@ -370,11 +382,11 @@ end
 
 ## overload methods for efficiency ##
 
-@inline _isvalid_char_pos(::CodeUnitMulti, ::Type{UTF8CSE}, str, pos::Integer) =
+@inline _isvalid_char_pos(::CodeUnitMulti, ::Type{<:UTF8_CSEs}, str, pos::Integer) =
     !is_valid_continuation(get_codeunit(pointer(str) + pos - 1))
 
 function _thisind(::CodeUnitMulti, str::MaybeSub{T}, len, pnt,
-                  pos::Integer) where {T<:Union{Str{<:UTF8CSE},String}}
+                  pos::Integer) where {T<:Union{Str{<:UTF8_CSEs},String}}
     pnt += pos - 1
     Int(pos) - (checkcont(pnt) ? (checkcont(pnt - 1) ? checkcont(pnt - 2) + 2 : 1) : 0)
 end
@@ -490,6 +502,27 @@ end
     end
     SubString(str, beg, lst)
 end
+
+# For now, use string support in Base for unvalidated UTF-8 strings
+_nextind(::CodeUnitMulti, str::Str{RawUTF8CSE}, pos::Int, nchar::Int) =
+    nextind(str.data, pos, nchar)
+_nextind(::CodeUnitMulti, str::Str{RawUTF8CSE}, pos::Int) =
+    nextind(str.data, pos)
+_prevind(::CodeUnitMulti, str::Str{RawUTF8CSE}, pos::Int, nchar::Int) =
+    prevind(str.data, pos, nchar)
+_prevind(::CodeUnitMulti, str::Str{RawUTF8CSE}, pos::Int) =
+    prevind(str.data, pos)
+
+#=
+_nextind(::CodeUnitMulti, str::SubString{<:Str{RawUTF8CSE}}, pos::Int, nchar::Int) =
+    nextind(str, pos, nchar)
+_nextind(::CodeUnitMulti, str::SubString{<:Str{RawUTF8CSE}}, pos::Int) =
+    nextind(str, pos)
+_prevind(::CodeUnitMulti, str::SubString{<:Str{RawUTF8CSE}}, pos::Int, nchar::Int) =
+    prevind(str, pos, nchar)
+_prevind(::CodeUnitMulti, str::SubString{<:Str{RawUTF8CSE}}, pos::Int) =
+    prevind(str, pos)
+=#
 
 const _ByteStr = Union{Str{ASCIICSE}, SubString{<:Str{ASCIICSE}},
                        Str{UTF8CSE},  SubString{<:Str{UTF8CSE}},
