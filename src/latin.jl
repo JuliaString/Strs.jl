@@ -90,14 +90,27 @@ end
 
 function convert(::Type{<:Str{C}}, str::AbstractString) where {C<:Latin_CSEs}
     # Might want to have invalids_as here
-    len, flags = unsafe_check_string(str)
-    (flags & ~(UTF_LONG | UTF_LATIN1)) == 0 || unierror(UTF_ERR_INVALID_LATIN1)
+    len, flags, num4byte, num3byte, num2byte = unsafe_check_string(str)
+    num4byte + num3byte + num2byte == 0 || unierror(UTF_ERR_INVALID_LATIN1)
     buf, pnt = _allocate(UInt8, len)
     @inbounds for ch in str
         set_codeunit!(pnt, ch%UInt8)
         pnt += 1
     end
     Str((C === _LatinCSE && flags == 0) ? ASCIICSE : C, buf)
+end
+
+function convert(::Type{<:Str{C}},
+                 str::MaybeSub{<:Str{<:Union{Word_CSEs,Quad_CSEs}}}) where {C<:Latin_CSEs}
+    # handle zero length string quickly
+    (len = ncodeunits(str)) == 0 && return C === _LatinCSE ? empty_ascii : empty_latin
+    @preserve str begin
+        pnt = pointer(str)
+        # get number of bytes to allocate
+        len, flags, num4byte, num3byte, num2byte, latinbyte = fast_check_string(pnt, len)
+        num4byte + num3byte + num2byte == 0 || unierror(UTF_ERR_INVALID_LATIN1)
+        Str((C === _LatinCSE && latinbyte == 0) ? ASCIICSE : C, _cvtsize(UInt8, pnt, len))
+    end
 end
 
 function convert(::Type{<:Str{LatinCSE}}, str::MS_ByteStr)

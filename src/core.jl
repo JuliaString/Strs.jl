@@ -242,17 +242,18 @@ cconvert(::Type{Ptr{T}}, str::SubString{<:Str{<:Byte_CSEs}}) where {T<:_Bytes} =
 cconvert(::Type{Ptr{UInt16}}, str::SubString{<:Str{<:Word_CSEs}}) = str
 cconvert(::Type{Ptr{UInt32}}, str::SubString{<:Str{<:Quad_CSEs}}) = str
 
-unsafe_convert(::Type{T}, s::SubString{<:Str{<:Byte_CSEs}}) where {T<:Ptr{<:_Bytes}} =
-    reinterpret(T, pointer(s) + s.offset)
-unsafe_convert(::Type{Ptr{UInt16}}, s::SubString{<:Str{<:Word_CSEs}}) =
-    pointer(s) + bytoff(UInt16, s.offset)
-unsafe_convert(::Type{Ptr{UInt32}}, s::SubString{<:Str{<:Quad_CSEs}}) =
-    pointer(s) + bytoff(UInt32, s.offset)
+unsafe_convert(::Type{Ptr{Int8}},   s::MaybeSub{<:Str{<:Byte_CSEs}}) =
+    reinterpret(Ptr{Int8}, pointer(s))
+unsafe_convert(::Type{Ptr{UInt8}},  s::MaybeSub{<:Str{<:Byte_CSEs}}) = pointer(s)
+unsafe_convert(::Type{Ptr{UInt16}}, s::MaybeSub{<:Str{<:Word_CSEs}}) = pointer(s)
+unsafe_convert(::Type{Ptr{UInt32}}, s::MaybeSub{<:Str{<:Quad_CSEs}}) = pointer(s)
 
-unsafe_convert(::Type{Ptr{Int8}},   s::Str{<:Byte_CSEs}) = reinterpret(Ptr{Int8}, pointer(s))
-unsafe_convert(::Type{Ptr{UInt8}},  s::Str{<:Byte_CSEs}) = pointer(s)
-unsafe_convert(::Type{Ptr{UInt16}}, s::Str{<:Word_CSEs}) = pointer(s)
-unsafe_convert(::Type{Ptr{UInt32}}, s::Str{<:Quad_CSEs}) = pointer(s)
+unsafe_convert(::Type{Ptr{Text1Chr}}, str::MaybeSub{<:Str{<:Byte_CSEs}}) =
+    reinterpret(Ptr{T}, pointer(str))
+unsafe_convert(::Type{Ptr{Text2Chr}}, str::MaybeSub{<:Str{<:Word_CSEs}}) =
+    reinterpret(Ptr{T}, pointer(str))
+unsafe_convert(::Type{Ptr{Text4Chr}}, str::MaybeSub{<:Str{<:Quad_CSEs}}) =
+    reinterpret(Ptr{T}, pointer(str))
 
 unsafe_convert(::Type{Ptr{Cvoid}},  s::MaybeSub{<:Str{C}}) where {C} =
     reinterpret(Ptr{Cvoid}, unsafe_convert(Ptr{codeunit(C)}, s))

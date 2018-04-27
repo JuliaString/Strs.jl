@@ -227,8 +227,12 @@ end
 
 #convert(::Type{<:Str{C}}, str::String) where {C} = convert(C, _str(str))
 
-convert(::Type{<:Str{Text1CSE}}, str::String) = Str(Text1CSE, str)
-convert(::Type{<:Str{BinaryCSE}}, str::String) = Str(BinaryCSE, str)
+convert(::Type{<:Str{Text1CSE}}, str::MaybeSub{String}) = Str(Text1CSE, String(str))
+convert(::Type{<:Str{BinaryCSE}}, str::MaybeSub{String}) = Str(BinaryCSE, String(str))
+convert(::Type{<:Str{BinaryCSE}}, str::Str{<:Union{ASCIICSE,Latin_CSEs,UTF8_CSEs}}) =
+    Str(BinaryCSE, str.data)
+convert(::Type{<:Str{BinaryCSE}}, str::SubString{<:Str{<:Union{ASCIICSE,Latin_CSEs,UTF8_CSEs}}}) =
+    Str(BinaryCSE, String(str))
 
 convert(::Type{<:Str{LatinCSE}}, str::Str{_LatinCSE}) = Str(LatinCSE, str.data)
 convert(::Type{<:Str{UCS2CSE}},  str::Str{_UCS2CSE})  = Str(UCS2CSE,  str.data)
