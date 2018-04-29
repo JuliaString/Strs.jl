@@ -26,6 +26,8 @@ Licensed under MIT License, see LICENSE.md
 @inline _write(::Type{UTF8CSE}, io, ch::AbsChar)   = write_utf8(io, codepoint(ch))
 @inline _write(::Type{UTF16CSE}, io, ch::AbsChar) = write_utf16(io, codepoint(ch))
 
+@inline _write(::Type{RawUTF8CSE}, io, ch::AbsChar) = print(io, codepoint(ch))
+
 @inline write(io::IO, ch::Chr) = write(io, codepoint(ch))
 
 # Todo: make this more common with print code
@@ -54,8 +56,10 @@ Licensed under MIT License, see LICENSE.md
     _fastwrite(io, str)
 @inline _write(::Type{UTF16CSE}, io, str::MaybeSub{<:Str{<:UCS2_CSEs}}) =
     _fastwrite(io, str)
+@inline _write(::Type{UTF8CSE}, io, str::MaybeSub{<:Str{RawUTF8CSE}}) =
+    _fastwrite(io, str)
 
-function _write(::Type{UTF8CSE}, io, str::MaybeSub{<:Str{<:Union{Latin_CSEs}}})
+function _write(::Type{<:UTF8_CSEs}, io, str::MaybeSub{<:Str{<:Union{Latin_CSEs}}})
     @preserve str begin
         pnt = pointer(str)
         fin = pnt + sizeof(str)
@@ -81,7 +85,7 @@ function _write(::Type{UTF8CSE}, io, str::MaybeSub{<:Str{<:Union{Latin_CSEs}}})
     end
 end
 
-function _write(::Type{UTF8CSE}, io, str::MaybeSub{<:Str{<:UCS2_CSEs}})
+function _write(::Type{<:UTF8_CSEs}, io, str::MaybeSub{<:Str{<:UCS2_CSEs}})
     @preserve str begin
         pnt = pointer(str)
         fin = pnt + sizeof(str)
@@ -104,7 +108,7 @@ function _write(::Type{UTF8CSE}, io, str::MaybeSub{<:Str{<:UCS2_CSEs}})
     end
 end
 
-function _write(::Type{UTF8CSE}, io, str::MaybeSub{<:Str{UTF16CSE}})
+function _write(::Type{<:UTF8_CSEs}, io, str::MaybeSub{<:Str{UTF16CSE}})
     @preserve str begin
         pnt = pointer(str)
         # Skip and write out ASCII sequences together
@@ -133,7 +137,7 @@ function _write(::Type{UTF8CSE}, io, str::MaybeSub{<:Str{UTF16CSE}})
 end
 
 
-function _write(::Type{UTF8CSE}, io, str::MaybeSub{<:Str{<:UTF32_CSEs}})
+function _write(::Type{<:UTF8_CSEs}, io, str::MaybeSub{<:Str{<:UTF32_CSEs}})
     @preserve str begin
         pnt = pointer(str)
         fin = pnt + sizeof(str)
@@ -206,7 +210,7 @@ function _write(::Type{<:UTF32_CSEs}, io, str::MaybeSub{<:Str{C}}
 end
 
 function _write(::Type{<:UTF32_CSEs}, io,
-                str::MaybeSub{<:Str{C}}) where {C<:Union{UTF8CSE,UTF16CSE}}
+                str::MaybeSub{<:Str{C}}) where {C<:Union{UTF8_CSEs,UTF16CSE}}
     cnt = 0
     @preserve str begin
         pnt = pointer(str)
@@ -229,7 +233,7 @@ print(io::IO, ch::LatinChars) = (_print(io, ch%UInt8) ; nothing)
 print(io::IO, str::MaybeSub{<:Str{<:CSE}}) = (_write(UTF8CSE, io, str) ; nothing)
 
 # optimized methods to avoid iterating over chars
-print(io::IO, str::MaybeSub{T}) where {T<:Str{<:Union{Text1CSE,BinaryCSE,ASCIICSE,UTF8CSE}}} =
+print(io::IO, str::MaybeSub{T}) where {T<:Str{<:Union{Binary_CSEs,ASCIICSE,UTF8_CSEs}}} =
     (_fastwrite(io, str); nothing)
 
 function sprint(f::Function, ::Type{T}, args...;

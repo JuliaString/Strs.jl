@@ -9,6 +9,9 @@ const graphemes  = Base.UTF8proc.graphemes
 const isassigned = Base.UTF8proc.is_assigned_char
 end
 
+Base.replace(str::String, pair::Pair{String,String}; count::Integer=0) =
+    replace(str, pair.first, pair.second, count)
+
 ## Start of code from operators.jl =================================================
 ##
 ## It is used to support the new string searching syntax on v0.6.2

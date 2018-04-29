@@ -237,10 +237,6 @@ convert(::Type{<:Str{Text4CSE}}, str::MaybeSub{<:Str{C}}
 
 convert(::Type{<:Str{Text4CSE}}, str::MaybeSub{<:Str{<:UTF32_CSEs}}) = Str(Text4CSE, _copysub(str))
 
-# I don't think this will work for Char anymore, broken by #24999
-unsafe_convert(::Type{Ptr{T}}, str::MaybeSub{Str{<:Quad_CSEs}}) where {T<:UniRawChar} =
-    @preserve str convert(Ptr{T}, pointer(str))
-
 # Should check for 0xxxxxfeff and 0xfffexxxx as well, might be 16-bit encoded
 _convert(pnt::Ptr{T}, len, T1) where {T<:Union{UInt32,UInt32_U,UInt32_S,UInt32_US}} =
     ((ch = unsafe_load(pnt)) == 0xfffe0000

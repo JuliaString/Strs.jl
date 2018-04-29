@@ -461,8 +461,6 @@ end
 convert(::Type{T},  str::MaybeSub{T}) where {T<:Str{<:Union{UCS2_CSEs, UTF32_CSEs}}} = str
 convert(::Type{<:Str{UTF16CSE}}, str::MaybeSub{<:Str{<:UCS2_CSEs}}) = Str(UTF16CSE, str.data)
 
-unsafe_convert(::Type{Ptr{UInt16}}, s::MS_UTF16) = pointer(s)
-
 function convert(::Type{<:Str{UTF16CSE}}, dat::AbstractArray{UInt16})
     is_empty(dat) && return empty_utf16
     len, flags, num4byte = unsafe_check_string(dat, 1, lastindex(dat))

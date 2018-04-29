@@ -73,7 +73,6 @@
         @test split(foobarbaz, cvtchar(C, 'x')) == [foobarbaz]
         @test split(foobarbaz, comma) == [foo,bar,baz]
         @test split(foobarbaz, ST(",")) == [foo,bar,baz]
-        @test split(foobarbaz, r",") == [foo,bar,baz]
         @test split(foobarbaz, comma; limit=0) == [foo,bar,baz]
         @test split(foobarbaz, comma; limit=1) == [foobarbaz]
         @test split(foobarbaz, comma; limit=2) == [foo,ST("bar,baz")]
@@ -114,10 +113,6 @@
             @test split(str, ".:.") == ["a","ba.",".cba",":.dcba",""]
             @test split(str, ".:."; keepempty=false) == ["a","ba.",".cba",":.dcba"]
             @test split(str, ".:.") == ["a","ba.",".cba",":.dcba",""]
-            @test split(str, r"\.(:\.)+") == ["a","ba.",".cba","dcba",""]
-            @test split(str, r"\.(:\.)+"; keepempty=false) == ["a","ba.",".cba","dcba"]
-            @test split(str, r"\.+:\.+") == ["a","ba","cba",":.dcba",""]
-            @test split(str, r"\.+:\.+"; keepempty=false) == ["a","ba","cba",":.dcba"]
 
             @test rsplit(str, ".:.") == ["a","ba.",".cba.:","dcba",""]
             @test rsplit(str, ".:."; keepempty=false) == ["a","ba.",".cba.:","dcba"]
@@ -134,19 +129,6 @@
         @test split(abc, "") == rsplit(abc, "") == ["a","b","c"]
         @test rsplit(abc, "", limit=2) == ["ab","c"]
         @test split(abc, "", limit=2) == ["a","bc"]
-
-        @test split(ST(""), r"") == [""]
-        @test split(abc,  r"") == ["a","b","c"]
-        @test split(abcd, r"b?") == ["a","c","d"]
-        @test split(abcd, r"b*") == ["a","c","d"]
-        @test split(abcd, r"b+") == ["a","cd"]
-        @test split(abcd, r"b?c?") == ["a","d"]
-        @test split(abcd, r"[bc]?") == ["a","","d"]
-        @test split(abcd, r"a*") == ["","b","c","d"]
-        @test split(abcd, r"a+") == ["","bcd"]
-        @test split(abcd, r"d*") == ["a","b","c",""]
-        @test split(abcd, r"d+") == [abc,""]
-        @test split(abcd, r"[ad]?") == ["","b","c",""]
 
         # multi-byte unicode characters (issue #26225)
         @test split(ST("α β γ"), ST(" ")) == rsplit(ST("α β γ"), ST(" ")) ==
@@ -175,13 +157,6 @@
 
         @test replace(abcd, "" => "^") == "^a^b^c^d^"
         @test replace(abcd, "b" => "^") == "a^cd"
-        @test replace(abcd, r"b?" => "^") == "^a^c^d^"
-        @test replace(abcd, r"b+" => "^") == "a^cd"
-        @test replace(abcd, r"b?c?" => "^") == "^a^d^"
-        @test replace(abcd, r"[bc]?" => "^") == "^a^^d^"
-
-        @test replace("foobarfoo", r"(fo|ba)" => "xx") == "xxoxxrxxo"
-        @test replace("foobarfoo", r"(foo|ba)" => bar) == "barbarrbar"
 
         @test replace(foobar, 'o' => 'ø') == "føøbar"
         @test replace(foobar, 'o' => 'ø', count=1) == "føobar"
@@ -229,21 +204,6 @@
 
         @test replace(ST("äƀçđ"), "" => "π") == "πäπƀπçπđπ"
         @test replace(ST("äƀçđ"), "ƀ" => "π") == "äπçđ"
-        @test replace(ST("äƀçđ"), r"ƀ?" => "π") == "πäπçπđπ"
-        @test replace(ST("äƀçđ"), r"ƀ+" => "π") == "äπçđ"
-        @test replace(ST("äƀçđ"), r"ƀ?ç?" => "π") == "πäπđπ"
-        @test replace(ST("äƀçđ"), r"[ƀç]?" => "π") == "πäππđπ"
-
-        @test replace(ST("foobarfoo"), r"(fo|ba)" => "ẍẍ") == "ẍẍoẍẍrẍẍo"
-
-        @test replace(ST("ḟøøbarḟøø"), r"(ḟø|ba)" => "xx") == "xxøxxrxxø"
-        @test replace(ST("ḟøøbarḟøø"), r"(ḟøø|ba)" => bar) == "barbarrbar"
-
-        @test replace(ST("fooƀäṙfoo"), r"(fo|ƀä)" => "xx") == "xxoxxṙxxo"
-        @test replace(ST("fooƀäṙfoo"), r"(foo|ƀä)" => "ƀäṙ") == "ƀäṙƀäṙṙƀäṙ"
-
-        @test replace(ST("ḟøøƀäṙḟøø"), r"(ḟø|ƀä)" => "xx") == "xxøxxṙxxø"
-        @test replace(ST("ḟøøƀäṙḟøø"), r"(ḟøø|ƀä)" => "ƀäṙ") == "ƀäṙƀäṙṙƀäṙ"
 
         @test replace(foo, "oo" => uppercase) == "fOO"
 
@@ -267,7 +227,6 @@
 
         # for Char pattern call Char replacement function
         @test replace(ST("a"), "a" => typeof) == "SubString{$ST}"
-        @test replace(ST("a"), r"a" => typeof) == "SubString{$ST}"
         @test replace(ST("a"), 'a' => typeof) == string(eltype(ST))
         @test replace(ST("a"), in("a") => typeof) == string(eltype(ST))
         @test replace(ST("a"), ['a'] => typeof) == string(eltype(ST))

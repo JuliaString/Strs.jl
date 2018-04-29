@@ -32,7 +32,7 @@ const test_legacy = false
 end
 
 using StringLiterals
-using Strs
+using Strs, StrRegex
 import Strs: LineCounts, CharTypes, CharStat, calcstats
 import Strs: _LatinStr, _UCS2Str, _UTF32Str, _LatinChr
 
@@ -594,9 +594,9 @@ searchstr(lines::Vector{String}, d=false) = searchlines(lines, "this is a test",
 searchstr(lines::Vector{T}, d=false) where {T} = searchlines(lines, T("this is a test"), d)
 
 searchreg(lines::Vector{<:AbstractString}, d=false) =
-    searchlinescvt(lines, r"this is a test", d)
-searchreg(lines::Vector{T}, d=false) where {T<:Str{<:Strs.Regex_CSEs}} =
-    searchlines(lines, r"this is a test", d)
+    searchlinescvt(lines, R"this is a test", d)
+searchreg(lines::Vector{T}, d=false) where {T<:Str{<:StrRegex.Regex_CSEs}} =
+    searchlines(lines, R"this is a test", d)
 searchreg(lines::Vector{String}, d=false) = searchlines(lines, r"this is a test", d)
 
 rsearchchar(lines) = searchchar(lines, true)

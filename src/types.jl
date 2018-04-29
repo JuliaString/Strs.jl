@@ -186,13 +186,17 @@ const _LatinCSE = CSE{LatinSubSet,  Native1Byte}
 const _UCS2CSE  = CSE{UCS2SubSet,   Native2Byte}
 const _UTF32CSE = CSE{UTF32SubSet,  Native4Byte}
 
-export UniPlusCSE
-const UniPlusCSE = CSE{UniPlusCharSet, UTF8Encoding}
+# Make wrappers for String type, this can help to be able to make (hashed) SubStr's of Strings
+export RawUTF8CSE, RawUTF8Str
+const RawUTF8CSE = CSE{UniPlusCharSet, UTF8Encoding}
+const RawUTF8Str = Str{RawUTF8CSE, Nothing, Nothing, Nothing}
+show(io::IO, ::Type{RawUTF8CSE}) = print(io, :RawUTF8CSE)
+show(io::IO, ::Type{RawUTF8Str}) = print(io, :RawUTF8Str)
+codepoint_cse(::Type{Char}) = RawUTF8CSE
 
 for nam in vcat(charsets, :_Latin)
     @eval codepoint_cse(::Type{$(symstr(nam,"Chr"))}) = $(symstr(nam,"CSE"))
 end
-codepoint_cse(::Type{Char}) = UniPlusCSE
 
 # Definition of built-in Str types
 
@@ -244,19 +248,24 @@ end
 # These should be done via traits
 const Binary_CSEs   = Union{Text1CSE, BinaryCSE}
 const Latin_CSEs    = Union{LatinCSE, _LatinCSE}
-const UTF8_CSEs     = Union{UTF8CSE,  UniPlusCSE}
+const UTF8_CSEs     = Union{UTF8CSE,  RawUTF8CSE}
 const UCS2_CSEs     = Union{UCS2CSE,  _UCS2CSE}
 const UTF32_CSEs    = Union{UTF32CSE, _UTF32CSE}
 const SubSet_CSEs   = Union{_LatinCSE, _UCS2CSE, _UTF32CSE}
 
-const Byte_CSEs     = Union{Text1CSE, BinaryCSE, ASCIICSE, LatinCSE, _LatinCSE, UTF8CSE}
-const Word_CSEs     = Union{Text2CSE, UCS2CSE, _UCS2CSE, UTF16CSE} # 16-bit characters
+const Byte_CSEs     = Union{ASCIICSE, Binary_CSEs, Latin_CSEs, UTF8_CSEs} # 8-bit code units
+const Word_CSEs     = Union{Text2CSE, UCS2CSE, _UCS2CSE, UTF16CSE} # 16-bit code units
 const Quad_CSEs     = Union{Text4CSE, UTF32CSE, _UTF32CSE}         # 32-bit code units
 
 basecse(::Type{C}) where {C<:CSE} = C
 basecse(::Type{_LatinCSE}) = LatinCSE
 basecse(::Type{_UCS2CSE})  = UCS2CSE
 basecse(::Type{_UTF32CSE}) = UTF32CSE
+
+basecse(::Type{<:Str{C}}) where {C<:CSE} = basecse(C)
+basecse(::Type{String}) = RawUTF8CSE
+
+basecse(::MaybeSub{T}) where {T<:AbstractString} = basecse(T)
 
 const MS_UTF8     = MaybeSub{<:Str{UTF8CSE}}
 const MS_UTF16    = MaybeSub{<:Str{UTF16CSE}}
@@ -267,7 +276,7 @@ const MS_ByteStr  = MaybeSub{<:Union{String,Str{BinaryCSE},Str{Text1CSE}}}
 const AbsChar = @static isdefined(Base, :AbstractChar) ? AbstractChar : Union{Char, Chr}
 
 ## Get the character set / encoding used by a string type
-cse(::Type{<:AbstractString}) = UniPlusCSE     # allows invalid sequences
+cse(::Type{<:AbstractString}) = RawUTF8CSE     # allows invalid sequences
 cse(::Type{<:SubString{T}}) where {T} = cse(T)
 cse(::Type{<:SubString{<:Str{C}}}) where {C<:SubSet_CSEs} = basecse(C)
 cse(::Type{<:Str{C}}) where {C<:CSE} = C

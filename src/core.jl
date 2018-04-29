@@ -44,6 +44,9 @@ _nextcp(::Type{T}, pnt) where {T} = _nextcpfun(CodePointStyle(T), T, pnt)
 
 @inline _length(::CodeUnitSingle, ::Type{<:CSE}, ::Ptr{<:CodeUnitTypes}, cnt::Int) = cnt
 
+@inline _length(::CodeUnitMulti, str::Str{RawUTF8CSE}) = length(str.data)
+@inline _length(::CodeUnitMulti, str::Str{RawUTF8CSE}, i::Int, j::Int) = length(str.data, i, j)
+
 @propagate_inbounds function _length(cs::CodePointStyle, str, i::Int, j::Int)
     @boundscheck begin
         # I think the bounds of these should be 1:siz
@@ -232,14 +235,28 @@ convert(::Type{T}, ch::Signed) where {T<:Str} = ch < 0 ? ncharerr(ch) : convert(
 Str(str::SubString{<:Str{C}}) where {C<:Byte_CSEs} =
     Str(C, unsafe_string(pointer(str.string, str.offset+1), str.ncodeunits))
 
-# don't make unnecessary copies when passing substrings to C functions
-cconvert(::Type{Ptr{UInt8}}, str::SubString{<:Str{<:Byte_CSEs}}) = str
-cconvert(::Type{Ptr{Int8}},  str::SubString{<:Str{<:Byte_CSEs}}) = str
+const _Bytes = Union{UInt8,Int8}
 
-unsafe_convert(::Type{Ptr{UInt8}}, s::SubString{<:Str{Byte_CSEs}}) =
-    convert(Ptr{UInt8}, pointer(s.string)) + s.offset
-unsafe_convert(::Type{Ptr{Int8}}, s::SubString{<:Str{Byte_CSEs}}) =
-    convert(Ptr{Int8}, pointer(s.string)) + s.offset
+# don't make unnecessary copies when passing substrings to C functions
+cconvert(::Type{Ptr{T}}, str::SubString{<:Str{<:Byte_CSEs}}) where {T<:_Bytes} = str
+cconvert(::Type{Ptr{UInt16}}, str::SubString{<:Str{<:Word_CSEs}}) = str
+cconvert(::Type{Ptr{UInt32}}, str::SubString{<:Str{<:Quad_CSEs}}) = str
+
+unsafe_convert(::Type{Ptr{Int8}},   s::MaybeSub{<:Str{<:Byte_CSEs}}) =
+    reinterpret(Ptr{Int8}, pointer(s))
+unsafe_convert(::Type{Ptr{UInt8}},  s::MaybeSub{<:Str{<:Byte_CSEs}}) = pointer(s)
+unsafe_convert(::Type{Ptr{UInt16}}, s::MaybeSub{<:Str{<:Word_CSEs}}) = pointer(s)
+unsafe_convert(::Type{Ptr{UInt32}}, s::MaybeSub{<:Str{<:Quad_CSEs}}) = pointer(s)
+
+unsafe_convert(::Type{Ptr{Text1Chr}}, str::MaybeSub{<:Str{<:Byte_CSEs}}) =
+    reinterpret(Ptr{T}, pointer(str))
+unsafe_convert(::Type{Ptr{Text2Chr}}, str::MaybeSub{<:Str{<:Word_CSEs}}) =
+    reinterpret(Ptr{T}, pointer(str))
+unsafe_convert(::Type{Ptr{Text4Chr}}, str::MaybeSub{<:Str{<:Quad_CSEs}}) =
+    reinterpret(Ptr{T}, pointer(str))
+
+unsafe_convert(::Type{Ptr{Cvoid}},  s::MaybeSub{<:Str{C}}) where {C} =
+    reinterpret(Ptr{Cvoid}, unsafe_convert(Ptr{codeunit(C)}, s))
 
 function _reverse(::CodeUnitSingle, ::Type{C}, len, str::Str{C}) where {C<:CSE}
     len < 2 && return str
