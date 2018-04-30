@@ -32,9 +32,15 @@ end
 
 ## transcoding to Latin1 ##
 
-convert(::Type{T}, s::T) where {T<:Str{<:Latin_CSEs}} = s
-convert(::Type{T}, s::Str{<:_UBS}) where {T<:Str{<:Latin_CSEs}} = T(s.data)
-convert(::Type{T}, s::Str{UTF8CSE}) where {T<:Str{<:Latin_CSEs}} = convert(T, s.data)
+#convert(::Type{T}, s::T) where {T<:Str{<:Latin_CSEs}} = s
+#convert(::Type{SubString{T}}, s::T) where {T<:Str{<:Latin_CSEs}} = SubString(s, 1)
+#convert(::Type{T}, s::T) where {T<:SubString{<:Str{<:Latin_CSEs}}} = s
+function convert(::Type{T}, s::MS_ASCIILatin) where {T<:Str{<:Latin_CSEs}}
+    C = basecse(T)
+    Str(C, _copysub(s))::Str{C,Nothing,Nothing,Nothing}
+end
+convert(::Type{<:SubString{T}}, s::MS_ASCIILatin) where {T<:Str{<:Latin_CSEs}} =
+    SubString(Str(basecse(T), _copysub(s)), 1)
 
 # Assumes that has already been checked for validity
 function _utf8_to_latin(pnt::Ptr{UInt8}, len)
@@ -88,7 +94,8 @@ function convert(::Type{String}, str::Str{<:Latin_CSEs})
     end
 end
 
-function convert(::Type{<:Str{C}}, str::AbstractString) where {C<:Latin_CSEs}
+function _convert(::Type{T}, str::AbstractString) where {C<:Latin_CSEs, T<:MaybeSub{<:Str{C}}}
+    is_empty(str) && return C === _LatinCSE ? empty_ascii : empty_latin
     # Might want to have invalids_as here
     len, flags, num4byte, num3byte, num2byte = unsafe_check_string(str)
     num4byte + num3byte + num2byte == 0 || unierror(UTF_ERR_INVALID_LATIN1)

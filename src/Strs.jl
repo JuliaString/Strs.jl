@@ -74,10 +74,18 @@ So: ASCIIStr would be: Valid, All ASCII, ... i.e. 0 + short/hash bits
 
 const V6_COMPAT = VERSION < v"0.7.0-DEV"
 
+@static if V6_COMPAT
+    has_module(mod) = isdefined(module_parent(current_module()), mod) || isdefined(Main, mod)
+else
+    has_module(mod) = isdefined(parentmodule(@__MODULE__), mod) || isdefined(Main, mod)
+end
+
+const HAS_COMPAT = has_module(:Compat)
+
 # Convenience functions
 export to_ascii, utf8, utf16, utf32
 
-export str, unsafe_str, codepoints, @str_str, @prn_str
+export str, unsafe_str, codepoints
 
 export category_code, category_string, category_abbrev, is_mutable, index
 
@@ -100,7 +108,7 @@ export is_assigned, is_grapheme_break, is_grapheme_break!, graphemes,
 symstr(s...) = Symbol(string(s...))
 quotesym(s...) = Expr(:quote, symstr(s...))
 
-using Base: @_inline_meta, @propagate_inbounds, @_propagate_inbounds_meta
+using Base: @_inline_meta, @propagate_inbounds, @_propagate_inbounds_meta, RefValue
 
 import Base: containsnul, convert, getindex, length, map, pointer, collect, in, hash,
              reverse, sizeof, string, cconvert, unsafe_convert, unsafe_load, read, write,

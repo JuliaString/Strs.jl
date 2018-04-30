@@ -1,9 +1,5 @@
 """"
-Enhanced string literals
-
 String literals with Swift-like format
-C and Python like formatting
-LaTex, Emoji, HTML, and Unicode names
 
 Copyright 2016-2018 Gandalf Software, Inc., Scott P. Jones
 Portions originally from code in Julia, copyright Julia contributors
@@ -11,10 +7,7 @@ Licensed under MIT License, see LICENSE.md
 """
 module Literals end
 
-#using Format
-#using StrTables, LaTeX_Entities, HTML_Entities, Unicode_Entities, Emoji_Entities
-
-#export @f_str, @F_str, @sinterpolate, @pr_str, @PR_str, @pr, @PR
+export @f_str, @F_str, @pr_str, @PR_str, @pr, @PR
 #export s_unescape_string, s_escape_string, s_print_unescaped, s_print_escaped
 
 @static if V6_COMPAT
@@ -30,263 +23,170 @@ else
 end
 
 """
-String macro with more Swift-like syntax
+String macro with more Swift-like syntax, plus support for emojis and LaTeX names
 """
-macro str_str(str)     ; _str(s_interp_parse(false, str)) ; end
-macro str_str(str, cs) ; dump(cs) ; _str(s_interp_parse(false, str)) ; end
+macro f_str(str) ; s_interp_parse(false, UniStr, str) ; end
+macro f_str(str, args...) ; for v in args ; dump(v) end ; s_interp_parse(false, UniStr, str) ; end
+
+"""
+String macro with more Swift-like syntax, plus support for emojis and LaTeX names, also legacy
+"""
+macro F_str(str) ; s_interp_parse(true, UniStr, str) ; end
 
 """
 String macros that calls print directly
 """
-macro prn_str(str)     ; s_print(false, str) ; end
-macro prn_str(str, cs) ; s_print(false, str) ; end
+macro pr_str(str) ; s_print(false, str) ; end
+macro PR_str(str) ; s_print(true, str) ; end
 
 throw_arg_err(msg) = throw(ArgumentError(msg))
-throw_arg_err(msg, s) = throw_arg_err(string(msg, repr(s)))
+throw_arg_err(msg, val) = throw_arg_err(string(msg, repr(val)))
 
 """
 Handle Unicode character constant, of form \\u{<hexdigits>}
 """
-function s_parse_unicode(io, s,  i)
-    done(s,i) &&
-        throw_arg_err("Incomplete \\u{...} in ", s)
-    c, i = next(s, i)
-    c != '{' &&
-        throw_arg_err("\\u missing opening { in ", s)
-    done(s,i) &&
-        throw_arg_err("Incomplete \\u{...} in ", s)
-    beg = i
-    c, i = next(s, i)
-    n::UInt32 = 0
-    k = 0
-    while c != '}'
-        done(s, i) &&
-            throw_arg_err("\\u{ missing closing } in ", s)
-        (k += 1) > 6 &&
-            throw_arg_err("Unicode constant too long in ", s)
-        n = n<<4 + c - ('0' <= c <= '9' ? '0' :
-                        'a' <= c <= 'f' ? 'a' - 10 :
-                        'A' <= c <= 'F' ? 'A' - 10 :
-                        throw_arg_err("\\u missing closing } in ", s))
-        c, i = next(s,i)
+function s_parse_unicode(io, str,  pos)
+    done(str, pos) && throw_arg_err("Incomplete \\u{...} in ", str)
+    chr, pos = next(str, pos)
+    chr != '{' && throw_arg_err("\\u missing opening { in ", str)
+    done(str, pos) && throw_arg_err("Incomplete \\u{...} in ", str)
+    beg = pos
+    chr, pos = next(str, pos)
+    num::UInt32 = 0
+    cnt = 0
+    while chr != '}'
+        done(str, pos) && throw_arg_err("\\u{ missing closing } in ", str)
+        (cnt += 1) > 6 && throw_arg_err("Unicode constant too long in ", str)
+        num = num<<4 + chr - ('0' <= chr <= '9' ? '0' :
+                              'a' <= chr <= 'f' ? 'a' - 10 :
+                              'A' <= chr <= 'F' ? 'A' - 10 :
+                              throw_arg_err("\\u missing closing } in ", str))
+        chr, pos = next(str, pos)
     end
-    k == 0 &&
-        throw_arg_err("\\u{} has no hex digits in ", s)
-    ((0x0d800 <= n <= 0x0dfff) || n > 0x10ffff) &&
-        throw_arg_err("Invalid Unicode character constant ", s[beg-3:i-1])
-    print(io, Char(n))
-    i
+    cnt == 0 && throw_arg_err("\\u{} has no hex digits in ", str)
+    ((0x0d800 <= num <= 0x0dfff) || num > 0x10ffff) &&
+        throw_arg_err("Invalid Unicode character constant ", str[beg-3:pos-1])
+    print(io, Char(num))
+    pos
 end
 
-#=
-"""
-Handle Emoji character, of form \\:name:
-"""
-function s_parse_emoji(io, s,  i)
-    beg = i # start location
-    c, i = next(s, i)
-    while c != ':'
-        done(s, i) &&
-            throw_arg_err("\\: missing closing : in ", s)
-        c, i = next(s, i)
-    end
-    emojistr = lookupname(Emoji_Entities.default, s[beg:i-2])
-    emojistr == "" &&
-        throw_arg_err("Invalid Emoji name in ", s)
-    print(io, emojistr)
-    i
-end
-
-"""
-Handle LaTeX character/string, of form \\<name>
-"""
-function s_parse_latex(io, s,  i)
-    beg = i # start location
-    c, i = next(s, i)
-    while c != '>'
-        done(s, i) &&
-            throw_arg_err("\\< missing closing > in ", s)
-        c, i = next(s, i)
-    end
-    latexstr = lookupname(LaTeX_Entities.default, s[beg:i-2])
-    latexstr == "" &&
-        throw_arg_err("Invalid LaTeX name in ", s)
-    print(io, latexstr)
-    i
-end
-
-"""
-Handle HTML character/string, of form \\&name;
-"""
-function s_parse_html(io, s,  i)
-    beg = i # start location
-    c, i = next(s, i)
-    while c != ';'
-        done(s, i) &&
-            throw_arg_err("\\& missing ending ; in ", s)
-        c, i = next(s, i)
-    end
-    htmlstr = lookupname(HTML_Entities.default, s[beg:i-2])
-    htmlstr == "" &&
-        throw_arg_err("Invalid HTML name in ", s)
-    print(io, htmlstr)
-    i
-end
-
-"""
-Handle Unicode name, of form \\N{name}, from Python
-"""
-function s_parse_uniname(io, s,  i)
-    done(s, i) &&
-        throw_arg_err("\\N incomplete in ", s)
-    c, i = next(s, i)
-    c != '{' &&
-        throw_arg_err("\\N missing initial { in ", s)
-    done(s, i) &&
-        throw_arg_err("\\N{ incomplete in ", s)
-    beg = i # start location
-    c, i = next(s, i)
-    while c != '}'
-        done(s, i) &&
-            throw_arg_err("\\N{ missing closing } in ", s)
-        c, i = next(s, i)
-    end
-    unistr = lookupname(Unicode_Entities.default, s[beg:i-2])
-    unistr == "" &&
-        throw_arg_err("Invalid Unicode name in ", s)
-    print(io, unistr)
-    i
-end
-=#
+check_extended(chr) = false
+parse_extended(io, str, pos, chr) = error("No literal extensions loaded")
+parse_fmt(io, str, pos, chr) = error("No format parser loaded")
+parse_pyfmt(io, str, pos, chr) = error("No Python format parser loaded")
 
 """
 String interpolation parsing, allow legacy \$, \\xHH, \\uHHHH, \\UHHHHHHHH
 """
-s_print_unescaped_legacy(io, s::AbstractString) = s_print_unescaped(io, s, true)
+s_print_unescaped_legacy(io, str::AbstractString) = s_print_unescaped(io, str, true)
 
 """
 String interpolation parsing
 Based on code resurrected from Julia base:
 https://github.com/JuliaLang/julia/blob/deab8eabd7089e2699a8f3a9598177b62cbb1733/base/string.jl
 """
-function s_print_unescaped(io, s::AbstractString, flg::Bool=false)
-    i = start(s)
-    while !done(s,i)
-        c, i = next(s,i)
-        if !done(s,i) && c == '\\'
-            c, i = next(s,i)
-            if c == 'u'
-                i = flg ? s_parse_unicode_legacy(io, s, i, c) : s_parse_unicode(io, s, i)
-#=
-            elseif c == ':'     # Emoji
-                i = s_parse_emoji(io, s, i)
-            elseif c == '&'     # HTML
-                i = s_parse_html(io, s, i)
-            elseif c == '<'     # LaTeX
-                i = s_parse_latex(io, s, i)
-            elseif c == 'N'     # Unicode name
-                i = s_parse_uniname(io, s, i)
-=#
-            elseif flg && c == 'U'
-                i = s_parse_unicode_legacy(io, s, i, c)
-            elseif flg && c == 'x' # hex byte
-                i = s_parse_hex_legacy(io, s, i)
+function s_print_unescaped(io, str::AbstractString, flg::Bool=false)
+    pos = start(str)
+    while !done(str, pos)
+        chr, pos = next(str, pos)
+        if !done(str, pos) && chr == '\\'
+            chr, pos = next(str, pos)
+            if (chr == 'u' ||  chr == 'U' || chr == 'x')
+                if flg
+                    pos = s_parse_legacy(io, str, pos, chr)
+                elseif chr == 'u'
+                    pos = s_parse_unicode(io, str, pos)
+                else
+                    throw_arg_err(string("\\", chr, " only supported in legacy mode (i.e. ",
+                                         "F\"...\" or PR\"...\""))
+                end
+            elseif check_extended(chr)
+                pos = parse_extended(io, str, pos, chr)
             else
-                c = (c == '0' ? '\0' :
-                     c == '$' ? '$'  :
-                     c == '"' ? '"'  :
-                     c == '\'' ? '\'' :
-                     c == '\\' ? '\\' :
-                     c == 'a' ? '\a' :
-                     c == 'b' ? '\b' :
-                     c == 't' ? '\t' :
-                     c == 'n' ? '\n' :
-                     c == 'v' ? '\v' :
-                     c == 'f' ? '\f' :
-                     c == 'r' ? '\r' :
-                     c == 'e' ? '\e' :
-                     throw_arg_err(string("Invalid \\",c," sequence in "), s))
-                write(io, UInt8(c))
+                chr = (chr == '0' ? '\0' :
+                       chr == '$' ? '$'  :
+                       chr == '"' ? '"'  :
+                       chr == '\'' ? '\'' :
+                       chr == '\\' ? '\\' :
+                       chr == 'a' ? '\a' :
+                       chr == 'b' ? '\b' :
+                       chr == 't' ? '\t' :
+                       chr == 'n' ? '\n' :
+                       chr == 'v' ? '\v' :
+                       chr == 'f' ? '\f' :
+                       chr == 'r' ? '\r' :
+                       chr == 'e' ? '\e' :
+                       throw_arg_err(string("Invalid \\", chr, " sequence in "), str))
+                write(io, UInt8(chr))
             end
         else
-            print(io, c)
+            print(io, chr)
         end
     end
 end
 
-function s_parse_unicode_legacy(io, s, i, c)
-    done(s, i) &&
-        throw_arg_err(string("\\", c, " used with no following hex digits"))
-    beg = i
-    m = (c == 'u' ? 4 : 8)
-    if s[i] == '{'
-        m == 4 || throw_arg_err("{ only allowed with \\u")
-        return s_parse_unicode(io, s, i)
+hexerr(chr) = throw_arg_err("\\$chr used with no following hex digits")
+
+function s_parse_legacy(io, str, pos, chr)
+    done(str, pos) && hexerr(chr)
+    beg = pos
+    max = chr == 'x' ? 2 : chr == 'u' ? 4 : 8
+    if str[pos] == '{'
+        max == 4 || throw_arg_err("{ only allowed with \\u")
+        return s_parse_unicode(io, str, pos)
     end
-    n = k = 0
-    while (k += 1) <= m && !done(s,i)
-        c, j = next(s,i)
-        n = '0' <= c <= '9' ? n<<4 + c-'0' :
-            'a' <= c <= 'f' ? n<<4 + c-'a'+10 :
-            'A' <= c <= 'F' ? n<<4 + c-'A'+10 : break
-        i = j
+    num = cnt = 0
+    while (cnt += 1) <= max && !done(str, pos)
+        chr, nxt = next(str, pos)
+        num = '0' <= chr <= '9' ? num << 4 + chr - '0' :
+              'a' <= chr <= 'f' ? num << 4 + chr - 'a' + 10 :
+              'A' <= chr <= 'F' ? num << 4 + chr - 'A' + 10 : break
+        pos = nxt
     end
-    k == 1 &&
-        throw_arg_err(string("\\", c, " used with no following hex digits"))
-    ((0x0d800 <= n <= 0x0dfff) || n > 0x10ffff) &&
-        throw_arg_err("Invalid Unicode character constant ", s[beg-2:i-1])
-    print(io, Char(n))
-    i
+    cnt == 1 && hexerr(chr)
+    if max == 2
+        write(io, UInt8(num))
+    elseif is_valid(UTF32Chr, num)
+        print(io, UTF32Chr(num))
+    else
+        throw_arg_err("Invalid Unicode character constant ", str[beg-2:pos-1])
+    end
+    pos
 end
 
-hexerr() = throw_arg_err("\\x used with no following hex digits")
-function s_parse_hex_legacy(io, s, i)
-    done(s,i) && hexerr()
-    c, i = next(s,i)
-    n = '0' <= c <= '9' ? c-'0' :
-        'a' <= c <= 'f' ? c-'a'+10 :
-        'A' <= c <= 'F' ? c-'A'+10 : hexerr()
-    if done(s,i)
-        write(io, UInt8(n))
-        return i
-    end
-    c, j = next(s,i)
-    n = '0' <= c <= '9' ? n<<4 + c-'0' :
-        'a' <= c <= 'f' ? n<<4 + c-'a'+10 :
-        'A' <= c <= 'F' ? n<<4 + c-'A'+10 : (j = i; n)
-    write(io, UInt8(n))
-    j
-end
+s_unescape_string(str::AbstractString) = _sprint(s_print_unescaped, str)
 
-s_unescape_string(s::AbstractString) = _sprint(s_print_unescaped, s)
-
-function s_print_escaped(io, s::AbstractString, esc::Union{AbstractString, Char})
-    i = start(s)
-    while !done(s,i)
-        c, i = next(s, i)
-        c == '\0'       ? print(io, "\\0") :
-        c == '\e'       ? print(io, "\\e") :
-        c == '\\'       ? print(io, "\\\\") :
-        c in esc        ? print(io, '\\', c) :
-        '\a' <= c <= '\r' ? print(io, '\\', "abtnvfr"[Int(c)-6]) :
-        isprint(c)      ? print(io, c) :
-                          print(io, "\\u{", outhex(c), "}")
+function s_print_escaped(io, str::AbstractString, esc::Union{AbstractString, AbsChar})
+    pos = start(str)
+    while !done(str, pos)
+        chr, pos = next(str, pos)
+        chr == '\0'         ? print(io, "\\0") :
+        chr == '\e'         ? print(io, "\\e") :
+        chr == '\\'         ? print(io, "\\\\") :
+        chr in esc          ? print(io, '\\', chr) :
+        '\a' <= chr <= '\r' ? print(io, '\\', "abtnvfr"[Int(chr)-6]) :
+        is_printable(chr)   ? print(io, chr) :
+                              print(io, "\\u{", outhex(chr%UInt32), "}")
     end
 end
 
-s_escape_string(s::AbstractString) = _sprint(s_print_escaped, s, '\"')
+s_escape_string(str::AbstractString) = _sprint(s_print_escaped, str, '\"')
 
-s_print(flg::Bool, s::AbstractString) = s_print(flg, s, flg ? s_unescape_str : s_unescape_legacy)
-function s_print(flg::Bool, s::AbstractString, unescape::Function)
-    sx = s_interp_parse_vec(flg, s, unescape)
+s_print(flg::Bool, str::AbstractString) =
+    s_print(flg, str, flg ? s_unescape_str : s_unescape_legacy)
+
+function s_print(flg::Bool, str::AbstractString, unescape::Function)
+    sx = s_interp_parse_vec(flg, str, unescape)
     (length(sx) == 1 && isa(sx[1], String)
      ? Expr(:call, :print, sx[1])
      : Expr(:call, :print, sx...))
 end
 
-function s_interp_parse(flg::Bool, s::AbstractString, unescape::Function, p::Function)
-    sx = s_interp_parse_vec(flg, s, unescape)
-    length(sx) == 1 && isa(sx[1], String) ? sx[1] : Expr(:call, :sprint, p, sx...)
+function s_interp_parse(flg::Bool, ::Type{S}, str::AbstractString,
+                        unescape::Function, p::Function) where {S<:AbstractString}
+    sx = s_interp_parse_vec(flg, str, unescape)
+    ((length(sx) == 1 && isa(sx[1], String)) ? sx[1]
+     : Expr(:call, :convert, S, Expr(:call, :sprint, p, sx...)))
 end
 
 function s_interp_parse_vec(flg::Bool, s::AbstractString, unescape::Function)
@@ -305,67 +205,10 @@ function s_interp_parse_vec(flg::Bool, s::AbstractString, unescape::Function)
                 push!(sx, esc(ex))
                 i = j
             elseif s[k] == '%'
-                # Move past \\, c should point to '%'
-                c, k = next(s, k)
-                done(s, k) && throw(_ParseError("Incomplete % expression"))
-                # Handle interpolation
-                if !is_empty(s[i:j-1])
-                    push!(sx, unescape(s[i:j-1]))
-                end
-                if s[k] == '('
-                    # Need to find end to parse to
-                    _, j = _parse(s, k, greedy=false)
-                    # This is a bit hacky, and probably doesn't perform as well as it could,
-                    # but it works! Same below.
-                    str = string("(StringLiterals.fmt", s[k:j-1], ')')
-                else
-                    # Move past %, c should point to letter
-                    beg = k
-                    while true
-                        c, k = next(s, k)
-                        done(s, k) &&
-                            throw(_ParseError("Incomplete % expression"))
-                        s[k] == '(' && break
-                    end
-                    _, j = _parse(s, k, greedy=false)
-                    str = string("(StringLiterals.cfmt(\"", s[beg-1:k-1], "\",", s[k+1:j-1], ')')
-                end
-                ex, _ = _parse(str, 1, greedy=false)
-                isa(ex, Expr) && (ex.head === :continue) &&
-                    throw(_ParseError("Incomplete expression"))
-                push!(sx, esc(ex))
-                i = j
+                i = j = parse_fmt(sx, s, unescape, i, j, k)
             elseif s[k] == '{'
-                # Move past \\, c should point to '{'
-                c, k = next(s, k)
-                done(s, k) &&
-                    throw(_ParseError("Incomplete {...} Python format expression"))
-                # Handle interpolation
-                is_empty(s[i:j-1]) ||
-                    push!(sx, unescape(s[i:j-1]))
-                beg = k # start location
-                c, k = next(s, k)
-                while c != '}'
-                    done(s, k) &&
-                        throw_arg_err("\\{ missing closing } in ", s)
-                    c, k = next(s, k)
-                end
-                done(s, k) &&
-                    throw(_ParseError("Missing (expr) in Python format expression"))
-                c, k = next(s, k)
-                c != '(' &&
-                    throw(_ParseError(string("Missing (expr) in Python format expression: ", c)))
-                # Need to find end to parse to
-                _, j = _parse(s, k-1, greedy=false)
-                # This is a bit hacky, and probably doesn't perform as well as it could,
-                # but it works! Same below.
-                str = string("(StringLiterals.pyfmt(\"", s[beg:k-3], "\",", s[k:j-1], ')')
-                ex, _ = _parse(str, 1, greedy=false)
-                isa(ex, Expr) && (ex.head === :continue) &&
-                    throw(_ParseError("Incomplete expression"))
-                push!(sx, esc(ex))
-                i = j
-            elseif flg && s[k] == '$'
+                i = j = parse_pyfmt(sx, s, unescape, i, j, k)
+           elseif flg && s[k] == '$'
                 is_empty(s[i:j-1]) ||
                     push!(sx, unescape(s[i:j-1]))
                 i = k
@@ -391,15 +234,16 @@ function s_interp_parse_vec(flg::Bool, s::AbstractString, unescape::Function)
     sx
 end
 
-function s_unescape_str(s)
-    s = s_unescape_string(s)
-    is_valid(String, s) ? s : throw_arg_err("Invalid UTF-8 sequence")
+function s_unescape_str(str)
+    str = s_unescape_string(str)
+    is_valid(String, str) ? str : throw_arg_err("Invalid UTF-8 sequence")
 end
-function s_unescape_legacy(s)
-    s = _sprint(s_print_unescaped_legacy, s)
-    is_valid(String, s) ? s : throw_arg_err("Invalid UTF-8 sequence")
+function s_unescape_legacy(str)
+    str = _sprint(s_print_unescaped_legacy, str)
+    is_valid(String, str) ? str : throw_arg_err("Invalid UTF-8 sequence")
 end
 
-s_interp_parse(flg::Bool, s::AbstractString, u::Function) = s_interp_parse(flg, s, u, print)
-s_interp_parse(flg::Bool, s::AbstractString) =
-    s_interp_parse(flg, s, flg ? s_unescape_legacy : s_unescape_str)
+s_interp_parse(flg::Bool, ::Type{S}, str::AbstractString, u::Function) where {S<:AbstractString} =
+    s_interp_parse(flg, S, str, u, print)
+s_interp_parse(flg::Bool,  ::Type{S}, str::AbstractString) where {S<:AbstractString} =
+    s_interp_parse(flg, S, str, flg ? s_unescape_legacy : s_unescape_str)
