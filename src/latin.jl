@@ -32,17 +32,14 @@ end
 
 ## transcoding to Latin1 ##
 
-#convert(::Type{T}, s::T) where {T<:Str{<:Latin_CSEs}} = s
-#convert(::Type{SubString{T}}, s::T) where {T<:Str{<:Latin_CSEs}} = SubString(s, 1)
-#convert(::Type{T}, s::T) where {T<:SubString{<:Str{<:Latin_CSEs}}} = s
-function convert(::Type{T}, s::MS_ASCIILatin) where {T<:Str{<:Latin_CSEs}}
-    C = basecse(T)
-    Str(C, _copysub(s))::Str{C,Nothing,Nothing,Nothing}
-end
-function convert(::Type{T}, s::MS_ASCIILatin) where {S<:Str{<:Latin_CSEs}, T<:SubString{S}}
-    C = basecse(T)
-    SubString{C}(Str(C, _copysub(s)), 1)
-end
+convert(::Type{<:Str{LatinCSE}}, s::MS_ASCIILatin) =
+    Str(LatinCSE, _copysub(s))::Str{LatinCSE,Nothing,Nothing,Nothing}
+convert(::Type{<:Str{_LatinCSE}}, s::MS_ASCIILatin) =
+    Str(_LatinCSE, _copysub(s))::Str{_LatinCSE,Nothing,Nothing,Nothing}
+convert(::Type{<:SubString{<:Str{LatinCSE}}}, s::MS_ASCIILatin) =
+    SubString(Str(LatinCSE, _copysub(s)), 1)
+convert(::Type{<:SubString{<:Str{_LatinCSE}}}, s::MS_ASCIILatin) =
+    SubString(Str(LatinCSE, _copysub(s)), 1)
 
 # Assumes that has already been checked for validity
 function _utf8_to_latin(pnt::Ptr{UInt8}, len)
