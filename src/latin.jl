@@ -8,14 +8,14 @@ Based in part on code for ASCIIString that used to be in Julia
 
 ## overload methods for efficiency ##
 
-is_ascii(str::MaybeSub{<:Str{C}}) where {C<:_LatinCSE}    = false
-is_latin(str::MaybeSub{<:Str{C}}) where {C<:Latin_CSEs}   = true
-is_bmp(str::MaybeSub{<:Str{C}}) where {C<:Latin_CSEs}     = true
-is_unicode(str::MaybeSub{<:Str{C}}) where {C<:Latin_CSEs} = true
+is_ascii(str::MaybeSub{<:Str{<:_LatinCSE}}) = false
+is_latin(str::MaybeSub{<:Str{<:LatinCSE}}) = true
+is_bmp(str::MS_Latin) = true
+is_unicode(str::MS_Latin) = true
 
-const _UBS = Union{ASCIICSE, Latin_CSEs}
+const MS_ASCIILatin = MaybeSub{<:Str{<:Union{ASCIICSE, Latin_CSEs}}}
 
-function string(collection::MaybeSub{<:Str{_UBS}}...)
+function string(collection::MS_ASCIILatin...)
     length(collection) == 1 && return collection[1]
     len = 0
     @inbounds for str in collection
@@ -39,8 +39,10 @@ function convert(::Type{T}, s::MS_ASCIILatin) where {T<:Str{<:Latin_CSEs}}
     C = basecse(T)
     Str(C, _copysub(s))::Str{C,Nothing,Nothing,Nothing}
 end
-convert(::Type{<:SubString{T}}, s::MS_ASCIILatin) where {T<:Str{<:Latin_CSEs}} =
-    SubString(Str(basecse(T), _copysub(s)), 1)
+function convert(::Type{T}, s::MS_ASCIILatin) where {S<:Str{<:Latin_CSEs}, T<:SubString{S}}
+    C = basecse(T)
+    SubString{C}(Str(C, _copysub(s)), 1)
+end
 
 # Assumes that has already been checked for validity
 function _utf8_to_latin(pnt::Ptr{UInt8}, len)
@@ -74,28 +76,24 @@ function _latin_to_utf8(pnt::Ptr{UInt8}, len)
     buf
 end
 
-# Fast conversion from LatinStr or _LatinStr to UTF8Str
-function convert(::Type{<:Str{UTF8CSE}}, str::Str{<:Latin_CSEs})
+# Fast conversion from LatinStr or _LatinStr to String/RawUTF8Str/UTF8Str
+function _convert(::Type{T}, str::MS_Latin
+                 ) where {S<:Union{String,Str{RawUTF8CSE},Str{UTF8CSE}},T<:MaybeSub{S}}
     # handle zero length string quickly
-    (len = ncodeunits(str)) == 0 && return empty_utf8
+    (len = ncodeunits(str)) == 0 && return _wrap_substr(T, empty_str(S))
     @preserve str begin
         pnt = pointer(str)
-        Str(UTF8CSE, (cnt = count_latin(len, pnt)) != 0 ? _latin_to_utf8(pnt, len + cnt) : str)
+        buf = (cnt = count_latin(len, pnt)) == 0 ? _copysub(str) : _latin_to_utf8(pnt, len + cnt)
+        _wrap_substr(T, S === String ? buf : Str(basecse(T), buf))
     end
 end
-
-# Fast conversion from LatinStr or _LatinStr to String
-function convert(::Type{String}, str::Str{<:Latin_CSEs})
-    # handle zero length string quickly
-    (len = ncodeunits(str)) == 0 && return empty_string
-    @preserve str begin
-        pnt = pointer(str)
-        (cnt = count_latin(len, pnt)) != 0 ? _latin_to_utf8(pnt, len + cnt) : str.data
-    end
-end
+convert(::Type{T}, str::MS_Latin) where {T<:Union{String,Str{RawUTF8CSE},Str{UTF8CSE}}} =
+    _convert(T, str)
+convert(::Type{T}, str::MS_Latin
+        ) where {S<:Union{String,Str{RawUTF8CSE},Str{UTF8CSE}},T<:SubString{S}} = _convert(T, str)
 
 function _convert(::Type{T}, str::AbstractString) where {C<:Latin_CSEs, T<:MaybeSub{<:Str{C}}}
-    is_empty(str) && return C === _LatinCSE ? empty_ascii : empty_latin
+    is_empty(str) && return C === _LatinCSE ? empty_ascii : _empty_latin
     # Might want to have invalids_as here
     len, flags, num4byte, num3byte, num2byte = unsafe_check_string(str)
     num4byte + num3byte + num2byte == 0 || unierror(UTF_ERR_INVALID_LATIN1)
@@ -106,71 +104,99 @@ function _convert(::Type{T}, str::AbstractString) where {C<:Latin_CSEs, T<:Maybe
     end
     Str((C === _LatinCSE && flags == 0) ? ASCIICSE : C, buf)
 end
+convert(::Type{T}, str::AbstractString) where {T<:Str{<:Latin_CSEs}} = _convert(T, str)
+convert(::Type{<:SubString{T}}, str::AbstractString) where {T<:Str{<:Latin_CSEs}} =
+    SubString(_convert(T, str), 1)
 
-function convert(::Type{<:Str{C}},
-                 str::MaybeSub{<:Str{<:Union{Word_CSEs,Quad_CSEs}}}) where {C<:Latin_CSEs}
+convert(::Type{T}, str::MaybeSub{String}) where {T<:Str{<:Latin_CSEs}} = _convert(T, str)
+convert(::Type{<:SubString{T}}, str::MaybeSub{String}) where {T<:Str{<:Latin_CSEs}} =
+    SubString{T}(_convert(T, str), 1)
+
+function _convert(::Type{T}, str::MaybeSub{<:Str{<:Union{Word_CSEs,Quad_CSEs}}}
+                 ) where {C<:Latin_CSEs, T<:MaybeSub{<:Str{C}}}
     # handle zero length string quickly
-    (len = ncodeunits(str)) == 0 && return C === _LatinCSE ? empty_ascii : empty_latin
+    (len = ncodeunits(str)) == 0 && return _empty_sub(T, C)
     @preserve str begin
         pnt = pointer(str)
         # get number of bytes to allocate
         len, flags, num4byte, num3byte, num2byte, latinbyte = fast_check_string(pnt, len)
         num4byte + num3byte + num2byte == 0 || unierror(UTF_ERR_INVALID_LATIN1)
-        Str((C === _LatinCSE && latinbyte == 0) ? ASCIICSE : C, _cvtsize(UInt8, pnt, len))
+        _wrap_substr(T, Str((C === _LatinCSE && latinbyte == 0) ? ASCIICSE : C,
+                            _cvtsize(UInt8, pnt, len)))
     end
 end
+convert(::Type{T}, str::MaybeSub{<:Str{<:Union{Word_CSEs,Quad_CSEs}}}
+        ) where {T<:Str{<:Latin_CSEs}} = _convert(T, str)
+convert(::Type{T}, str::MaybeSub{<:Str{<:Union{Word_CSEs,Quad_CSEs}}}
+        ) where {T<:SubString{<:Str{Latin_CSEs}}} = _convert(T, str)
 
-function convert(::Type{<:Str{LatinCSE}}, str::MS_ByteStr)
+function _convert(::Type{T}, str::MS_ByteStr) where {T<:MaybeSub{<:Str{LatinCSE}}}
     # handle zero length string quickly
-    (siz = sizeof(str)) == 0 && return empty_latin
+    (siz = sizeof(str)) == 0 && return _wrap_substr(T, empty_latin)
     @preserve str begin
         pnt = pointer(str)
         # get number of bytes to allocate
         len, flags, num4byte, num3byte, num2byte, latinbyte = fast_check_string(pnt, siz)
         num4byte + num3byte + num2byte == 0 || unierror(UTF_ERR_INVALID_LATIN1)
-        Str(LatinCSE, flags == 0 ? _copysub(str) : _utf8_to_latin(pnt, len))
+        _wrap_substr(T, Str(LatinCSE, flags == 0 ? _copysub(str) : _utf8_to_latin(pnt, len)))
     end
 end
+convert(::Type{T}, str::MS_ByteStr) where {T<:Str{LatinCSE}} = _convert(T, str)
+convert(::Type{T}, str::MS_ByteStr) where {T<:SubString{<:Str{LatinCSE}}} = _convert(T, str)
 
 _convert(::Type{_LatinCSE}, ch::UInt8) = _convert(ch <= 0x7f ? ASCIICSE : _LatinCSE, ch)
 convert(::Type{<:Str{_LatinCSE}}, ch::Unsigned) =
     ch < 0xff ? _convert(_LatinCSE, ch%UInt8) : unierror(UTF_ERR_LATIN1, ch)
 
-function convert(::Type{<:Str{_LatinCSE}}, str::MS_ByteStr)
+function _convert(::Type{T}, str::MS_ByteStr) where {T<:MaybeSub{<:Str{_LatinCSE}}}
     # handle zero length string quickly
-    (siz = sizeof(str)) == 0 && return empty_ascii
+    (siz = sizeof(str)) == 0 && return _wrap_substr(T, empty_ascii)
     @preserve str begin
         pnt = pointer(str)
         # get number of bytes to allocate
         len, flags, num4byte, num3byte, num2byte, latinbyte = fast_check_string(pnt, siz)
         num4byte + num3byte + num2byte == 0 || unierror(UTF_ERR_INVALID_LATIN1)
-        Str(latinbyte == 0 ? ASCIICSE : _LatinCSE,
-            flags == 0 ? _copysub(str) : _utf8_to_latin(pnt, len))
+        _wrap_substr(T, Str(latinbyte == 0 ? ASCIICSE : _LatinCSE,
+                            flags == 0 ? _copysub(str) : _utf8_to_latin(pnt, len)))
     end
 end
+convert(::Type{T}, str::MS_ByteStr) where {T<:Str{_LatinCSE}} = _convert(T, str)
+convert(::Type{T}, str::MS_ByteStr) where {T<:SubString{<:Str{_LatinCSE}}} = _convert(T, str)
 
-function convert(::Type{<:Str{C}}, vec::Vector{CU}) where {C<:Latin_CSEs,CU<:CodeUnitTypes}
+function _convert(::Type{T}, vec::Vector{CU}
+                 ) where {C<:Latin_CSEs,T<:MaybeSub{<:Str{C}},CU<:CodeUnitTypes}
     # handle zero length string quickly
-    (len = length(vec)) == 0 && return C === _LatinCSE ? empty_ascii : empty_latin
+    (len = length(vec)) == 0 && return _empty_sub(T, C)
     @preserve vec begin
         pnt = pointer(vec)
         # get number of bytes to allocate
         len, flags, num4byte, num3byte, num2byte, latinbyte = fast_check_string(pnt, len)
         num4byte + num3byte + num2byte == 0 || unierror(UTF_ERR_INVALID_LATIN1)
-        Str((C === _LatinCSE && latinbyte == 0) ? ASCIICSE : C,
-            (CU !== UInt8 || flags == 0) ? _cvtsize(UInt8, pnt, len) : _utf8_to_latin(pnt, len))
+        _wrap_substr(T, Str((C === _LatinCSE && latinbyte == 0) ? ASCIICSE : C,
+                            ((CU !== UInt8 || flags == 0)
+                             ? _cvtsize(UInt8, pnt, len) : _utf8_to_latin(pnt, len))))
     end
 end
 
-function convert(::Type{<:Str{C}},
-                 str::MaybeSub{<:Str{<:Union{Text2CSE,Text4CSE}}}) where {C<:Latin_CSEs}
+convert(::Type{T}, vec::Vector{<:CodeUnitTypes}) where {T<:Str{<:Latin_CSEs}} =
+    _convert(T, vec)
+convert(::Type{T}, vec::Vector{<:CodeUnitTypes}) where {T<:SubString{<:Str{<:Latin_CSEs}}} =
+    _convert(T, vec)
+
+const MS_T24 = MaybeSub{<:Str{<:Union{Text2CSE,Text4CSE}}}
+
+function _convert(::Type{T}, str::MS_T24) where {C<:Latin_CSEs,T<:MaybeSub{<:Str{C}}}
     # handle zero length string quickly
-    (len = ncodeunits(str)) == 0 && return C === _LatinCSE ? empty_ascii : empty_latin
+    (len = ncodeunits(str)) == 0 && return _empty_sub(T, C)
     @preserve str begin
         pnt = pointer(str)
         # get number of bytes to allocate
         len, flags, num4byte, num3byte, num2byte, latinbyte = fast_check_string(pnt, len)
         num4byte + num3byte + num2byte == 0 || unierror(UTF_ERR_INVALID_LATIN1)
-        Str((C === _LatinCSE && latinbyte == 0) ? ASCIICSE : C, _cvtsize(UInt8, pnt, len))
+        _wrap_substr(T, Str((C === _LatinCSE && latinbyte == 0) ? ASCIICSE : C,
+                            _cvtsize(UInt8, pnt, len)))
     end
 end
+
+convert(::Type{T}, str::MS_T24) where {T<:Str{<:Latin_CSEs}} = _convert(T, str)
+convert(::Type{T}, str::MS_T24) where {T<:SubString{<:Str{<:Latin_CSEs}}} = _convert(T, str)

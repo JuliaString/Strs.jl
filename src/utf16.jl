@@ -251,7 +251,7 @@ function convert(::Type{<:Str{C}}, str::AbstractString) where {C<:UCS2_CSEs}
     Str((C === _UCS2CSE && num3byte != 0) ? _UCS2CSE : UCS2CSE, buf)
 end
 
-function convert(::Type{<:Str{C}}, str::MS_ByteStr) where {C<:UCS2_CSEs}
+function convert(::Type{<:Str{C}}, str::MS_RawUTF8) where {C<:UCS2_CSEs}
     # Might want to have an invalids_as argument
     # handle zero length string quickly
     (siz = sizeof(str)) == 0 && return empty_str(C)
@@ -268,8 +268,10 @@ end
 
 # handle zero length string quickly, just widen these
 convert(::Type{<:Str{C}},
-        str::MaybeSub{<:Str{Union{ASCIICSE, Latin_CSEs}}}) where {C<:UCS2_CSEs} =
-    (siz = sizeof(str)) == 0 ? empty_str(C) : Str(C, _cvtsize(UInt16, pointer(str), siz))
+        str::MaybeSub{<:Str{Union{Binary_CSEs, ASCIICSE, Latin_CSEs}}}) where {C<:Word_CSEs} =
+            ((siz = sizeof(str)) == 0
+             ? empty_str(C)
+             : @preserve str Str(C, _cvtsize(UInt16, pointer(str), siz)))
 
 function convert(::Type{<:Str{C}}, str::MS_UTF16) where {C<:UCS2_CSEs}
     # Might want to have an invalids_as argument
@@ -327,7 +329,7 @@ function convert(::Type{<:Str{UTF16CSE}}, str::AbstractString)
     Str(UTF16CSE, buf)
 end
 
-function convert(::Type{<:Str{UTF16CSE}}, str::MS_ByteStr)
+function convert(::Type{<:Str{UTF16CSE}}, str::MS_RawUTF8)
     # handle zero length string quickly
     (siz = sizeof(str)) == 0 && return empty_utf16
     @preserve str begin
@@ -479,10 +481,6 @@ function convert(::Type{<:Str{UTF16CSE}}, str::MaybeSub{<:Str{Text2CSE}})
     @preserve str fast_check_string(pointer(str), len)
     Str(UTF16CSE, _copysub(str))
 end
-
-convert(::Type{<:Str{Text2CSE}},
-        str::MaybeSub{<:Str{C}}) where {C<:Union{ASCIICSE,Text1CSE,BinaryCSE,Latin_CSEs}} =
-            @preserve str Str(Text2CSE, _cvtsize(UInt16, pointer(str), ncodeunits(str)))
 
 function convert(::Type{<:Str{C}},
                  str::MaybeSub{<:Str{T}}) where {C<:UCS2_CSEs,T<:Union{Text2CSE,Text4CSE}}

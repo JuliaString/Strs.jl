@@ -675,7 +675,7 @@ function convert(::Type{<:Str{UTF8CSE}}, str::AbstractString)
     Str(UTF8CSE, buf)
 end
 
-function convert(::Type{<:Str{UTF8CSE}}, str::T) where {T<:MS_ByteStr}
+function convert(::Type{<:Str{UTF8CSE}}, str::Union{MS_ByteStr, MS_RawUTF8})
     # handle zero length string quickly
     (siz = sizeof(str)) == 0 && return empty_utf8
     @preserve str begin
@@ -691,8 +691,7 @@ function convert(::Type{<:Str{UTF8CSE}}, str::T) where {T<:MS_ByteStr}
     end
 end
 
-function convert(::Type{<:Str{UTF8CSE}},
-                 str::MaybeSub{T}) where {C<:Union{Text2CSE,Text4CSE},T<:Str{C}}
+function convert(::Type{<:Str{UTF8CSE}}, str::MaybeSub{<:Str{<:Union{Text2CSE,Text4CSE}}})
     # handle zero length string quickly
     (len = ncodeunits(str)) == 0 && return empty_utf8
     @preserve str begin

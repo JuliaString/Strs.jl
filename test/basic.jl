@@ -33,6 +33,23 @@ for T in AllCharTypes
     test_strings_base[T] = [String(rand(T, len)) for len in test_string_length]
 end
 
+#=
+dispstr(str) = string(typeof(str), "(\"", str[1:10], "...", str[end-10,end], "\")")
+showstr(str) = length(str) > 20 ? dispstr(str) : string(typeof(str), "(\"", str, "\")")
+
+@testset "constructors" begin
+    for (ST, type_list) in compat_types, CT in type_list, str in test_strings_base[CT]
+        println(typeof(ST))
+        println(typeof(CT))
+        println(typeof(str))
+        print("ST=$ST, CT=$CT, $(showstr(str)), ")
+        x = convert(ST, str)
+        println(showstr(x))
+        #@eval @test convert($ST, $str) == $str
+    end
+end
+=#
+
 @testset "constructors" begin
     for (ST, type_list) in compat_types, CT in type_list, str in test_strings_base[CT]
         @eval @test convert($ST, $str) == $str
@@ -74,13 +91,13 @@ end
 
 @testset "CharSet" begin
     for CT in charsets
-        @test "$(typeof(CharSet(CT)))" == "CharSet{$(CT)}"
+        @test "$(typeof(CharSet(CT)))" == "CharSet{:$(CT)}"
     end
 end
 
 @testset "Encoding" begin
     for CT in charsets
-        @test "$(typeof(Encoding(CT)))" == "Encoding{$(CT)}"
+        @test "$(typeof(Encoding(CT)))" == "Encoding{:$(CT)}"
     end
 end
 
@@ -1064,3 +1081,4 @@ end
 
 @test isvalid(UTF32Str, Char['d','\uff','\u7ff','\u7fff','\U7ffff'])
 @test reverse(utf32("abcd \uff\u7ff\u7fff\U7ffff")) == utf32("\U7ffff\u7fff\u7ff\uff dcba")
+
