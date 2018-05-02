@@ -74,14 +74,6 @@ So: ASCIIStr would be: Valid, All ASCII, ... i.e. 0 + short/hash bits
 
 const V6_COMPAT = VERSION < v"0.7.0-DEV"
 
-@static if V6_COMPAT
-    has_module(mod) = isdefined(module_parent(current_module()), mod) || isdefined(Main, mod)
-else
-    has_module(mod) = isdefined(parentmodule(@__MODULE__), mod) || isdefined(Main, mod)
-end
-
-const HAS_COMPAT = has_module(:Compat)
-
 # Convenience functions
 export to_ascii, utf8, utf16, utf32
 

@@ -16,7 +16,7 @@ Base.replace(str::String, pair::Pair{String,String}; count::Integer=0) =
 ##
 ## It is used to support the new string searching syntax on v0.6.2
 
-@static if !HAS_COMPAT
+@static if !isdefined(module_parent(current_module()), :Compat) && !isdefined(Main, :Compat)
 """
     Fix2(f, x)
 

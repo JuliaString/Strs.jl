@@ -234,11 +234,11 @@ convert(::Type{<:Str{BinaryCSE}}, str::Str{<:Union{ASCIICSE,Latin_CSEs,UTF8_CSEs
 convert(::Type{<:Str{BinaryCSE}}, str::SubString{<:Str{<:Union{ASCIICSE,Latin_CSEs,UTF8_CSEs}}}) =
     Str(BinaryCSE, String(str))
 
-convert(::Type{<:Str{LatinCSE}}, str::Str{_LatinCSE}) = Str(LatinCSE, str.data)
+#convert(::Type{<:Str{LatinCSE}}, str::Str{_LatinCSE}) = Str(LatinCSE, str.data)
 convert(::Type{<:Str{UCS2CSE}},  str::Str{_UCS2CSE})  = Str(UCS2CSE,  str.data)
 convert(::Type{<:Str{UTF32CSE}}, str::Str{_UTF32CSE}) = Str(UTF32CSE, str.data)
 
-convert(::Type{<:Str{LatinCSE}}, str::Str{ASCIICSE})  = Str(LatinCSE, str.data)
+#convert(::Type{<:Str{LatinCSE}}, str::Str{ASCIICSE})  = Str(LatinCSE, str.data)
 
 convert(::Type{String}, str::Str{<:Union{ASCIICSE,Text1CSE,BinaryCSE}}) = str.data
 

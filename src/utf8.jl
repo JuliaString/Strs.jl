@@ -628,11 +628,8 @@ function convert(::Type{<:Str{UTF8CSE}}, ch::Unsigned)
     Str(UTF8CSE, buf)
 end
 
-@static if !V6_COMPAT
-# Note: this will have to change back to s.endof for v0.6!
-convert(::Type{SubString{<:Str{UTF8CSE}}}, s::SubString{<:Str{ASCIICSE}}) =
-    SubString(Str(UTF8CSE, s.string), s.offset + 1, s.offset + s.ncodeunits)
-end
+convert(::Type{<:SubString{<:Str{UTF8CSE}}}, s::SubString{<:Str{ASCIICSE}}) =
+    SubString(Str(UTF8CSE, s), 1)
 
 function convert(::Type{<:Str{UTF8CSE}}, dat::Vector{UInt8})
     # handle zero length string quickly
