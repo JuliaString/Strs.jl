@@ -267,7 +267,6 @@ include("utf8case.jl")
 include("utf16case.jl")
 include("util.jl")
 include("io.jl")
-include("literals.jl")
 include("murmurhash3.jl")
 include("hash.jl")
 
