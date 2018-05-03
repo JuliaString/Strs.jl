@@ -22,7 +22,7 @@ pr_ul(l)  = pwc(:underline, l)
 
 const pkglist =
     ["StrTables", "LaTeX_Entities", "Emoji_Entities", "HTML_Entities", "Unicode_Entities",
-     "Format", "Strs", "PCRE2", "StrRegex", "StrEntities", "StrFormat", "StrICU"]
+     "Format", "Strs", "PCRE2", "StrRegex", "StrLiterals", "StrEntities", "StrFormat", "StrICU"]
 
 function rmpkg(pkg)
     try
