@@ -77,7 +77,7 @@ const V6_COMPAT = VERSION < v"0.7.0-DEV"
 # Convenience functions
 export to_ascii, utf8, utf16, utf32
 
-export str, unsafe_str, codepoints, @str_str, @prn_str
+export str, unsafe_str, codepoints
 
 export category_code, category_string, category_abbrev, is_mutable, index
 
@@ -100,7 +100,7 @@ export is_assigned, is_grapheme_break, is_grapheme_break!, graphemes,
 symstr(s...) = Symbol(string(s...))
 quotesym(s...) = Expr(:quote, symstr(s...))
 
-using Base: @_inline_meta, @propagate_inbounds, @_propagate_inbounds_meta
+using Base: @_inline_meta, @propagate_inbounds, @_propagate_inbounds_meta, RefValue
 
 import Base: containsnul, convert, getindex, length, map, pointer, collect, in, hash,
              reverse, sizeof, string, cconvert, unsafe_convert, unsafe_load, read, write,
@@ -267,7 +267,6 @@ include("utf8case.jl")
 include("utf16case.jl")
 include("util.jl")
 include("io.jl")
-include("literals.jl")
 include("murmurhash3.jl")
 include("hash.jl")
 

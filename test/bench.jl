@@ -31,8 +31,7 @@ const test_legacy = false
     using LegacyStrings
 end
 
-using StringLiterals
-using Strs, StrRegex
+using Strs, StrRegex, StrLiterals, StrFormat, StrEntities
 import Strs: LineCounts, CharTypes, CharStat, calcstats
 import Strs: _LatinStr, _UCS2Str, _UTF32Str, _LatinChr
 

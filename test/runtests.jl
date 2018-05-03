@@ -35,14 +35,14 @@ end
 
 include("basic.jl")
 
-@testset "Invalid sequences" begin include("invalid.jl") end
-@testset "Valid sequences"   begin include("valid.jl")   end
-@testset "Bounds Errors"     begin include("bounds.jl")  end
-@testset "UTF-16 tests"      begin include("utf16.jl")   end
-@testset "UTF-32 tests"      begin include("utf32.jl")   end
-@testset "Conversion errors" begin include("convert.jl") end
-@testset "Pointer functions" begin include("pointer.jl") end
-@testset "Search functions"  begin include("search.jl")  end
-@testset "SubStrings"        begin include("substr.jl")  end
-@testset "Utility functions" begin include("util.jl")    end
-@testset "IO functions"      begin include("io.jl")      end
+@testset "Invalid sequences" begin include("invalid.jl")  end
+@testset "Valid sequences"   begin include("valid.jl")    end
+@testset "Bounds Errors"     begin include("bounds.jl")   end
+@testset "UTF-16 tests"      begin include("utf16.jl")    end
+@testset "UTF-32 tests"      begin include("utf32.jl")    end
+@testset "Conversion errors" begin include("convert.jl")  end
+@testset "Pointer functions" begin include("pointer.jl")  end
+@testset "Search functions"  begin include("search.jl")   end
+@testset "SubStrings"        begin include("substr.jl")   end
+@testset "Utility functions" begin include("util.jl")     end
+@testset "IO functions"      begin include("io.jl")       end

@@ -73,8 +73,8 @@ const UTF32SubSet  = CharSet{:UTF32SubSet} # Has at least 1 non-BMP character in
 export Native1Byte, UTF8Encoding
 const Native1Byte  = Encoding(:Byte)
 const UTF8Encoding = Encoding(:UTF8)
-@eval show(io::IO, ::Type{UTF8Encoding})  = print(io, "UTF-8")
-@eval show(io::IO, ::Type{Native1Byte}) = print(io, "8-bit")
+@eval show(io::IO, ::Type{UTF8Encoding}) = print(io, "UTF-8")
+@eval show(io::IO, ::Type{Native1Byte})  = print(io, "8-bit")
 
 
 # Allow handling different endian encodings
@@ -99,8 +99,8 @@ const _CSE{U} = Union{CharSet{U}, Encoding{U}} where {U}
 print(io::IO, ::S) where {S<:_CSE{U}} where {U} =
     print(io, U)
 
-show(io::IO, ::Type{CharSet{S}}) where {S}   = print(io, "CharSet{", string(S), "}")
-show(io::IO, ::Type{Encoding{S}}) where {S}  = print(io, "Encoding{", string(S), "}")
+show(io::IO, ::Type{CharSet{S}}) where {S}   = print(io, "CharSet{:", string(S), "}")
+show(io::IO, ::Type{Encoding{S}}) where {S}  = print(io, "Encoding{:", string(S), "}")
 show(io::IO, ::Type{CSE{CS,E}}) where {S,T,CS<:CharSet{S},E<:Encoding{T}} =
     print(io, "CSE{", string(S), ", ", string(T), "}")
 print(io::IO, ::T) where {S,U,CS<:CharSet{S},E<:Encoding{U},T<:CSE{CS,E}} =
@@ -224,6 +224,9 @@ end
 empty_str(::Type{<:Str{C}}) where {C<:CSE} = empty_str(C)
 empty_str(::Type{String}) = empty_string
 
+const empty_rawutf8 = Str(RawUTF8CSE, empty_string)
+empty_str(::Type{RawUTF8CSE}) = empty_rawutf8
+
 typemin(::Type{T}) where {T<:Str} = empty_str(T)
 typemin(::T) where {T<:Str} = empty_str(T)
 
@@ -271,7 +274,13 @@ const MS_UTF8     = MaybeSub{<:Str{UTF8CSE}}
 const MS_UTF16    = MaybeSub{<:Str{UTF16CSE}}
 const MS_UTF32    = MaybeSub{<:Str{UTF32CSE}}
 const MS_SubUTF32 = MaybeSub{<:Str{_UTF32CSE}}
-const MS_ByteStr  = MaybeSub{<:Union{String,Str{BinaryCSE},Str{Text1CSE}}}
+const MS_Latin    = MaybeSub{<:Str{<:Latin_CSEs}}
+const MS_ByteStr  = MaybeSub{<:Str{<:Binary_CSEs}}
+const MS_RawUTF8  = MaybeSub{<:Union{String,Str{RawUTF8CSE}}}
+
+_wrap_substr(::Type{<:Any}, str) = str
+_wrap_substr(::Type{SubString}, str) = SubString(str, 1)
+_empty_sub(::Type{T}, ::Type{C}) where {T,C} = _wrap_substr(T, empty_str(C))
 
 const AbsChar = @static isdefined(Base, :AbstractChar) ? AbstractChar : Union{Char, Chr}
 

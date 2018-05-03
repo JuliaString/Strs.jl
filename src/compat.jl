@@ -16,6 +16,7 @@ Base.replace(str::String, pair::Pair{String,String}; count::Integer=0) =
 ##
 ## It is used to support the new string searching syntax on v0.6.2
 
+@static if !method_exists(in, (Any,))
 """
     Fix2(f, x)
 
@@ -69,6 +70,7 @@ used to implement specialized methods.
 in(x) = Fix2(in, x)
 
 const OccursIn = Fix2{typeof(in)}
+end # !HAS_COMPAT
 
 ## end of code from operators.jl =================================================
 
@@ -159,7 +161,6 @@ Base.contains(hay::AbstractString, str::Str)     = occurs_in(str, hay)
 Base.contains(hay::Str, str::AbstractString)     = occurs_in(str, hay)
 Base.contains(hay::Str, str::Str)                = occurs_in(str, hay)
 Base.contains(hay::AbstractString, chr::AbsChar) = occurs_in(chr, hay)
-Base.contains(hay::AbstractString, pat::Regex)   = occurs_in(pat, hay)
 
 const utf8crc = Base.crc32c
 
@@ -186,7 +187,10 @@ end
     throw(UnicodeError(UTF_ERR_INVALID_INDEX, Int(i), codeunit(s, i)))
 
 function thisind(str::String, pos::Integer)
-    @boundscheck 0 < pos <= ncodeunits(str) || boundserr(str, pos)
+    pos == 0 && return 0
+    len = ncodeunits(str)
+    pos == len + 1 && return pos
+    @boundscheck 0 < pos <= len || boundserr(str, pos)
     pnt = pointer(str) + pos - 1
     pos - (checkcont(pnt) ? (checkcont(pnt - 1) ? (checkcont(pnt - 2) ? 3 : 2) : 1) : 0)
 end

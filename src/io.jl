@@ -236,7 +236,7 @@ print(io::IO, str::MaybeSub{<:Str{<:CSE}}) = (_write(UTF8CSE, io, str) ; nothing
 print(io::IO, str::MaybeSub{T}) where {T<:Str{<:Union{Binary_CSEs,ASCIICSE,UTF8_CSEs}}} =
     (_fastwrite(io, str); nothing)
 
-function sprint(f::Function, ::Type{T}, args...;
+function Base.sprint(f::Function, ::Type{T}, args...;
                 context=nothing, sizehint::Integer=0) where {T<:Union{String, Str}}
     s = IOBuffer(sizehint=sizehint)
     if context !== nothing

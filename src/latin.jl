@@ -8,14 +8,14 @@ Based in part on code for ASCIIString that used to be in Julia
 
 ## overload methods for efficiency ##
 
-is_ascii(str::MaybeSub{<:Str{C}}) where {C<:_LatinCSE}    = false
-is_latin(str::MaybeSub{<:Str{C}}) where {C<:Latin_CSEs}   = true
-is_bmp(str::MaybeSub{<:Str{C}}) where {C<:Latin_CSEs}     = true
-is_unicode(str::MaybeSub{<:Str{C}}) where {C<:Latin_CSEs} = true
+is_ascii(str::MaybeSub{<:Str{<:_LatinCSE}}) = false
+is_latin(str::MaybeSub{<:Str{<:LatinCSE}}) = true
+is_bmp(str::MS_Latin) = true
+is_unicode(str::MS_Latin) = true
 
-const _UBS = Union{ASCIICSE, Latin_CSEs}
+const MS_ASCIILatin = MaybeSub{<:Str{<:Union{ASCIICSE, Latin_CSEs}}}
 
-function string(collection::MaybeSub{<:Str{_UBS}}...)
+function string(collection::MS_ASCIILatin...)
     length(collection) == 1 && return collection[1]
     len = 0
     @inbounds for str in collection
@@ -32,9 +32,41 @@ end
 
 ## transcoding to Latin1 ##
 
-convert(::Type{T}, s::T) where {T<:Str{<:Latin_CSEs}} = s
-convert(::Type{T}, s::Str{<:_UBS}) where {T<:Str{<:Latin_CSEs}} = T(s.data)
-convert(::Type{T}, s::Str{UTF8CSE}) where {T<:Str{<:Latin_CSEs}} = convert(T, s.data)
+function convert(::Type{<:Str{C}}, str::AbstractString) where {C<:Latin_CSEs}
+    is_empty(str) && return C === _LatinCSE ? empty_ascii : empty_latin
+    # Might want to have invalids_as here
+    len, flags, num4byte, num3byte, num2byte = unsafe_check_string(str)
+    num4byte + num3byte + num2byte == 0 || unierror(UTF_ERR_INVALID_LATIN1)
+    buf, pnt = _allocate(UInt8, len)
+    @inbounds for ch in str
+        set_codeunit!(pnt, ch%UInt8)
+        pnt += 1
+    end
+    Str((C === _LatinCSE && flags == 0) ? ASCIICSE : C, buf)
+end
+
+const ASCIISubStr  = SubString{<:Str{ASCIICSE}}
+const LatinSubStr  = SubString{<:Str{LatinCSE}}
+const _LatinSubStr = SubString{<:Str{_LatinCSE}}
+
+_cpyconvert(::Type{C}, str) where {C} = Str(C, _copysub(str))::Str{C,Nothing,Nothing,Nothing}
+_cpysubset(::Type{_LatinCSE}, str) = Str(is_ascii(s) ? ASCIICSE : _LatinCSE, _copysub(s))
+
+convert(::Type{<:Str{LatinCSE}}, s::Str{LatinCSE})  = s
+convert(::Type{<:Str{LatinCSE}}, s::Str{ASCIICSE})  = _cpyconvert(LatinCSE, s)
+convert(::Type{<:Str{LatinCSE}}, s::Str{_LatinCSE}) = _cpyconvert(LatinCSE, s)
+
+convert(::Type{<:Str{LatinCSE}}, s::LatinSubStr)  = _cpyconvert(LatinCSE, s)
+convert(::Type{<:Str{LatinCSE}}, s::ASCIISubStr)  = _cpyconvert(LatinCSE, s)
+convert(::Type{<:Str{LatinCSE}}, s::_LatinSubStr) = _cpyconvert(LatinCSE, s)
+
+convert(::Type{<:Str{_LatinCSE}}, s::Str{LatinCSE})  = s
+convert(::Type{<:Str{_LatinCSE}}, s::Str{ASCIICSE})  = s
+convert(::Type{<:Str{_LatinCSE}}, s::Str{_LatinCSE}) = s
+
+convert(::Type{<:Str{_LatinCSE}}, s::LatinSubStr)  = _cpysubset(_LatinCSE, s)
+convert(::Type{<:Str{_LatinCSE}}, s::ASCIISubStr)  = _cpyconvert(LatinCSE, s)
+convert(::Type{<:Str{_LatinCSE}}, s::_LatinSubStr) = Str(_LatinCSE, _copysub(s))
 
 # Assumes that has already been checked for validity
 function _utf8_to_latin(pnt::Ptr{UInt8}, len)
@@ -68,40 +100,28 @@ function _latin_to_utf8(pnt::Ptr{UInt8}, len)
     buf
 end
 
-# Fast conversion from LatinStr or _LatinStr to UTF8Str
-function convert(::Type{<:Str{UTF8CSE}}, str::Str{<:Latin_CSEs})
+# Fast conversion from LatinStr or _LatinStr to RawUTF8Str/UTF8Str
+function convert(::Type{<:Str{C}}, str::MS_Latin) where {C<:UTF8_CSEs}
     # handle zero length string quickly
-    (len = ncodeunits(str)) == 0 && return empty_utf8
+    (len = ncodeunits(str)) == 0 && return empty_str(C)
     @preserve str begin
         pnt = pointer(str)
-        Str(UTF8CSE, (cnt = count_latin(len, pnt)) != 0 ? _latin_to_utf8(pnt, len + cnt) : str)
+        Str(C,(cnt = count_latin(len, pnt)) == 0 ? _copysub(str) : _latin_to_utf8(pnt, len + cnt))
     end
 end
 
 # Fast conversion from LatinStr or _LatinStr to String
-function convert(::Type{String}, str::Str{<:Latin_CSEs})
+function convert(::Type{String}, str::MS_Latin)
     # handle zero length string quickly
     (len = ncodeunits(str)) == 0 && return empty_string
     @preserve str begin
         pnt = pointer(str)
-        (cnt = count_latin(len, pnt)) != 0 ? _latin_to_utf8(pnt, len + cnt) : str.data
+        (cnt = count_latin(len, pnt)) == 0 ? _copysub(str) : _latin_to_utf8(pnt, len + cnt)
     end
 end
 
-function convert(::Type{<:Str{C}}, str::AbstractString) where {C<:Latin_CSEs}
-    # Might want to have invalids_as here
-    len, flags, num4byte, num3byte, num2byte = unsafe_check_string(str)
-    num4byte + num3byte + num2byte == 0 || unierror(UTF_ERR_INVALID_LATIN1)
-    buf, pnt = _allocate(UInt8, len)
-    @inbounds for ch in str
-        set_codeunit!(pnt, ch%UInt8)
-        pnt += 1
-    end
-    Str((C === _LatinCSE && flags == 0) ? ASCIICSE : C, buf)
-end
-
-function convert(::Type{<:Str{C}},
-                 str::MaybeSub{<:Str{<:Union{Word_CSEs,Quad_CSEs}}}) where {C<:Latin_CSEs}
+function convert(::Type{<:Str{C}}, str::MaybeSub{<:Str{<:Union{Word_CSEs,Quad_CSEs}}}
+                 ) where {C<:Latin_CSEs}
     # handle zero length string quickly
     (len = ncodeunits(str)) == 0 && return C === _LatinCSE ? empty_ascii : empty_latin
     @preserve str begin
@@ -115,7 +135,7 @@ end
 
 function convert(::Type{<:Str{LatinCSE}}, str::MS_ByteStr)
     # handle zero length string quickly
-    (siz = sizeof(str)) == 0 && return empty_latin
+    (siz = sizeof(str)) == 0 && return empty_str(LatinCSE)
     @preserve str begin
         pnt = pointer(str)
         # get number of bytes to allocate
@@ -144,21 +164,21 @@ end
 
 function convert(::Type{<:Str{C}}, vec::Vector{CU}) where {C<:Latin_CSEs,CU<:CodeUnitTypes}
     # handle zero length string quickly
-    (len = length(vec)) == 0 && return C === _LatinCSE ? empty_ascii : empty_latin
+    (len = length(vec)) == 0 && return _empty_str(C)
     @preserve vec begin
         pnt = pointer(vec)
         # get number of bytes to allocate
         len, flags, num4byte, num3byte, num2byte, latinbyte = fast_check_string(pnt, len)
         num4byte + num3byte + num2byte == 0 || unierror(UTF_ERR_INVALID_LATIN1)
         Str((C === _LatinCSE && latinbyte == 0) ? ASCIICSE : C,
-            (CU !== UInt8 || flags == 0) ? _cvtsize(UInt8, pnt, len) : _utf8_to_latin(pnt, len))
+            ((CU !== UInt8 || flags == 0) ? _cvtsize(UInt8, pnt, len) : _utf8_to_latin(pnt, len)))
     end
 end
 
-function convert(::Type{<:Str{C}},
-                 str::MaybeSub{<:Str{<:Union{Text2CSE,Text4CSE}}}) where {C<:Latin_CSEs}
+function convert(::Type{<:Str{C}}, str::MaybeSub{<:Str{<:Union{Text2CSE,Text4CSE}}}
+                 ) where {C<:Latin_CSEs}
     # handle zero length string quickly
-    (len = ncodeunits(str)) == 0 && return C === _LatinCSE ? empty_ascii : empty_latin
+    (len = ncodeunits(str)) == 0 && return empty_str(C)
     @preserve str begin
         pnt = pointer(str)
         # get number of bytes to allocate

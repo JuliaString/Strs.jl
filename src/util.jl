@@ -108,7 +108,11 @@ function checkkeep(keepempty, keep, fun)
     keep
 end
 
-splitarr(::Type{C}) where {C} = SubString{Str{basecse(C),Nothing,Nothing,Nothing}}[]
+splitarr(::Type{C}) where {C<:CSE} = SubString{Str{basecse(C),Nothing,Nothing,Nothing}}[]
+
+splitarr(::MaybeSub{String}) = SubString{String}[]
+splitarr(::MaybeSub{T}) where {T<:Str} =
+    SubString{Str{basecse(T),Nothing,Nothing,Nothing}}[]
 
 Base._split(str::MaybeSub{<:Str}, splitter, limit, keepempty, vec) =
     __split(str, splitter, limit, keepempty, vec)
