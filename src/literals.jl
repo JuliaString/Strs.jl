@@ -10,6 +10,9 @@ module Literals end
 export @f_str, @F_str, @pr_str, @PR_str, @pr, @PR
 #export s_unescape_string, s_escape_string, s_print_unescaped, s_print_escaped
 
+const parse_chr   = Dict{Char, Function}()
+const interpolate = Dict{Char, Function}()
+
 @static if V6_COMPAT
     const _parse = parse
     const _ParseError = ParseError
@@ -70,11 +73,6 @@ function s_parse_unicode(io, str,  pos)
     pos
 end
 
-check_extended(chr) = false
-parse_extended(io, str, pos, chr) = error("No literal extensions loaded")
-parse_fmt(io, str, pos, chr) = error("No format parser loaded")
-parse_pyfmt(io, str, pos, chr) = error("No Python format parser loaded")
-
 """
 String interpolation parsing, allow legacy \$, \\xHH, \\uHHHH, \\UHHHHHHHH
 """
@@ -100,8 +98,8 @@ function s_print_unescaped(io, str::AbstractString, flg::Bool=false)
                     throw_arg_err(string("\\", chr, " only supported in legacy mode (i.e. ",
                                          "F\"...\" or PR\"...\""))
                 end
-            elseif check_extended(chr)
-                pos = parse_extended(io, str, pos, chr)
+            elseif chr in parse_chr
+                pos = parse_chr[chr](io, str, pos, chr)
             else
                 chr = (chr == '0' ? '\0' :
                        chr == '$' ? '$'  :
@@ -195,7 +193,8 @@ function s_interp_parse_vec(flg::Bool, s::AbstractString, unescape::Function)
     while !done(s, j)
         c, k = next(s, j)
         if c == '\\' && !done(s, k)
-            if s[k] == '('
+            c = s[k]
+            if c == '('
                 # Handle interpolation
                 is_empty(s[i:j-1]) ||
                     push!(sx, unescape(s[i:j-1]))
@@ -204,11 +203,9 @@ function s_interp_parse_vec(flg::Bool, s::AbstractString, unescape::Function)
                     throw(_ParseError("Incomplete expression"))
                 push!(sx, esc(ex))
                 i = j
-            elseif s[k] == '%'
-                i = j = parse_fmt(sx, s, unescape, i, j, k)
-            elseif s[k] == '{'
-                i = j = parse_pyfmt(sx, s, unescape, i, j, k)
-           elseif flg && s[k] == '$'
+            elseif c in interpolate
+                i = j = interpolate[c](sx, s, unescape, i, j, k)
+            elseif flg && c == '$'
                 is_empty(s[i:j-1]) ||
                     push!(sx, unescape(s[i:j-1]))
                 i = k
