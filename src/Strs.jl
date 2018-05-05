@@ -72,7 +72,12 @@ So: ASCIIStr would be: Valid, All ASCII, ... i.e. 0 + short/hash bits
     _UTF32Str would be: Valid, maybe no ascii, maybe Latin1, maybe BMP, some non-bmp
 =#
 
-const V6_COMPAT = VERSION < v"0.7.0-DEV"
+using CharSetEncodings
+
+# From CharSetEncodings
+export CSE, CharSet, Encoding, cse, charset, encoding, basetype, basecse, MaybeSub
+export @cs_str, @enc_str, @cse
+export BIG_ENDIAN, LITTLE_ENDIAN
 
 # Convenience functions
 export to_ascii, utf8, utf16, utf32
@@ -81,14 +86,9 @@ export str, unsafe_str, codepoints
 
 export category_code, category_string, category_abbrev, is_mutable, index
 
-# From types.jl
-export Str, Chr, UniStr, CSE, CharSet, Encoding, @cs_str, @enc_str, @cse
-export cse, charset, encoding, basetype
+export Str, Chr, UniStr
 
-# Note: the generated *Str, *Chr, *CSE, *CharSet and encoding names
-# (Native*, Swapped*, UTF8Encoding) for the built-in types are exported directly from types.jl
-
-export BIG_ENDIAN, LITTLE_ENDIAN
+# Note: the generated *Str, *Chr for the built-in types are exported directly from types.jl
 
 # From search.jl
 export found, find_result
@@ -96,9 +96,6 @@ export found, find_result
 # From unicode.jl
 export is_assigned, is_grapheme_break, is_grapheme_break!, graphemes,
        category_code, category_abbrev, category_string
-
-symstr(s...) = Symbol(string(s...))
-quotesym(s...) = Expr(:quote, symstr(s...))
 
 using Base: @_inline_meta, @propagate_inbounds, @_propagate_inbounds_meta, RefValue
 
@@ -111,8 +108,8 @@ import Base: containsnul, convert, getindex, length, map, pointer, collect, in, 
              lstrip, rstrip, strip, lpad, rpad, split, rsplit, join, IOBuffer, IteratorSize
 
 # Conditionally import names that are only in v0.6 or in master
-for sym in (:codeunit, :codeunits, :ncodeunits,
-            :thisind, :firstindex, :lastindex, :codepoint, :Fix2, :unsafe_crc32c)
+for sym in (:codeunits, :ncodeunits, :codepoint, , :Fix2, :unsafe_crc32c,
+            :thisind, :firstindex, :lastindex)
     if isdefined(Base, sym)
         @eval import Base: $sym
     else

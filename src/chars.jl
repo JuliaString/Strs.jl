@@ -6,11 +6,6 @@ Licensed under MIT License, see LICENSE.md
 In part based on code for Char in Julia
 =#
 
-"""Default value for Str /Chr types"""
-codeunit(::Type{<:CSE}) = UInt8
-codeunit(::Type{<:Word_CSEs}) = UInt16
-codeunit(::Type{<:Quad_CSEs}) = UInt32
-
 """Type of codeunits"""
 codeunit(::Type{UniStr})    = UInt32 # Note, the real type could be UInt8, UInt16, or UInt32
 codeunit(::Type{<:Str{C}}) where {C<:CSE} = codeunit(C)
