@@ -33,90 +33,12 @@ ValidatedStyle(::Type{<:Str}) = AlwaysValid()
 
 ValidatedStyle(A::T) where {T<:Union{AbsChar,AbstractString}} = ValidatedStyle(T)
 
-# single or multiple codeunits per codepoint
+CharSetStyle(::Type{<:Str{C}}) where {C<:CSE} = CharSetStyle(C)
 
-"""
-    CodePointStyle(A)
-    CodePointStyle(typeof(A))
-
-`CodePointStyle` specifies the whether a string type uses one or multiple codeunits to
-encode a single codepoint.
-When you define a new `AbstractString` type, you can choose to implement it with either
-single or multi-codeunit indexing.
-
-    Strs.CodePointStyle(::Type{<:MyString}) = CodeUnitMulti()
-
-The default is `CodeUnitMulti()`
-"""
-abstract type CodePointStyle end
-
-struct CodeUnitSingle <: CodePointStyle end
-struct CodeUnitMulti  <: CodePointStyle end
-
-CodePointStyle(::Type{<:CSE}) = CodeUnitSingle()
-CodePointStyle(::Type{<:Union{UTF8_CSEs,UTF16CSE}}) = CodeUnitMulti()
-
-CodePointStyle(::Type{T}) where {T<:AbstractString} = CodePointStyle(cse(T))
-
-CodePointStyle(::Type{<:SubString{T}}) where {T<:AbstractString} = CodePointStyle(T)
-CodePointStyle(v::AbstractString) = CodePointStyle(typeof(v))
-
-is_multi(str::AbstractString) = CodePointStyle(str) === CodeUnitMulti()
-
-# Type of character set
-
-"""
-    CharSetStyle(A)
-    CharSetStyle(typeof(A))
-
-`CharSetStyle` specifies the information about the character set used by the string or
-characters.
-When you define a new `AbstractString` or `AbstractChar` type,
-you can choose to implement it with
-
-    Strs.CharSetStyle(::Type{<:MyString}) = CharSetISOCompat()
-
-The default is `CharSetUnicode()`
-"""
-abstract type CharSetStyle end
-
-"""Codepoints are not in Unicode compatible order"""
-struct CharSetOther         <: CharSetStyle end
-"""Characters 0-0x7f same as ASCII"""
-struct CharSetASCIICompat   <: CharSetStyle end
-"""Characters 0-0x9f follows ISO 8859"""
-struct CharSetISOCompat     <: CharSetStyle end
-"""Characters 0-0xd7ff, 0xe000-0xffff follow Unicode BMP"""
-struct CharSetBMPCompat     <: CharSetStyle end
-"""Full Unicode character set, no additions"""
-struct CharSetUnicode       <: CharSetStyle end
-"""Unicode character set, plus encodings of invalid characters"""
-struct CharSetUnicodePlus   <: CharSetStyle end
-"""8-bit Binary string, not text"""
-struct CharSetBinary        <: CharSetStyle end
-"""Raw bytes, words, or character string, unknown encoding/character set"""
-struct CharSetUnknown       <: CharSetStyle end
-                                 
-CharSetStyle(A::AbstractString) = CharSetStyle(typeof(A))
-
-CharSetStyle(::Type{<:AbstractString})    = CharSetUnicodePlus()
-CharSetStyle(::Type{<:Str{<:Union{Text1CSE, Text2CSE, Text4CSE}}}) = CharSetUnknown()
-CharSetStyle(::Type{<:Str{BinaryCSE}})    = CharSetBinary()
-CharSetStyle(::Type{<:Str{ASCIICSE}})     = CharSetASCIICompat()
-CharSetStyle(::Type{<:Str{<:Latin_CSEs}}) = CharSetISOCompat()
-CharSetStyle(::Type{<:Str{<:UCS2_CSEs}})  = CharSetBMPCompat()
-
-CharSetStyle(A::AbstractChar)   = CharSetStyle(typeof(A))
-
-CharSetStyle(::Type{<:AbstractChar}) = CharSetUnicode()
-CharSetStyle(::Type{Char})      = CharSetUnicodePlus() # Encodes invalid characters also
-CharSetStyle(::Type{UInt8})     = CharSetBinary()
 CharSetStyle(::Type{ASCIIChr})  = CharSetASCIICompat()
 CharSetStyle(::Type{LatinChr})  = CharSetISOCompat()
 CharSetStyle(::Type{_LatinChr}) = CharSetISOCompat()
 CharSetStyle(::Type{UCS2Chr})   = CharSetBMPCompat()
-CharSetStyle(::Type{UInt16})    = CharSetUnknown()
-CharSetStyle(::Type{UInt32})    = CharSetUnknown()
 
 # must check range if CS1 is smaller than CS2, even if CS2 is valid for it's range
 _isvalid(::ValidatedStyle, ::Type{ASCIICharSet}, ::Type{T}, val) where {T<:CharSet} = is_ascii(val)
@@ -236,76 +158,6 @@ _ismutable(::MutableStr, str::Type{T}) where {T<:Str} = true
 is_mutable(::Type{T}) where {T<:Str} = _ismutable(MutableStyle(T))
 
 isimmutable(str::T) where {T<:Str} = !is_mutable(T)
-
-# Comparison traits
-
-"""
-    CompareStyle(Union{A, typeof(A)}, Union{B, typeof(B)})
-
-`CompareStyle` specifies how to compare two strings with character set encodings A and B
-
-    Strs.CompareStyle(::Type{<:MyString}, ::Type{String}) = ByteCompare()
-
-The default is `CodePointCompare`
-"""
-abstract type CompareStyle end
-
-# Todo: merge these with EqualsStyle
-
-struct NoCompare        <: CompareStyle end # For equality checks, can't be equal
-struct ByteCompare      <: CompareStyle end # Compare bytewise
-struct ASCIICompare     <: CompareStyle end # Compare bytewise for ASCII subset, else codepoint
-struct WordCompare      <: CompareStyle end # Compare first not equal word with <
-struct UTF16Compare     <: CompareStyle end # Compare first not equal word adjusting > 0xd7ff
-struct WidenCompare     <: CompareStyle end # Narrower can be simply widened for comparisons
-struct CodePointCompare <: CompareStyle end # Compare CodePoints
-
-CompareStyle(::Type{<:CSE}, ::Type{<:CSE}) = CodePointCompare()
-
-CompareStyle(::Type{C}, ::Type{C}) where {C<:CSE} =
-    ByteCompare()
-CompareStyle(::Type{C}, ::Type{C}) where {C<:Union{Word_CSEs,Quad_CSEs}} =
-    WordCompare()
-
-CompareStyle(::Type{UTF16CSE},    ::Type{UTF16CSE})    = UTF16Compare()
-CompareStyle(::Type{UTF16CSE},    ::Type{<:UCS2_CSEs}) = UTF16Compare()
-CompareStyle(::Type{<:UCS2_CSEs}, ::Type{UTF16CSE})    = UTF16Compare()
-
-CompareStyle(::Type{ASCIICSE}, ::Type{<:Union{Binary_CSEs,Latin_CSEs,UTF8_CSEs}}) =
-    ByteCompare()
-CompareStyle(::Type{ASCIICSE}, ::Type{<:Union{Word_CSEs,Quad_CSEs}}) =
-    WidenCompare()
-
-CompareStyle(::Type{<:Latin_CSEs}, ::Type{<:Latin_CSEs}) =
-    ByteCompare()
-CompareStyle(::Type{<:Latin_CSEs}, ::Type{UTF8_CSEs}) =
-    ASCIICompare()
-CompareStyle(::Type{<:Latin_CSEs}, ::Type{<:Union{Word_CSEs,Quad_CSEs}}) =
-    WidenCompare()
-
-CompareStyle(::Type{<:UCS2_CSEs}, ::Type{<:Union{ASCIICSE,Binary_CSEs,Latin_CSEs,Quad_CSEs}}) =
-    WidenCompare()
-CompareStyle(::Type{<:UCS2_CSEs},  ::Type{<:UCS2_CSEs}) =
-    WordCompare()
-
-CompareStyle(::Type{<:UTF32_CSEs},
-             ::Type{<:Union{ASCIICSE,Binary_CSEs,Latin_CSEs,Text2CSE,UCS2_CSEs}}) =
-    WidenCompare()
-CompareStyle(::Type{<:UTF32_CSEs},  ::Type{<:UTF32_CSEs}) =
-    WordCompare()
-
-CompareStyle(::Type{S}, ::Type{T}) where {S<:AbstractString, T<:AbstractString} =
-    CompareStyle(cse(S), cse(T))
-CompareStyle(::Type{T}, ::Type{T}) where {T<:AbstractString} = ByteCompare()
-
-CompareStyle(A::AbstractString, B::AbstractString) = CompareStyle(typeof(A), typeof(B))
-
-Base.promote_rule(::Type{NoCompare},    ::Type{<:CompareStyle})   = NoCompare
-Base.promote_rule(::Type{ByteCompare},  ::Type{CodePointCompare}) = ByteCompare
-Base.promote_rule(::Type{WordCompare},  ::Type{CodePointCompare}) = WordCompare
-Base.promote_rule(::Type{UTF16Compare}, ::Type{CodePointCompare}) = UTF16Compare
-Base.promote_rule(::Type{ASCIICompare}, ::Type{CodePointCompare}) = ASCIICompare
-Base.promote_rule(::Type{WidenCompare}, ::Type{CodePointCompare}) = WidenCompare
 
 """
     CanContain(Union{A, typeof(A)}, Union{B, typeof(B)})

@@ -166,11 +166,10 @@ function find(::Type{D}, ch::AbsChar, str::AbstractString, pos::Integer) where {
         @boundscheck pos > len+1 && boundserr(str, pos)
         return 0
     end
-    # Only check if CodeUnitMulti
-    (cus = CodePointStyle(str)) === CodeUnitMulti() &&
-        (@inbounds is_valid(str, pos) || index_error(str, pos))
+    # Only check if MultiCU
+    is_multi(str) && (@inbounds is_valid(str, pos) || index_error(str, pos))
     # Check here if ch is valid for the type of string
-    is_valid(eltype(str), ch) ? _srch_cp(D(), cus, str, ch, pos, len) : 0
+    is_valid(eltype(str), ch) ? _srch_cp(D(), EncodingStyle(str), str, ch, pos, len) : 0
 end
 
 _get_dir(::Type{First}) = Fwd()
@@ -178,7 +177,7 @@ _get_dir(::Type{Last})  = Rev()
 
 find(::Type{D}, ch::AbsChar, str::AbstractString) where {D<:Union{First,Last}} =
     ((len = ncodeunits(str)) == 0 || !is_valid(eltype(str), ch) ? 0
-     : _srch_cp(_get_dir(D), CodePointStyle(str), str, ch,
+     : _srch_cp(_get_dir(D), EncodingStyle(str), str, ch,
                 D === First ? 1 : lastindex(str), len))
 
 function find(::Type{D}, needle::AbstractString, str::AbstractString,
@@ -198,7 +197,7 @@ function find(::Type{D}, needle::AbstractString, str::AbstractString,
     is_valid(eltype(str), ch) || return _not_found
     # Check if single character
     if nxt > tlen
-        pos = _srch_cp(D(), CodePointStyle(str), str, ch, pos, slen)
+        pos = _srch_cp(D(), EncodingStyle(str), str, ch, pos, slen)
         return pos == 0 ? _not_found : (pos:pos)
     end
     _srch_strings(D(), cmp, str, needle, ch, nxt, pos, slen, tlen)
@@ -214,7 +213,7 @@ function find(::Type{T}, needle::AbstractString, str::AbstractString) where {T<:
     is_valid(eltype(str), ch) || return _not_found
     # Check if single character
     if nxt > tlen
-        pos = _srch_cp(_get_dir(T), CodePointStyle(str), str, ch, pos, slen)
+        pos = _srch_cp(_get_dir(T), EncodingStyle(str), str, ch, pos, slen)
         return pos:(pos - (pos == 0))
     end
     _srch_strings(_get_dir(T), cmp, str, needle, ch, nxt, pos, slen, tlen)
@@ -274,10 +273,10 @@ end
 
 # _srch_cp is only called with values that are valid for that string type,
 # and checking as already been done on the position (pos)
-# These definitions only work for CodeUnitSingle types
-_srch_cp(::Fwd, ::CodeUnitSingle, str::T, cp::AbsChar, pos, len) where {T<:Str} =
+# These definitions only work for SingleCU types
+_srch_cp(::Fwd, ::SingleCU, str::T, cp::AbsChar, pos, len) where {T<:Str} =
     @preserve str _srch_codeunit(Fwd(), pointer(str), cp%codeunit(T), pos, len)
-_srch_cp(::Rev, ::CodeUnitSingle, str::T, cp::AbsChar, pos, len) where {T<:Str} =
+_srch_cp(::Rev, ::SingleCU, str::T, cp::AbsChar, pos, len) where {T<:Str} =
     @preserve str _srch_codeunit(Rev(), pointer(str), cp%codeunit(T), pos)
 
 function _srch_cp(::Fwd, cus, str, cp, pos, len)
@@ -313,7 +312,7 @@ end
 end
 
 function _srch_strings(::Fwd, ::CompareStyle, str, needle, ch, subpos, pos, slen, tlen)
-    cu = CodePointStyle(str)
+    cu = EncodingStyle(str)
     while (pos = _srch_cp(Fwd(), cu, str, ch, pos, slen)) != 0
         nxt = nextind(str, pos)
         res = _cmp_str(str, nxt, slen, needle, subpos, tlen)
@@ -325,7 +324,7 @@ function _srch_strings(::Fwd, ::CompareStyle, str, needle, ch, subpos, pos, slen
 end
 
 function _srch_strings(::Rev, ::CompareStyle, str, needle, ch, nxtsub, pos, slen, tlen)
-    cu = CodePointStyle(str)
+    cu = EncodingStyle(str)
     while (prv = prevind(str, pos)) != 0 &&
         (loc = _srch_cp(Rev(), cu, str, ch, prv, slen)) != 0
         res = _cmp_str(str, nextind(str, loc), slen, needle, nxtsub, tlen)
@@ -359,7 +358,7 @@ function _srch_str_bloom(::Fwd, str, spnt, npnt, ch, pos, slen, tlen)
             end
 
             # match found
-            j == tlen - 1 && return pos:_thisind(CodePointStyle(str), str, slen, spnt, pos + j)
+            j == tlen - 1 && return pos:_thisind(EncodingStyle(str), str, slen, spnt, pos + j)
 
             # no match, try to rule out the next character
             if pos <= slen && _check_bloom_mask(bloom_mask, spnt, pos + tlen)

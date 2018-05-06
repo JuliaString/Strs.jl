@@ -27,10 +27,10 @@ const _hi_bit_16  = 0x8000_8000_8000_8000
     len + count_ones((cnt & CHUNKMSK) == 0 ? v : (v & _mask_bytes(cnt)))
 end
 
-_length_al(::CodeUnitMulti, ::Type{UTF16CSE}, beg::Ptr{UInt16}, cnt::Int) =
+_length_al(::MultiCU, ::Type{UTF16CSE}, beg::Ptr{UInt16}, cnt::Int) =
     (pnt = reinterpret(Ptr{UInt64}, beg); _align_len_utf16(pnt, cnt<<1, _get_lead(pnt)))
 
-function _length(::CodeUnitMulti, ::Type{UTF16CSE}, beg::Ptr{UInt16}, cnt::Int)
+function _length(::MultiCU, ::Type{UTF16CSE}, beg::Ptr{UInt16}, cnt::Int)
     align = reinterpret(UInt, beg)
     pnt = reinterpret(Ptr{UInt64}, align & ~CHUNKMSK)
     v = _get_lead(pnt)
@@ -42,7 +42,7 @@ function _length(::CodeUnitMulti, ::Type{UTF16CSE}, beg::Ptr{UInt16}, cnt::Int)
     _align_len_utf16(pnt, cnt<<1, v)
 end
 
-function _nextind(::CodeUnitMulti, str::MS_UTF16, pos::Int, nchar::Int)
+function _nextind(::MultiCU, str::MS_UTF16, pos::Int, nchar::Int)
     nchar < 0 && ncharerr(nchar)
     siz = ncodeunits(str)
     @boundscheck 0 <= pos <= siz || boundserr(str, pos)
@@ -63,7 +63,7 @@ function _nextind(::CodeUnitMulti, str::MS_UTF16, pos::Int, nchar::Int)
     end
 end
 
-function _prevind(::CodeUnitMulti, str::MS_UTF16, pos::Int, nchar::Int)
+function _prevind(::MultiCU, str::MS_UTF16, pos::Int, nchar::Int)
     nchar < 0 && ncharerr(nchar)
     @boundscheck 0 < pos <= ncodeunits(str)+1 || boundserr(str, pos)
     @preserve str begin
@@ -143,20 +143,20 @@ is_latin(str::SubString{<:Str{_UCS2CSE}}) = is_latin(Str{UCS2CSE}(str.data))
     cnt
 end
 
-@inline _lastindex(::CodeUnitMulti, str::MS_UTF16) =
+@inline _lastindex(::MultiCU, str::MS_UTF16) =
     ((len = ncodeunits(str)) != 0
      ? (is_surrogate_codeunit(get_codeunit(pointer(str), len)) ? len-1 : len) : 0)
 
 get_supplementary(lead::Unsigned, trail::Unsigned) = (UInt32(lead-0xd7f7)<<10 + trail)
 
-function _nextcpfun(::CodeUnitMulti, ::Type{UTF16CSE}, pnt)
+function _nextcpfun(::MultiCU, ::Type{UTF16CSE}, pnt)
     ch = get_codeunit(pnt)
     (is_surrogate_lead(ch)
      ? (get_supplementary(ch, get_codeunit(pnt + 2)), pnt + 4)
      : (ch%UInt32, pnt + 2))
 end
 
-@propagate_inbounds function _next(::CodeUnitMulti, T, str::MS_UTF16, pos::Int)
+@propagate_inbounds function _next(::MultiCU, T, str::MS_UTF16, pos::Int)
     @boundscheck pos <= ncodeunits(str) || boundserr(str, pos)
     @preserve str begin
         pnt = bytoff(pointer(str), pos)
@@ -167,23 +167,23 @@ end
     end
 end
 
-@inline _thisind(::CodeUnitMulti, str::MS_UTF16, len, pnt, pos) =
+@inline _thisind(::MultiCU, str::MS_UTF16, len, pnt, pos) =
     Int(pos) - is_surrogate_trail(get_codeunit(pnt, pos))
 
-@propagate_inbounds @inline function _nextind(::CodeUnitMulti, str::MS_UTF16, pos::Int)
+@propagate_inbounds @inline function _nextind(::MultiCU, str::MS_UTF16, pos::Int)
     pos == 0 && return 1
     @boundscheck 1 <= pos <= ncodeunits(str) || boundserr(str, pos)
     @preserve str pos + 1 + is_surrogate_lead(get_codeunit(pointer(str), pos))
 end
 
-@propagate_inbounds @inline function _prevind(::CodeUnitMulti, str::MS_UTF16, pos::Int)
+@propagate_inbounds @inline function _prevind(::MultiCU, str::MS_UTF16, pos::Int)
     (pos -= 1) == 0 && return 0
     numcu = ncodeunits(str)
     @boundscheck 0 < pos <= numcu || boundserr(str, pos + 1)
     @preserve str pos - is_surrogate_trail(get_codeunit(pointer(str), pos))
 end
 
-function _reverse(::CodeUnitMulti, ::Type{UTF16CSE}, len, pnt::Ptr{T}) where {T<:CodeUnitTypes}
+function _reverse(::MultiCU, ::Type{UTF16CSE}, len, pnt::Ptr{T}) where {T<:CodeUnitTypes}
     buf, beg = _allocate(UInt16, len)
     out = bytoff(beg, len)
     while out > beg
@@ -195,7 +195,7 @@ function _reverse(::CodeUnitMulti, ::Type{UTF16CSE}, len, pnt::Ptr{T}) where {T<
     Str(UTF16CSE, buf)
 end
 
-@inline _isvalid_char_pos(::CodeUnitMulti, ::Type{UTF16CSE}, str, pos::Integer) =
+@inline _isvalid_char_pos(::MultiCU, ::Type{UTF16CSE}, str, pos::Integer) =
     @preserve str !is_surrogate_trail(get_codeunit(pointer(str), pos))
 
 function is_valid(::Type{<:Str{<:UCS2_CSEs}}, data::AbstractArray{UInt16})

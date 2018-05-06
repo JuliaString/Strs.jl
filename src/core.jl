@@ -8,44 +8,44 @@ Licensed under MIT License, see LICENSE.md
 Inspired by / derived from code in Julia
 =#
 
-_lastindex(::CodeUnitSingle, str) = (@_inline_meta(); ncodeunits(str))
+_lastindex(::SingleCU, str) = (@_inline_meta(); ncodeunits(str))
 
-@propagate_inbounds function _getindex(::CodeUnitSingle, T, str, pos::Int)
+@propagate_inbounds function _getindex(::SingleCU, T, str, pos::Int)
     @_inline_meta()
     @boundscheck checkbounds(str, pos)
     T(get_codeunit(pointer(str), pos))
 end
 
-@propagate_inbounds function _next(::CodeUnitSingle, T, str, pos)
+@propagate_inbounds function _next(::SingleCU, T, str, pos)
     @_inline_meta()
     @boundscheck 0 < pos <= ncodeunits(str) || boundserr(str, pos)
     T(get_codeunit(str, pos)), pos + 1
 end
 
-_nextcpfun(::CodeUnitSingle, ::Type{S}, pnt::Ptr{T}) where {S,T<:CodeUnitTypes} =
+_nextcpfun(::SingleCU, ::Type{S}, pnt::Ptr{T}) where {S,T<:CodeUnitTypes} =
     get_codeunit(pnt), pnt + sizeof(T)
 _nextcp(::Type{T}, pnt) where {T} = _nextcpfun(CodePointStyle(T), T, pnt)
 
-@propagate_inbounds _getindex(::CodeUnitMulti, T, str, pos::Int) =
-    first(_next(CodeUnitMulti(), T, str, pos))
+@propagate_inbounds _getindex(::MultiCU, T, str, pos::Int) =
+    first(_next(MultiCU(), T, str, pos))
 
-@inline _length(::CodeUnitSingle, str) = ncodeunits(str)
+@inline _length(::SingleCU, str) = ncodeunits(str)
 
 # Use more generic length check
 @inline _length_check(str::SubString{<:Str{C}}, cnt) where {C<:CSE} =
-    _length(CodeUnitMulti(), C, pointer(str), cnt)
+    _length(MultiCU(), C, pointer(str), cnt)
 
 # Go directly to aligned length check
 @inline _length_check(str::Str{C}, cnt) where {C<:CSE} =
-    _length_al(CodeUnitMulti(), C, pointer(str), cnt)
+    _length_al(MultiCU(), C, pointer(str), cnt)
 
-@inline _length(::CodeUnitMulti, str::MaybeSub{T}) where {T<:Str} =
+@inline _length(::MultiCU, str::MaybeSub{T}) where {T<:Str} =
     (cnt = ncodeunits(str); cnt < 2 ? Int(cnt > 0) : @preserve str _length_check(str, cnt))
 
-@inline _length(::CodeUnitSingle, ::Type{<:CSE}, ::Ptr{<:CodeUnitTypes}, cnt::Int) = cnt
+@inline _length(::SingleCU, ::Type{<:CSE}, ::Ptr{<:CodeUnitTypes}, cnt::Int) = cnt
 
-@inline _length(::CodeUnitMulti, str::Str{RawUTF8CSE}) = length(str.data)
-@inline _length(::CodeUnitMulti, str::Str{RawUTF8CSE}, i::Int, j::Int) = length(str.data, i, j)
+@inline _length(::MultiCU, str::Str{RawUTF8CSE}) = length(str.data)
+@inline _length(::MultiCU, str::Str{RawUTF8CSE}, i::Int, j::Int) = length(str.data, i, j)
 
 @propagate_inbounds function _length(cs::CodePointStyle, str, i::Int, j::Int)
     @boundscheck begin
@@ -58,7 +58,7 @@ _nextcp(::Type{T}, pnt) where {T} = _nextcpfun(CodePointStyle(T), T, pnt)
         @preserve str _length(cs, cse(str), bytoff(pointer(str), i - 1), cnt)
 end
 
-@inline _thisind(::CodeUnitSingle, str, len, pnt, pos) = Int(pos)
+@inline _thisind(::SingleCU, str, len, pnt, pos) = Int(pos)
 
 @propagate_inbounds function _thisind(cs::CS, str, pos) where {CS<:CodePointStyle}
     @_inline_meta()
@@ -71,26 +71,26 @@ end
     @preserve str _thisind(cs, str, len, pointer(str), pos)
 end
 
-@propagate_inbounds function _prevind(::CodeUnitSingle, str, i)
+@propagate_inbounds function _prevind(::SingleCU, str, i)
     @_inline_meta()
     @boundscheck 0 < i <= ncodeunits(str)+1 || boundserr(str, i)
     Int(i) - 1
 end
 
-@propagate_inbounds function _prevind(::CodeUnitSingle, str, i, nchar)
+@propagate_inbounds function _prevind(::SingleCU, str, i, nchar)
     @_inline_meta()
     nchar < 0 && ncharerr(nchar)
     @boundscheck 0 < i <= ncodeunits(str)+1 || boundserr(str, i)
     max(Int(i) - nchar, 0)
 end
 
-@propagate_inbounds function _nextind(::CodeUnitSingle, str, i)
+@propagate_inbounds function _nextind(::SingleCU, str, i)
     @_inline_meta()
     @boundscheck 0 <= i <= ncodeunits(str) || boundserr(str, i)
     Int(i) + 1
 end
 
-@propagate_inbounds function _nextind(::CodeUnitSingle, str, i, nchar)
+@propagate_inbounds function _nextind(::SingleCU, str, i, nchar)
     @_inline_meta()
     nchar < 0 && ncharerr(nchar)
     @boundscheck 0 <= i <= ncodeunits(str) || boundserr(str, i)
@@ -149,20 +149,20 @@ end
     _isvalid_char_pos(CodePointStyle(T), cse(T), str, i)
 end
 
-_isvalid_char_pos(::CodeUnitSingle, C, str, i) = true
+_isvalid_char_pos(::SingleCU, C, str, i) = true
 
-@propagate_inbounds function _collectstr(::CodeUnitMulti, ::Type{S},
+@propagate_inbounds function _collectstr(::MultiCU, ::Type{S},
                                          str::MaybeSub{T}) where {S,T<:Str}
-    len = _length(CodeUnitMulti(), str)
+    len = _length(MultiCU(), str)
     vec = create_vector(S, len)
     pos = 1
     @inbounds for i = 1:len
-        vec[i], pos = _next(CodeUnitMulti(), S, str, pos)
+        vec[i], pos = _next(MultiCU(), S, str, pos)
     end
     vec
 end
 
-@propagate_inbounds function _collectstr(::CodeUnitSingle, ::Type{S},
+@propagate_inbounds function _collectstr(::SingleCU, ::Type{S},
                                          str::MaybeSub{T}) where {S,T<:Str}
     len = ncodeunits(str)
     vec = create_vector(S, len)
@@ -219,7 +219,7 @@ function _convert(::Type{C}, ch::T) where {C<:CSE,T<:CodeUnitTypes}
     Str(C, buf)
 end
 
-# Todo: These should be made more generic, work for all CodeUnitSingle types
+# Todo: These should be made more generic, work for all SingleCU types
 
 convert(::Type{<:Str{ASCIICSE}}, ch::Unsigned) =
     is_ascii(ch) ? _convert(ASCIICSE, ch%UInt8) : unierror(UTF_ERR_INVALID_ASCII, 0, ch)
@@ -258,7 +258,7 @@ unsafe_convert(::Type{Ptr{Text4Chr}}, str::MaybeSub{<:Str{<:Quad_CSEs}}) =
 unsafe_convert(::Type{Ptr{Cvoid}},  s::MaybeSub{<:Str{C}}) where {C} =
     reinterpret(Ptr{Cvoid}, unsafe_convert(Ptr{codeunit(C)}, s))
 
-function _reverse(::CodeUnitSingle, ::Type{C}, len, str::Str{C}) where {C<:CSE}
+function _reverse(::SingleCU, ::Type{C}, len, str::Str{C}) where {C<:CSE}
     len < 2 && return str
     @preserve str begin
         pnt = pointer(str)
@@ -273,9 +273,9 @@ function _reverse(::CodeUnitSingle, ::Type{C}, len, str::Str{C}) where {C<:CSE}
     end
 end
 
-function _reverse(::CodeUnitMulti, ::Type{C}, len, str) where {C<:CSE}
+function _reverse(::MultiCU, ::Type{C}, len, str) where {C<:CSE}
     @inbounds ((t = nextind(str, 0)) > len || nextind(str, t) > len) && return str
-    @preserve str _reverse(CodeUnitMulti(), C, len, pointer(str))
+    @preserve str _reverse(MultiCU(), C, len, pointer(str))
 end
 
 reverse(str::MaybeSub{T}) where {C<:CSE,T<:Str{C}} =

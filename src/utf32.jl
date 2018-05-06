@@ -145,7 +145,7 @@ end
 function convert(::Type{<:Str{UTF32CSE}}, str::MS_UTF8)
     # handle zero length string quickly
     (len = ncodeunits(str)) == 0 && return empty_str(UTF32CSE)
-    cnt = _length(CodeUnitMulti(), str)
+    cnt = _length(MCU, str)
     # Optimize case where no characters > 0x7f, otherwise has multi-byte UTF-8 sequences
     Str(UTF32CSE, @preserve str (cnt == len
                                  ? _cvtsize(UInt32, pointer(str), cnt)
@@ -164,7 +164,7 @@ function convert(::Type{<:Str{UTF32CSE}}, str::MS_UTF16)
     # handle zero length string quickly
     (len = ncodeunits(str)) == 0 && return empty_utf32
     # Get number of characters to create
-    cnt = _length(CodeUnitMulti(), str)
+    cnt = _length(MCU, str)
     # No surrogate pairs, do optimized copy
     Str(UTF32CSE, @preserve str (cnt == len
                                  ? _cvtsize(UInt32, pointer(str), cnt)

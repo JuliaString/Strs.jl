@@ -72,14 +72,14 @@ end
 
 utf_trail(c::UInt8) = (0xe5000000 >>> ((c & 0xf0) >> 3)) & 0x3
 
-@inline function _lastindex(::CodeUnitMulti, str::MS_UTF8)
+@inline function _lastindex(::MultiCU, str::MS_UTF8)
     (len = ncodeunits(str)) > 1 || return len
     @preserve str begin
         pnt = pointer(str) + len - 1
         len - (checkcont(pnt) ? (checkcont(pnt - 1) ? checkcont(pnt - 2) + 2 : 1) : 0)
     end
 end
-@inline function _lastindex(::CodeUnitMulti, str::MaybeSub{<:Str{RawUTF8CSE}})
+@inline function _lastindex(::MultiCU, str::MaybeSub{<:Str{RawUTF8CSE}})
     (len = ncodeunits(str)) > 1 || return len
     @preserve str begin
         pnt = pointer(str) + len - 1
@@ -120,10 +120,10 @@ const hi_mask = 0x8080_8080_8080_8080
     len + count_ones(cnt & CHUNKMSK == 0 ? v : (v & _mask_bytes(cnt)))
 end
 
-_length_al(::CodeUnitMulti, ::Type{UTF8CSE}, beg::Ptr{UInt8}, cnt::Int) =
+_length_al(::MultiCU, ::Type{UTF8CSE}, beg::Ptr{UInt8}, cnt::Int) =
     (pnt = reinterpret(Ptr{UInt64}, beg); _align_len_utf8(pnt, cnt, unsafe_load(pnt)))
 
-function _length(::CodeUnitMulti, ::Type{UTF8CSE}, beg::Ptr{UInt8}, cnt::Int)
+function _length(::MultiCU, ::Type{UTF8CSE}, beg::Ptr{UInt8}, cnt::Int)
     align = reinterpret(UInt, beg)
     pnt = reinterpret(Ptr{UInt64}, align & ~CHUNKMSK)
     v = unsafe_load(pnt)
@@ -331,7 +331,7 @@ function _check_utf8(beg, pnt, fin)
     0
 end
 
-function _nextcpfun(::CodeUnitMulti, ::Type{UTF8CSE}, pnt)
+function _nextcpfun(::MultiCU, ::Type{UTF8CSE}, pnt)
     ch = get_codeunit(pnt)
     if ch < 0x80
         ch%UInt32, pnt + 1
@@ -345,7 +345,7 @@ function _nextcpfun(::CodeUnitMulti, ::Type{UTF8CSE}, pnt)
 end
 
 # Gets next codepoint
-@propagate_inbounds function _next(::CodeUnitMulti, ::Type{T}, str::MS_UTF8,
+@propagate_inbounds function _next(::MultiCU, ::Type{T}, str::MS_UTF8,
                                    pos::Int) where {T<:Chr}
     len = ncodeunits(str)
     @boundscheck 0 < pos <= len || boundserr(str, pos)
@@ -366,9 +366,9 @@ end
     end
 end
 
-_next(::CodeUnitMulti, ::Type{T}, str::Str{RawUTF8CSE}, pos::Int) where {T} =
+_next(::MultiCU, ::Type{T}, str::Str{RawUTF8CSE}, pos::Int) where {T} =
     next(str.data, pos)
-_next(::CodeUnitMulti, ::Type{T}, str::SubString{<:Str{RawUTF8CSE}}, pos::Int) where {T} =
+_next(::MultiCU, ::Type{T}, str::SubString{<:Str{RawUTF8CSE}}, pos::Int) where {T} =
     next(SubString(str.string.data, s.offset + pos, s.offset + ncodeunits(s)), 1)
 
 done(str::Str{<:UTF8_CSEs}, i::Int) = i > sizeof(str.data)
@@ -382,16 +382,16 @@ end
 
 ## overload methods for efficiency ##
 
-@inline _isvalid_char_pos(::CodeUnitMulti, ::Type{<:UTF8_CSEs}, str, pos::Integer) =
+@inline _isvalid_char_pos(::MultiCU, ::Type{<:UTF8_CSEs}, str, pos::Integer) =
     !is_valid_continuation(get_codeunit(pointer(str) + pos - 1))
 
-function _thisind(::CodeUnitMulti, str::MaybeSub{T}, len, pnt,
+function _thisind(::MultiCU, str::MaybeSub{T}, len, pnt,
                   pos::Integer) where {T<:Union{Str{<:UTF8_CSEs},String}}
     pnt += pos - 1
     Int(pos) - (checkcont(pnt) ? (checkcont(pnt - 1) ? checkcont(pnt - 2) + 2 : 1) : 0)
 end
 
-@propagate_inbounds function _nextind(::CodeUnitMulti, str::MS_UTF8, pos::Integer)
+@propagate_inbounds function _nextind(::MultiCU, str::MS_UTF8, pos::Integer)
     pos == 0 && return 1
     numcu = ncodeunits(str)
     @boundscheck 1 <= pos <= numcu || boundserr(str, pos)
@@ -406,7 +406,7 @@ end
     end
 end
 
-@propagate_inbounds function _prevind(::CodeUnitMulti, str::MS_UTF8, pos::Integer)
+@propagate_inbounds function _prevind(::MultiCU, str::MS_UTF8, pos::Integer)
     (pos -= 1) == 0 && return 0
     numcu = ncodeunits(str)
     @preserve str begin
@@ -424,7 +424,7 @@ end
     end
 end
 
-@propagate_inbounds function _nextind(::CodeUnitMulti, str::MS_UTF8, pos::Int, nchar::Int)
+@propagate_inbounds function _nextind(::MultiCU, str::MS_UTF8, pos::Int, nchar::Int)
     nchar < 0 && ncharerr(nchar)
     siz = ncodeunits(str)
     @boundscheck 0 <= pos <= siz || boundserr(str, pos)
@@ -460,7 +460,7 @@ end
     end
 end
 
-@propagate_inbounds function _prevind(::CodeUnitMulti, str::MS_UTF8, pos::Int, nchar::Int)
+@propagate_inbounds function _prevind(::MultiCU, str::MS_UTF8, pos::Int, nchar::Int)
     nchar < 0 && ncharerr(nchar)
     numcu = ncodeunits(str)
     @boundscheck 0 < pos <= numcu+1 || boundserr(str, pos)
@@ -504,23 +504,23 @@ end
 end
 
 # For now, use string support in Base for unvalidated UTF-8 strings
-_nextind(::CodeUnitMulti, str::Str{RawUTF8CSE}, pos::Int, nchar::Int) =
+_nextind(::MultiCU, str::Str{RawUTF8CSE}, pos::Int, nchar::Int) =
     nextind(str.data, pos, nchar)
-_nextind(::CodeUnitMulti, str::Str{RawUTF8CSE}, pos::Int) =
+_nextind(::MultiCU, str::Str{RawUTF8CSE}, pos::Int) =
     nextind(str.data, pos)
-_prevind(::CodeUnitMulti, str::Str{RawUTF8CSE}, pos::Int, nchar::Int) =
+_prevind(::MultiCU, str::Str{RawUTF8CSE}, pos::Int, nchar::Int) =
     prevind(str.data, pos, nchar)
-_prevind(::CodeUnitMulti, str::Str{RawUTF8CSE}, pos::Int) =
+_prevind(::MultiCU, str::Str{RawUTF8CSE}, pos::Int) =
     prevind(str.data, pos)
 
 #=
-_nextind(::CodeUnitMulti, str::SubString{<:Str{RawUTF8CSE}}, pos::Int, nchar::Int) =
+_nextind(::MultiCU, str::SubString{<:Str{RawUTF8CSE}}, pos::Int, nchar::Int) =
     nextind(str, pos, nchar)
-_nextind(::CodeUnitMulti, str::SubString{<:Str{RawUTF8CSE}}, pos::Int) =
+_nextind(::MultiCU, str::SubString{<:Str{RawUTF8CSE}}, pos::Int) =
     nextind(str, pos)
-_prevind(::CodeUnitMulti, str::SubString{<:Str{RawUTF8CSE}}, pos::Int, nchar::Int) =
+_prevind(::MultiCU, str::SubString{<:Str{RawUTF8CSE}}, pos::Int, nchar::Int) =
     prevind(str, pos, nchar)
-_prevind(::CodeUnitMulti, str::SubString{<:Str{RawUTF8CSE}}, pos::Int) =
+_prevind(::MultiCU, str::SubString{<:Str{RawUTF8CSE}}, pos::Int) =
     prevind(str, pos)
 =#
 
@@ -531,7 +531,7 @@ const _ByteStr = Union{Str{ASCIICSE}, SubString{<:Str{ASCIICSE}},
 string(c::_ByteStr...) = length(c) == 1 ? c[1]::UTF8Str : UTF8Str(_string(c))
     # ^^ at least one must be UTF-8 or the ASCII-only method would get called
 
-function _reverse(::CodeUnitMulti, ::Type{UTF8CSE}, len, pnt::Ptr{T}) where {T<:CodeUnitTypes}
+function _reverse(::MultiCU, ::Type{UTF8CSE}, len, pnt::Ptr{T}) where {T<:CodeUnitTypes}
     buf, beg = _allocate(T, len)
     out = beg + len
     while out >= beg

@@ -152,7 +152,7 @@ unsafe_crc32c(a, n, crc) = ccall(:jl_crc32c, UInt32, (UInt32, Ptr{UInt8}, Csize_
 function sizeof(str::SubString{T}) where {T<:Str}
     is_multi(str) || return str.endof
     str.endof == 0 && return 0
-    _nextind(CodeUnitMulti(), str.string, str.offset + str.endof) - str.offset - 1
+    _nextind(MultiCU(), str.string, str.offset + str.endof) - str.offset - 1
 end
 
 occurs_in(str::String, hay::String) = contains(hay, str)
@@ -178,7 +178,7 @@ for sym in (:bin, :oct, :dec, :hex)
 end
 
 function repeat(ch::Char, cnt::Integer)
-    cnt > 1 && return String(_repeat(CodeUnitMulti(), UTF8CSE, ch%UInt32, cnt))
+    cnt > 1 && return String(_repeat(MultiCU(), UTF8CSE, ch%UInt32, cnt))
     cnt < 0 && repeaterr(cnt)
     cnt == 0 ? empty_string : string(Char(ch%UInt32))
 end

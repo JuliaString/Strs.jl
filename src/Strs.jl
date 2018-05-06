@@ -75,9 +75,17 @@ So: ASCIIStr would be: Valid, All ASCII, ... i.e. 0 + short/hash bits
 using CharSetEncodings
 
 # From CharSetEncodings
-export CSE, CharSet, Encoding, cse, charset, encoding, basetype, basecse, MaybeSub
+export CSE, CharSet, Encoding, cse, charset, encoding, basetype, basecse, MaybeSub, is_multi
 export @cs_str, @enc_str, @cse
 export BIG_ENDIAN, LITTLE_ENDIAN
+    
+import CharSetEncodings: EncodingStyle, CharSetStyle, CompareStyle
+
+# Convenience aliases
+const SingleCU = SingleCodeUnitEncoding
+const MultiCU  = MultiCodeUnitEncoding
+const SCU = SingleCU()
+const MCU = MultiCU()
 
 # Convenience functions
 export to_ascii, utf8, utf16, utf32

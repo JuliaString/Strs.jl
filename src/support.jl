@@ -933,10 +933,10 @@ end
     buf
 end
 
-_repeat(::CodeUnitSingle, ::Type{C}, ch::T, cnt) where {T,C<:CSE} =
+_repeat(::SingleCU, ::Type{C}, ch::T, cnt) where {T,C<:CSE} =
     _repeat_chr(basetype(T), ch, cnt)
 
-function _repeat(::CodeUnitMulti, ::Type{UTF8CSE}, ch, cnt)
+function _repeat(::MultiCU, ::Type{UTF8CSE}, ch, cnt)
     if ch <= 0x7f
         _repeat_chr(UInt8, ch, cnt)
     elseif ch <= 0x7ff
@@ -948,7 +948,7 @@ function _repeat(::CodeUnitMulti, ::Type{UTF8CSE}, ch, cnt)
     end
 end
 
-_repeat(::CodeUnitMulti, ::Type{UTF16CSE}, ch, cnt) =
+_repeat(::MultiCU, ::Type{UTF16CSE}, ch, cnt) =
     ch <= 0xffff ? _repeat_chr(UInt16, ch, cnt) : _repeat_chr(UInt32, get_utf16_32(ch), cnt)
 
 function repeat(str::T, cnt::Integer) where {C<:CSE,T<:Str{C}}
