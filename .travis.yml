@@ -26,9 +26,8 @@ git:
 #  - if [ $TRAVIS_OS_NAME = osx ]; then brew install gcc; fi
 
 ## uncomment the following lines to override the default test script
-#script:
-#  - julia -e 'Pkg.clone(pwd()); Pkg.build("Strs"); Pkg.test("Strs"; coverage=true)'
-  - julia -e 'Pkg.clone("https://github.com/JuliaString/StrTables.jl.git"); Pkg.clone("https://github.com/JuliaString/LaTeX_Entities.jl.git"); Pkg.clone("https://github.com/JuliaString/Emoji_Entities.jl.git"); Pkg.clone("https://github.com/JuliaString/HTML_Entities.jl.git"); Pkg.clone("https://github.com/JuliaString/Unicode_Entities.jl.git"); Pkg.clone("https://github.com/JuliaString/Format.jl.git"); Pkg.clone(pwd()); Pkg.add("LightXML"); Pkg.add("JSON"); Pkg.build("LaTeX_Entities"); Pkg.build("Emoji_Entities"); Pkg.build("HTML_Entities"); Pkg.build("Unicode_Entities"); Pkg.test("Strs"; coverage=true)'
+script:
+  - julia -e 'Pkg.clone(pwd()); Pkg.test("Strs"; coverage=true)'
 after_success:
   # push coverage results to Coveralls
   - julia -e 'cd(Pkg.dir("Strs")); Pkg.add("Coverage"); using Coverage; Coveralls.submit(Coveralls.process_folder())'
