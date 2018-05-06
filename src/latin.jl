@@ -69,6 +69,8 @@ convert(::Type{<:Str{_LatinCSE}}, s::ASCIISubStr)  = _cpyconvert(LatinCSE, s)
 convert(::Type{<:Str{_LatinCSE}}, s::_LatinSubStr) = Str(_LatinCSE, _copysub(s))
 
 # Assumes that has already been checked for validity
+
+# These should be sped up to do chunks at a time, when no bytes > 0x7f
 function _utf8_to_latin(pnt::Ptr{UInt8}, len)
     buf, out = _allocate(UInt8, len)
     fin = out + len

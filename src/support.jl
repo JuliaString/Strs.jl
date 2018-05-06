@@ -645,19 +645,31 @@ end
 
 count_chars(T, dat, len) = count_chars(T, codeunit(T), dat, 1, len)
 
+@inline function _count_mask_al(pnt, siz, msk, v)
+    cnt = 0
+    fin = pnt + siz
+    while (pnt += CHUNKSZ) < fin
+        cnt += count_ones(v & msk)
+        v = unsafe_load(pnt)
+    end
+    cnt + count_ones((siz & CHUNKMSK == 0 ? v : (v & _mask_bytes(siz))) & msk)
+end
+@inline _count_mask_al(pnt, siz, msk) = _count_mask_al(pnt, siz, msk, unsafe_load(pnt))
+
+@inline function _count_mask_ul(beg, siz, msk)
+    align = reinterpret(UInt, beg)
+    pnt = reinterpret(Ptr{UInt64}, align & ~CHUNKMSK)
+    v = unsafe_load(pnt)
+    if (align &= CHUNKMSK) != 0
+        v &= ~_mask_bytes(align)
+        siz += align
+    end
+    _count_mask_al(pnt, siz, msk, v)
+end
 """
 Calculate the total number of bytes > 0x7f
 """
-function count_latin(len, pnt::Ptr{UInt8})
-    # Todo: optimize this to work on chunks when pnt is aligned
-    cnt = 0
-    fin = pnt + len
-    while pnt < fin
-        cnt += (get_codeunit(pnt) > 0x7f)
-        pnt += 1
-    end
-    cnt
-end
+count_latin(len, pnt::Ptr{UInt8}) = _count_mask_ul(pnt, len, hi_mask)
 
 """
 Validates and calculates number of characters in a UTF-8,UTF-16 or UTF-32 encoded vector/string
@@ -777,6 +789,8 @@ end
 first(str::Str, n::Integer) = str[1:min(end, nextind(str, 0, n))]
 last(str::Str, n::Integer)  = str[max(1, prevind(str, ncodeunits(str)+1, n)):end]
 
+const HAS_WMEMCPY = !(@static V6_COMPAT ? is_windows() : Sys.iswindows())
+
 const Chrs = @static V6_COMPAT ? Union{Char,AbstractChar} : Chr
 
 function repeat(ch::CP, cnt::Integer) where {CP <: Chrs}
@@ -867,7 +881,9 @@ _memcmp(a::SubString{<:Str{<:Quad_CSEs}}, b::SubString{<:Str{Quad_CSEs}}, siz) =
 _memcpy(dst::Ptr{UInt8}, src::Ptr, siz) =
     ccall(:memcpy, Ptr{UInt8}, (Ptr{Cvoid}, Ptr{Cvoid}, UInt), dst, src, siz)
 _memcpy(a::Ptr{WidChr}, b::Ptr{WidChr}, len) =
-    ccall(:wmemcpy, Ptr{WidChr}, (Ptr{WidChr}, Ptr{WidChr}, UInt), a, b, len)
+    (HAS_WMEMCPY
+     ? ccall(:wmemcpy, Ptr{WidChr}, (Ptr{WidChr}, Ptr{WidChr}, UInt), a, b, len)
+     : ccall(:memcpy, Ptr{WidChr}, (Ptr{WidChr}, Ptr{WidChr}, UInt), a, b, bytoff(WidChr, len)))
 _memcpy(a::Ptr{OthChr}, b::Ptr{OthChr}, len) =
     ccall(:memcpy, Ptr{OthChr}, (Ptr{OthChr}, Ptr{OthChr}, UInt), a, b, bytoff(OthChr, len))
 
@@ -936,11 +952,12 @@ function repeat(str::T, cnt::Integer) where {C<:CSE,T<:Str{C}}
     CU = codeunit(T)
     @preserve str begin
         len = ncodeunits(str)
-        totlen = len * cnt
-        buf, out = _allocate(CU, totlen)
         if len == 1 # common case: repeating a single codeunit string
+            buf, out = _allocate(CU, cnt)
             _memset(out, get_codeunit(pointer(str)), cnt)
         else
+            totlen = len * cnt
+            buf, out = _allocate(CU, totlen)
             pnt = pointer(str)
             fin = bytoff(out, totlen)
             siz = bytoff(CU, len)

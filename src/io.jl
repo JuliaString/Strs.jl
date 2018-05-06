@@ -408,9 +408,9 @@ join(strings::AbstractArray{<:MaybeSub{<:Str}}, delim) =
 join(strings::AbstractArray{<:MaybeSub{T}},
      delim) where {C<:Union{Text1CSE, BinaryCSE, ASCIICSE, Latin_CSEs},T<:Str{C}} =
     _join(C, strings, delim)
-join(strings::AbstractArray{<:MaybeSub{T}}, d) where {C<:Word_CSEs,T<:Str{C}} =
+join(strings::AbstractArray{<:MaybeSub{T}}, delim) where {C<:Word_CSEs,T<:Str{C}} =
     _join(C, strings, delim)
-join(strings::AbstractArray{<:MaybeSub{T}}, d) where {C<:Quad_CSEs,T<:Str{C}} =
+join(strings::AbstractArray{<:MaybeSub{T}}, delim) where {C<:Quad_CSEs,T<:Str{C}} =
     _join(C, strings, delim)
 
 join(strings::AbstractArray{<:MaybeSub{<:Str}}, delim, last) =
