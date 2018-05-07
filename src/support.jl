@@ -789,8 +789,6 @@ end
 first(str::Str, n::Integer) = str[1:min(end, nextind(str, 0, n))]
 last(str::Str, n::Integer)  = str[max(1, prevind(str, ncodeunits(str)+1, n)):end]
 
-const HAS_WMEMCPY = !(@static V6_COMPAT ? is_windows() : Sys.iswindows())
-
 const Chrs = @static V6_COMPAT ? Union{Char,AbstractChar} : Chr
 
 function repeat(ch::CP, cnt::Integer) where {CP <: Chrs}
@@ -804,22 +802,36 @@ end
 
 # low level mem support functions
 
+const HAS_WMEM = !(@static V6_COMPAT ? is_windows() : Sys.iswindows())
+
+@static if HAS_WMEM
+
 const (WidChr,OthChr) = @static sizeof(Cwchar_t) == 4 ? (UInt32,UInt16) : (UInt16,UInt32)
 
-_fwd_memchr(ptr::Ptr{UInt8}, byt::UInt8, len::Integer) =
-    ccall(:memchr, Ptr{UInt8}, (Ptr{UInt8}, Int32, Csize_t), ptr, byt, len)
+@inline _memcmp(a::Ptr{T}, b::Ptr{T}, len) where {T<:WidChr} =
+    ccall(:wmemcmp, Int32, (Ptr{T}, Ptr{T}, UInt), a, b, len)
+@inline _memcpy(a::Ptr{T}, b::Ptr{T}, len) where {T<:WidChr} =
+    ccall(:wmemcpy, Ptr{T}, (Ptr{T}, Ptr{T}, UInt), a, b, len)
+@inline _memset(pnt::Ptr{T}, ch::T, cnt) where {T<:WidChr} =
+    ccall(:wmemset, Ptr{T}, (Ptr{T}, Cuint, Csize_t), pnt, ch, cnt)
 
-_fwd_memchr(ptr::Ptr{WidChr}, wchr::WidChr, len::Integer) =
-    ccall(:wmemchr, Ptr{WidChr}, (Ptr{WidChr}, Int32, Csize_t), ptr, wchr, len)
+_fwd_memchr(ptr::Ptr{T}, wchr::T, len::Integer) where {T<:WidChr} =
+    ccall(:wmemchr, Ptr{T}, (Ptr{T}, Int32, Csize_t), ptr, wchr, len)
+_fwd_memchr(ptr::Ptr{T}, wchr::T, fin::Ptr{T}) where {T<:WidChr} =
+    ptr < fin ? _fwd_memchr(ptr, wchr, chroff(fin - ptr)) : C_NULL
 
-_fwd_memchr(beg::Ptr{OthChr}, wchr::OthChr, len::Integer) =
+else
+    const OthChr = Union{UInt16, UInt32}
+end
+
+_fwd_memchr(ptr::Ptr{T}, byt::T, len::Integer) where {T<:UInt8} =
+    ccall(:memchr, Ptr{T}, (Ptr{T}, Int32, Csize_t), ptr, byt, len)
+
+_fwd_memchr(beg::Ptr{T}, wchr::T, len::Integer) where {T<:OthChr} =
     _fwd_memchr(beg, ch, bytoff(beg, len))
 
-_fwd_memchr(ptr::Ptr{UInt8}, byt::UInt8, fin::Ptr{UInt8}) =
+_fwd_memchr(ptr::Ptr{T}, byt::T, fin::Ptr{T}) where {T<:UInt8} =
     ptr < fin ? _fwd_memchr(ptr, byt, fin - ptr) : C_NULL
-
-_fwd_memchr(ptr::Ptr{WidChr}, wchr::WidChr, fin::Ptr{WidChr}) =
-    ptr < fin ? _fwd_memchr(ptr, wchr, chroff(fin - ptr)) : C_NULL
 
 function _fwd_memchr(pnt::Ptr{T}, wchr::T, fin::Ptr{T}) where {T<:OthChr}
     while pnt < fin
@@ -829,8 +841,8 @@ function _fwd_memchr(pnt::Ptr{T}, wchr::T, fin::Ptr{T}) where {T<:OthChr}
     C_NULL
 end
 
-_rev_memchr(ptr::Ptr{UInt8}, byt::UInt8, len::Integer) =
-    ccall(:memrchr, Ptr{UInt8}, (Ptr{UInt8}, Int32, Csize_t), ptr, byt, len)
+_rev_memchr(ptr::Ptr{T}, byt::T, len::Integer) where {T<:UInt8} =
+    ccall(:memrchr, Ptr{T}, (Ptr{T}, Int32, Csize_t), ptr, byt, len)
 
 function _rev_memchr(beg::Ptr{T}, ch::T, len::Integer) where {T<:Union{UInt16,UInt32}}
     pnt = bytoff(beg, len)
@@ -840,17 +852,15 @@ function _rev_memchr(beg::Ptr{T}, ch::T, len::Integer) where {T<:Union{UInt16,UI
     C_NULL
 end
 
-_memcmp(a::Ptr{UInt8}, b::Ptr{UInt8}, len) =
-    ccall(:memcmp, Int32, (Ptr{UInt8}, Ptr{UInt8}, UInt), a, b, len)
-_memcmp(a::Ptr{WidChr}, b::Ptr{WidChr}, len) =
-    ccall(:wmemcmp, Int32, (Ptr{WidChr}, Ptr{WidChr}, UInt), a, b, len)
+_memcmp(a::Ptr{T}, b::Ptr{T}, len) where {T<:UInt8} =
+    ccall(:memcmp, Int32, (Ptr{T}, Ptr{T}, UInt), a, b, len)
 
-function _memcmp(apnt::Ptr{OthChr}, bpnt::Ptr{OthChr}, len)
+function _memcmp(apnt::Ptr{T}, bpnt::Ptr{T}, len) where {T<:OthChr}
     fin = bytoff(apnt, len)
     while apnt < fin
         (c1 = get_codeunit(apnt)) == (c2 = get_codeunit(bpnt)) || return _cmp(c1, c2)
-        apnt += sizeof(OthChr)
-        bpnt += sizeof(OthChr)
+        apnt += sizeof(T)
+        bpnt += sizeof(T)
     end
     0
 end
@@ -880,23 +890,17 @@ _memcmp(a::SubString{<:Str{<:Quad_CSEs}}, b::SubString{<:Str{Quad_CSEs}}, siz) =
 
 _memcpy(dst::Ptr{UInt8}, src::Ptr, siz) =
     ccall(:memcpy, Ptr{UInt8}, (Ptr{Cvoid}, Ptr{Cvoid}, UInt), dst, src, siz)
-_memcpy(a::Ptr{WidChr}, b::Ptr{WidChr}, len) =
-    (HAS_WMEMCPY
-     ? ccall(:wmemcpy, Ptr{WidChr}, (Ptr{WidChr}, Ptr{WidChr}, UInt), a, b, len)
-     : ccall(:memcpy, Ptr{WidChr}, (Ptr{WidChr}, Ptr{WidChr}, UInt), a, b, bytoff(WidChr, len)))
-_memcpy(a::Ptr{OthChr}, b::Ptr{OthChr}, len) =
-    ccall(:memcpy, Ptr{OthChr}, (Ptr{OthChr}, Ptr{OthChr}, UInt), a, b, bytoff(OthChr, len))
+_memcpy(a::Ptr{T}, b::Ptr{T}, len) where {T<:OthChr} =
+    ccall(:memcpy, Ptr{T}, (Ptr{T}, Ptr{T}, UInt), a, b, bytoff(T, len))
 
-@inline _memset(pnt::Ptr{UInt8}, ch::UInt8, cnt) =
-    ccall(:memset, Ptr{UInt8}, (Ptr{UInt8}, Cint, Csize_t), pnt, ch, cnt)
-@inline _memset(pnt::Ptr{WidChr}, ch::WidChr, cnt) =
-    ccall(:wmemset, Ptr{WidChr}, (Ptr{WidChr}, Cuint, Csize_t), pnt, ch, cnt)
+@inline _memset(pnt::Ptr{T}, ch::T, cnt) where {T<:UInt8} =
+    ccall(:memset, Ptr{T}, (Ptr{T}, Cint, Csize_t), pnt, ch, cnt)
 
-@inline function _memset(pnt::Ptr{OthChr}, ch::OthChr, cnt)
+@inline function _memset(pnt::Ptr{T}, ch::T, cnt) where {T<:OthChr}
     fin = bytoff(pnt, cnt)
     while pnt < fin
         set_codeunit!(pnt, ch)
-        pnt += sizeof(OthChr)
+        pnt += sizeof(T)
     end
 end
 
