@@ -3,3 +3,4 @@ StrRegex
 StrFormat
 StrEntities
 InternedStrings
+BenchmarkTools

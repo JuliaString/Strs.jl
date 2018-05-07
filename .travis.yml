@@ -27,9 +27,11 @@ git:
 
 ## uncomment the following lines to override the default test script
 script:
-  - julia -e 'Pkg.clone(pwd()); Pkg.test("Strs"; coverage=true)'
+  - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
+  - julia -e 'VERSION < v"0.7.0-DEV" || (using Pkg); p="https://github.com/JuliaString"; s=".jl.git"; l="_Entities"; for n in ("StrTables", "LightXML", "JSON", "Format", "PCRE2", "InternedStrings") ; Pkg.add(n) ; end ; t=("LaTeX","Emoji","HTML","Unicode"); for n in t; Pkg.add("$n$l"); end; for n in ("APITools", "StrAPI", "CharSetEncodings", "Chars", "StrBase", "StrRegex", "StrLiterals", "StrFormat", "StrEntities") ; Pkg.clone("$p/$n$s"); end ; Pkg.clone(pwd()); for n in t; Pkg.build("$n$l"); end; Pkg.test("Strs"; coverage=true)'
+  #- julia -e 'Pkg.clone(pwd()); Pkg.test("Strs"; coverage=true)'
 after_success:
   # push coverage results to Coveralls
-  - julia -e 'cd(Pkg.dir("Strs")); Pkg.add("Coverage"); using Coverage; Coveralls.submit(Coveralls.process_folder())'
+  - julia -e 'VERSION < v"0.7.0-DEV" || (using Pkg); cd(Pkg.dir("Strs")); Pkg.add("Coverage"); using Coverage; Coveralls.submit(Coveralls.process_folder())'
   # push coverage results to Codecov
-  - julia -e 'cd(Pkg.dir("Strs")); Pkg.add("Coverage"); using Coverage; Codecov.submit(Codecov.process_folder())'
+  - julia -e 'VERSION < v"0.7.0-DEV" || (using Pkg); cd(Pkg.dir("Strs")); Pkg.add("Coverage"); using Coverage; Codecov.submit(Codecov.process_folder())'
