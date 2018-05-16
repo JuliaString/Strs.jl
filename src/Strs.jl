@@ -15,8 +15,11 @@ using PCRE2
 import StrTables: lookupname, matchchar, matches, longestmatches, completions
 export lookupname, matchchar, matches, longestmatches, completions
 
-using InternedStrings
+using InternedStrings: intern
 export @i_str, intern
+
+macro i_str(str) ; Expr(:call, :intern, s_interp_parse(false, UniStr, str)) ; end
+macro I_str(str) ; Expr(:call, :intern, s_interp_parse(true,  UniStr, str)) ; end
 
 using Format
 export FormatSpec, FormatExpr, printfmt, printfmtln, format, generate_formatter
