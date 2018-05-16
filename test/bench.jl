@@ -136,15 +136,15 @@ function save_books(books; dir::Any=nothing)
     end
 end
 
-show(io::IO, cnt::LineCounts) =
+Base.show(io::IO, cnt::LineCounts) =
     pr"\(io)\%10d(cnt.bytes)\%12.3f(cnt.bytes/cnt.chars)"
 
-function show(io::IO, s::CharTypes)
+function Base.show(io::IO, s::CharTypes)
     pr"\(io)\%10d(s.ascii)\%10d(s.latin)\%10d(s.utf2byte)\%10d(s.ucs2)"
     pr"\(io)\%10d(s.utf32)\%10d(s.surr)\%10d(s.invalid)"
 end
 
-function show(io::IO, v::Tuple{String,CharStat})
+function Base.show(io::IO, v::Tuple{String,CharStat})
     s = v[2]
     pr_ul(io, "File name              Lines     Chars   Avg C/L     Empty")
     pr_ul(io, "       Min       Max   MaxType\n")
