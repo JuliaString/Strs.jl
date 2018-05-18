@@ -8,7 +8,6 @@ Licensed under MIT License, see LICENSE.md
 module Strs
 
 using APITools
-@api init
 
 using PCRE2
 

@@ -3,11 +3,11 @@ const test_legacy = false
 using BenchmarkTools
 
 using APITools
-@api init
-@api test StrAPI, CharSetEncodings, Chars, StrBase, StrRegex, StrLiterals, StrFormat, StrEntities
-@api test Strs
 
-@static V6_COMPAT ? (using Base.Test) : (using Test, Pkg, REPL)
+@api test StrAPI, CharSetEncodings, Chars, StrBase,
+          StrRegex, StrLiterals, StrFormat, StrEntities, Strs
+
+@static V6_COMPAT || (using Pkg, REPL)
 
 const ver = "v0.$(VERSION.minor)"
 const git = "https://github.com/JuliaString/"
