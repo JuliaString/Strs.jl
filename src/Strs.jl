@@ -8,6 +8,7 @@ Licensed under MIT License, see LICENSE.md
 module Strs
 
 using APITools
+export @api, V6_COMPAT
 
 using PCRE2
 
@@ -25,14 +26,13 @@ export FormatSpec, FormatExpr, printfmt, printfmtln, format, generate_formatter
 export pyfmt, cfmt, fmt
 export fmt_default, fmt_default!, reset!, default_spec, default_spec!
 
-@api extend StrAPI, CharSetEncodings, Chars, StrBase, StrRegex,
-            StrLiterals, StrFormat, StrEntities
+@api extend StrAPI, CharSetEncodings, Chars, StrBase, StrRegex, StrLiterals
+using StrFormat, StrEntities
 
 # Need to fix APITools to do this!
-for mod in (StrAPI, CharSetEncodings, Chars, StrBase, StrRegex, StrLiterals,
-            StrFormat, StrEntities),
-    grp in (:define_module, :define_public, :public)
-    eval(Expr( :export, getfield(Core.eval(mod, :__api__), grp)...))
+for mod in (StrAPI, CharSetEncodings, Chars, StrBase, StrRegex, StrLiterals),
+    grp in (:modules, :public, :public!)
+    eval(Expr( :export, getfield(eval(mod, :__api__), grp)...))
 end
 
 @api freeze

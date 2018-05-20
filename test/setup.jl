@@ -2,10 +2,9 @@ const test_legacy = false
 
 using BenchmarkTools
 
-using APITools
+using Strs
 
-@api test StrAPI, CharSetEncodings, Chars, StrBase,
-          StrRegex, StrLiterals, StrFormat, StrEntities, Strs
+@api test StrAPI, StrBase
 
 @static V6_COMPAT || (using Pkg, REPL)
 
