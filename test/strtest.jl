@@ -1,28 +1,11 @@
-const V6_COMPAT = VERSION < v"0.7.0-DEV"
+isdefined(:STRS_SETUP) || include("setup.jl")
 
-@static V6_COMPAT || (using Pkg, REPL)
-
-const ver = "v0.$(VERSION.minor)"
-const git = "https://github.com/JuliaString/"
-const pkgdir = Pkg.dir()
-
-const mparse    = @static V6_COMPAT ? parse : Meta.parse
-_rep(str, a, b) = @static V6_COMPAT ? replace(str, a, b) : replace(str, a => b)
-const RC        = @static V6_COMPAT ? Base.REPLCompletions : REPL.REPLCompletions
-_stdout()       = @static V6_COMPAT ? STDOUT : stdout
-
-@static if V6_COMPAT
-    const pwc = print_with_color
-else
-    pwc(c, io, str) = printstyled(io, str; color = c)
-end
-
-pwc(c, l) = pwc(c, _stdout(), l)
-pr_ul(l)  = pwc(:underline, l)
+const pkgadd =
+    ["StrTables", "LaTeX_Entities", "Emoji_Entities", "HTML_Entities", "Unicode_Entities",
+     "Format", "PCRE2"]
 
 const pkglist =
-    ["StrTables", "LaTeX_Entities", "Emoji_Entities", "HTML_Entities", "Unicode_Entities",
-     "Format", "CharSetEncodings", "Strs", "PCRE2", "StrRegex", "StrLiterals", "StrEntities", "StrFormat", "StrICU"]
+    ["APITools", "StrAPI", "CharSetEncodings", "Chars", "StrBase", "StrRegex", "StrLiterals", "StrEntities", "StrFormat", "Strs", "StrICU"]
 
 function rmpkg(pkg)
     try
@@ -32,13 +15,13 @@ function rmpkg(pkg)
     Pkg.rm(pkg)
     p = joinpath(pkgdir, pkg)
     run(`rm -rf $p`)
-    j = joinpath(_rep(pkgdir, ver, joinpath("lib", ver)), string(pkg, ".ji"))
+    j = joinpath(replace(pkgdir, ver, joinpath("lib", ver)) => string(pkg, ".ji"))
     run(`rm -rf $j`)
 end
 
 function loadall(loc=git)
     # Get rid of any old copies of the package
-    for pkg in pkglist
+    for pkg in vcat(pkgadd, pkglist)
         rmpkg(pkg)
     end
 
@@ -46,9 +29,11 @@ function loadall(loc=git)
     Pkg.clone(loc == git ? "https://github.com/ScottPJones/JSON.jl" : "/j/JSON.jl")
     Pkg.checkout("JSON", "spj/useptr")
     Pkg.build("JSON")
-    #loadpkg("LightXML"; loc = loc == git ? "https://github.com/JuliaIO/" : "/j/")
     loadpkg("LightXML"; loc="https://github.com/JuliaIO/")
 
+    for pkg in pkgadd
+        Pkg.add(pkg)
+    end
     for pkg in pkglist
         Pkg.clone(joinpath(loc, string(pkg, ".jl")))
     end
@@ -318,7 +303,7 @@ macro usestr()
     for pkg in pkglist
         print(io, pkg, ", ")
     end
-    :( $(mparse(String(take!(io)[1:end-2]))) )
+    :( $(parse(Expr, String(take!(io)[1:end-2]))) )
 end
 
 nothing

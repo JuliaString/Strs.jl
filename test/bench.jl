@@ -21,24 +21,7 @@ res = load_results(fname) # Loads the results from the given file
 dispbench(res)            # Displays the results in a pretty format
 =#
 
-const V6_COMPAT = VERSION < v"0.7.0-DEV"
-
-using BenchmarkTools
-
-const test_legacy = false
-
-@static if test_legacy
-    using LegacyStrings
-end
-
-using Strs, StrRegex, StrLiterals, StrFormat, StrEntities
-import Strs: LineCounts, CharTypes, CharStat, calcstats
-import Strs: _LatinStr, _UCS2Str, _UTF32Str, _LatinChr
-
-uninit(T, len) = @static V6_COMPAT ? T(len) : T(undef, len)
-create_vector(T, len)  = uninit(Vector{T}, len)
-
-import Base: show
+isdefined(Main, :STRS_SETUP) || include("setup.jl")
 
 const inppath = "textsamples"
 const gutpath = "gutenberg"
@@ -60,9 +43,9 @@ const gutenbergbooks =
      ("cache/epub/48322/pg48322", "German"),
      )
 
-const downloadedbooks =
-    (("LYSAIa GORA DIeVICh'Ia - SIeRGIeI GOLOVAChIoV.txt", "Russian"),
-     )
+const downloadedbooks = (
+#                         ("LYSAIa GORA DIeVICh'Ia - SIeRGIeI GOLOVAChIoV.txt", "Russian"),
+                         )
 
 getdefdir(dir)::String = dir === nothing ? homedir() : dir
 
@@ -89,6 +72,7 @@ Load books from Project Gutenberg site, removing lines added at beginning and en
 are not part of the book, as much as possible
 """
 function load_gutenberg!(books, list, dict, gutenbergdir)
+    mkpath(gutenbergdir)
     for (nam, lang) in list
         cnt = get(dict, lang, 0)
         dict[lang] = cnt + 1
@@ -140,6 +124,7 @@ If the directory is not set, it will default to the user's home directory
 """
 function save_books(books; dir::Any=nothing)
     sampledir = joinpath(getdefdir(dir), smppath)
+    mkpath(sampledir)
     for (nam, book) in books
         outnam = joinpath(sampledir, nam)
         open(outnam, "w") do io
@@ -151,15 +136,15 @@ function save_books(books; dir::Any=nothing)
     end
 end
 
-show(io::IO, cnt::LineCounts) =
+Base.show(io::IO, cnt::LineCounts) =
     pr"\(io)\%10d(cnt.bytes)\%12.3f(cnt.bytes/cnt.chars)"
 
-function show(io::IO, s::CharTypes)
+function Base.show(io::IO, s::CharTypes)
     pr"\(io)\%10d(s.ascii)\%10d(s.latin)\%10d(s.utf2byte)\%10d(s.ucs2)"
     pr"\(io)\%10d(s.utf32)\%10d(s.surr)\%10d(s.invalid)"
 end
 
-function show(io::IO, v::Tuple{String,CharStat})
+function Base.show(io::IO, v::Tuple{String,CharStat})
     s = v[2]
     pr_ul(io, "File name              Lines     Chars   Avg C/L     Empty")
     pr_ul(io, "       Min       Max   MaxType\n")
@@ -170,17 +155,6 @@ function show(io::IO, v::Tuple{String,CharStat})
     pr"\(io)Total characters: \(s.chars)\n"
     pr"\(io)Lines with > 0:   \(s.lines)\n"
 end
-
-_stdout() = @static V6_COMPAT ? STDOUT : stdout
-@static if V6_COMPAT
-    const pwc = print_with_color
-else
-    pwc(c, io, str) = printstyled(io, str; color = c)
-end
-pwc(c, l) = pwc(c, _stdout(), l)
-
-pr_ul(io, l) = pwc(:underline, io, l)
-pr_ul(l)     = pwc(:underline, l)
 
 print_size_ratio(io, val) =
     pwc(val < .95 ? :green : val > 1.05 ? :red : :normal, io, f"\%6.3f(val)")
@@ -694,7 +668,7 @@ checkdigit(l)   = checkcp(is_digit,     l)
 checkxdigit(l)  = checkcp(is_hex_digit, l)
 checklower(l)   = checkcp(is_lowercase, l)
 checkupper(l)   = checkcp(is_uppercase, l)
-checkalpha(l)   = checkcp(is_alpha,     l)
+checkletter(l)  = checkcp(is_letter,    l)
 checknumeric(l) = checkcp(is_numeric,   l)
 checkspace(l)   = checkcp(is_space,     l)
 checkalnum(l)   = checkcp(is_alphanumeric, l)
@@ -799,7 +773,7 @@ const tests =
      #=
      (checkcntrl,   "iscntrl\nchars"),
      (checkupper,   "isupper\nchars"),
-     (checkalpha,   "isalpha\nchars"),
+     (checkletter,  "isletter\nchars"),
      (checkspace,   "isspace\nchars"),
      (checkprint,   "isprint\nchars"),
      (checkpunct,   "ispunct\nchars"),
@@ -942,7 +916,7 @@ function checkboolchar(fun, lines)
     res = []
     for text in lines
         len = length(text)
-        bv = uninit(BitVector, len)
+        bv = _uninit(BitVector, len)
         for (i, ch) in enumerate(text)
             bv[i] = fun(ch)
         end
@@ -953,7 +927,7 @@ end
 
 function checkline(::Type{Bool}, fun, lines)
     len = length(lines)
-    bv = uninit(BitVector, len)
+    bv = _uninit(BitVector, len)
     for (i, text) in enumerate(lines)
         bv[i] = fun(text)
     end
@@ -1116,10 +1090,10 @@ const testlist =
     (((length, text_width, hash), "length, text_width, hash"),
      ((is_ascii, is_valid), "is_ascii, is_valid"),
      ((lowercase, uppercase, reverse), "lowercase, uppercase, reverse"),
-     ((is_ascii, is_valid, is_control, is_lowercase, is_uppercase, is_alpha,
+     ((is_ascii, is_valid, is_control, is_lowercase, is_uppercase, is_letter,
        is_alphanumeric, is_space, is_printable, is_punctuation, is_graphic,
        is_digit, is_hex_digit),
-      "is_(ascii|valid|control|lowercase|uppercase|alpha|alphanumeric|space|printable|" *
+      "is_(ascii|valid|control|lowercase|uppercase|letter|alphanumeric|space|printable|" *
       "punctuation|graphic|digit|hex_digit)"),
      ((UInt32, ), "UInt32"),
      ((sizeof, ), "sizeof"))
