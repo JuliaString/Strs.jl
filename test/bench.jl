@@ -694,7 +694,7 @@ function wrap(f, lines, io, cnts::LineCounts, t, msg, fast=true, basetime=0%UInt
         tim = fast ? mintime(f, lines) : round(UInt64, 1e9 * @belapsed ($f)($lines))
         push!(t, (msg, res, tim))
         pr"\(io)\%-22s(replace(msg, '\n' => ' ')*':') \%12d(res)"
-        pr"\(io) \%12.3f(tim/1000000)"
+        pr"\(io) \%12.3f(tim/1000)"
         pr"\(io) \%12.3f(tim/cnts.lines)"
         pr"\(io) \%12.3f(tim/cnts.chars)"
         pr"\(io) \%12.3f(tim/cnts.bytes)"
@@ -726,7 +726,7 @@ function wrap(::Type{T}, f, lines, io, cnts::LineCounts, t, msg,
         tim = fast ? mintime(T, f, lines) : round(UInt64, 1e9 * @belapsed ($f)($lines))
         push!(t, (msg, res, tim))
         pr"\(io)\%-22s(replace(msg, '\n' => ' ')*':') \%12d(res)"
-        pr"\(io) \%12.3f(tim/1000000)"
+        pr"\(io) \%12.3f(tim/1000)"
         pr"\(io) \%12.3f(tim/cnts.lines)"
         pr"\(io) \%12.3f(tim/cnts.chars)"
         pr"\(io) \%12.3f(tim/cnts.bytes)"
@@ -804,7 +804,7 @@ end
 
 function testperf(lines::Vector{T}, io, cnts, docnam, basetime, fast) where {T<:AbstractString}
     # Test performance
-    pr_ul(io, f"""\%-22s(docnam) \%12s("Result") \%12s("ms total") """)
+    pr_ul(io, f"""\%-22s(docnam) \%12s("Result") \<mu>s\%10s(" total") """)
     pr_ul(io, f"""\%12s("ns/line") \%12s("ns/char") \%12s("ns/byte")\n""")
     t = []
     # Just run everything once
@@ -834,7 +834,7 @@ function testcvt(::Type{S}, vec, io, numlines, numchars, siz, docnam,
     #println(typeof(vec))
 
     # Test performance
-    pr_ul(io, f"""\%-22s(docnam) \%12s("Result") \%12s("ms total") """)
+    pr_ul(io, f"""\%-22s(docnam) \%12s("Result") \<mu>s\%10s(" total") """)
     pr_ul(io, f"""\%12s("ns/line") \%12s("ns/char") \%12s("ns/byte")\n""")
     t = []
     # Just run everything once
@@ -1041,7 +1041,14 @@ function comparetestchar(lines, results, list, displist)
             pr"Can't display diffs \(diff[end][2]): \(sprint(showerror, ex, catch_backtrace()))"
         end
         str = String(take!(io))
-        println(str[1:200])
+        #println(str[1:200])
+        cnt = 0
+        max = min(length(str), 80)
+        for ch in str
+            (cnt += 1) > max && break
+            print(ch)
+        end
+        println()
     end
     diff
 end
