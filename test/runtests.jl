@@ -6,4 +6,4 @@ include("bench.jl")
 
 @time books = load_books()
 @time save_books(books)
-@time tst = checktests()
+@time tst = checktests(test=true)

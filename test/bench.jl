@@ -30,7 +30,7 @@ const smppath = "samples"
 const gutenbergbooks =
     (("files/2600/2600-0",        "English"), # War & Peace, some other languages in quotes
      ("files/1400/1400-0",        "English"), # Great Expectations, uses Unicode quotes
-     ("files/42286/42286-0",      "Hungarian"),
+     #("files/42286/42286-0",      "Hungarian"),
      #("files/8119/8119-0",        "Polish"), # couldn't get this to load correctly
      ("files/32941/32941-0",      "Japanese"),
      ("files/24264/24264-0",      "Chinese"),
@@ -636,18 +636,18 @@ function checksplit(lines)
 end
 
 repeat1(str)  = repeat(str, 1)
-repeat10(str) = repeat(str, 10)
+repeat20(str) = repeat(str, 20)
 repeat1c(str)  = @inbounds repeat(str[1], 1)
-repeat10c(str) = @inbounds repeat(str[1], 10)
+repeat20c(str) = @inbounds repeat(str[1], 20)
 
 countsklength(l)  = checkstr(sklength, l)
 countoldlength(l) = checkstr(oldlength, l)
 checktextwidth(l) = checkstr(text_width, l)
 
 checkrepeat1(l)   = checktext(repeat1, l)
-checkrepeat10(l)  = checktext(repeat10, l)
+checkrepeat20(l)  = checktext(repeat20, l)
 checkrepeat1c(l)  = checktext(repeat1c, l)
-checkrepeat10c(l) = checktext(repeat10c, l)
+checkrepeat20c(l) = checktext(repeat20c, l)
 checkreverse(l)   = checktext(reverse, l)
 
 checknextind(l) = checkstr(iteratenextind, l)
@@ -752,14 +752,14 @@ const tests =
      (checksplit,   "split\nline"),
      (checkreverse, "reverse"),
      (checkrepeat1,  "repeat 1\nstring"),
-     (checkrepeat10,  "repeat 10\nstring"),
+     (checkrepeat20,  "repeat 10\nstring"),
      (searchstr,    "search\nstring"),
      (searchchar,    "search\nchar"),
      (searchreg,     "search\nregex"),
 #     (rsearchstr,    "rsearch\nstring"),
 #     (rsearchchar,    "rsearch\nchar"),
 #     (checkrepeat1c,  "repeat 1\nchar"),
-#     (checkrepeat10c,  "repeat 10\nchar"),
+#     (checkrepeat20c,  "repeat 10\nchar"),
 #    (countsklength,  "length\nSK"),
 #    (countoldlength, "length\nOld"),
      (countchars,   "iteration\nChar"),
@@ -792,19 +792,21 @@ function select_lines(lines::Vector{<:AbstractString}; num=1000)
     sizehint!(out, num)
     len = length(lines)
     i = len>>1
-    j = len-1
+    j = i-1
     while length(out) < num
         is_empty(lines[i]) || push!(out, i)
         is_empty(lines[j]) || push!(out, j)
-        i += 1 > len && break
-        j -= 1 < 1   && break
+        (i += 1) > len && break
+        (j -= 1) < 1   && break
     end
     out
 end
 
+const mu_total = f"\<mu>s total"
+
 function testperf(lines::Vector{T}, io, cnts, docnam, basetime, fast) where {T<:AbstractString}
     # Test performance
-    pr_ul(io, f"""\%-22s(docnam) \%12s("Result") \<mu>s\%10s(" total") """)
+    pr_ul(io, f"""\%-22s(docnam) \%12s("Result") \%12s(mu_total) """)
     pr_ul(io, f"""\%12s("ns/line") \%12s("ns/char") \%12s("ns/byte")\n""")
     t = []
     # Just run everything once
@@ -834,7 +836,7 @@ function testcvt(::Type{S}, vec, io, numlines, numchars, siz, docnam,
     #println(typeof(vec))
 
     # Test performance
-    pr_ul(io, f"""\%-22s(docnam) \%12s("Result") \<mu>s\%10s(" total") """)
+    pr_ul(io, f"""\%-22s(docnam) \%12s("Result") \%12s(mu_total) """)
     pr_ul(io, f"""\%12s("ns/line") \%12s("ns/char") \%12s("ns/byte")\n""")
     t = []
     # Just run everything once
@@ -971,64 +973,20 @@ function runcheckcu(lines, list)
 end
 
 striplist(list) = replace(string(list), "Base.Unicode." => "")
-function comparetestline(lines, results, list, displist)
-    pr"  Lines:     \(displist)"
-    diff = []
-    for (i, fun) in enumerate(list)
-        fundiff = []
-        funres = results[i]
-        try
-            for (j, text) in enumerate(lines)
-                res = fun(text)
-                res == funres[j] ||
-                    push!(fundiff, typeof(res) == Bool ? (j, text) : (j, text, res, funres[j]))
-            end
-            is_empty(fundiff) || push!(diff, (i, fun, fundiff))
-        catch ex
-            typeof(ex) == InterruptException && rethrow()
-            pr"Failed test \(fun): \(sprint(showerror, ex, catch_backtrace()))"
-        end
-    end
-    if is_empty(diff)
-        pwc(:green, "\r\u2714\n")
-    else
-        pwc(:red, "\e[s\rX\e[u")
-        io = IOBuffer()
-        try
-            print(io, " => ", diff)
-        catch ex
-            typeof(ex) == InterruptException && rethrow()
-            pr"Can't display diffs \(diff[end][2]): \(sprint(showerror, ex, catch_backtrace()))"
-        end
-        str = String(take!(io))
-        println(str[1:200])
-    end
-    diff
-end
 
-function comparetestchar(lines, results, list, displist)
-    pr"  Chars:     \(displist)"
-    diff = []
-    for (i, fun) in enumerate(list)
-        fundiff = []
-        lineres = results[i]
-        try
-            for (j, text) in enumerate(lines)
-                chrdiff = []
-                chrres = lineres[j]
-                for (k, ch) in enumerate(text)
-                    res = fun(ch)
-                    res == chrres[k] ||
-                        push!(chrdiff, typeof(res) == Bool ? (k, ch) : (k, ch, res, chrres[k]))
-                end
-                is_empty(chrdiff) || push!(fundiff, (j, text, chrdiff))
-            end
-            is_empty(fundiff) || push!(diff, (i, fun, fundiff))
-        catch ex
-            typeof(ex) == InterruptException && rethrow()
-            pr"Failed test \(fun): \(sprint(showerror, ex, catch_backtrace()))"
+function comparetest(fun, typ, n, test, lines, res)
+    results = res[n]
+    list = testlist[n][1]
+    local diff
+    msg = f"  \%11s(string(typ,':')) \(testlist[n][2])"
+    if test
+        @testset "$msg" begin
+            diff = fun(test, lines, results, list)
         end
+        return diff
     end
+    println(msg)
+    diff = fun(test, lines, results, list)
     if is_empty(diff)
         pwc(:green, "\r\u2714\n")
     else
@@ -1041,7 +999,6 @@ function comparetestchar(lines, results, list, displist)
             pr"Can't display diffs \(diff[end][2]): \(sprint(showerror, ex, catch_backtrace()))"
         end
         str = String(take!(io))
-        #println(str[1:200])
         cnt = 0
         max = min(length(str), 80)
         for ch in str
@@ -1053,8 +1010,31 @@ function comparetestchar(lines, results, list, displist)
     diff
 end
 
-function comparetestcu(lines, results, list, displist)
-    pr"  CodeUnits: \(displist)"
+function testline(test, lines, results, list)
+    diff = []
+    for (i, fun) in enumerate(list)
+        fundiff = []
+        funres = results[i]
+        try
+            for (j, text) in enumerate(lines)
+                res = fun(text)
+                res == funres[j] ||
+                    push!(fundiff, typeof(res) == Bool ? (j, text) : (j, text, res, funres[j]))
+            end
+            test && @test is_empty(fundiff)
+            is_empty(fundiff) || push!(diff, (i, fun, fundiff))
+        catch ex
+            typeof(ex) == InterruptException && rethrow()
+            pr"Failed test \(fun): \(sprint(showerror, ex, catch_backtrace()))"
+        end
+    end
+    diff
+end
+
+testchar(args...) = testch(identity, args...)
+testcu(args...)   = testch(codeunits, args...)
+
+function testch(op, test, lines, results, list)
     diff = []
     for (i, fun) in enumerate(list)
         fundiff = []
@@ -1063,32 +1043,19 @@ function comparetestcu(lines, results, list, displist)
             for (j, text) in enumerate(lines)
                 chrdiff = []
                 chrres = lineres[j]
-                for (k, ch) in enumerate(codeunits(text))
+                for (k, ch) in enumerate(op(text))
                     res = fun(ch)
                     res == chrres[k] ||
                         push!(chrdiff, typeof(res) == Bool ? (k, ch) : (k, ch, res, chrres[k]))
                 end
                 is_empty(chrdiff) || push!(fundiff, (j, text, chrdiff))
             end
+            test && @test is_empty(fundiff)
             is_empty(fundiff) || push!(diff, (i, fun, fundiff))
         catch ex
             typeof(ex) == InterruptException && rethrow()
             pr"Failed test \(fun): \(sprint(showerror, ex, catch_backtrace()))"
         end
-    end
-    if is_empty(diff)
-        pwc(:green, "\r\u2714\n")
-    else
-        pwc(:red, "\e[s\rX\e[u")
-        io = IOBuffer()
-        try
-            print(io, " => ", diff)
-        catch ex
-            typeof(ex) == InterruptException && rethrow()
-            pr"Can't display diffs \(diff[end][2]): \(sprint(showerror, ex, catch_backtrace()))"
-        end
-        str = String(take!(io))
-        println(str[1:200])
     end
     diff
 end
@@ -1108,17 +1075,19 @@ const testlist =
 # Use String to calculate a baseline (note, sizeof needs to be checked separately, as only
 # UTF8Str should be the same).
 
-function compareall(io, lines, res)
+comparetestline(n, test, lines, res) = comparetest(testline, "Lines", n, test, lines, res)
+
+function compareall(io, lines, res, test)
     pr"\(io)\(eltype(lines))\n"
-    (comparetestline(lines, res[1], testlist[1]...),
-     comparetestline(lines, res[2], testlist[2]...),
-     comparetestline(lines, res[3], testlist[3]...),
-     comparetestchar(lines, res[4], testlist[4]...),
-     eltype(lines) == UTF8Str ? comparetestcu(lines, res[5], testlist[5]...) : [],
-     eltype(lines) == UTF8Str ? comparetestline(lines, res[6], testlist[6]...) : [])
+    (comparetestline(1, test, lines, res),
+     comparetestline(2, test, lines, res),
+     comparetestline(3, test, lines, res),
+     comparetest(testchar, "Chars", 4, test, lines, res),
+     eltype(lines) == UTF8Str ? comparetest(testcu, "CodeUnits", 5, test, lines, res) : [],
+     eltype(lines) == UTF8Str ? comparetestline(6, test, lines, res) : [])
 end
 
-function checktests(io = _stdout(); dir::Any=nothing)
+function checktests(io = _stdout(); dir::Any=nothing, test::Bool=false)
     totres = []
     totcmp = []
     sampledir = joinpath(getdefdir(dir), smppath)
@@ -1140,7 +1109,7 @@ function checktests(io = _stdout(); dir::Any=nothing)
         cmp = []
         pr"\(io)Checking \(fname):\n"
         for i = 2:length(list)
-            push!(cmp, compareall(io, enc[i], res))
+            push!(cmp, compareall(io, enc[i], res, test))
         end
         push!(totres, (fname, res))
         push!(totcmp, (fname, cmp))
@@ -1178,7 +1147,7 @@ function benchdir(io = _stdout();  dir::Any=nothing, fast::Bool=true)
         for siz in sizes[2:end] ; print_ratio_rev(siz/basesize) ; end
         pr"\n\n"
 
-        # Select the middle 100 non-empty lines of the file for benchmarking
+        # Select the middle 1000 non-empty lines of the file for benchmarking
         sellines = select_lines(lines)
         sel = [enclines[sellines] for enclines in enc]
         selsiz = [sum(sizeof, enclines) for enclines in sel]
