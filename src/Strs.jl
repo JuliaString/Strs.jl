@@ -32,7 +32,7 @@ using StrFormat, StrEntities, StrRegex
 # Need to fix APITools to do this!
 for mod in (StrAPI, CharSetEncodings, Chars, StrBase, StrRegex, StrLiterals),
     grp in (:modules, :public, :public!)
-    eval(Expr( :export, getfield(eval(mod, :__api__), grp)...))
+    APITools.m_eval(Expr( :export, getfield(eval(mod, :__api__), grp)...))
 end
 
 @api freeze
