@@ -7,7 +7,7 @@ Licensed under MIT License, see LICENSE.md
 """
 module Strs
 
-using APITools
+using ModuleInterfaceTools
 export @api, V6_COMPAT
 
 using PCRE2
@@ -29,10 +29,10 @@ export fmt_default, fmt_default!, reset!, default_spec, default_spec!
 @api extend StrAPI, CharSetEncodings, Chars, StrBase, StrLiterals
 using StrFormat, StrEntities, StrRegex
 
-# Need to fix APITools to do this!
+# Need to fix ModuleInterfaceTools to do this!
 for mod in (StrAPI, CharSetEncodings, Chars, StrBase, StrRegex, StrLiterals),
     grp in (:modules, :public, :public!)
-    APITools.m_eval(Expr( :export, getfield(eval(mod, :__api__), grp)...))
+    ModuleInterfaceTools.m_eval(Expr( :export, getfield(eval(mod, :__api__), grp)...))
 end
 
 @api freeze

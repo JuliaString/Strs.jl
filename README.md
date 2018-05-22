@@ -34,7 +34,7 @@ Strs.jl is now a container for a number of different packages from [JuliaString.
 * [StrEntities](https://github.com/JuliaString/StrEntities.jl): Entity extensions for literals
 * [InternedStrings](https://github.com/JuliaString/InternedStrings.jl): save space by interning strings (by @oxinabox!)
 
-The new package [APITools](https://github.com/JuliaString/APITools.jl) is used to set up a consistent and easy to use API for most of the cooperating packages, without having to worry too much about imports, exports, using, and what functions are part of a public API, and which ones are part of the internal development API for other packages to extend.
+The new package [ModuleInterfaceTools](https://github.com/JuliaString/ModuleInterfaceTools.jl) is used to set up a consistent and easy to use API for most of the cooperating packages, without having to worry too much about imports, exports, using, and what functions are part of a public API, and which ones are part of the internal development API for other packages to extend.
 
 I would very much appreciate any constructive criticism, help implementing some of the ideas, ideas on how to make it perform better, bikeshedding on names and API, etc.
 Also, I'd love contributions of benchmark code and/or samples for different use cases of strings,

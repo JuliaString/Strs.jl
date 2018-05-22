@@ -5,7 +5,7 @@ const pkgadd =
      "Format", "PCRE2"]
 
 const pkglist =
-    ["APITools", "StrAPI", "CharSetEncodings", "Chars", "StrBase", "StrRegex", "StrLiterals", "StrEntities", "StrFormat", "Strs", "StrICU"]
+    ["ModuleInterfaceTools", "StrAPI", "CharSetEncodings", "Chars", "StrBase", "StrRegex", "StrLiterals", "StrEntities", "StrFormat", "Strs", "StrICU"]
 
 function rmpkg(pkg)
     try
