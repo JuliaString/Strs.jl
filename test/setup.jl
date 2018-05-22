@@ -1,7 +1,7 @@
 const test_legacy = false
 
 using BenchmarkTools
-
+using ModuleInterfaceTools
 using Strs
 
 @api test StrAPI, StrBase, StrRegex
