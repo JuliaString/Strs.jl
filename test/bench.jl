@@ -30,7 +30,7 @@ const smppath = "samples"
 const gutenbergbooks =
     (("files/2600/2600-0",        "English"), # War & Peace, some other languages in quotes
      ("files/1400/1400-0",        "English"), # Great Expectations, uses Unicode quotes
-     #("files/42286/42286-0",      "Hungarian"),
+     ("files/42286/42286-0",      "Hungarian"),
      #("files/8119/8119-0",        "Polish"), # couldn't get this to load correctly
      ("files/32941/32941-0",      "Japanese"),
      ("files/24264/24264-0",      "Chinese"),
@@ -171,7 +171,7 @@ function display_results(io, xres)
     # (fname, stats, sizes, res)
     (fname, stats, sizes, selstat, selsiz, res) = xres
     show(io, (fname, stats))
-    show(io, (fname, selstat))
+    selstat == stats || show(io, (fname, selstat))
     t1 = res[1][3]
     numchars = selstat.len
     pr"\(io)\n\n\%-12.12s(res[1][1])\%6.3f(sizes[1]/stats.len)"
@@ -193,7 +193,7 @@ function dispres(io, xres)
     # (fname, stats, sizes, res)
     (fname, stats, sizes, selstat, selsiz, res) = xres
     show(io, (fname, stats))
-    show(io, (fname, selstat))
+    selstat == stats || show(io, (fname, selstat))
     maxlen = 0
     pos = 0
     for i = 1:length(res)
@@ -1117,7 +1117,7 @@ function checktests(io = _stdout(); dir::Any=nothing, test::Bool=false)
     totres, totcmp
 end
 
-function benchdir(io = _stdout();  dir::Any=nothing, fast::Bool=true)
+function benchdir(io = _stdout();  dir::Any=nothing, fast::Bool=true, select::Bool=false)
     totres = []
     totlines = []
     totnames = []
@@ -1148,10 +1148,17 @@ function benchdir(io = _stdout();  dir::Any=nothing, fast::Bool=true)
         pr"\n\n"
 
         # Select the middle 1000 non-empty lines of the file for benchmarking
-        sellines = select_lines(lines)
-        sel = [enclines[sellines] for enclines in enc]
-        selsiz = [sum(sizeof, enclines) for enclines in sel]
-        selstat = calcstats(sel[1])
+        if select
+            sellines = select_lines(lines)
+            sel = [enclines[sellines] for enclines in enc]
+            selsiz = [sum(sizeof, enclines) for enclines in sel]
+            selstat = calcstats(sel[1])
+        else
+            sellines = 1:length(lines)
+            sel = enc
+            selstat = stats
+            selsiz = sizes
+        end
         numchars = selstat.len
         numlines = selstat.num
 
