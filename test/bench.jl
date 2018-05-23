@@ -22,6 +22,7 @@ dispbench(res)            # Displays the results in a pretty format
 =#
 
 isdefined(Main, :STRS_SETUP) || include("setup.jl")
+@static V6_COMPAT || (using Serialization)
 
 const inppath = "textsamples"
 const gutpath = "gutenberg"
@@ -635,19 +636,19 @@ function checksplit(lines)
     cnt
 end
 
-repeat1(str)  = repeat(str, 1)
-repeat20(str) = repeat(str, 20)
+repeat1(str)   = repeat(str, 1)
+repeat10(str)  = repeat(SubString(str, 1, 5), 10)
 repeat1c(str)  = @inbounds repeat(str[1], 1)
-repeat20c(str) = @inbounds repeat(str[1], 20)
+repeat80c(str) = @inbounds repeat(str[1], 80)
 
 countsklength(l)  = checkstr(sklength, l)
 countoldlength(l) = checkstr(oldlength, l)
 checktextwidth(l) = checkstr(text_width, l)
 
 checkrepeat1(l)   = checktext(repeat1, l)
-checkrepeat20(l)  = checktext(repeat20, l)
+checkrepeat10(l)  = checktext(repeat10, l)
 checkrepeat1c(l)  = checktext(repeat1c, l)
-checkrepeat20c(l) = checktext(repeat20c, l)
+checkrepeat80c(l) = checktext(repeat80c, l)
 checkreverse(l)   = checktext(reverse, l)
 
 checknextind(l) = checkstr(iteratenextind, l)
@@ -752,14 +753,14 @@ const tests =
      (checksplit,   "split\nline"),
      (checkreverse, "reverse"),
      (checkrepeat1,  "repeat 1\nstring"),
-     (checkrepeat20,  "repeat 10\nstring"),
+     (checkrepeat10,  "repeat 10\nstring"),
      (searchstr,    "search\nstring"),
      (searchchar,    "search\nchar"),
      (searchreg,     "search\nregex"),
 #     (rsearchstr,    "rsearch\nstring"),
 #     (rsearchchar,    "rsearch\nchar"),
-#     (checkrepeat1c,  "repeat 1\nchar"),
-#     (checkrepeat20c,  "repeat 10\nchar"),
+     (checkrepeat1c,  "repeat 1\nchar"),
+     (checkrepeat80c,  "repeat 80\nchar"),
 #    (countsklength,  "length\nSK"),
 #    (countoldlength, "length\nOld"),
      (countchars,   "iteration\nChar"),

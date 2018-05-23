@@ -26,13 +26,13 @@ export FormatSpec, FormatExpr, printfmt, printfmtln, format, generate_formatter
 export pyfmt, cfmt, fmt
 export fmt_default, fmt_default!, reset!, default_spec, default_spec!
 
-@api extend StrAPI, CharSetEncodings, Chars, StrBase, StrLiterals
+@api extend StrAPI, CharSetEncodings, ChrBase, StrBase, StrLiterals
 using StrFormat, StrEntities, StrRegex
 
 const m_eval = ModuleInterfaceTools.m_eval
 
 # Need to fix ModuleInterfaceTools to do this!
-for mod in (StrAPI, CharSetEncodings, Chars, StrBase, StrRegex, StrLiterals),
+for mod in (StrAPI, CharSetEncodings, ChrBase, StrBase, StrRegex, StrLiterals),
     grp in (:modules, :public, :public!)
     m_eval(Expr( :export, getfield(m_eval(mod, :__api__), grp)...))
 end

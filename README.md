@@ -1,14 +1,10 @@
 # Strs
 
-[![Build Status](https://travis-ci.org/JuliaString/Strs.jl.svg?branch=master)](https://travis-ci.org/JuliaString/Strs.jl)
+| **Info** | **Package Status** | **Package Evaluator** | **Coverage** |
+|:------------------:|:------------------:|:---------------------:|:-----------------:|
+| [![License](http://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat)](LICENSE.md) | [![Build Status](https://travis-ci.org/JuliaString/Strs.jl.svg?branch=master)](https://travis-ci.org/JuliaString/Strs.jl) | [![Strs](http://pkg.julialang.org/badges/Strs_0.6.svg)](http://pkg.julialang.org/?pkg=Strs) | [![Coverage Status](https://coveralls.io/repos/github/JuliaString/Strs.jl/badge.svg?branch=master)](https://coveralls.io/github/JuliaString/Strs.jl?branch=master) |
+| [![Gitter Chat](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/JuliaString/Lobby?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge) | | [![Strs](http://pkg.julialang.org/badges/Strs_0.7.svg)](http://pkg.julialang.org/?pkg=Strs) | [![codecov.io](http://codecov.io/github/JuliaString/Strs.jl/coverage.svg?branch=master)](http://codecov.io/github/JuliaString/Strs.jl?branch=master) |
 
-[![Coverage Status](https://coveralls.io/repos/github/JuliaString/Strs.jl/badge.svg?branch=master)](https://coveralls.io/github/JuliaString/Strs.jl?branch=master)
-
-[![codecov.io](http://codecov.io/github/JuliaString/Strs.jl/coverage.svg?branch=master)](http://codecov.io/github/JuliaString/Strs.jl?branch=master)
-
-[![](https://twitter.com/twitter/statuses/995385258332901377)]
-
-The `Strs` package is now working on both the release version (v0.6.2) and the latest master (v0.7.0-DEV).
 
 It represents an attempt to give Julia better string handling than possible with Base `String` and `Char`.
 
@@ -19,7 +15,7 @@ Strs.jl is now a container for a number of different packages from [JuliaString.
 
 * [StrAPI](https://github.com/JuliaString/StrAPI.jl): Common API for string/character functionality
 * [CharSetEncodings](https://github.com/JuliaString/CharSetEncodings.jl): Basic types/support for Character Sets, Encodings, and Character Set Encodings
-* [Chars](https://github.com/JuliaString/Chars.jl): `Chr{CharSet,CodeUnitType}` type and support
+* [ChrBase](https://github.com/JuliaString/ChrBase.jl): `Chr{CharSet,CodeUnitType}` type and support
 * [StrBase](https://github.com/JuliaString/StrBase.jl): `Str{CSE, Hash, SubSet, Cache}` type
 * [PCRE2](https://github.com/JuliaString/PCRE2.jl): `PCRE2` library support
 * [StrRegex](https://github.com/JuliaString/StrRegex.jl): `Regex` support for all string types
@@ -44,7 +40,7 @@ or pointers to such (such as a way to get lots of tweets, to test mixed text and
 
 The general philosophy of the architecture is as follows: have a single easy to use type that can replace `String` that conforms to the recommendations of the Unicode Organization (which internally uses 4 types and is implemented currently as a Julia Union, and has O(1) indexing to characters, not just code units), as well as types to represent binary strings, raw unvalidated strings (made up of 1, 2, or 4 byte codepoints), as well as types for validated ASCII, Latin1, UCS2 (16-bit, BMP [Basic Multilingual Plane]), UTF-8, UTF-16, and UTF-32 encoded strings.
 
-Operations on multi code unit encodings such as UTF-8 & UTF-16 will be moved to a `UnicodeStr` package.
+Optimizations for multi code unit encodings such as UTF-8 & UTF-16 will be moved to `StrUTF8` and `StrUTF16` packages (before splitting them out, I'll make sure that the functionality still works, only with slower generic methods, so that you only take up the extra space if you need the faster speed).
 Extensions such as converting to and from non-Unicode encodings, such as Windows CP-1252 or China's official character set, GB18030,  will be done in another package, `StrEncodings`.
 
 Subtypes that directly support things like substrings, caching hash values, and caching one or more versions of the string (such as the originally unmodified byte, 16-bit or 32-bit word stream, in the case where the input was not valid, or a valid UTF-8 (similar to the way Python can cache a UTF-8 version of a string) and/or UTF-16 encoded version, for better performance when interoperating with other languages such as JavaScript, Swift, Java, or OS APIs like Windows that expect UTF-16).

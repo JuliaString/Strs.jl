@@ -1,11 +1,11 @@
 isdefined(ModuleInterfaceTools.cur_mod(), :STRS_SETUP) || include("setup.jl")
 
 const pkgadd =
-    ["StrTables", "LaTeX_Entities", "Emoji_Entities", "HTML_Entities", "Unicode_Entities",
-     "Format", "PCRE2"]
+    ["ModuleInterfaceTools", "Format", "PCRE2",
+     "StrTables", "LaTeX_Entities", "Emoji_Entities", "HTML_Entities", "Unicode_Entities"]
 
 const pkglist =
-    ["ModuleInterfaceTools", "StrAPI", "CharSetEncodings", "Chars", "StrBase",
+    ["StrAPI", "CharSetEncodings", "ChrBase", "StrBase",
      "StrRegex", "StrLiterals", "StrEntities", "StrFormat", "Strs", "StrICU"]
 
 function rmpkg(pkg)
