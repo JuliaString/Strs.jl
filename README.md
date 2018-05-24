@@ -1,5 +1,6 @@
 # Strs
 
+[![Logo](Logo.gif)](https://github.com/cormullion)
 | **Info** | **Package Status** | **Package Evaluator** | **Coverage** |
 |:------------------:|:------------------:|:---------------------:|:-----------------:|
 | [![License](http://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat)](LICENSE.md) | [![Build Status](https://travis-ci.org/JuliaString/Strs.jl.svg?branch=master)](https://travis-ci.org/JuliaString/Strs.jl) | [![Strs](http://pkg.julialang.org/badges/Strs_0.6.svg)](http://pkg.julialang.org/?pkg=Strs) | [![Coverage Status](https://coveralls.io/repos/github/JuliaString/Strs.jl/badge.svg?branch=master)](https://coveralls.io/github/JuliaString/Strs.jl?branch=master) |
