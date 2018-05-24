@@ -1,6 +1,7 @@
 # Strs
 
 [![Logo](Logo.gif)](https://github.com/cormullion)
+
 | **Info** | **Package Status** | **Package Evaluator** | **Coverage** |
 |:------------------:|:------------------:|:---------------------:|:-----------------:|
 | [![License](http://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat)](LICENSE.md) | [![Build Status](https://travis-ci.org/JuliaString/Strs.jl.svg?branch=master)](https://travis-ci.org/JuliaString/Strs.jl) | [![Strs](http://pkg.julialang.org/badges/Strs_0.6.svg)](http://pkg.julialang.org/?pkg=Strs) | [![Coverage Status](https://coveralls.io/repos/github/JuliaString/Strs.jl/badge.svg?branch=master)](https://coveralls.io/github/JuliaString/Strs.jl?branch=master) |
@@ -142,7 +143,7 @@ I would like to thank some of those giants in particular:
 
 * [Lyndon White](https://github.com/oxinabox), I've already "appropriated" :grinning: his very nice [InternedStrings](https://github.com/JuliaString/InternedStrings.jl) into this package, I'm really lucky to have gotten him to join the organization!
 * [Bogumił Kamiński](https://github.com/bkamins) who has been doing a great job testing and reviewing `Strs` (as well as doing the same for the string/character support in Julia Base), as well as input into the design. (Also very glad to have co-opted him to become a member of the org)
-* Last but not least, Julia mathematical artist (and blogger!) extraordinaire, [Cormullion](https://github.com/cormullion), creator of our wonderful logo!
+* Logo drawn with Julia by [cormullion](https://github.com/cormullion).
 
 Also thanks to anybody who's answered my (sometimes stupid :grinning:) questions on [Gitter](https://gitter.im/JuliaLang/julia) and [Discourse](https://discourse.julialang.org/)
 
