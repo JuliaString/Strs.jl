@@ -1,6 +1,7 @@
 # Strs
 
 [![Logo](Logo.gif)](https://github.com/cormullion)
+
 | **Info** | **Package Status** | **Package Evaluator** | **Coverage** |
 |:------------------:|:------------------:|:---------------------:|:-----------------:|
 | [![License](http://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat)](LICENSE.md) | [![Build Status](https://travis-ci.org/JuliaString/Strs.jl.svg?branch=master)](https://travis-ci.org/JuliaString/Strs.jl) | [![Strs](http://pkg.julialang.org/badges/Strs_0.6.svg)](http://pkg.julialang.org/?pkg=Strs) | [![Coverage Status](https://coveralls.io/repos/github/JuliaString/Strs.jl/badge.svg?branch=master)](https://coveralls.io/github/JuliaString/Strs.jl?branch=master) |
@@ -14,22 +15,26 @@ Str and Chr, and to start optimizing the functions (although they are already su
 
 Strs.jl is now a container for a number of different packages from [JuliaString.org](https://juliastring.org)
 
-* [StrAPI](https://github.com/JuliaString/StrAPI.jl): Common API for string/character functionality
-* [CharSetEncodings](https://github.com/JuliaString/CharSetEncodings.jl): Basic types/support for Character Sets, Encodings, and Character Set Encodings
-* [ChrBase](https://github.com/JuliaString/ChrBase.jl): `Chr{CharSet,CodeUnitType}` type and support
-* [StrBase](https://github.com/JuliaString/StrBase.jl): `Str{CSE, Hash, SubSet, Cache}` type
-* [PCRE2](https://github.com/JuliaString/PCRE2.jl): `PCRE2` library support
-* [StrRegex](https://github.com/JuliaString/StrRegex.jl): `Regex` support for all string types
-* [StrLiterals](https://github.com/JuliaString/StrLiterals.jl): Extensible string literal support
-* [Format](https://github.com/JuliaString/Format.jl): Python/C style formatting (based on [Formatting](https://github.com/JuliaIO/Formatting.jl)
-* [StrFormat](https://github.com/JuliaString/StrFormat.jl): formatting extensions for literals
-* [StrTables](https://github.com/JuliaString/StrTables.jl): low-level support for entity tables
-* [HTML_Entities](https://github.com/JuliaString/HTML_Entities.jl)
-* [LaTeX_Entities](https://github.com/JuliaString/LaTeX_Entities.jl)
-* [Emoji_Entities](https://github.com/JuliaString/Emoji_Entities.jl)
-* [Unicode_Entities](https://github.com/JuliaString/Unicode_Entities.jl)
-* [StrEntities](https://github.com/JuliaString/StrEntities.jl): Entity extensions for literals
-* [InternedStrings](https://github.com/JuliaString/InternedStrings.jl): save space by interning strings (by @oxinabox!)
+| **Package** | **Build Status** | **Description** |
+|:-------------:|:-----------:|:-------------------|
+| [ModuleInterfaceTools](https://github.com/JuliaString/ModuleInterfaceTools.jl) | [![Build Status](https://travis-ci.org/JuliaString/ModuleInterfaceTools.jl.svg?branch=master)](https://travis-ci.org/JuliaString/ModuleInterfaceTools.jl) | Tools to create a common API for all of these packages
+| [StrAPI](https://github.com/JuliaString/StrAPI.jl) | [![Build Status](https://travis-ci.org/JuliaString/StrAPI.jl.svg?branch=master)](https://travis-ci.org/JuliaString/StrAPI.jl) | Common API for string/character functionality
+| [CharSetEncodings](https://github.com/JuliaString/CharSetEncodings.jl) | [![Build Status](https://travis-ci.org/JuliaString/CharSetEncodings.jl.svg?branch=master)](https://travis-ci.org/JuliaString/CharSetEncodings.jl) | Basic types/support for Character Sets, Encodings, and Character Set Encodings
+| [ChrBase](https://github.com/JuliaString/ChrBase.jl) | [![Build Status](https://travis-ci.org/JuliaString/ChrBase.jl.svg?branch=master)](https://travis-ci.org/JuliaString/ChrBase.jl) | `Chr{CharSet,CodeUnitType}` type and support
+| [MurmurHash3](https://github.com/JuliaString/MurmurHash3.jl) | [![Build Status](https://travis-ci.org/JuliaString/MurmurHash3.jl.svg?branch=master)](https://travis-ci.org/JuliaString/MurmurHash3.jl) | Pure Julia implementation of MurmurHash3
+| [StrBase](https://github.com/JuliaString/StrBase.jl) | [![Build Status](https://travis-ci.org/JuliaString/StrBase.jl.svg?branch=master)](https://travis-ci.org/JuliaString/StrBase.jl) | `Str{CSE, Hash, SubSet, Cache}` type
+| [PCRE2](https://github.com/JuliaString/PCRE2.jl) | [![Build Status](https://travis-ci.org/JuliaString/PCRE2.jl.svg?branch=master)](https://travis-ci.org/JuliaString/PCRE2.jl) | `PCRE2` library support
+| [StrRegex](https://github.com/JuliaString/StrRegex.jl) | [![Build Status](https://travis-ci.org/JuliaString/StrRegex.jl.svg?branch=master)](https://travis-ci.org/JuliaString/StrRegex.jl) | `Regex` support for all string types
+| [StrLiterals](https://github.com/JuliaString/StrLiterals.jl) | [![Build Status](https://travis-ci.org/JuliaString/StrLiterals.jl.svg?branch=master)](https://travis-ci.org/JuliaString/StrLiterals.jl) | Extensible string literal support
+| [Format](https://github.com/JuliaString/Format.jl) | [![Build Status](https://travis-ci.org/JuliaString/Format.jl.svg?branch=master)](https://travis-ci.org/JuliaString/Format.jl) | Python/C style formatting (based on [Formatting](https://github.com/JuliaIO/Formatting.jl)
+| [StrFormat](https://github.com/JuliaString/StrFormat.jl) | [![Build Status](https://travis-ci.org/JuliaString/StrFormat.jl.svg?branch=master)](https://travis-ci.org/JuliaString/StrFormat.jl) | Formatting extensions for literals
+| [StrTables](https://github.com/JuliaString/StrTables.jl) | [![Build Status](https://travis-ci.org/JuliaString/StrTables.jl.svg?branch=master)](https://travis-ci.org/JuliaString/StrTables.jl) | Low-level support for entity tables
+| [HTML_Entities](https://github.com/JuliaString/HTML_Entities.jl) | [![Build Status](https://travis-ci.org/JuliaString/HTML_Entities.jl.svg?branch=master)](https://travis-ci.org/JuliaString/HTML_Entities.jl)
+| [LaTeX_Entities](https://github.com/JuliaString/LaTeX_Entities.jl) | [![Build Status](https://travis-ci.org/JuliaString/LaTeX_Entities.jl.svg?branch=master)](https://travis-ci.org/JuliaString/LaTeX_Entities.jl)
+| [Emoji_Entities](https://github.com/JuliaString/Emoji_Entities.jl) | [![Build Status](https://travis-ci.org/JuliaString/Emoji_Entities.jl.svg?branch=master)](https://travis-ci.org/JuliaString/Emoji_Entities.jl)
+| [Unicode_Entities](https://github.com/JuliaString/Unicode_Entities.jl) | [![Build Status](https://travis-ci.org/JuliaString/Unicode_Entities.jl.svg?branch=master)](https://travis-ci.org/JuliaString/Unicode_Entities.jl) |
+| [StrEntities](https://github.com/JuliaString/StrEntities.jl) | [![Build Status](https://travis-ci.org/JuliaString/StrEntities.jl.svg?branch=master)](https://travis-ci.org/JuliaString/StrEntities.jl) | Entity extensions for literals
+| [InternedStrings](https://github.com/JuliaString/InternedStrings.jl) | [![Build Status](https://travis-ci.org/JuliaString/InternedStrings.jl.svg?branch=master)](https://travis-ci.org/JuliaString/InternedStrings.jl) | Save space by interning strings (by @oxinabox!)
 
 The new package [ModuleInterfaceTools](https://github.com/JuliaString/ModuleInterfaceTools.jl) is used to set up a consistent and easy to use API for most of the cooperating packages, without having to worry too much about imports, exports, using, and what functions are part of a public API, and which ones are part of the internal development API for other packages to extend.
 
