@@ -1,0 +1,14 @@
+name = "Strs"
+desc = "Str & Chr support"
+authors = ["ScottPJones <scottjones@alum.mit.edu>"]
+keywords = ["Strings", "Characters", "Formatting", "Intern", "Unicode", "Regex"]
+license = "MIT"
+uuid = "74bd3093-d400-43d3-8216-79b3093f48e9"
+repo = "https://github.com/JuliaString/Strs.jl.git"
+version = "0.1.1"
+
+[deps]
+StrRegex = "128fb37e-e16c-4908-8083-6410b01968ef"
+StrFormat = "a5a47323-cf2a-443b-a747-99a2b29c4966"
+StrEntities = "f6164076-6934-4707-9ef0-ff39da4345e6"
+InternedStrings = "7d512f48-7fb1-5a58-b986-67e6dc259f01"
