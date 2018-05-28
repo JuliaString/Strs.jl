@@ -5,7 +5,6 @@ keywords = ["Strings", "Characters", "Formatting", "Intern", "Unicode", "Regex"]
 license = "MIT"
 uuid = "74bd3093-d400-43d3-8216-79b3093f48e9"
 repo = "https://github.com/JuliaString/Strs.jl.git"
-version = "0.1.1"
 
 [deps]
 StrRegex = "128fb37e-e16c-4908-8083-6410b01968ef"
