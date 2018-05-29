@@ -40,9 +40,8 @@ install:
 build_script:
 # Need to convert from shallow to complete for Pkg.clone to work
   - IF EXIST .git\shallow (git fetch --unshallow)
-  - C:\projects\julia\bin\julia -e "VERSION < v\"0.7.0-DEV\" || (using Pkg,InteractiveUtils);
-      versioninfo(); pkg = \"Strs\";
-      if VERSION < v\"0.7.0-DEV.5183\"; Pkg.clone(pwd(),pkg); else; Pkg.add(pwd(), pkg); end"
+  - C:\projects\julia\bin\julia -e "VERSION < v\"0.7.0-DEV\" || (using InteractiveUtils);
+      versioninfo(); if VERSION < v\"0.7.0-DEV.5183\"; Pkg.clone(pwd(),\"Strs\"); end"
 
 test_script:
   - C:\projects\julia\bin\julia -e "VERSION < v\"0.7.0-DEV\" || (using Pkg); Pkg.test(\"Strs\")"

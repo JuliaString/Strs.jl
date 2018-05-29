@@ -28,7 +28,7 @@ git:
 ## uncomment the following lines to override the default test script
 script:
   - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
-  - julia -e 'VERSION < v"0.7.0-DEV" || (using Pkg) ; if VERSION < v"0.7.0-DEV.5183" ; l="_Entities"; for n in ("ModuleInterfaceTools", "StrTables", "LightXML", "JSON", "Format", "PCRE2", "InternedStrings", "StrAPI", "CharSetEncodings") ; Pkg.add(n) ; end ; t=("LaTeX","Emoji","HTML","Unicode"); for n in t; d=n*"_Entities" ; Pkg.add(d); Pkg.build(d) ; end; for n in ("ChrBase", "MurmurHash3", "StrBase", "StrRegex", "StrLiterals", "StrFormat", "StrEntities") ; Pkg.clone("https://github.com/JuliaString/$n.jl.git"); end ; Pkg.clone(pwd()); else ; Pkg.add(pwd()) ; end ; Pkg.test("Strs"; coverage=true)'
+  - julia -e 'VERSION < v"0.7.0-DEV" || (using Pkg) ; if VERSION < v"0.7.0-DEV.5183" ; l="_Entities"; for n in ("ModuleInterfaceTools", "StrTables", "LightXML", "JSON", "Format", "PCRE2", "InternedStrings", "StrAPI", "CharSetEncodings") ; Pkg.add(n) ; end ; t=("LaTeX","Emoji","HTML","Unicode"); for n in t; d=n*"_Entities" ; Pkg.add(d); Pkg.build(d) ; end; for n in ("ChrBase", "MurmurHash3", "StrBase", "StrRegex", "StrLiterals", "StrFormat", "StrEntities") ; Pkg.clone("https://github.com/JuliaString/$n.jl.git"); end ; Pkg.clone(pwd()); end ; Pkg.test("Strs"; coverage=true)'
 after_success:
   # push coverage results to Coveralls
   - julia -e 'VERSION < v"0.7.0-DEV" || (using Pkg); cd(Pkg.dir("Strs")); Pkg.add("Coverage"); using Coverage; Coveralls.submit(Coveralls.process_folder())'
