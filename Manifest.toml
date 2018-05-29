@@ -34,16 +34,21 @@ repo-url = "https://github.com/JuliaString/StrAPI.jl"
 uuid = "69e7dfc3-c4d0-5e14-8d95-d6042a05b383"
 
 [[StrBase]]
-deps = ["CharSetEncodings", "ModuleInterfaceTools", "Random", "StrAPI"]
+deps = ["ModuleInterfaceTools", "Random", "StrAPI", "CharSetEncodings", "ChrBase"]
 repo-rev = ""
 repo-url = "https://github.com/JuliaString/StrBase.jl"
-uuid = "40048718-5f69-11e8-3be1-2f493f2f747a"
+uuid = "9ae48233-fac8-48c3-9111-9059e0a096a8"
 
 [[StrRegex]]
 deps = ["PCRE2", "StrBase"]
 repo-rev = ""
 repo-url = "https://github.com/JuliaString/StrRegex.jl.git"
 uuid = "128fb37e-e16c-4908-8083-6410b01968ef"
+
+[[StrTables]]
+repo-rev = ""
+repo-url = "https://github.com/JuliaString/StrTables.jl.git"
+uuid = "9700d1a9-a7c8-5760-9816-a99fda30bb8f"
 
 [[Test]]
 uuid = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
