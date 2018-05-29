@@ -1,0 +1,49 @@
+[[CharSetEncodings]]
+deps = ["ModuleInterfaceTools", "Pkg", "StrAPI"]
+repo-rev = ""
+repo-url = "https://github.com/JuliaString/CharSetEncodings.jl"
+uuid = "cb9422de-a9d8-5b68-86db-ff05833ab307"
+
+[[ChrBase]]
+deps = ["CharSetEncodings", "ModuleInterfaceTools", "Random", "StrAPI"]
+repo-rev = ""
+repo-url = "https://github.com/JuliaString/ChrBase.jl"
+uuid = "40048718-5f69-11e8-3be1-2f493f2f747a"
+
+[[ModuleInterfaceTools]]
+deps = ["Pkg", "Test"]
+repo-rev = ""
+repo-url = "https://github.com/JuliaString/ModuleInterfaceTools.jl"
+uuid = "5cb8414e-7aab-5a03-a681-351269c074bf"
+
+[[PCRE2]]
+repo-rev = ""
+repo-url = "https://github.com/JuliaString/PCRE2.jl"
+uuid = "c9310f65-a42c-5928-aca3-d34f64192029"
+
+[[Pkg]]
+uuid = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
+
+[[Random]]
+uuid = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+
+[[StrAPI]]
+deps = ["ModuleInterfaceTools", "Pkg", "Random"]
+repo-rev = ""
+repo-url = "https://github.com/JuliaString/StrAPI.jl"
+uuid = "69e7dfc3-c4d0-5e14-8d95-d6042a05b383"
+
+[[StrBase]]
+deps = ["CharSetEncodings", "ModuleInterfaceTools", "Random", "StrAPI"]
+repo-rev = ""
+repo-url = "https://github.com/JuliaString/StrBase.jl"
+uuid = "40048718-5f69-11e8-3be1-2f493f2f747a"
+
+[[StrRegex]]
+deps = ["PCRE2", "StrBase"]
+repo-rev = ""
+repo-url = "https://github.com/JuliaString/StrRegex.jl.git"
+uuid = "128fb37e-e16c-4908-8083-6410b01968ef"
+
+[[Test]]
+uuid = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
