@@ -49,23 +49,20 @@ Strs.jl is now a container for a number of different packages from [JuliaString.
 | [StrAPI][strapi-loc] | [![][strapi-tvs-img]][strapi-tvs-url] | [![][strapi-app-img]][strapi-app-url] | Common API for string/character functionality
 | [CharSetEncodings][cse-loc] | [![][cse-tvs-img]][cse-tvs-url] | [![][cse-app-img]][cse-app-url] | Basic types/support for Character Sets, Encodings, and Character Set Encodings
 | [ChrBase][chrbase-loc] | [![][chrbase-tvs-img]][chrbase-tvs-url] | [![][chrbase-app-img]][chrbase-app-url] | `Chr{CharSet,CodeUnitType}` type and support
-| [MurmurHash3][mh3-loc] | [![][chrbase-tvs-img]][chrbase-tvs-url] | [![][chrbase-app-img]][chrbase-app-url] | Pure Julia implementation of MurmurHash3
-| [PCRE2][pcre2-loc] | [![][mh3-tvs-img]][mh3-tvs-url] | [![][mh3-app-img]][mh3-app-url] | `PCRE2` library support
-| [Format][format-loc] | [![][mh3-tvs-img]][mh3-tvs-url] | [![][mh3-app-img]][mh3-app-url] | Python/C style formatting (based on [Formatting](https://github.com/JuliaIO/Formatting.jl)
-
-| **Package** | **Build Status** | **Description** |
-|:-------------:|:-----------:|:-------------------|
-| [StrBase](https://github.com/JuliaString/StrBase.jl) | [![Build Status](https://travis-ci.org/JuliaString/StrBase.jl.svg?branch=master)](https://travis-ci.org/JuliaString/StrBase.jl) | `Str{CSE, Hash, SubSet, Cache}` type
-| [StrRegex](https://github.com/JuliaString/StrRegex.jl) | [![Build Status](https://travis-ci.org/JuliaString/StrRegex.jl.svg?branch=master)](https://travis-ci.org/JuliaString/StrRegex.jl) | `Regex` support for all string types
-| [StrLiterals](https://github.com/JuliaString/StrLiterals.jl) | [![Build Status](https://travis-ci.org/JuliaString/StrLiterals.jl.svg?branch=master)](https://travis-ci.org/JuliaString/StrLiterals.jl) | Extensible string literal support
-| [StrFormat](https://github.com/JuliaString/StrFormat.jl) | [![Build Status](https://travis-ci.org/JuliaString/StrFormat.jl.svg?branch=master)](https://travis-ci.org/JuliaString/StrFormat.jl) | Formatting extensions for literals
-| [StrTables](https://github.com/JuliaString/StrTables.jl) | [![Build Status](https://travis-ci.org/JuliaString/StrTables.jl.svg?branch=master)](https://travis-ci.org/JuliaString/StrTables.jl) | Low-level support for entity tables
-| [HTML_Entities](https://github.com/JuliaString/HTML_Entities.jl) | [![Build Status](https://travis-ci.org/JuliaString/HTML_Entities.jl.svg?branch=master)](https://travis-ci.org/JuliaString/HTML_Entities.jl)
-| [LaTeX_Entities](https://github.com/JuliaString/LaTeX_Entities.jl) | [![Build Status](https://travis-ci.org/JuliaString/LaTeX_Entities.jl.svg?branch=master)](https://travis-ci.org/JuliaString/LaTeX_Entities.jl)
-| [Emoji_Entities](https://github.com/JuliaString/Emoji_Entities.jl) | [![Build Status](https://travis-ci.org/JuliaString/Emoji_Entities.jl.svg?branch=master)](https://travis-ci.org/JuliaString/Emoji_Entities.jl)
-| [Unicode_Entities](https://github.com/JuliaString/Unicode_Entities.jl) | [![Build Status](https://travis-ci.org/JuliaString/Unicode_Entities.jl.svg?branch=master)](https://travis-ci.org/JuliaString/Unicode_Entities.jl) |
-| [StrEntities](https://github.com/JuliaString/StrEntities.jl) | [![Build Status](https://travis-ci.org/JuliaString/StrEntities.jl.svg?branch=master)](https://travis-ci.org/JuliaString/StrEntities.jl) | Entity extensions for literals
-| [InternedStrings](https://github.com/JuliaString/InternedStrings.jl) | [![Build Status](https://travis-ci.org/JuliaString/InternedStrings.jl.svg?branch=master)](https://travis-ci.org/JuliaString/InternedStrings.jl) | Save space by interning strings (by @oxinabox!)
+| [MurmurHash3][mh3-loc] | [![][mh3-tvs-img]][mh3-tvs-url] | [![][mh3-app-img]][mh3-app-url] | Pure Julia implementation of MurmurHash3
+| [PCRE2][pcre2-loc] | [![][pcre2-tvs-img]][pcre2-tvs-url] | [![][pcre2-app-img]][pcre2-app-url] | `PCRE2` library support
+| [Format][format-loc] | [![][format-tvs-img]][format-tvs-url] | [![][format-app-img]][format-app-url] | Python/C style formatting (based on [Formatting](https://github.com/JuliaIO/Formatting.jl)
+| [StrBase][strbase-loc] | [![][strbase-tvs-img]][strbase-tvs-url] | [![][strbase-app-img]][strbase-app-url] | `Str{CSE, Hash, SubSet, Cache}` type
+| [StrRegex][strregex-loc] | [![][strregex-tvs-img]][strregex-tvs-url] | [![][strregex-app-img]][strregex-app-url] | `Regex` support for all string types
+| [StrLiterals][strliterals-loc] | [![][strliterals-tvs-img]][strliterals-tvs-url] | [![][strliterals-app-img]][strliterals-app-url] | Extensible string literal support
+| [StrFormat][strformat-loc] | [![][strformat-tvs-img]][strformat-tvs-url] | [![][strformat-app-img]][strformat-app-url] | Formatting extensions for literals
+| [StrTables][strtables-loc] | [![][strtables-tvs-img]][strtables-tvs-url] | [![][strtables-app-img]][strtables-app-url] | Low-level support for entity tables
+| [HTML_Entities][html-loc] | [![][html-tvs-img]][html-tvs-url] | [![][html-app-img]][html-app-url] |
+| [Emoji_Entities][emoji-loc] | [![][emoji-tvs-img]][emoji-tvs-url] | [![][emoji-app-img]][emoji-app-url] | 
+| [LaTeX_Entities][latex-loc] | [![][latex-tvs-img]][latex-tvs-url] | [![][latex-app-img]][latex-app-url] |
+| [Unicode_Entities][unicode-loc] | [![][unicode-tvs-img]][unicode-tvs-url] | [![][unicode-app-img]][unicode-app-url] | 
+| [StrEntities][strentities-loc] | [![][strentities-tvs-img]][strentities-tvs-url] | [![][strentities-app-img]][strentities-app-url] | Entity extensions for literals
+| [InternedStrings][int-loc] | [![][int-tvs-img]][int-tvs-url] | | Save space by interning strings (by @oxinabox!)
 
 
 [mit-loc]:     https://github.com/JuliaString/ModuleInterfaceTools.jl
@@ -109,6 +106,75 @@ Strs.jl is now a container for a number of different packages from [JuliaString.
 [chrbase-tvs-url]: https://travis-ci.org/JuliaString/ChrBase.jl
 [chrbase-app-img]: https://ci.appveyor.com/api/projects/status/lrdfni7si4o797fr/branch/master?svg=true
 [chrbase-app-url]: https://ci.appveyor.com/project/ScottPJones/chrbase-jl/branch/master
+
+[strbase-loc]:     https://github.com/JuliaString/StrBase.jl
+[strbase-tvs-img]: https://travis-ci.org/JuliaString/StrBase.jl.svg?branch=master
+[strbase-tvs-url]: https://travis-ci.org/JuliaString/StrBase.jl
+[strbase-app-img]: https://ci.appveyor.com/api/projects/status/2v12uwlr0ueale6n/branch/master?svg=true
+[strbase-app-url]: https://ci.appveyor.com/project/ScottPJones/strbase-jl/branch/master
+
+[strregex-loc]:     https://github.com/JuliaString/StrRegex.jl
+[strregex-tvs-img]: https://travis-ci.org/JuliaString/StrRegex.jl.svg?branch=master
+[strregex-tvs-url]: https://travis-ci.org/JuliaString/StrRegex.jl
+[strregex-app-img]: https://ci.appveyor.com/api/projects/status/iyhlb4unq5ml4g0w/branch/master?svg=true
+[strregex-app-url]: https://ci.appveyor.com/project/ScottPJones/strregex-jl/branch/master
+
+[strliterals-loc]:     https://github.com/JuliaString/StrLiterals.jl
+[strliterals-tvs-img]: https://travis-ci.org/JuliaString/StrLiterals.jl.svg?branch=master
+[strliterals-tvs-url]: https://travis-ci.org/JuliaString/StrLiterals.jl
+[strliterals-app-img]: https://ci.appveyor.com/api/projects/status/8462oq09ek07knos/branch/master?svg=true
+[strliterals-app-url]: https://ci.appveyor.com/project/ScottPJones/strliterals-jl/branch/master
+
+[strformat-loc]:     https://github.com/JuliaString/StrFormat.jl
+[strformat-tvs-img]: https://travis-ci.org/JuliaString/StrFormat.jl.svg?branch=master
+[strformat-tvs-url]: https://travis-ci.org/JuliaString/StrFormat.jl
+[strformat-app-img]: https://ci.appveyor.com/api/projects/status/r3c2alh3jfcmu2gc/branch/master?svg=true
+[strformat-app-url]: https://ci.appveyor.com/project/ScottPJones/strformat-jl/branch/master
+
+[strtables-loc]:     https://github.com/JuliaString/StrTables.jl
+[strtables-tvs-img]: https://travis-ci.org/JuliaString/StrTables.jl.svg?branch=master
+[strtables-tvs-url]: https://travis-ci.org/JuliaString/StrTables.jl
+[strtables-app-img]: https://ci.appveyor.com/api/projects/status/ekt5t6nt8g0cqhjb/branch/master?svg=true
+[strtables-app-url]: https://ci.appveyor.com/project/ScottPJones/strtables-jl/branch/master
+
+[html-loc]:     https://github.com/JuliaString/HTML_Entities.jl
+[html-tvs-img]: https://travis-ci.org/JuliaString/HTML_Entities.jl.svg?branch=master
+[html-tvs-url]: https://travis-ci.org/JuliaString/HTML_Entities.jl
+[html-app-img]: https://ci.appveyor.com/api/projects/status/xp05kd5mamt92yhj/branch/master?svg=true
+[html-app-url]: https://ci.appveyor.com/project/ScottPJones/html-entities-jl/branch/master
+
+[emoji-loc]:     https://github.com/JuliaString/Emoji_Entities.jl
+[emoji-tvs-img]: https://travis-ci.org/JuliaString/Emoji_Entities.jl.svg?branch=master
+[emoji-tvs-url]: https://travis-ci.org/JuliaString/Emoji_Entities.jl
+[emoji-app-img]: https://ci.appveyor.com/api/projects/status/4p6o3reehca95put/branch/master?svg=true
+
+[emoji-app-url]: https://ci.appveyor.com/project/ScottPJones/emoji-entities-jl/branch/master
+
+[latex-loc]:     https://github.com/JuliaString/LaTeX_Entities.jl
+[latex-tvs-img]: https://travis-ci.org/JuliaString/LaTeX_Entities.jl.svg?branch=master
+[latex-tvs-url]: https://travis-ci.org/JuliaString/LaTeX_Entities.jl
+[latex-app-img]: https://ci.appveyor.com/api/projects/status/ok2sdq4u5xwlc6b0/branch/master?svg=true
+[latex-app-url]: https://ci.appveyor.com/project/ScottPJones/latex-entities-jl/branch/master
+
+[unicode-loc]:     https://github.com/JuliaString/Unicode_Entities.jl
+[unicode-tvs-img]: https://travis-ci.org/JuliaString/Unicode_Entities.jl.svg?branch=master
+[unicode-tvs-url]: https://travis-ci.org/JuliaString/Unicode_Entities.jl
+[unicode-app-img]: https://ci.appveyor.com/api/projects/status/c1luci97ry8fxdt7/branch/master?svg=true
+[unicode-app-url]: https://ci.appveyor.com/project/ScottPJones/unicode-entities-jl/branch/master
+
+[strentities-loc]:     https://github.com/JuliaString/StrEntities.jl
+[strentities-tvs-img]: https://travis-ci.org/JuliaString/StrEntities.jl.svg?branch=master
+[strentities-tvs-url]: https://travis-ci.org/JuliaString/StrEntities.jl
+[strentities-app-img]: https://ci.appveyor.com/api/projects/status/5pj0ubfrai4dsp0r/branch/master?svg=true
+[strentities-app-url]: https://ci.appveyor.com/project/ScottPJones/strentities-jl/branch/master
+
+[int-loc]:     https://github.com/JuliaString/InternedStrings.jl
+[int-tvs-img]: https://travis-ci.org/JuliaString/InternedStrings.jl.svg?branch=master
+[int-tvs-url]: https://travis-ci.org/JuliaString/InternedStrings.jl
+[int-app-img]: https://ci.appveyor.com/api/projects/status/8dlhr5sprhokwyqb/branch/master?svg=true
+
+[int-app-url]: https://ci.appveyor.com/project/ScottPJones/internedstrings-jl/branch/master
+
 
 The new package [ModuleInterfaceTools](https://github.com/JuliaString/ModuleInterfaceTools.jl) is used to set up a consistent and easy to use API for most of the cooperating packages, without having to worry too much about imports, exports, using, and what functions are part of a public API, and which ones are part of the internal development API for other packages to extend.
 

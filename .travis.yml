@@ -13,9 +13,9 @@ git:
 
 ## uncomment the following lines to allow failures on nightly julia
 ## (tests will run but not make your overall status red)
-#matrix:
-#  allow_failures:
-#    - julia: nightly
+matrix:
+  allow_failures:
+    - julia: nightly
 
 ## uncomment and modify the following lines to manually install system packages
 #addons:
@@ -28,7 +28,7 @@ git:
 ## uncomment the following lines to override the default test script
 script:
   - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
-  - julia -e 'if VERSION < v"0.7.0-DEV.5183" ; l="_Entities"; for n in ("ModuleInterfaceTools", "StrTables", "LightXML", "JSON", "Format", "PCRE2", "InternedStrings", "StrAPI", "CharSetEncodings", "ChrBase", "MurmurHash3") ; Pkg.add(n) ; end ; t=("LaTeX","Emoji","HTML","Unicode"); for n in t; d=n*"_Entities" ; Pkg.add(d); Pkg.build(d) ; end; for n in ("StrBase", "StrRegex", "StrLiterals", "StrFormat", "StrEntities") ; Pkg.clone("https://github.com/JuliaString/$n.jl.git"); end ; Pkg.clone(pwd()); else; Pkg.up(); end ; Pkg.test("Strs"; coverage=true)'
+  - julia -e 'mit="ModuleInterfaceTools"; mh3="MurmurHash3"; loc="https://github.com/JuliaString"; if VERSION < v"0.7.0-DEV.5183"; cln = Pkg.clone; cln("$loc/$mit.jl"); cln("$loc/$mh3.jl"); l="_Entities"; for n in ("StrTables", "LightXML", "JSON", "Format", "PCRE2", "InternedStrings", "StrAPI", "CharSetEncodings", "ChrBase") ; Pkg.add(n) ; end ; t=("LaTeX","Emoji","HTML","Unicode"); for n in t; d=n*"_Entities"; Pkg.add(d); Pkg.build(d); end; cln(pwd()); else; using Pkg; cln = Pkg.add; cln("$loc/$mit.jl"); cln("$loc/$mh3.jl"); end; Pkg.build("PCRE2"); for n in ("StrBase", "StrRegex", "StrLiterals", "StrFormat", "StrEntities"); cln("$loc/$n.jl.git"); end; Pkg.test("Strs"; coverage=true)'
 after_success:
   # push coverage results to Coveralls
   - julia -e 'cd(Pkg.dir("Strs")); Pkg.add("Coverage"); using Coverage; Coveralls.submit(Coveralls.process_folder())'

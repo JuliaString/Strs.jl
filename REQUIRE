@@ -1,5 +1,12 @@
 julia 0.6
-StrRegex
-StrFormat
-StrEntities
 InternedStrings
+ChrBase
+PCRE2
+Format
+HTML_Entities
+LaTeX_Entities
+Emoji_Entities
+Unicode_Entities
+#StrRegex
+#StrFormat
+#StrEntities
