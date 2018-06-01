@@ -40,17 +40,17 @@ install:
 build_script:
 # Need to convert from shallow to complete for Pkg.clone to work
   - IF EXIST .git\shallow (git fetch --unshallow)
-  - C:\projects\julia\bin\julia -e "VERSION < v\"0.7.0-DEV\" || (using Pkg, InteractiveUtils);
-      versioninfo(); pkg = \"Strs\"; url = \"https://github.com/JuliaString\"
+  - C:\projects\julia\bin\julia -e "VERSION < v\"0.7.0-DEV\" || (using InteractiveUtils);
+      versioninfo(); pkg = \"Strs\";
+      la = (\"ModuleInterfaceTools\", \"MurmurHash3\", \"StrTables\", \"LightXML\", \"JSON\", \"Format\", \"PCRE2\", \"InternedStrings\", \"StrAPI\", \"CharSetEncodings\", \"ChrBase\");
+      lc = (\"StrBase\", \"StrRegex\", \"StrLiterals\", \"StrFormat\", \"StrEntities\");
       if VERSION < v\"0.7.0-DEV.5183\";
-         for n in (\"ModuleInterfaceTools\", \"MurmurHash3\", \"StrTables\", \"LightXML\", \"JSON\", \"Format\", \"PCRE2\", \"InternedStrings\", \"StrAPI\", \"CharSetEncodings\");
-             Pkg.add(n);
-         end;
+         for n in la; Pkg.add(n); end;
          for n in (\"LaTeX\",\"Emoji\",\"HTML\",\"Unicode\");
              d=n*\"_Entities\" ; Pkg.add(d); Pkg.build(d);
          end;
-         for n in (\"ChrBase\", \"StrBase\", \"StrRegex\", \"StrLiterals\", \"StrFormat\", \"StrEntities\");
-             Pkg.clone(\"$url/$n.jl.git\");
-         end"
+         for n in lc; Pkg.clone(\"https://github.com/JuliaString/$n.jl.git\", n); end;
+         Pkg.clone(pwd(), pkg);
+     else; Pkg.up(); end"
 test_script:
-  - C:\projects\julia\bin\julia -e "VERSION < v\"0.7.0-DEV\" || (using Pkg); Pkg.test(\"Strs\")"
+  - C:\projects\julia\bin\julia -e "Pkg.test(\"Strs\")"

@@ -3,13 +3,30 @@ desc = "Str & Chr support"
 authors = ["ScottPJones <scottjones@alum.mit.edu>"]
 keywords = ["Strings", "Characters", "Formatting", "Intern", "Unicode", "Regex"]
 license = "MIT"
-repo-rev = ""
-repo-url = "https://github.com/JuliaString/Strs.jl.git"
 uuid = "74bd3093-d400-43d3-8216-79b3093f48e9"
-version = "0.1.0"
 
 [deps]
-StrRegex = "128fb37e-e16c-4908-8083-6410b01968ef"
-StrFormat = "a5a47323-cf2a-443b-a747-99a2b29c4966"
-StrEntities = "f6164076-6934-4707-9ef0-ff39da4345e6"
-InternedStrings = "7d512f48-7fb1-5a58-b986-67e6dc259f01"
+Pkg     = "fe1c5a76-5840-53d2-82f9-288dd83ce2ce"
+Test    = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+Random  = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+Unicode = "4ec0a83e-493e-50e2-b9ac-8f72acf5a8f5"
+Dates   = "ade2ca70-3891-5945-98fb-dc099432e06a"
+
+ModuleInterfaceTools = "5cb8414e-7aab-5a03-a681-351269c074bf" # x13gh7y6id3fbmke
+MurmurHash3          = "f0d41675-b40b-4ac0-9c24-1938651d8492" # q55ln7mp20ph5cko
+PCRE2                = "c9310f65-a42c-5928-aca3-d34f64192029" # d62uhoik906m7n8r
+Format               = "1fa38f19-a742-5d3f-a2b9-30dd87b9d5f8" # 9wb580eyjv4k3iej
+StrTables            = "9700d1a9-a7c8-5760-9816-a99fda30bb8f" # ekt5t6nt8g0cqhjb
+LaTeX_Entities       = "9927f19a-46ce-5bdd-a20a-f46a78b61e3d" # ok2sdq4u5xwlc6b0
+Emoji_Entities       = "fd8f23de-bd2f-5c75-921c-0c9ab51355f5" # 4p6o3reehca95put
+HTML_Entities        = "7693890a-d069-55fe-a829-b4a6d304f0ee" # xp05kd5mamt92yhj
+Unicode_Entities     = "a8aa15d3-c567-5e9f-b6cc-4b0f97f09cf7" # c1luci97ry8fxdt7
+StrAPI               = "69e7dfc3-c4d0-5e14-8d95-d6042a05b383" # pyw9o1y3wywo95tt
+CharSetEncodings     = "cb9422de-a9d8-5b68-86db-ff05833ab307" # 08ylxl46exltiemd
+ChrBase              = "c13fa7b1-fb91-5a40-8b3c-3aad7fd30002" # lrdfni7si4o797fr
+StrBase              = "9ae48233-fac8-48c3-9111-9059e0a096a8" # 2v12uwlr0ueale6n
+StrRegex             = "128fb37e-e16c-4908-8083-6410b01968ef" # iyhlb4unq5ml4g0w
+StrLiterals          = "627f7b36-cfa1-4420-8f93-de9d4fe56cdc" # 8462oq09ek07knos
+StrEntities          = "f6164076-6934-4707-9ef0-ff39da4345e6" # 5pj0ubfrai4dsp0r
+StrFormat            = "a5a47323-cf2a-443b-a747-99a2b29c4966" # r3c2alh3jfcmu2gc
+InternedStrings      = "7d512f48-7fb1-5a58-b986-67e6dc259f01"
