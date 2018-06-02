@@ -28,7 +28,7 @@ matrix:
 ## uncomment the following lines to override the default test script
 script:
   - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
-  - julia -e 'mit="ModuleInterfaceTools"; mh3="MurmurHash3"; loc="https://github.com/JuliaString"; if VERSION < v"0.7.0-DEV.5183"; cln = Pkg.clone; cln("$loc/$mit.jl"); cln("$loc/$mh3.jl"); l="_Entities"; for n in ("StrTables", "LightXML", "JSON", "Format", "PCRE2", "InternedStrings", "StrAPI", "CharSetEncodings", "ChrBase") ; Pkg.add(n) ; end ; t=("LaTeX","Emoji","HTML","Unicode"); for n in t; d=n*"_Entities"; Pkg.add(d); Pkg.build(d); end; cln(pwd()); else; using Pkg; cln = Pkg.add; cln("$loc/$mit.jl"); cln("$loc/$mh3.jl"); end; Pkg.build("PCRE2"); for n in ("StrBase", "StrRegex", "StrLiterals", "StrFormat", "StrEntities"); cln("$loc/$n.jl.git"); end; Pkg.test("Strs"; coverage=true)'
+  - julia -e 'mit="ModuleInterfaceTools"; mh3="MurmurHash3"; loc="https://github.com/JuliaString"; if VERSION < v"0.7.0-DEV.5183"; cln = Pkg.clone; cln("$loc/$mit.jl"); cln("$loc/$mh3.jl"); l="_Entities"; for n in ("StrTables", "LightXML", "JSON", "Format", "PCRE2", "InternedStrings", "StrAPI", "CharSetEncodings", "ChrBase") ; Pkg.add(n) ; end ; t=("LaTeX","Emoji","HTML","Unicode"); for n in t; d=n*"_Entities"; Pkg.add(d); Pkg.build(d); end; cln(pwd()); else; using Pkg; cln = Pkg.add; cln("$loc/$mit.jl"); cln("$loc/$mh3.jl"); Pkg.up(); end; Pkg.build("PCRE2"); for n in ("StrBase", "StrRegex", "StrLiterals", "StrFormat", "StrEntities"); cln("$loc/$n.jl.git"); end; Pkg.test("Strs"; coverage=true)'
 after_success:
   # push coverage results to Coveralls
   - julia -e 'cd(Pkg.dir("Strs")); Pkg.add("Coverage"); using Coverage; Coveralls.submit(Coveralls.process_folder())'

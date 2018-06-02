@@ -46,23 +46,21 @@ build_script:
       la = (\"StrTables\", \"LightXML\", \"JSON\", \"Format\", \"PCRE2\", \"InternedStrings\", \"StrAPI\", \"CharSetEncodings\", \"ChrBase\");
       lc = (\"StrBase\", \"StrRegex\", \"StrLiterals\", \"StrFormat\", \"StrEntities\");
       if VERSION < v\"0.7.0-DEV.5183\";
-         cln = Pkg.clone;
-         cln(\"$loc/$mit.jl.git\", mit);
-         cln(\"$loc/$mh3.jl.git\", mh3);
+         Pkg.clone(\"$loc/$mit.jl.git\", mit);
+         Pkg.clone(\"$loc/$mh3.jl.git\", mh3);
          for n in la; Pkg.add(n); end;
          for n in (\"LaTeX\",\"Emoji\",\"HTML\",\"Unicode\");
              d=n*\"_Entities\" ; Pkg.add(d); Pkg.build(d);
          end;
          Pkg.build(\"PCRE2\");
-         for n in lc; cln(\"$loc/$n.jl.git\", n); end;
-         cln(pwd(), pkg);
+         for n in lc; Pkg.clone(\"$loc/$n.jl.git\", n); end;
+         Pkg.clone(pwd(), pkg);
      else;
          using Pkg;
-         cln(a,b) = Pkg.add(a);
-         cln(\"$loc/$mit.jl.git\", mit);
-         cln(\"$loc/$mh3.jl.git\", mh3);
+         Pkg.add(\"$loc/$mit.jl.git\");
+         Pkg.add(\"$loc/$mh3.jl.git\");
          Pkg.build(\"PCRE2\");
-         for n in lc; cln(\"$loc/$n.jl.git\", n); end;
+         for n in lc; Pkg.add(\"$loc/$n.jl.git\"); end;
      end"
 
 test_script:
