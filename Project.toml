@@ -22,7 +22,7 @@ StrBase = "e79e7a6a-7bb1-5a4d-9d64-da657b06f53a"
 
 StrEntities = "f6164076-6934-4707-9ef0-ff39da4345e6"
 StrFormat = "a5a47323-cf2a-443b-a747-99a2b29c4966"
-StrLiterals = "627f7b36-cfa1-4420-8f93-de9d4fe56cdc"
+StrLiterals = "68059f60-971f-57ff-a2d0-18e7de9ccc84" # 8462oq09ek07knos
 StrRegex = "128fb37e-e16c-4908-8083-6410b01968ef"
 StrTables = "9700d1a9-a7c8-5760-9816-a99fda30bb8f"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"

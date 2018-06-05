@@ -4,9 +4,9 @@ using BenchmarkTools
 using ModuleInterfaceTools
 using Strs
 
-@api test StrAPI, StrBase, StrRegex
-
 @static V6_COMPAT || (using Pkg, REPL)
+
+@api test StrAPI, StrBase, StrRegex
 
 const ver = "v0.$(VERSION.minor)"
 const git = "https://github.com/JuliaString/"
