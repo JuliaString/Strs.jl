@@ -36,6 +36,8 @@
 [coverall-m-img]: https://coveralls.io/repos/github/JuliaString/Strs.jl/badge.svg?branch=master
 
 
+[![GitHub release](https://img.shields.io/github/release/qubyte/rubidium.svg)](http://github.com/JuliaString/Strs.jl)
+
 It represents an attempt to give Julia better string handling than possible with Base `String` and `Char`.
 
 I am now trying to make sure that all of the functionality in String and Char is implemented for
@@ -57,12 +59,12 @@ Strs.jl is now a container for a number of different packages from [JuliaString.
 | [StrLiterals][strliterals-loc] | [![][strliterals-tvs-img]][strliterals-tvs-url] | [![][strliterals-app-img]][strliterals-app-url] | Extensible string literal support
 | [StrFormat][strformat-loc] | [![][strformat-tvs-img]][strformat-tvs-url] | [![][strformat-app-img]][strformat-app-url] | Formatting extensions for literals
 | [StrTables][strtables-loc] | [![][strtables-tvs-img]][strtables-tvs-url] | [![][strtables-app-img]][strtables-app-url] | Low-level support for entity tables
-| [HTML_Entities][html-loc] | [![][html-tvs-img]][html-tvs-url] | [![][html-app-img]][html-app-url] |
-| [Emoji_Entities][emoji-loc] | [![][emoji-tvs-img]][emoji-tvs-url] | [![][emoji-app-img]][emoji-app-url] | 
-| [LaTeX_Entities][latex-loc] | [![][latex-tvs-img]][latex-tvs-url] | [![][latex-app-img]][latex-app-url] |
-| [Unicode_Entities][unicode-loc] | [![][unicode-tvs-img]][unicode-tvs-url] | [![][unicode-app-img]][unicode-app-url] | 
+| [HTML_Entities][html-loc] | [![][html-tvs-img]][html-tvs-url] | [![][html-app-img]][html-app-url] | HTML character sequences
+| [Emoji_Entities][emoji-loc] | [![][emoji-tvs-img]][emoji-tvs-url] | [![][emoji-app-img]][emoji-app-url] | Emoji names (including composite ones)
+| [LaTeX_Entities][latex-loc] | [![][latex-tvs-img]][latex-tvs-url] | [![][latex-app-img]][latex-app-url] | Julia LaTeX character names
+| [Unicode_Entities][unicode-loc] | [![][unicode-tvs-img]][unicode-tvs-url] | [![][unicode-app-img]][unicode-app-url] | Unicode standard character names
 | [StrEntities][strentities-loc] | [![][strentities-tvs-img]][strentities-tvs-url] | [![][strentities-app-img]][strentities-app-url] | Entity extensions for literals
-| [InternedStrings][int-loc] | [![][int-tvs-img]][int-tvs-url] | | Save space by interning strings (by @oxinabox!)
+| [InternedStrings][int-loc] | [![][int-tvs-img]][int-tvs-url] | [![][int-app-img]][int-app-url] | Save space by interning strings (by @oxinabox!)
 
 
 [mit-loc]:     https://github.com/JuliaString/ModuleInterfaceTools.jl

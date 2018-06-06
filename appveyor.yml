@@ -40,28 +40,8 @@ install:
 build_script:
 # Need to convert from shallow to complete for Pkg.clone to work
   - IF EXIST .git\shallow (git fetch --unshallow)
-  - C:\projects\julia\bin\julia -e "VERSION < v\"0.7.0-DEV\" || (using InteractiveUtils);
-      versioninfo(); pkg = \"Strs\"; mit = \"ModuleInterfaceTools\"; mh3 = \"MurmurHash3\";
-      loc = \"https://github.com/JuliaString\";
-      la = (\"StrTables\", \"LightXML\", \"JSON\", \"Format\", \"PCRE2\", \"InternedStrings\", \"StrAPI\", \"CharSetEncodings\", \"ChrBase\");
-      lc = (\"StrBase\", \"StrRegex\", \"StrLiterals\", \"StrFormat\", \"StrEntities\");
-      if VERSION < v\"0.7.0-DEV.5183\";
-         Pkg.clone(\"$loc/$mit.jl.git\", mit);
-         Pkg.clone(\"$loc/$mh3.jl.git\", mh3);
-         for n in la; Pkg.add(n); end;
-         for n in (\"LaTeX\",\"Emoji\",\"HTML\",\"Unicode\");
-             d=n*\"_Entities\" ; Pkg.add(d); Pkg.build(d);
-         end;
-         Pkg.build(\"PCRE2\");
-         for n in lc; Pkg.clone(\"$loc/$n.jl.git\", n); end;
-         Pkg.clone(pwd(), pkg);
-     else;
-         using Pkg;
-         Pkg.add(\"$loc/$mit.jl.git\");
-         Pkg.add(\"$loc/$mh3.jl.git\");
-         Pkg.build(\"PCRE2\");
-         for n in lc; Pkg.add(\"$loc/$n.jl.git\"); end;
-     end"
+  - C:\projects\julia\bin\julia -e "VERSION < v\"0.7.0-DEV\" || (using Pkg, InteractiveUtils);
+      versioninfo(); Pkg.clone(pwd(), \"Strs\")"
 
 test_script:
-  - C:\projects\julia\bin\julia -e "Pkg.test(\"Strs\")"
+  - C:\projects\julia\bin\julia -e "VERSION < v\"0.7.0-DEV\" || (using Pkg); Pkg.test(\"Strs\")"

@@ -1,10 +1,11 @@
 const test_legacy = false
 
-using BenchmarkTools
 using ModuleInterfaceTools
-using Strs
 
 @static V6_COMPAT || (using Pkg, REPL)
+
+using BenchmarkTools
+using Strs
 
 @api test StrAPI, StrBase, StrRegex
 
