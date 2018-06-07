@@ -36,7 +36,8 @@
 [coverall-m-img]: https://coveralls.io/repos/github/JuliaString/Strs.jl/badge.svg?branch=master
 
 
-[![GitHub release](https://img.shields.io/github/release/qubyte/rubidium.svg)](http://github.com/JuliaString/Strs.jl)
+[![][https://img.shields.io/github/release/qubyte/rubidium.svg]](https://juliastring.org)
+[![][https://img.shields.io/github/release-date/SubtitleEdit/subtitleedit.svg](https://juliastring.org)
 
 It represents an attempt to give Julia better string handling than possible with Base `String` and `Char`.
 
