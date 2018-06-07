@@ -2,16 +2,31 @@
 
 [![Logo](Logo.gif)](https://github.com/cormullion)
 
-| **Info** | **Windows** | **Linux & MacOS** | **Package Evaluator** | **CodeCov** | **Coveralls** |
-|:------------------:|:------------------:|:---------------------:|:-----------------:|:---------------------:|:-----------------:|
-| [![][license-img]][license-url] | [![][app-s-img]][app-s-url] | [![][travis-s-img]][travis-url] | [![][pkg-s-img]][pkg-s-url] | [![][codecov-img]][codecov-url] | [![][coverall-s-img]][coverall-s-url]
-| [![][gitter-img]][gitter-url] | [![][app-m-img]][app-m-url] | [![][travis-m-img]][travis-url] | [![][pkg-m-img]][pkg-m-url] | [![][codecov-img]][codecov-url] | [![][coverall-m-img]][coverall-m-url]
+[![][gitter-img]][gitter-url]
+[![][license-img]][license-url]
+[![][release]][strs-url]
+[![][release-date]][strs-url]
+[![][julia-release]][julia-url]
+[![][julia-release-date]][julia-url]
+
+| **Windows** | **Linux & MacOS** | **Package Evaluator** | **CodeCov** | **Coveralls** |
+|:------------------:|:------------------:|:---------------------:|:-----------------:|:---------------------:|
+| [![][app-s-img]][app-s-url] | [![][travis-s-img]][travis-url] | [![][pkg-s-img]][pkg-s-url] | [![][codecov-img]][codecov-url] | [![][coverall-s-img]][coverall-s-url]
+| [![][app-m-img]][app-m-url] | [![][travis-m-img]][travis-url] | [![][pkg-m-img]][pkg-m-url] | [![][codecov-img]][codecov-url] | [![][coverall-m-img]][coverall-m-url]
 
 [license-img]:  http://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat
 [license-url]:  LICENSE.md
 
 [gitter-img]:   https://badges.gitter.im/Join%20Chat.svg
 [gitter-url]:   https://gitter.im/JuliaString/Lobby?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge
+
+[strs-url]:     https://github.com/JuliaString/Strs.jl
+[release]:      https://img.shields.io/github/release/JuliaString/Strs.jl.svg
+[release-date]: https://img.shields.io/github/release-date/JuliaString/Strs.jl.svg
+
+[julia-url]:          https://github.com/JuliaLang/julia
+[julia-release]:      https://img.shields.io/github/release/JuliaLang/julia.svg
+[julia-release-date]: https://img.shields.io/github/release-date/JuliaLang/julia.svg
 
 [travis-url]:   https://travis-ci.org/JuliaString/Strs.jl
 [travis-s-img]: https://travis-ci.org/JuliaString/Strs.jl.svg
@@ -34,8 +49,6 @@
 [coverall-m-url]: https://coveralls.io/github/JuliaString/Strs.jl?branch=master
 [coverall-s-img]: https://coveralls.io/repos/github/JuliaString/Strs.jl/badge.svg
 [coverall-m-img]: https://coveralls.io/repos/github/JuliaString/Strs.jl/badge.svg?branch=master
-
-[![](https://img.shields.io/github/release-date/JuliaString/Strs.jl.svg)](juliastring.org)
 
 It represents an attempt to give Julia better string handling than possible with Base `String` and `Char`.
 
