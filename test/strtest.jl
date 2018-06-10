@@ -1,3 +1,5 @@
+using ModuleInterfaceTools
+
 isdefined(ModuleInterfaceTools.cur_mod(), :STRS_SETUP) || include("setup.jl")
 
 const pkgadd =

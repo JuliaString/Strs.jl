@@ -64,7 +64,7 @@ Strs.jl is now a container for a number of different packages from [JuliaString.
 | [ChrBase][chrbase-loc] | [![][chrbase-rel]][chrbase-loc] | [![][chrbase-dat]][chrbase-loc]  | [![][chrbase-tvs-img]][chrbase-tvs-url] | [![][chrbase-app-img]][chrbase-app-url] | `Chr{CharSet,CodeUnitType}` type and support
 | [MurmurHash3][mh3-loc] | [![][mh3-rel]][mh3-loc] | [![][mh3-dat]][mh3-loc]  | [![][mh3-tvs-img]][mh3-tvs-url] | [![][mh3-app-img]][mh3-app-url] | Pure Julia implementation of MurmurHash3
 | [PCRE2][pcre2-loc] | [![][pcre2-rel]][pcre2-loc] | [![][pcre2-dat]][pcre2-loc]  | [![][pcre2-tvs-img]][pcre2-tvs-url] | [![][pcre2-app-img]][pcre2-app-url] | `PCRE2` library support
-| [Format][format-loc] | [![][format-rel]][format-loc] | [![][format-dat]][format-loc]  | [![][format-tvs-img]][format-tvs-url] | [![][format-app-img]][format-app-url] | Python/C style formatting (based on [Formatting](https://github.com/JuliaIO/Formatting.jl)
+| [Format][format-loc] | [![][format-rel]][format-loc] | [![][format-dat]][format-loc]  | [![][format-tvs-img]][format-tvs-url] | [![][format-app-img]][format-app-url] | Python/C style formatting (based on [Formatting](https://github.com/JuliaIO/Formatting.jl))
 | [StrBase][strbase-loc] | [![][strbase-rel]][strbase-loc] | [![][strbase-dat]][strbase-loc]  | [![][strbase-tvs-img]][strbase-tvs-url] | [![][strbase-app-img]][strbase-app-url] | `Str{CSE, Hash, SubSet, Cache}` type
 | [StrRegex][strregex-loc] | [![][strregex-rel]][strregex-loc] | [![][strregex-dat]][strregex-loc]  | [![][strregex-tvs-img]][strregex-tvs-url] | [![][strregex-app-img]][strregex-app-url] | `Regex` support for all string types
 | [StrLiterals][strliterals-loc] | [![][strliterals-rel]][strliterals-loc] | [![][strliterals-dat]][strliterals-loc]  | [![][strliterals-tvs-img]][strliterals-tvs-url] | [![][strliterals-app-img]][strliterals-app-url] | Extensible string literal support
@@ -83,104 +83,104 @@ Strs.jl is now a container for a number of different packages from [JuliaString.
 [mit-tvs-url]: https://travis-ci.org/JuliaString/ModuleInterfaceTools.jl
 [mit-app-img]: https://ci.appveyor.com/api/projects/status/x13gh7y6id3fbmke/branch/master?svg=true
 [mit-app-url]: https://ci.appveyor.com/project/ScottPJones/moduleinterfacetools-jl/branch/master
-[mit-rel]:     https://img.shields.io/github/release/JuliaString/ModuleInterfaceTools.jl.svg?label="_"
-[mit-dat]:     https://img.shields.io/github/release-date/JuliaString/ModuleInterfaceTools.jl.svg?label="_"
+[mit-rel]:     https://img.shields.io/github/release/JuliaString/ModuleInterfaceTools.jl.svg?label="."
+[mit-dat]:     https://img.shields.io/github/release-date/JuliaString/ModuleInterfaceTools.jl.svg?label="."
 
 [mh3-loc]:     https://github.com/JuliaString/MurmurHash3.jl
 [mh3-tvs-img]: https://travis-ci.org/JuliaString/MurmurHash3.jl.svg?branch=master
 [mh3-tvs-url]: https://travis-ci.org/JuliaString/MurmurHash3.jl
 [mh3-app-img]: https://ci.appveyor.com/api/projects/status/q55ln7mp20ph5cko/branch/master?svg=true
 [mh3-app-url]: https://ci.appveyor.com/project/ScottPJones/MurmurHash3-jl/branch/master
-[mh3-rel]:     https://img.shields.io/github/release/JuliaString/MurmurHash3.jl.svg?label="_"
-[mh3-dat]:     https://img.shields.io/github/release-date/JuliaString/MurmurHash3.jl.svg?label="_"
+[mh3-rel]:     https://img.shields.io/github/release/JuliaString/MurmurHash3.jl.svg?label="."
+[mh3-dat]:     https://img.shields.io/github/release-date/JuliaString/MurmurHash3.jl.svg?label="."
 
 [pcre2-loc]:     https://github.com/JuliaString/PCRE2.jl
 [pcre2-tvs-img]: https://travis-ci.org/JuliaString/PCRE2.jl.svg?branch=master
 [pcre2-tvs-url]: https://travis-ci.org/JuliaString/PCRE2.jl
 [pcre2-app-img]: https://ci.appveyor.com/api/projects/status/d62uhoik906m7n8r/branch/master?svg=true
 [pcre2-app-url]: https://ci.appveyor.com/project/ScottPJones/pcre2-jl/branch/master
-[pcre2-rel]:     https://img.shields.io/github/release/JuliaString/PCRE2.jl.svg?label="_"
-[pcre2-dat]:     https://img.shields.io/github/release-date/JuliaString/PCRE2.jl.svg?label="_"
+[pcre2-rel]:     https://img.shields.io/github/release/JuliaString/PCRE2.jl.svg?label="."
+[pcre2-dat]:     https://img.shields.io/github/release-date/JuliaString/PCRE2.jl.svg?label="."
 
 [format-loc]:     https://github.com/JuliaString/Format.jl
 [format-tvs-img]: https://travis-ci.org/JuliaString/Format.jl.svg?branch=master
 [format-tvs-url]: https://travis-ci.org/JuliaString/Format.jl
 [format-app-img]: https://ci.appveyor.com/api/projects/status/9wb580eyjv4k3iej/branch/master?svg=true
 [format-app-url]: https://ci.appveyor.com/project/ScottPJones/format-jl/branch/master
-[format-rel]:     https://img.shields.io/github/release/JuliaString/Format.jl.svg?label="_"
-[format-dat]:     https://img.shields.io/github/release-date/JuliaString/Format.jl.svg?label="_"
+[format-rel]:     https://img.shields.io/github/release/JuliaString/Format.jl.svg?label="."
+[format-dat]:     https://img.shields.io/github/release-date/JuliaString/Format.jl.svg?label="."
 
 [strapi-loc]:     https://github.com/JuliaString/StrAPI.jl
 [strapi-tvs-img]: https://travis-ci.org/JuliaString/StrAPI.jl.svg?branch=master
 [strapi-tvs-url]: https://travis-ci.org/JuliaString/StrAPI.jl
 [strapi-app-img]: https://ci.appveyor.com/api/projects/status/pyw9o1y3wywo95tt/branch/master?svg=true
 [strapi-app-url]: https://ci.appveyor.com/project/ScottPJones/strapi-jl/branch/master
-[strapi-rel]:     https://img.shields.io/github/release/JuliaString/StrAPI.jl.svg?label="_"
-[strapi-dat]:     https://img.shields.io/github/release-date/JuliaString/StrAPI.jl.svg?label="_"
+[strapi-rel]:     https://img.shields.io/github/release/JuliaString/StrAPI.jl.svg?label="."
+[strapi-dat]:     https://img.shields.io/github/release-date/JuliaString/StrAPI.jl.svg?label="."
 
 [cse-loc]:     https://github.com/JuliaString/CharSetEncodings.jl
 [cse-tvs-img]: https://travis-ci.org/JuliaString/CharSetEncodings.jl.svg?branch=master
 [cse-tvs-url]: https://travis-ci.org/JuliaString/CharSetEncodings.jl
 [cse-app-img]: https://ci.appveyor.com/api/projects/status/08ylxl46exltiemd/branch/master?svg=true
 [cse-app-url]: https://ci.appveyor.com/project/ScottPJones/charsetencodings-jl/branch/master
-[cse-rel]:     https://img.shields.io/github/release/JuliaString/CharSetEncodings.jl.svg?label="_"
-[cse-dat]:     https://img.shields.io/github/release-date/JuliaString/CharSetEncodings.jl.svg?label="_"
+[cse-rel]:     https://img.shields.io/github/release/JuliaString/CharSetEncodings.jl.svg?label="."
+[cse-dat]:     https://img.shields.io/github/release-date/JuliaString/CharSetEncodings.jl.svg?label="."
 
 [chrbase-loc]:     https://github.com/JuliaString/ChrBase.jl
 [chrbase-tvs-img]: https://travis-ci.org/JuliaString/ChrBase.jl.svg?branch=master
 [chrbase-tvs-url]: https://travis-ci.org/JuliaString/ChrBase.jl
 [chrbase-app-img]: https://ci.appveyor.com/api/projects/status/lrdfni7si4o797fr/branch/master?svg=true
 [chrbase-app-url]: https://ci.appveyor.com/project/ScottPJones/chrbase-jl/branch/master
-[chrbase-rel]:     https://img.shields.io/github/release/JuliaString/ChrBase.jl.svg?label="_"
-[chrbase-dat]:     https://img.shields.io/github/release-date/JuliaString/ChrBase.jl.svg?label="_"
+[chrbase-rel]:     https://img.shields.io/github/release/JuliaString/ChrBase.jl.svg?label="."
+[chrbase-dat]:     https://img.shields.io/github/release-date/JuliaString/ChrBase.jl.svg?label="."
 
 [strbase-loc]:     https://github.com/JuliaString/StrBase.jl
 [strbase-tvs-img]: https://travis-ci.org/JuliaString/StrBase.jl.svg?branch=master
 [strbase-tvs-url]: https://travis-ci.org/JuliaString/StrBase.jl
 [strbase-app-img]: https://ci.appveyor.com/api/projects/status/2v12uwlr0ueale6n/branch/master?svg=true
 [strbase-app-url]: https://ci.appveyor.com/project/ScottPJones/strbase-jl/branch/master
-[strbase-rel]:     https://img.shields.io/github/release/JuliaString/StrBase.jl.svg?label="_"
-[strbase-dat]:     https://img.shields.io/github/release-date/JuliaString/StrBase.jl.svg?label="_"
+[strbase-rel]:     https://img.shields.io/github/release/JuliaString/StrBase.jl.svg?label="."
+[strbase-dat]:     https://img.shields.io/github/release-date/JuliaString/StrBase.jl.svg?label="."
 
 [strregex-loc]:     https://github.com/JuliaString/StrRegex.jl
 [strregex-tvs-img]: https://travis-ci.org/JuliaString/StrRegex.jl.svg?branch=master
 [strregex-tvs-url]: https://travis-ci.org/JuliaString/StrRegex.jl
 [strregex-app-img]: https://ci.appveyor.com/api/projects/status/iyhlb4unq5ml4g0w/branch/master?svg=true
 [strregex-app-url]: https://ci.appveyor.com/project/ScottPJones/strregex-jl/branch/master
-[strregex-rel]:     https://img.shields.io/github/release/JuliaString/StrRegex.jl.svg?label="_"
-[strregex-dat]:     https://img.shields.io/github/release-date/JuliaString/StrRegex.jl.svg?label="_"
+[strregex-rel]:     https://img.shields.io/github/release/JuliaString/StrRegex.jl.svg?label="."
+[strregex-dat]:     https://img.shields.io/github/release-date/JuliaString/StrRegex.jl.svg?label="."
 
 [strliterals-loc]:     https://github.com/JuliaString/StrLiterals.jl
 [strliterals-tvs-img]: https://travis-ci.org/JuliaString/StrLiterals.jl.svg?branch=master
 [strliterals-tvs-url]: https://travis-ci.org/JuliaString/StrLiterals.jl
 [strliterals-app-img]: https://ci.appveyor.com/api/projects/status/8462oq09ek07knos/branch/master?svg=true
 [strliterals-app-url]: https://ci.appveyor.com/project/ScottPJones/strliterals-jl/branch/master
-[strliterals-rel]:     https://img.shields.io/github/release/JuliaString/StrLiterals.svg?label="_"
-[strliterals-dat]:     https://img.shields.io/github/release-date/JuliaString/StrLiterals.jl.svg?label="_"
+[strliterals-rel]:     https://img.shields.io/github/release/JuliaString/StrLiterals.svg?label="."
+[strliterals-dat]:     https://img.shields.io/github/release-date/JuliaString/StrLiterals.jl.svg?label="."
 
 [strformat-loc]:     https://github.com/JuliaString/StrFormat.jl
 [strformat-tvs-img]: https://travis-ci.org/JuliaString/StrFormat.jl.svg?branch=master
 [strformat-tvs-url]: https://travis-ci.org/JuliaString/StrFormat.jl
 [strformat-app-img]: https://ci.appveyor.com/api/projects/status/r3c2alh3jfcmu2gc/branch/master?svg=true
 [strformat-app-url]: https://ci.appveyor.com/project/ScottPJones/strformat-jl/branch/master
-[strformat-rel]:     https://img.shields.io/github/release/JuliaString/StrFormat.jl.svg?label="_"
-[strformat-dat]:     https://img.shields.io/github/release-date/JuliaString/StrFormat.jl.svg?label="_"
+[strformat-rel]:     https://img.shields.io/github/release/JuliaString/StrFormat.jl.svg?label="."
+[strformat-dat]:     https://img.shields.io/github/release-date/JuliaString/StrFormat.jl.svg?label="."
 
 [strtables-loc]:     https://github.com/JuliaString/StrTables.jl
 [strtables-tvs-img]: https://travis-ci.org/JuliaString/StrTables.jl.svg?branch=master
 [strtables-tvs-url]: https://travis-ci.org/JuliaString/StrTables.jl
 [strtables-app-img]: https://ci.appveyor.com/api/projects/status/ekt5t6nt8g0cqhjb/branch/master?svg=true
 [strtables-app-url]: https://ci.appveyor.com/project/ScottPJones/strtables-jl/branch/master
-[strtables-rel]:     https://img.shields.io/github/release/JuliaString/StrTables.jl.svg?label="_"
-[strtables-dat]:     https://img.shields.io/github/release-date/JuliaString/StrTables.jl.svg?label="_"
+[strtables-rel]:     https://img.shields.io/github/release/JuliaString/StrTables.jl.svg?label="."
+[strtables-dat]:     https://img.shields.io/github/release-date/JuliaString/StrTables.jl.svg?label="."
 
 [html-loc]:     https://github.com/JuliaString/HTML_Entities.jl
 [html-tvs-img]: https://travis-ci.org/JuliaString/HTML_Entities.jl.svg?branch=master
 [html-tvs-url]: https://travis-ci.org/JuliaString/HTML_Entities.jl
 [html-app-img]: https://ci.appveyor.com/api/projects/status/xp05kd5mamt92yhj/branch/master?svg=true
 [html-app-url]: https://ci.appveyor.com/project/ScottPJones/html-entities-jl/branch/master
-[html-rel]:     https://img.shields.io/github/release/JuliaString/HTML_Entities.jl.svg?label="_"
-[html-dat]:     https://img.shields.io/github/release-date/JuliaString/HTML_Entities.jl.svg?label="_"
+[html-rel]:     https://img.shields.io/github/release/JuliaString/HTML_Entities.jl.svg?label="."
+[html-dat]:     https://img.shields.io/github/release-date/JuliaString/HTML_Entities.jl.svg?label="."
 
 [emoji-loc]:     https://github.com/JuliaString/Emoji_Entities.jl
 [emoji-tvs-img]: https://travis-ci.org/JuliaString/Emoji_Entities.jl.svg?branch=master
@@ -188,32 +188,32 @@ Strs.jl is now a container for a number of different packages from [JuliaString.
 [emoji-app-img]: https://ci.appveyor.com/api/projects/status/4p6o3reehca95put/branch/master?svg=true
 
 [emoji-app-url]: https://ci.appveyor.com/project/ScottPJones/emoji-entities-jl/branch/master
-[emoji-rel]:     https://img.shields.io/github/release/JuliaString/Emoji_Entities.jl.svg?label="_"
-[emoji-dat]:     https://img.shields.io/github/release-date/JuliaString/Emoji_Entities.jl.svg?label="_"
+[emoji-rel]:     https://img.shields.io/github/release/JuliaString/Emoji_Entities.jl.svg?label="."
+[emoji-dat]:     https://img.shields.io/github/release-date/JuliaString/Emoji_Entities.jl.svg?label="."
 
 [latex-loc]:     https://github.com/JuliaString/LaTeX_Entities.jl
 [latex-tvs-img]: https://travis-ci.org/JuliaString/LaTeX_Entities.jl.svg?branch=master
 [latex-tvs-url]: https://travis-ci.org/JuliaString/LaTeX_Entities.jl
 [latex-app-img]: https://ci.appveyor.com/api/projects/status/ok2sdq4u5xwlc6b0/branch/master?svg=true
 [latex-app-url]: https://ci.appveyor.com/project/ScottPJones/latex-entities-jl/branch/master
-[latex-rel]:     https://img.shields.io/github/release/JuliaString/LaTeX_Entities.jl.svg?label="_"
-[latex-dat]:     https://img.shields.io/github/release-date/JuliaString/LaTeX_Entities.jl.svg?label="_"
+[latex-rel]:     https://img.shields.io/github/release/JuliaString/LaTeX_Entities.jl.svg?label="."
+[latex-dat]:     https://img.shields.io/github/release-date/JuliaString/LaTeX_Entities.jl.svg?label="."
 
 [unicode-loc]:     https://github.com/JuliaString/Unicode_Entities.jl
 [unicode-tvs-img]: https://travis-ci.org/JuliaString/Unicode_Entities.jl.svg?branch=master
 [unicode-tvs-url]: https://travis-ci.org/JuliaString/Unicode_Entities.jl
 [unicode-app-img]: https://ci.appveyor.com/api/projects/status/c1luci97ry8fxdt7/branch/master?svg=true
 [unicode-app-url]: https://ci.appveyor.com/project/ScottPJones/unicode-entities-jl/branch/master
-[unicode-rel]:     https://img.shields.io/github/release/JuliaString/Unicode_Entities.jl.svg?label="_"
-[unicode-dat]:     https://img.shields.io/github/release-date/JuliaString/Unicode_Entities.jl.svg?label="_"
+[unicode-rel]:     https://img.shields.io/github/release/JuliaString/Unicode_Entities.jl.svg?label="."
+[unicode-dat]:     https://img.shields.io/github/release-date/JuliaString/Unicode_Entities.jl.svg?label="."
 
 [strentities-loc]:     https://github.com/JuliaString/StrEntities.jl
 [strentities-tvs-img]: https://travis-ci.org/JuliaString/StrEntities.jl.svg?branch=master
 [strentities-tvs-url]: https://travis-ci.org/JuliaString/StrEntities.jl
 [strentities-app-img]: https://ci.appveyor.com/api/projects/status/5pj0ubfrai4dsp0r/branch/master?svg=true
 [strentities-app-url]: https://ci.appveyor.com/project/ScottPJones/strentities-jl/branch/master
-[strentities-rel]:     https://img.shields.io/github/release/JuliaString/StrEntities.jl.svg?label="_"
-[strentities-dat]:     https://img.shields.io/github/release-date/JuliaString/StrEntities.jl.svg?label="_"
+[strentities-rel]:     https://img.shields.io/github/release/JuliaString/StrEntities.jl.svg?label="."
+[strentities-dat]:     https://img.shields.io/github/release-date/JuliaString/StrEntities.jl.svg?label="."
 
 [int-loc]:     https://github.com/JuliaString/InternedStrings.jl
 [int-tvs-img]: https://travis-ci.org/JuliaString/InternedStrings.jl.svg?branch=master
@@ -221,8 +221,8 @@ Strs.jl is now a container for a number of different packages from [JuliaString.
 [int-app-img]: https://ci.appveyor.com/api/projects/status/8dlhr5sprhokwyqb/branch/master?svg=true
 
 [int-app-url]: https://ci.appveyor.com/project/ScottPJones/internedstrings-jl/branch/master
-[int-rel]:     https://img.shields.io/github/release/JuliaString/InternedStrings.jl.svg?label="_"
-[int-dat]:     https://img.shields.io/github/release-date/JuliaString/InternedStrings.jl.svg?label="_"
+[int-rel]:     https://img.shields.io/github/release/JuliaString/InternedStrings.jl.svg?label="."
+[int-dat]:     https://img.shields.io/github/release-date/JuliaString/InternedStrings.jl.svg?label="."
 
 
 The new package [ModuleInterfaceTools](https://github.com/JuliaString/ModuleInterfaceTools.jl) is used to set up a consistent and easy to use API for most of the cooperating packages, without having to worry too much about imports, exports, using, and what functions are part of a public API, and which ones are part of the internal development API for other packages to extend.
