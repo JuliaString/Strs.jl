@@ -54,7 +54,7 @@ It represents an attempt to give Julia better string handling than possible with
 I am now trying to make sure that all of the functionality in String and Char is implemented for
 Str and Chr, and to start optimizing the functions (although they are already substantially faster)
 
-Strs.jl is now a container for a number of different packages from [JuliaString.org](https://juliastring.org)
+Strs.jl is now a container for a number of different packages from [JuliaString.org](http://juliastring.org)
 
 | **Package** | **Release** | **Release Date** | **Linux & MacOS** | **Windows** | **Description** |
 |:-------------:|:-------------:|:-------------:|:-----------:|:-----------:|:-------------------|
