@@ -8,7 +8,7 @@ Licensed under MIT License, see LICENSE.md
 module Strs
 
 using ModuleInterfaceTools
-using ModuleInterfaceTools: @api, m_eval, cur_mod
+using ModuleInterfaceTools: @api, m_eval
 export @api, V6_COMPAT
 
 using PCRE2
@@ -33,7 +33,8 @@ end
 
 # Need to fix ModuleInterfaceTools to do this!
 for mod in (StrRegex, StrLiterals), grp in (:modules, :public, :public!)
-    m_eval(cur_mod(), Expr( :export, getfield(m_eval(mod, :__api__), grp)...))
+    m_eval(@static V6_COMPAT ? current_module : @__MODULE__,
+           Expr( :export, getfield(m_eval(mod, :__api__), grp)...))
 end
 
 @api freeze
