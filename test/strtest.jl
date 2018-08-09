@@ -1,6 +1,8 @@
 using ModuleInterfaceTools
 
-isdefined(ModuleInterfaceTools.cur_mod(), :STRS_SETUP) || include("setup.jl")
+const curmod = @static V6_COMPAT ? current_module() : @__MODULE__
+
+isdefined(curmod, :STRS_SETUP) || include("setup.jl")
 
 const pkgadd =
     ["ModuleInterfaceTools", "Format", "PCRE2",
