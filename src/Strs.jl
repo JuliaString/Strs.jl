@@ -27,14 +27,17 @@ macro I_str(str) ; Expr(:call, :intern, interpolated_parse(str, StrBase._str, tr
 
 const m_eval = ModuleInterfaceTools.m_eval
 
+#=
 function __init__()
-    StrLiterals.string_type[] = UniStr
+    StrLiterals.string_type[] = String
 end
+=#
+
+const curmod = @static V6_COMPAT ? current_module() : @__MODULE__
 
 # Need to fix ModuleInterfaceTools to do this!
 for mod in (StrRegex, StrLiterals), grp in (:modules, :public, :public!)
-    m_eval(@static V6_COMPAT ? current_module : @__MODULE__,
-           Expr( :export, getfield(m_eval(mod, :__api__), grp)...))
+    m_eval(curmod, Expr( :export, getfield(m_eval(mod, :__api__), grp)...))
 end
 
 @api freeze
