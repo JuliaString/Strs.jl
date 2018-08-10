@@ -4,6 +4,7 @@ keywords = ["Strings", "Characters", "Formatting", "Intern", "Unicode", "Regex"]
 license = "MIT"
 name = "Strs"
 uuid = "74bd3093-d400-43d3-8216-79b3093f48e9"
+version = "0.1.1"
 
 [deps]
 ChrBase = "c13fa7b1-fb91-5a40-8b3c-3aad7fd30002"
