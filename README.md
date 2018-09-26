@@ -156,7 +156,7 @@ Strs.jl is now a container for a number of different packages from [JuliaString.
 [strliterals-tvs-url]: https://travis-ci.org/JuliaString/StrLiterals.jl
 [strliterals-app-img]: https://ci.appveyor.com/api/projects/status/8462oq09ek07knos/branch/master?svg=true
 [strliterals-app-url]: https://ci.appveyor.com/project/ScottPJones/strliterals-jl/branch/master
-[strliterals-rel]:     https://img.shields.io/github/release/JuliaString/StrLiterals.svg?label="."
+[strliterals-rel]:     https://img.shields.io/github/release/JuliaString/StrLiterals.jl.svg?label="."
 [strliterals-dat]:     https://img.shields.io/github/release-date/JuliaString/StrLiterals.jl.svg?label="."
 
 [strformat-loc]:     https://github.com/JuliaString/StrFormat.jl
