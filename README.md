@@ -40,6 +40,7 @@
 [pkg-m-url]:    http://pkg.julialang.org/detail/Strs
 [pkg-s-img]:    http://pkg.julialang.org/badges/Strs_0.6.svg
 [pkg-m-img]:    http://pkg.julialang.org/badges/Strs_0.7.svg
+[pkg-r-img]:    http://pkg.julialang.org/badges/Strs_1.0.svg
 
 [codecov-url]:  https://codecov.io/gh/JuliaString/Strs.jl
 [codecov-img]:  https://codecov.io/gh/JuliaString/Strs.jl/branch/master/graph/badge.svg
@@ -54,7 +55,7 @@ It represents an attempt to give Julia better string handling than possible with
 I am now trying to make sure that all of the functionality in String and Char is implemented for
 Str and Chr, and to start optimizing the functions (although they are already substantially faster)
 
-Strs.jl is now a container for a number of different packages from [JuliaString.org](https://juliastring.org)
+Strs.jl is now a container for a number of different packages from [JuliaString.org](http://juliastring.org)
 
 | **Package** | **Release** | **Release Date** | **Linux & MacOS** | **Windows** | **Description** |
 |:-------------:|:-------------:|:-------------:|:-----------:|:-----------:|:-------------------|
