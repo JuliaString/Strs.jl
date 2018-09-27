@@ -8,7 +8,7 @@ Licensed under MIT License, see LICENSE.md
 module Strs
 
 using ModuleInterfaceTools
-using ModuleInterfaceTools: @api, m_eval
+using ModuleInterfaceTools: m_eval
 export @api, V6_COMPAT
 
 using PCRE2
@@ -25,7 +25,7 @@ export @i_str, @I_str, intern
 macro i_str(str) ; Expr(:call, :intern, interpolated_parse(str, StrBase._str)) ; end
 macro I_str(str) ; Expr(:call, :intern, interpolated_parse(str, StrBase._str, true)) ; end
 
-const m_eval = ModuleInterfaceTools.m_eval
+#const m_eval = ModuleInterfaceTools.m_eval
 
 #=
 function __init__()

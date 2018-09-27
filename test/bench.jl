@@ -1023,6 +1023,7 @@ function testline(test, lines, results, list)
                 res == funres[j] ||
                     push!(fundiff, typeof(res) == Bool ? (j, text) : (j, text, res, funres[j]))
             end
+            test && !is_empty(fundiff) && pr"Failed test \(fun): \(fundiff)"
             test && @test is_empty(fundiff)
             is_empty(fundiff) || push!(diff, (i, fun, fundiff))
         catch ex

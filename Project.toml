@@ -1,30 +1,39 @@
-authors = ["ScottPJones <scottjones@alum.mit.edu>"]
+name = "Strs"
 desc = "Str & Chr support"
+authors = ["ScottPJones <scottjones@alum.mit.edu>"]
 keywords = ["Strings", "Characters", "Formatting", "Intern", "Unicode", "Regex"]
 license = "MIT"
-name = "Strs"
-uuid = "74bd3093-d400-43d3-8216-79b3093f48e9"
+uuid = "7bddbee9-b4ee-5d4f-bf0b-c84b4398bbf6"
 version = "0.1.1"
 
 [deps]
-ChrBase = "c13fa7b1-fb91-5a40-8b3c-3aad7fd30002"
-Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
-Emoji_Entities = "fd8f23de-bd2f-5c75-921c-0c9ab51355f5"
-HTML_Entities = "7693890a-d069-55fe-a829-b4a6d304f0ee"
-InternedStrings = "7d512f48-7fb1-5a58-b986-67e6dc259f01"
-LaTeX_Entities = "9927f19a-46ce-5bdd-a20a-f46a78b61e3d"
-ModuleInterfaceTools = "5cb8414e-7aab-5a03-a681-351269c074bf"
-MurmurHash3 = "b10b62ed-fbae-5ea5-b934-abaf0477b71d"
-PCRE2 = "c9310f65-a42c-5928-aca3-d34f64192029"
-Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
-Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
-StrAPI = "69e7dfc3-c4d0-5e14-8d95-d6042a05b383"
-StrBase = "e79e7a6a-7bb1-5a4d-9d64-da657b06f53a"
-StrEntities = "f6164076-6934-4707-9ef0-ff39da4345e6"
-StrFormat = "a5a47323-cf2a-443b-a747-99a2b29c4966"
-StrLiterals = "68059f60-971f-57ff-a2d0-18e7de9ccc84"
-StrRegex = "2267b70d-4c4a-5da2-8395-98751c0d506a"
-StrTables = "9700d1a9-a7c8-5760-9816-a99fda30bb8f"
-Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+Pkg     = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
+REPL    = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
+Test    = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+Dates   = "ade2ca70-3891-5945-98fb-dc099432e06a"
+Random  = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Unicode = "4ec0a83e-493e-50e2-b9ac-8f72acf5a8f5"
+
+ModuleInterfaceTools = "5cb8414e-7aab-5a03-a681-351269c074bf"
+
+InternedStrings  = "7d512f48-7fb1-5a58-b986-67e6dc259f01"
+
+StrTables        = "9700d1a9-a7c8-5760-9816-a99fda30bb8f"
+Emoji_Entities   = "fd8f23de-bd2f-5c75-921c-0c9ab51355f5"
+HTML_Entities    = "7693890a-d069-55fe-a829-b4a6d304f0ee"
+LaTeX_Entities   = "9927f19a-46ce-5bdd-a20a-f46a78b61e3d"
 Unicode_Entities = "a8aa15d3-c567-5e9f-b6cc-4b0f97f09cf7"
+
+StrLiterals = "68059f60-971f-57ff-a2d0-18e7de9ccc84"
+StrEntities = "42b7a45b-8021-5b99-aff5-7432580bee1c"
+Format      = "1fa38f19-a742-5d3f-a2b9-30dd87b9d5f8" # 9wb580eyjv4k3iej
+StrFormat   = "b5087856-efa9-5a6d-8e6f-97303a7af894"
+
+MurmurHash3 = "b10b62ed-fbae-5ea5-b934-abaf0477b71d"
+
+StrAPI      = "69e7dfc3-c4d0-5e14-8d95-d6042a05b383"
+ChrBase     = "c13fa7b1-fb91-5a40-8b3c-3aad7fd30002"
+StrBase     = "e79e7a6a-7bb1-5a4d-9d64-da657b06f53a"
+
+PCRE2       = "c9310f65-a42c-5928-aca3-d34f64192029"
+StrRegex    = "2267b70d-4c4a-5da2-8395-98751c0d506a"
