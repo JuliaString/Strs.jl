@@ -7,13 +7,6 @@ uuid = "7bddbee9-b4ee-5d4f-bf0b-c84b4398bbf6"
 version = "0.1.1"
 
 [deps]
-Pkg     = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
-REPL    = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
-Test    = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
-Dates   = "ade2ca70-3891-5945-98fb-dc099432e06a"
-Random  = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
-Unicode = "4ec0a83e-493e-50e2-b9ac-8f72acf5a8f5"
-
 ModuleInterfaceTools = "5cb8414e-7aab-5a03-a681-351269c074bf"
 
 InternedStrings  = "7d512f48-7fb1-5a58-b986-67e6dc259f01"
@@ -37,3 +30,10 @@ StrBase     = "e79e7a6a-7bb1-5a4d-9d64-da657b06f53a"
 
 PCRE2       = "c9310f65-a42c-5928-aca3-d34f64192029"
 StrRegex    = "2267b70d-4c4a-5da2-8395-98751c0d506a"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+REPL = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
+
+[targets]
+test = ["Test", "REPL"]
