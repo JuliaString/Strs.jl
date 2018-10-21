@@ -24,6 +24,9 @@ dispbench(res)            # Displays the results in a pretty format
 isdefined(Main, :STRS_SETUP) || include("setup.jl")
 @static V6_COMPAT || (using Serialization)
 
+@static V6_COMPAT || (Base.iterate(it::Union{CodePoints,CodeUnits}) = iterate(it, 1))
+
+
 const inppath = "textsamples"
 const gutpath = "gutenberg"
 const smppath = "samples"
@@ -227,6 +230,7 @@ function dispres(io, xres)
     end
     for i = 2:length(res)
         rn = res[i]
+        rn[1] == "UniStr" && continue
         pr"\(io)\n\%-12.12s(rn[1])\%6.3f(sizes[i]/stats.len)"
         tn = rn[3]
         minres = min(length(t1), length(tn))
@@ -292,42 +296,26 @@ function douppercase(lines::Vector{<:AbstractString})
     cnt
 end
 
-@inline function iteratechars(text::AbstractString)
-    cnt = 0
-    for ch in text
-        cnt += is_digit(ch)
-    end
-    cnt
-end
-
-@inline function iteratecps(text::AbstractString)
-    cnt = 0
-    for ch in codepoints(text)
-        cnt += is_digit(ch)
-    end
-    cnt
-end
-
-@inline function iteratecus(text::AbstractString)
-    cnt = 0
-    for ch in codeunits(text)
-        cnt += is_digit(ch)
-    end
-    cnt
-end
-
 function countchars(lines::Vector{T}) where {T<:AbstractString}
     cnt = 0
-    for text in lines
-        cnt += iteratechars(text)
+    @inbounds for text in lines, ch in text
+        cnt += 1
     end
     cnt
 end
 
 function countcps(lines::Vector{T}) where {T<:AbstractString}
     cnt = 0
-    for text in lines
-        cnt += iteratecps(text)
+    for text in lines, ch in codepoints(text)
+        cnt += 1
+    end
+    cnt
+end
+
+function countcus(lines::Vector{T}) where {T<:AbstractString}
+    cnt = 0
+    @inbounds for text in lines, cu in codeunits(text)
+        cnt += 1
     end
     cnt
 end
@@ -336,22 +324,6 @@ function countsize(lines::Vector{<:AbstractString})
     cnt = 0
     for text in lines
         cnt += sizeof(text)
-    end
-    cnt
-end
-
-@inline function countcodeunits(text::AbstractString)
-    cnt = 0
-    @inbounds for cu in codeunits(text)
-        cnt += cu
-    end
-    cnt
-end
-
-function countsize2(lines::Vector{<:AbstractString})
-    cnt = 0
-    for text in lines
-        cnt += countcodeunits(text)
     end
     cnt
 end
@@ -409,88 +381,35 @@ end
     cnt
 end
 
-@inline function iteratefunchars(fun, text)
+function checkcus(fun, lines::Vector{<:AbstractString})
     cnt = 0
-    for ch in text
-        cnt += fun(ch)
-    end
-    cnt
-end
-
-@inline function iteratefuncps(fun, text)
-    cnt = 0
-    for ch in codepoints(text)
-        cnt += fun(ch)
-    end
-    cnt
-end
-
-@inline function iteratefuncus(fun, text)
-    cnt = 0
-    for ch in codeunits(text)
-        cnt += fun(ch)
-    end
-    cnt
-end
-
-function checkchars(fun, lines::Vector{<:AbstractString})
-    cnt = 0
-    for text in lines
-        cnt += iteratefunchars(fun, text)
+    for text in lines, cu in codeunits(text)
+        cnt += fun(cu)
     end
     cnt
 end
 
 function checkcp(fun, lines::Vector{<:AbstractString})
     cnt = 0
-    for text in lines
-        cnt += iteratefuncps(fun, text)
+    for text in lines, cp in text
+        cnt += fun(cp)
     end
     cnt
 end
 
 checkjoin(lines) = sizeof(join(lines))
 
-@inline function sumchars(text)
-    t = 0
-    for ch in text
-        t += UInt32(ch)
-    end
-    t
-end
-@inline function sumcp(text)
-    t = 0
-    for ch in codepoints(text)
-        t += UInt32(ch)
-    end
-    t
-end
-@inline function sumcu(text)
-    t = 0
-    for ch in codeunits(text)
-        t += UInt32(ch)
-    end
-    t
-end
-
 function sumcharvals(lines::Vector{<:AbstractString})
     t = 0
-    for text in lines
-        t += sumchars(text)
-    end
-    t
-end
-function sumcodepnts(lines::Vector{<:AbstractString})
-    t = 0
-    for text in lines
-        t += sumcp(text)
+    for text in lines, ch in text
+        t += UInt32(ch)
     end
     t
 end
 function sumcodeunits(lines::Vector{<:AbstractString})
     t = 0
-    for text in lines
-        t += sumcu(text)
+    for text in lines, cu in codeunits(text)
+        t += UInt32(cu)
     end
     t
 end
@@ -653,15 +572,9 @@ checkrepeat80c(l) = checktext(repeat80c, l)
 checkreverse(l)   = checktext(reverse, l)
 
 checknextind(l) = checkstr(iteratenextind, l)
-countchars(l)   = checkstr(iteratechars, l)
-countcps(l)     = checkstr(iteratecps, l)
-countcus(l)     = checkstr(iteratecus, l)
 
 validstr(l)     = checkstr(is_valid, l)
 asciistr(l)     = checkstr(is_ascii, l)
-
-validchars(l)   = checkchars(is_valid, l)
-asciichars(l)   = checkchars(is_ascii, l)
 
 checkvalid(l)   = checkcp(is_valid,     l)
 checkascii(l)   = checkcp(is_ascii,     l)
@@ -754,17 +667,17 @@ const tests =
      (checksplit,   "split\nline"),
      (checkreverse, "reverse"),
      (checkrepeat1,  "repeat 1\nstring"),
-     (checkrepeat10,  "repeat 10\nstring"),
+#     (checkrepeat10,  "repeat 10\nstring"),
      (searchstr,    "search\nstring"),
      (searchchar,    "search\nchar"),
      (searchreg,     "search\nregex"),
 #     (rsearchstr,    "rsearch\nstring"),
 #     (rsearchchar,    "rsearch\nchar"),
-     (checkrepeat1c,  "repeat 1\nchar"),
-     (checkrepeat80c,  "repeat 80\nchar"),
+#     (checkrepeat1c,  "repeat 1\nchar"),
+#     (checkrepeat80c,  "repeat 80\nchar"),
 #    (countsklength,  "length\nSK"),
 #    (countoldlength, "length\nOld"),
-     (countchars,   "iteration\nChar"),
+     (countchars,   "iteration\nchar"),
      (sumcharvals,  "sum\nchar vals"),
      (asciistr,     "isascii\nstring"),
      (validstr,     "isvalid\nstring"),
