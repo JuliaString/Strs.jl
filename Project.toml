@@ -34,6 +34,7 @@ StrRegex    = "2267b70d-4c4a-5da2-8395-98751c0d506a"
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 REPL = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
+BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 
 [targets]
-test = ["Test", "REPL"]
+test = ["Test", "REPL", "BenchmarkTools"]
