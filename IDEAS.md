@@ -58,3 +58,31 @@ So: ASCIIStr would be: Valid, All ASCII, ... i.e. 0 + short/hash bits
     _LatinStr would be: Valid, maybe no ascii, Latin1, no bmp, no non-bmp
     _UCS2Str  would be: Valid, maybe no ascii, maybe Latin1, some bmp, no non-bmp
     _UTF32Str would be: Valid, maybe no ascii, maybe Latin1, maybe BMP, some non-bmp
+
+
+1) Pick up last 32 bits
+
+Top byte all zero means: ASCII, Valid
+
+7 00 Valid, 10 Invalid, 10 Not validated
+6 
+5 0 -> no Latin1, 1 -> some Latin1
+4 0 -> None > 0x7ff, 1 -> some > 0x7ff (for UTF8 conversions?)
+3 free
+2 free
+1 UCS2,  UTF32 (i.e. have at least extra 8 bits, maybe extra 24)
+0 ASCII, 1 Latin1
+-------
+7 bits 16-23 hold 8-bit count, of # char > 0xff for UCS2, or > 0xffff for UTF32
+6
+5
+4
+3
+2
+1
+0
+------
+lower 16 on UTF32 holds 16-bit count, # char > 0xff & <= 0xffff
+
+max of count means unknown (not counted)
+max-1 means that value or more

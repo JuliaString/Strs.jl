@@ -25,14 +25,6 @@ export @i_str, @I_str, intern
 macro i_str(str) ; Expr(:call, :intern, interpolated_parse(str, StrBase._str)) ; end
 macro I_str(str) ; Expr(:call, :intern, interpolated_parse(str, StrBase._str, true)) ; end
 
-#const m_eval = ModuleInterfaceTools.m_eval
-
-#=
-function __init__()
-    StrLiterals.string_type[] = String
-end
-=#
-
 const curmod = @static V6_COMPAT ? current_module() : @__MODULE__
 
 # Need to fix ModuleInterfaceTools to do this!
