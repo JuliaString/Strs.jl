@@ -4,7 +4,7 @@ authors = ["ScottPJones <scottjones@alum.mit.edu>"]
 keywords = ["Strings", "Characters", "Formatting", "Intern", "Unicode", "Regex"]
 license = "MIT"
 uuid = "7bddbee9-b4ee-5d4f-bf0b-c84b4398bbf6"
-version = "0.2.0"
+version = "0.2.1"
 
 [deps]
 ModuleInterfaceTools = "5cb8414e-7aab-5a03-a681-351269c074bf"
