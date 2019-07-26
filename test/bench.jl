@@ -22,8 +22,8 @@ dispbench(res)            # Displays the results in a pretty format
 =#
 
 isdefined(Main, :STRS_SETUP) || include("setup.jl")
-@static V6_COMPAT || (using Serialization)
 
+@static V6_COMPAT || (using Serialization)
 @static V6_COMPAT || (Base.iterate(it::Union{CodePoints,CodeUnits}) = iterate(it, 1))
 
 
@@ -230,7 +230,7 @@ function dispres(io, xres)
     end
     for i = 2:length(res)
         rn = res[i]
-        rn[1] == "UniStr" && continue
+        #rn[1] == "UniStr" && continue
         pr"\(io)\n\%-12.12s(rn[1])\%6.3f(sizes[i]/stats.len)"
         tn = rn[3]
         minres = min(length(t1), length(tn))
@@ -296,7 +296,7 @@ function douppercase(lines::Vector{<:AbstractString})
     cnt
 end
 
-function countchars(lines::Vector{T}) where {T<:AbstractString}
+function countchars(lines::Vector{<:AbstractString})
     cnt = 0
     @inbounds for text in lines, ch in text
         cnt += 1
@@ -304,7 +304,7 @@ function countchars(lines::Vector{T}) where {T<:AbstractString}
     cnt
 end
 
-function countcps(lines::Vector{T}) where {T<:AbstractString}
+function countcps(lines::Vector{<:AbstractString})
     cnt = 0
     for text in lines, ch in codepoints(text)
         cnt += 1
@@ -312,7 +312,7 @@ function countcps(lines::Vector{T}) where {T<:AbstractString}
     cnt
 end
 
-function countcus(lines::Vector{T}) where {T<:AbstractString}
+function countcus(lines::Vector{<:AbstractString})
     cnt = 0
     @inbounds for text in lines, cu in codeunits(text)
         cnt += 1
@@ -670,7 +670,7 @@ const tests =
 #     (checkrepeat10,  "repeat 10\nstring"),
      (searchstr,    "search\nstring"),
      (searchchar,    "search\nchar"),
-     (searchreg,     "search\nregex"),
+#     (searchreg,     "search\nregex"),
 #     (rsearchstr,    "rsearch\nstring"),
 #     (rsearchchar,    "rsearch\nchar"),
 #     (checkrepeat1c,  "repeat 1\nchar"),
@@ -719,7 +719,7 @@ end
 
 const mu_total = f"\<mu>s total"
 
-function testperf(lines::Vector{T}, io, cnts, docnam, basetime, fast) where {T<:AbstractString}
+function testperf(lines::Vector{<:AbstractString}, io, cnts, docnam, basetime, fast)
     # Test performance
     pr_ul(io, f"""\%-22s(docnam) \%12s("Result") \%12s(mu_total) """)
     pr_ul(io, f"""\%12s("ns/line") \%12s("ns/char") \%12s("ns/byte")\n""")
