@@ -1,13 +1,11 @@
 # Strs
 
-[pkg-url]: https://juliaci.github.io/NanosoldierReports/pkgeval_badges/report.html
-
-# change E/Example to the initial and name of your package
+[pkg-url]:  https://juliaci.github.io/NanosoldierReports/pkgeval_badges/report.html
 [strs-pkg]: https://juliaci.github.io/NanosoldierReports/pkgeval_badges/S/Strs.svg
 
 [![][gitter-img]][gitter-url]
 [![contributions welcome][contrib]](https://github.com/JuliaString/Strs.jl/issues)
-[![PkgEval][strs-pkg]][pkg-url]
+[![][strs-pkg]][pkg-url]
 [![][release]][strs-url]
 [![][release-date]][strs-url]
 [![][license-img]][license-url]
@@ -75,7 +73,7 @@ It brings together the following:
    Default formatting based on the type of the argument: i.e. `f"\(1.23)"` returns `"1.23"`, but `f"\%(1.23)"` returns `"1.230000"` based on the default format set up for AbstractFloat types.
    See [Format](https://github.com/JuliaString/Format.jl) for more information on how to set up defaults for your own types, or to change the defaults for floats, strings, etc.
 
-  It also supports C-style formatting, but without having to count the position of the argument: i.e. instead of `@sprintf("$name has \$%10.8f", 1.23)"`, `f"\(name) has $\%10.8f(1.23)"`
+   It also supports C-style formatting, but without having to count the position of the argument: i.e. instead of `@sprintf("$name has \$%10.8f", 1.23)"`, `f"\(name) has $\%10.8f(1.23)"`
 
 2) Faster and more flexible set of string and character types,
    such as `ASCIIStr`, `Latin1Str`, `UCS2Str`, `UTF32Str`, that are indexed by character,
@@ -93,6 +91,10 @@ It brings together the following:
 
 5) Highly optimized string functions, operating on 2, 4, or 8 characters at a time
    (I do intend to optimize these further, by using vector instructions on Intel, ARM, and POWER architectures, to process up to 64 characters at a time).
+
+6) Thread-safe Regex support (it was not thread-safe in the LTS (long term support) version of Julia, currently v1.05, but that has been fixed as of the v1.3 release)
+
+7) Regex support that doesn't assume that `String` values are valid UTF-8, so that it can't be used as a way of attacking programs written in Julia by passing certain unvalidated strings to the PCRE2 library. For speed, one can use the `UTF8Str` type instead of `String` using `R"..."` instead of the `r"..."`.
 
 I would very much appreciate any constructive criticism, help implementing some of the ideas, ideas on how to make it perform better, bikeshedding on names and API, etc.
 Also, I'd love contributions of benchmark code and/or samples for different use cases of strings,
