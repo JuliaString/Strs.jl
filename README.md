@@ -1,10 +1,11 @@
 # Strs
 
-[pkg-url]: https://juliaci.github.io/NanosoldierReports/pkgeval_badges/report.html
+[pkg-url]:  https://juliaci.github.io/NanosoldierReports/pkgeval_badges/report.html
+[strs-pkg]: https://juliaci.github.io/NanosoldierReports/pkgeval_badges/S/Strs.svg
 
 [![][gitter-img]][gitter-url]
 [![contributions welcome][contrib]](https://github.com/JuliaString/Strs.jl/issues)
-[![PkgEval][https://juliaci.github.io/NanosoldierReports/pkgeval_badges/S/Strs.svg]][pkg-url]
+[![][strs-pkg]][pkg-url]
 [![][release]][strs-url]
 [![][release-date]][strs-url]
 [![][license-img]][license-url]
