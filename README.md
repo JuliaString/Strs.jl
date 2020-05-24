@@ -1,7 +1,13 @@
 # Strs
 
+[pkg-url]: https://juliaci.github.io/NanosoldierReports/pkgeval_badges/report.html
+
+# change E/Example to the initial and name of your package
+[strs-pkg]: https://juliaci.github.io/NanosoldierReports/pkgeval_badges/S/Strs.svg
+
 [![][gitter-img]][gitter-url]
 [![contributions welcome][contrib]](https://github.com/JuliaString/Strs.jl/issues)
+[![PkgEval][strs-pkg]][pkg-url]
 [![][release]][strs-url]
 [![][release-date]][strs-url]
 [![][license-img]][license-url]
@@ -9,10 +15,10 @@
 
 [contrib]:    https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat
 
-| **Julia** | **Windows** | **Linux & MacOS** | **Package Evaluator** | **CodeCov** | **Coveralls** |
-|:------------------:|:------------------:|:------------------:|:---------------------:|:-----------------:|:---------------------:|
-| [![][julia-release]][julia-url] | [![][app-s-img]][app-s-url] | [![][travis-s-img]][travis-url] | [![][pkg-s-img]][pkg-s-url] | [![][codecov-img]][codecov-url] | [![][coverall-s-img]][coverall-s-url]
-| [Latest][julia-url] | [![][app-m-img]][app-m-url] | [![][travis-m-img]][travis-url] | [![][pkg-m-img]][pkg-m-url] | [![][codecov-img]][codecov-url] | [![][coverall-m-img]][coverall-m-url]
+| **Julia** | **Windows** | **Linux & MacOS** | **CodeCov** | **Coveralls** |
+|:------------------:|:------------------:|:------------------:|:-----------------:|:---------------------:|
+| [![][julia-release]][julia-url] | [![][app-s-img]][app-s-url] | [![][travis-s-img]][travis-url] | [![][codecov-img]][codecov-url] | [![][coverall-s-img]][coverall-s-url]
+| [Latest][julia-url] | [![][app-m-img]][app-m-url] | [![][travis-m-img]][travis-url] | [![][codecov-img]][codecov-url] | [![][coverall-m-img]][coverall-m-url]
 
 [license-img]:  http://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat
 [license-url]:  LICENSE.md
@@ -36,12 +42,6 @@
 [app-s-img]:    https://ci.appveyor.com/api/projects/status/evgf40ra7bcpm6i2?svg=true
 [app-m-img]:    https://ci.appveyor.com/api/projects/status/evgf40ra7bcpm6i2/branch/master?svg=true
 
-[pkg-s-url]:    http://pkg.julialang.org/detail/Strs
-[pkg-m-url]:    http://pkg.julialang.org/detail/Strs
-[pkg-s-img]:    http://pkg.julialang.org/badges/Strs_0.6.svg
-[pkg-m-img]:    http://pkg.julialang.org/badges/Strs_0.7.svg
-[pkg-r-img]:    http://pkg.julialang.org/badges/Strs_1.0.svg
-
 [codecov-url]:  https://codecov.io/gh/JuliaString/Strs.jl
 [codecov-img]:  https://codecov.io/gh/JuliaString/Strs.jl/branch/master/graph/badge.svg
 
@@ -50,36 +50,79 @@
 [coverall-s-img]: https://coveralls.io/repos/github/JuliaString/Strs.jl/badge.svg
 [coverall-m-img]: https://coveralls.io/repos/github/JuliaString/Strs.jl/badge.svg?branch=master
 
-It represents an attempt to give Julia better string handling than possible with Base `String` and `Char`.
+Strs.jl is container for a number of different packages from [JuliaString.org](https://juliastring.org)
 
-I am now trying to make sure that all of the functionality in String and Char is implemented for
-Str and Chr, and to start optimizing the functions (although they are already substantially faster)
+It brings together the following:
 
-Strs.jl is now a container for a number of different packages from [JuliaString.org](http://juliastring.org)
+1) A better type of string literal, using [StrLiterals](https://github.com/JuliaString/StrLiterals.jls), [StrFormat](https://github.com/JuliaString/StrFormat.jl), and [StrEntities](https:://github.com/JUliaString/StrEntities.jl)
 
-| **Package** | **Release** | **Release Date** | **Linux & MacOS** | **Windows** | **Description** |
-|:-------------:|:-------------:|:-------------:|:-----------:|:-----------:|:-------------------|
-| [ModuleInterfaceTools][mit-loc] | [![][mit-rel]][mit-loc] | [![][mit-dat]][mit-loc] | [![][mit-tvs-img]][mit-tvs-url] | [![][mit-app-img]][mit-app-url] | Tools to create a common API for all of these packages
-| [StrAPI][strapi-loc] | [![][strapi-rel]][strapi-loc] | [![][strapi-dat]][strapi-loc]  | [![][strapi-tvs-img]][strapi-tvs-url] | [![][strapi-app-img]][strapi-app-url] | Common API for string/character functionality
-| [CharSetEncodings][cse-loc] | [![][cse-rel]][cse-loc] | [![][cse-dat]][cse-loc]  | [![][cse-tvs-img]][cse-tvs-url] | [![][cse-app-img]][cse-app-url] | Basic types/support for Character Sets, Encodings, and Character Set Encodings
-| [ChrBase][chrbase-loc] | [![][chrbase-rel]][chrbase-loc] | [![][chrbase-dat]][chrbase-loc]  | [![][chrbase-tvs-img]][chrbase-tvs-url] | [![][chrbase-app-img]][chrbase-app-url] | `Chr{CharSet,CodeUnitType}` type and support
-| [MurmurHash3][mh3-loc] | [![][mh3-rel]][mh3-loc] | [![][mh3-dat]][mh3-loc]  | [![][mh3-tvs-img]][mh3-tvs-url] | [![][mh3-app-img]][mh3-app-url] | Pure Julia implementation of MurmurHash3
-| [PCRE2][pcre2-loc] | [![][pcre2-rel]][pcre2-loc] | [![][pcre2-dat]][pcre2-loc]  | [![][pcre2-tvs-img]][pcre2-tvs-url] | [![][pcre2-app-img]][pcre2-app-url] | `PCRE2` library support
-| [Format][format-loc] | [![][format-rel]][format-loc] | [![][format-dat]][format-loc]  | [![][format-tvs-img]][format-tvs-url] | [![][format-app-img]][format-app-url] | Python/C style formatting (based on [Formatting](https://github.com/JuliaIO/Formatting.jl))
-| [StrBase][strbase-loc] | [![][strbase-rel]][strbase-loc] | [![][strbase-dat]][strbase-loc]  | [![][strbase-tvs-img]][strbase-tvs-url] | [![][strbase-app-img]][strbase-app-url] | `Str{CSE, Hash, SubSet, Cache}` type
-| [StrRegex][strregex-loc] | [![][strregex-rel]][strregex-loc] | [![][strregex-dat]][strregex-loc]  | [![][strregex-tvs-img]][strregex-tvs-url] | [![][strregex-app-img]][strregex-app-url] | `Regex` support for all string types
-| [StrLiterals][strliterals-loc] | [![][strliterals-rel]][strliterals-loc] | [![][strliterals-dat]][strliterals-loc]  | [![][strliterals-tvs-img]][strliterals-tvs-url] | [![][strliterals-app-img]][strliterals-app-url] | Extensible string literal support
-| [StrFormat][strformat-loc] | [![][strformat-rel]][strformat-loc] | [![][strformat-dat]][strformat-loc]  | [![][strformat-tvs-img]][strformat-tvs-url] | [![][strformat-app-img]][strformat-app-url] | Formatting extensions for literals
-| [StrTables][strtables-loc] | [![][strtables-rel]][strtables-loc] | [![][strtables-dat]][strtables-loc]  | [![][strtables-tvs-img]][strtables-tvs-url] | [![][strtables-app-img]][strtables-app-url] | Low-level support for entity tables
-| [HTML_Entities][html-loc] | [![][html-rel]][html-loc] | [![][html-dat]][html-loc]  | [![][html-tvs-img]][html-tvs-url] | [![][html-app-img]][html-app-url] | HTML character sequences
-| [Emoji_Entities][emoji-loc] | [![][emoji-rel]][emoji-loc] | [![][emoji-dat]][emoji-loc]  | [![][emoji-tvs-img]][emoji-tvs-url] | [![][emoji-app-img]][emoji-app-url] | Emoji names (including composite ones)
-| [LaTeX_Entities][latex-loc] | [![][latex-rel]][latex-loc] | [![][latex-dat]][latex-loc]  | [![][latex-tvs-img]][latex-tvs-url] | [![][latex-app-img]][latex-app-url] | Julia LaTeX character names
-| [Unicode_Entities][unicode-loc] | [![][unicode-rel]][unicode-loc] | [![][unicode-dat]][unicode-loc]  | [![][unicode-tvs-img]][unicode-tvs-url] | [![][unicode-app-img]][unicode-app-url] | Unicode standard character names
-| [StrEntities][strentities-loc] | [![][strentities-rel]][strentities-loc] | [![][strentities-dat]][strentities-loc]  | [![][strentities-tvs-img]][strentities-tvs-url] | [![][strentities-app-img]][strentities-app-url] | Entity extensions for literals
-| [InternedStrings][int-loc] | [![][int-rel]][int-loc] | [![][int-dat]][int-loc]  | [![][int-tvs-img]][int-tvs-url] | [![][int-app-img]][int-app-url] | Save space by interning strings (by @oxinabox!)
+   This is of the form `f"..."` or `F"..."`.
+
+   This uses Swift-style `\` escape sequences, such as `\u{xxxx}` for Unicode constants, instead of `\uXXXX` and `\UXXXXXXXX`, which have the advantage of not having to worry about some digit or letter A-F or a-f occurring after the last hex digit of the Unicode constant.
+
+   It also means that `$`, a very common character for LaTeX strings or output of currencies, does not need to be in a string quoted as '\$'
+
+   It uses `\(expr)` for interpolation like Swift, instead of `$name` or `$(expr)`, which also has the advantage of not having to worry about the next character in the string someday being allowed in a name.
+
+   It allows for embedding Unicode characters using a variety of easy to remember names, instead of hex codes:
+   `\:emojiname:`
+   `\<latexname>`
+   `\N{unicodename}`
+   `\&htmlname;`
+   Examples of this are:
+   `f"\<dagger> \&yen; \N{ACCOUNT OF} \:snake:"`, which returns the string: `"† ¥ ℀ 🐍   "`
+
+   Default formatting based on the type of the argument: i.e. `f"\(1.23)"` returns `"1.23"`, but `f"\%(1.23)"` returns `"1.230000"` based on the default format set up for AbstractFloat types.
+   See [Format](https://github.com/JuliaString/Format.jl) for more information on how to set up defaults for your own types, or to change the defaults for floats, strings, etc.
+
+  It also supports C-style formatting, but without having to count the position of the argument: i.e. instead of `@sprintf("$name has \$%10.8f", 1.23)"`, `f"\(name) has $\%10.8f(1.23)"`
+
+2) Faster and more flexible set of string and character types,
+   such as `ASCIIStr`, `Latin1Str`, `UCS2Str`, `UTF32Str`, that are indexed by character,
+   which can be much easier to use than to have deal with `nextind` and `prevind`, etc.
+   This alleviates a common source of bugs in Julia, where people are unfamiliar with the difference between indexing by the byte or codeunit offset, instead of by the codepoints (characters).
+   Using these types in your code can help speed things up.
+
+3) Faster and VALIDATED `UTF8Str` type.
+   Julia's built-in `String` type allows storing invalid sequences.
+   (Strs provides a `Text1Str` type for holding strings that might be invalid UTF-8, or might be
+   some other encoding, such as Microsoft's CP1252)
+   This is especially a problem because the built-in Regex support in Julia incorrectly passes a flag saying that the argument has already been checked and is a valid UTF-8 sequence.  Skipping that check in PCRE2 does make regex matching much faster, however it leaves you open to attacks if your are using regex on unchecked string input.
+
+4) Types for Binary strings, as well as strings that are known to be text strings, but whose encoding is not known (might be UTF-8 with certain commonly accepted but invalid sequence, such as representing characters > uFFFF in 6 bytes, as two 16 bit surrogate characters, or encoding a null byte as `\0xc0\0x80` instead of `\0`, or S-JIS, CP1252, etc.)
+
+5) Highly optimized string functions, operating on 2, 4, or 8 characters at a time
+   (I do intend to optimize these further, by using vector instructions on Intel, ARM, and POWER architectures, to process up to 64 characters at a time).
+
+I would very much appreciate any constructive criticism, help implementing some of the ideas, ideas on how to make it perform better, bikeshedding on names and API, etc.
+Also, I'd love contributions of benchmark code and/or samples for different use cases of strings,
+or pointers to such (such as a way to get lots of tweets, to test mixed text and emojis, for example).
+
+
+| **Package** | **Release** | **Release Date** | **Package Evaluator** | **Linux & MacOS** | **Windows** | **Description** |
+|:-------------:|:-------------:|:-------------:|:-------------:|:-----------:|:-----------:|:-------------------|
+| [ModuleInterfaceTools][mit-loc] | [![][mit-rel]][mit-loc] | [![][mit-dat]][mit-loc] | [![][mit-pkg]][pkg-url] | [![][mit-tvs-img]][mit-tvs-url] | [![][mit-app-img]][mit-app-url] | Tools to create a common API for all of these packages
+| [StrAPI][strapi-loc] | [![][strapi-rel]][strapi-loc] | [![][strapi-dat]][strapi-loc] | [![][strapi-pkg]][pkg-url] | [![][strapi-tvs-img]][strapi-tvs-url] | [![][strapi-app-img]][strapi-app-url] | Common API for string/character functionality
+| [CharSetEncodings][cse-loc] | [![][cse-rel]][cse-loc] | [![][cse-dat]][cse-loc] | [![][cse-pkg]][pkg-url] | [![][cse-tvs-img]][cse-tvs-url] | [![][cse-app-img]][cse-app-url] | Basic types/support for Character Sets, Encodings, and Character Set Encodings
+| [ChrBase][chrbase-loc] | [![][chrbase-rel]][chrbase-loc] | [![][chrbase-dat]][chrbase-loc] | [![][chrbase-pkg]][pkg-url] | [![][chrbase-tvs-img]][chrbase-tvs-url] | [![][chrbase-app-img]][chrbase-app-url] | `Chr{CharSet,CodeUnitType}` type and support
+| [MurmurHash3][mh3-loc] | [![][mh3-rel]][mh3-loc] | [![][mh3-dat]][mh3-loc] | [![][mh3-pkg]][pkg-url] | [![][mh3-tvs-img]][mh3-tvs-url] | [![][mh3-app-img]][mh3-app-url] | Pure Julia implementation of MurmurHash3
+| [PCRE2][pcre2-loc] | [![][pcre2-rel]][pcre2-loc] | [![][pcre2-dat]][pcre2-loc] | [![][pcre2-pkg]][pkg-url] | [![][pcre2-tvs-img]][pcre2-tvs-url] | [![][pcre2-app-img]][pcre2-app-url] | `PCRE2` library support
+| [Format][format-loc] | [![][format-rel]][format-loc] | [![][format-dat]][format-loc] | [![][format-pkg]][pkg-url] | [![][format-tvs-img]][format-tvs-url] | [![][format-app-img]][format-app-url] | Python/C style formatting (based on [Formatting](https://github.com/JuliaIO/Formatting.jl))
+| [StrBase][strbase-loc] | [![][strbase-rel]][strbase-loc] | [![][strbase-dat]][strbase-loc] | [![][strbase-pkg]][pkg-url] | [![][strbase-tvs-img]][strbase-tvs-url] | [![][strbase-app-img]][strbase-app-url] | `Str{CSE, Hash, SubSet, Cache}` type
+| [StrRegex][strregex-loc] | [![][strregex-rel]][strregex-loc] | [![][strregex-dat]][strregex-loc] | [![][strregex-pkg]][pkg-url] | [![][strregex-tvs-img]][strregex-tvs-url] | [![][strregex-app-img]][strregex-app-url] | `Regex` support for all string types
+| [StrLiterals][strliterals-loc] | [![][strliterals-rel]][strliterals-loc] | [![][strliterals-dat]][strliterals-loc] | [![][strliterals-pkg]][pkg-url] | [![][strliterals-tvs-img]][strliterals-tvs-url] | [![][strliterals-app-img]][strliterals-app-url] | Extensible string literal support
+| [StrFormat][strformat-loc] | [![][strformat-rel]][strformat-loc] | [![][strformat-dat]][strformat-loc] | [![][strformat-pkg]][pkg-url] | [![][strformat-tvs-img]][strformat-tvs-url] | [![][strformat-app-img]][strformat-app-url] | Formatting extensions for literals
+| [StrTables][strtables-loc] | [![][strtables-rel]][strtables-loc] | [![][strtables-dat]][strtables-loc] | [![][strtables-pkg]][pkg-url] | [![][strtables-tvs-img]][strtables-tvs-url] | [![][strtables-app-img]][strtables-app-url] | Low-level support for entity tables
+| [HTML_Entities][html-loc] | [![][html-rel]][html-loc] | [![][html-dat]][html-loc] | [![][html-pkg]][pkg-url] | [![][html-tvs-img]][html-tvs-url] | [![][html-app-img]][html-app-url] | HTML character sequences
+| [Emoji_Entities][emoji-loc] | [![][emoji-rel]][emoji-loc] | [![][emoji-dat]][emoji-loc] | [![][emoji-pkg]][pkg-url] | [![][emoji-tvs-img]][emoji-tvs-url] | [![][emoji-app-img]][emoji-app-url] | Emoji names (including composite ones)
+| [LaTeX_Entities][latex-loc] | [![][latex-rel]][latex-loc] | [![][latex-dat]][latex-loc] | [![][latex-pkg]][pkg-url] | [![][latex-tvs-img]][latex-tvs-url] | [![][latex-app-img]][latex-app-url] | Julia LaTeX character names
+| [Unicode_Entities][unicode-loc] | [![][unicode-rel]][unicode-loc] | [![][unicode-dat]][unicode-loc] | [![][unicode-pkg]][pkg-url] | [![][unicode-tvs-img]][unicode-tvs-url] | [![][unicode-app-img]][unicode-app-url] | Unicode standard character names
+| [StrEntities][strentities-loc] | [![][strentities-rel]][strentities-loc] | [![][strentities-dat]][strentities-loc] | [![][strentities-pkg]][pkg-url] | [![][strentities-tvs-img]][strentities-tvs-url] | [![][strentities-app-img]][strentities-app-url] | Entity extensions for literals
+| [InternedStrings][int-loc] | [![][int-rel]][int-loc] | [![][int-dat]][int-loc] | [![][int-pkg]][pkg-url] | [![][int-tvs-img]][int-tvs-url] | [![][int-app-img]][int-app-url] | Save space by interning strings (by @oxinabox!)
 
 
 [mit-loc]:     https://github.com/JuliaString/ModuleInterfaceTools.jl
+[mit-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/M/ModuleInterfaceTools.svg
 [mit-tvs-img]: https://travis-ci.org/JuliaString/ModuleInterfaceTools.jl.svg?branch=master
 [mit-tvs-url]: https://travis-ci.org/JuliaString/ModuleInterfaceTools.jl
 [mit-app-img]: https://ci.appveyor.com/api/projects/status/x13gh7y6id3fbmke/branch/master?svg=true
@@ -88,6 +131,7 @@ Strs.jl is now a container for a number of different packages from [JuliaString.
 [mit-dat]:     https://img.shields.io/github/release-date/JuliaString/ModuleInterfaceTools.jl.svg?label="."
 
 [mh3-loc]:     https://github.com/JuliaString/MurmurHash3.jl
+[mh3-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/M/MurmurHash3.svg
 [mh3-tvs-img]: https://travis-ci.org/JuliaString/MurmurHash3.jl.svg?branch=master
 [mh3-tvs-url]: https://travis-ci.org/JuliaString/MurmurHash3.jl
 [mh3-app-img]: https://ci.appveyor.com/api/projects/status/q55ln7mp20ph5cko/branch/master?svg=true
@@ -96,6 +140,7 @@ Strs.jl is now a container for a number of different packages from [JuliaString.
 [mh3-dat]:     https://img.shields.io/github/release-date/JuliaString/MurmurHash3.jl.svg?label="."
 
 [pcre2-loc]:     https://github.com/JuliaString/PCRE2.jl
+[pcre2-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/P/PCRE2.svg
 [pcre2-tvs-img]: https://travis-ci.org/JuliaString/PCRE2.jl.svg?branch=master
 [pcre2-tvs-url]: https://travis-ci.org/JuliaString/PCRE2.jl
 [pcre2-app-img]: https://ci.appveyor.com/api/projects/status/d62uhoik906m7n8r/branch/master?svg=true
@@ -104,6 +149,7 @@ Strs.jl is now a container for a number of different packages from [JuliaString.
 [pcre2-dat]:     https://img.shields.io/github/release-date/JuliaString/PCRE2.jl.svg?label="."
 
 [format-loc]:     https://github.com/JuliaString/Format.jl
+[format-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/F/Format.svg
 [format-tvs-img]: https://travis-ci.org/JuliaString/Format.jl.svg?branch=master
 [format-tvs-url]: https://travis-ci.org/JuliaString/Format.jl
 [format-app-img]: https://ci.appveyor.com/api/projects/status/9wb580eyjv4k3iej/branch/master?svg=true
@@ -112,6 +158,7 @@ Strs.jl is now a container for a number of different packages from [JuliaString.
 [format-dat]:     https://img.shields.io/github/release-date/JuliaString/Format.jl.svg?label="."
 
 [strapi-loc]:     https://github.com/JuliaString/StrAPI.jl
+[strapi-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/S/StrAPI.svg
 [strapi-tvs-img]: https://travis-ci.org/JuliaString/StrAPI.jl.svg?branch=master
 [strapi-tvs-url]: https://travis-ci.org/JuliaString/StrAPI.jl
 [strapi-app-img]: https://ci.appveyor.com/api/projects/status/pyw9o1y3wywo95tt/branch/master?svg=true
@@ -120,6 +167,7 @@ Strs.jl is now a container for a number of different packages from [JuliaString.
 [strapi-dat]:     https://img.shields.io/github/release-date/JuliaString/StrAPI.jl.svg?label="."
 
 [cse-loc]:     https://github.com/JuliaString/CharSetEncodings.jl
+[cse-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/C/CharSetEncodings.svg
 [cse-tvs-img]: https://travis-ci.org/JuliaString/CharSetEncodings.jl.svg?branch=master
 [cse-tvs-url]: https://travis-ci.org/JuliaString/CharSetEncodings.jl
 [cse-app-img]: https://ci.appveyor.com/api/projects/status/08ylxl46exltiemd/branch/master?svg=true
@@ -128,6 +176,7 @@ Strs.jl is now a container for a number of different packages from [JuliaString.
 [cse-dat]:     https://img.shields.io/github/release-date/JuliaString/CharSetEncodings.jl.svg?label="."
 
 [chrbase-loc]:     https://github.com/JuliaString/ChrBase.jl
+[chrbase-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/C/ChrBase.svg
 [chrbase-tvs-img]: https://travis-ci.org/JuliaString/ChrBase.jl.svg?branch=master
 [chrbase-tvs-url]: https://travis-ci.org/JuliaString/ChrBase.jl
 [chrbase-app-img]: https://ci.appveyor.com/api/projects/status/lrdfni7si4o797fr/branch/master?svg=true
@@ -136,6 +185,7 @@ Strs.jl is now a container for a number of different packages from [JuliaString.
 [chrbase-dat]:     https://img.shields.io/github/release-date/JuliaString/ChrBase.jl.svg?label="."
 
 [strbase-loc]:     https://github.com/JuliaString/StrBase.jl
+[strbase-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/S/StrBase.svg
 [strbase-tvs-img]: https://travis-ci.org/JuliaString/StrBase.jl.svg?branch=master
 [strbase-tvs-url]: https://travis-ci.org/JuliaString/StrBase.jl
 [strbase-app-img]: https://ci.appveyor.com/api/projects/status/2v12uwlr0ueale6n/branch/master?svg=true
@@ -144,6 +194,7 @@ Strs.jl is now a container for a number of different packages from [JuliaString.
 [strbase-dat]:     https://img.shields.io/github/release-date/JuliaString/StrBase.jl.svg?label="."
 
 [strregex-loc]:     https://github.com/JuliaString/StrRegex.jl
+[strregex-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/S/StrRegex.svg
 [strregex-tvs-img]: https://travis-ci.org/JuliaString/StrRegex.jl.svg?branch=master
 [strregex-tvs-url]: https://travis-ci.org/JuliaString/StrRegex.jl
 [strregex-app-img]: https://ci.appveyor.com/api/projects/status/iyhlb4unq5ml4g0w/branch/master?svg=true
@@ -152,6 +203,7 @@ Strs.jl is now a container for a number of different packages from [JuliaString.
 [strregex-dat]:     https://img.shields.io/github/release-date/JuliaString/StrRegex.jl.svg?label="."
 
 [strliterals-loc]:     https://github.com/JuliaString/StrLiterals.jl
+[strliterals-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/S/StrLiterals.svg
 [strliterals-tvs-img]: https://travis-ci.org/JuliaString/StrLiterals.jl.svg?branch=master
 [strliterals-tvs-url]: https://travis-ci.org/JuliaString/StrLiterals.jl
 [strliterals-app-img]: https://ci.appveyor.com/api/projects/status/8462oq09ek07knos/branch/master?svg=true
@@ -160,6 +212,7 @@ Strs.jl is now a container for a number of different packages from [JuliaString.
 [strliterals-dat]:     https://img.shields.io/github/release-date/JuliaString/StrLiterals.jl.svg?label="."
 
 [strformat-loc]:     https://github.com/JuliaString/StrFormat.jl
+[strformat-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/S/StrFormat.svg
 [strformat-tvs-img]: https://travis-ci.org/JuliaString/StrFormat.jl.svg?branch=master
 [strformat-tvs-url]: https://travis-ci.org/JuliaString/StrFormat.jl
 [strformat-app-img]: https://ci.appveyor.com/api/projects/status/r3c2alh3jfcmu2gc/branch/master?svg=true
@@ -168,6 +221,7 @@ Strs.jl is now a container for a number of different packages from [JuliaString.
 [strformat-dat]:     https://img.shields.io/github/release-date/JuliaString/StrFormat.jl.svg?label="."
 
 [strtables-loc]:     https://github.com/JuliaString/StrTables.jl
+[strtables-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/S/StrTables.svg
 [strtables-tvs-img]: https://travis-ci.org/JuliaString/StrTables.jl.svg?branch=master
 [strtables-tvs-url]: https://travis-ci.org/JuliaString/StrTables.jl
 [strtables-app-img]: https://ci.appveyor.com/api/projects/status/ekt5t6nt8g0cqhjb/branch/master?svg=true
@@ -176,6 +230,7 @@ Strs.jl is now a container for a number of different packages from [JuliaString.
 [strtables-dat]:     https://img.shields.io/github/release-date/JuliaString/StrTables.jl.svg?label="."
 
 [html-loc]:     https://github.com/JuliaString/HTML_Entities.jl
+[html-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/H/HTML_Entities.svg
 [html-tvs-img]: https://travis-ci.org/JuliaString/HTML_Entities.jl.svg?branch=master
 [html-tvs-url]: https://travis-ci.org/JuliaString/HTML_Entities.jl
 [html-app-img]: https://ci.appveyor.com/api/projects/status/xp05kd5mamt92yhj/branch/master?svg=true
@@ -184,15 +239,16 @@ Strs.jl is now a container for a number of different packages from [JuliaString.
 [html-dat]:     https://img.shields.io/github/release-date/JuliaString/HTML_Entities.jl.svg?label="."
 
 [emoji-loc]:     https://github.com/JuliaString/Emoji_Entities.jl
+[emoji-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/E/Emoji_Entities.svg
 [emoji-tvs-img]: https://travis-ci.org/JuliaString/Emoji_Entities.jl.svg?branch=master
 [emoji-tvs-url]: https://travis-ci.org/JuliaString/Emoji_Entities.jl
 [emoji-app-img]: https://ci.appveyor.com/api/projects/status/4p6o3reehca95put/branch/master?svg=true
-
 [emoji-app-url]: https://ci.appveyor.com/project/ScottPJones/emoji-entities-jl/branch/master
 [emoji-rel]:     https://img.shields.io/github/release/JuliaString/Emoji_Entities.jl.svg?label="."
 [emoji-dat]:     https://img.shields.io/github/release-date/JuliaString/Emoji_Entities.jl.svg?label="."
 
 [latex-loc]:     https://github.com/JuliaString/LaTeX_Entities.jl
+[latex-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/L/LaTeX_Entities.svg
 [latex-tvs-img]: https://travis-ci.org/JuliaString/LaTeX_Entities.jl.svg?branch=master
 [latex-tvs-url]: https://travis-ci.org/JuliaString/LaTeX_Entities.jl
 [latex-app-img]: https://ci.appveyor.com/api/projects/status/ok2sdq4u5xwlc6b0/branch/master?svg=true
@@ -201,6 +257,7 @@ Strs.jl is now a container for a number of different packages from [JuliaString.
 [latex-dat]:     https://img.shields.io/github/release-date/JuliaString/LaTeX_Entities.jl.svg?label="."
 
 [unicode-loc]:     https://github.com/JuliaString/Unicode_Entities.jl
+[unicode-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/U/Unicode_Entitites.svg
 [unicode-tvs-img]: https://travis-ci.org/JuliaString/Unicode_Entities.jl.svg?branch=master
 [unicode-tvs-url]: https://travis-ci.org/JuliaString/Unicode_Entities.jl
 [unicode-app-img]: https://ci.appveyor.com/api/projects/status/c1luci97ry8fxdt7/branch/master?svg=true
@@ -209,6 +266,7 @@ Strs.jl is now a container for a number of different packages from [JuliaString.
 [unicode-dat]:     https://img.shields.io/github/release-date/JuliaString/Unicode_Entities.jl.svg?label="."
 
 [strentities-loc]:     https://github.com/JuliaString/StrEntities.jl
+[strentities-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/S/StrEntities.svg
 [strentities-tvs-img]: https://travis-ci.org/JuliaString/StrEntities.jl.svg?branch=master
 [strentities-tvs-url]: https://travis-ci.org/JuliaString/StrEntities.jl
 [strentities-app-img]: https://ci.appveyor.com/api/projects/status/5pj0ubfrai4dsp0r/branch/master?svg=true
@@ -217,20 +275,16 @@ Strs.jl is now a container for a number of different packages from [JuliaString.
 [strentities-dat]:     https://img.shields.io/github/release-date/JuliaString/StrEntities.jl.svg?label="."
 
 [int-loc]:     https://github.com/JuliaString/InternedStrings.jl
+[int-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/I/InternedStrings.svg
 [int-tvs-img]: https://travis-ci.org/JuliaString/InternedStrings.jl.svg?branch=master
 [int-tvs-url]: https://travis-ci.org/JuliaString/InternedStrings.jl
 [int-app-img]: https://ci.appveyor.com/api/projects/status/8dlhr5sprhokwyqb/branch/master?svg=true
-
 [int-app-url]: https://ci.appveyor.com/project/ScottPJones/internedstrings-jl/branch/master
 [int-rel]:     https://img.shields.io/github/release/JuliaString/InternedStrings.jl.svg?label="."
 [int-dat]:     https://img.shields.io/github/release-date/JuliaString/InternedStrings.jl.svg?label="."
 
 
 The new package [ModuleInterfaceTools](https://github.com/JuliaString/ModuleInterfaceTools.jl) is used to set up a consistent and easy to use API for most of the cooperating packages, without having to worry too much about imports, exports, using, and what functions are part of a public API, and which ones are part of the internal development API for other packages to extend.
-
-I would very much appreciate any constructive criticism, help implementing some of the ideas, ideas on how to make it perform better, bikeshedding on names and API, etc.
-Also, I'd love contributions of benchmark code and/or samples for different use cases of strings,
-or pointers to such (such as a way to get lots of tweets, to test mixed text and emojis, for example).
 
 ## Architecture and Operations
 
