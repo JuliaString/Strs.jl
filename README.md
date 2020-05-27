@@ -52,7 +52,7 @@ Strs.jl is container for a number of different packages from [JuliaString.org](h
 
 It brings together the following:
 
-1) A better type of string literal, using [StrLiterals](https://github.com/JuliaString/StrLiterals.jls), [StrFormat](https://github.com/JuliaString/StrFormat.jl), and [StrEntities](https:://github.com/JUliaString/StrEntities.jl)
+1) A better type of string literal, using [StrLiterals](https://github.com/JuliaString/StrLiterals.jl), [StrFormat](https://github.com/JuliaString/StrFormat.jl), and [StrEntities](https:://github.com/JUliaString/StrEntities.jl)
 
    This is of the form `f"..."` or `F"..."`.
 
