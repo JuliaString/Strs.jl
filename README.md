@@ -13,10 +13,10 @@
 
 [contrib]:    https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat
 
-| **Julia** | **Windows** | **Linux & MacOS** | **CodeCov** | **Coveralls** |
-|:------------------:|:------------------:|:------------------:|:-----------------:|:---------------------:|
-| [![][julia-release]][julia-url] | [![][app-s-img]][app-s-url] | [![][travis-s-img]][travis-url] | [![][codecov-img]][codecov-url] | [![][coverall-s-img]][coverall-s-url]
-| [Latest][julia-url] | [![][app-m-img]][app-m-url] | [![][travis-m-img]][travis-url] | [![][codecov-img]][codecov-url] | [![][coverall-m-img]][coverall-m-url]
+| **Julia Version** | **Unit Tests** | **Coverage** |
+|:------------------:|:------------------:|:------------------:|
+| [![][julia-release]][julia-url] | [![][travis-s-img]][travis-url] | [![][codecov-img]][codecov-url]
+| [Latest][julia-url] | [![][travis-m-img]][travis-url] | [![][codecov-img]][codecov-url]
 
 [license-img]:  http://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat
 [license-url]:  LICENSE.md
@@ -35,20 +35,14 @@
 [travis-s-img]: https://travis-ci.org/JuliaString/Strs.jl.svg
 [travis-m-img]: https://travis-ci.org/JuliaString/Strs.jl.svg?branch=master
 
-[app-s-url]:    https://ci.appveyor.com/project/ScottPJones/strs-jl
-[app-m-url]:    https://ci.appveyor.com/project/ScottPJones/strs-jl/branch/master
-[app-s-img]:    https://ci.appveyor.com/api/projects/status/evgf40ra7bcpm6i2?svg=true
-[app-m-img]:    https://ci.appveyor.com/api/projects/status/evgf40ra7bcpm6i2/branch/master?svg=true
-
 [codecov-url]:  https://codecov.io/gh/JuliaString/Strs.jl
 [codecov-img]:  https://codecov.io/gh/JuliaString/Strs.jl/branch/master/graph/badge.svg
 
-[coverall-s-url]: https://coveralls.io/github/JuliaString/Strs.jl
-[coverall-m-url]: https://coveralls.io/github/JuliaString/Strs.jl?branch=master
-[coverall-s-img]: https://coveralls.io/repos/github/JuliaString/Strs.jl/badge.svg
-[coverall-m-img]: https://coveralls.io/repos/github/JuliaString/Strs.jl/badge.svg?branch=master
-
-Strs.jl is container for a number of different packages from [JuliaString.org](https://juliastring.org)
+Strs.jl is a container for a number of different packages from [JuliaString.org](https://juliastring.org)
+It has two main goals:
+1) To be a drop-in replacement for the built-in `String` and `Char` types, adding types that are both faster and easier to use,
+   that are also using for interfacing with other languages, and are safer to use.
+2) To have a better option than the built-in string literal syntax and the `@printf`/`@sprintf` macros for formatted output.
 
 It brings together the following:
 
@@ -101,34 +95,32 @@ Also, I'd love contributions of benchmark code and/or samples for different use 
 or pointers to such (such as a way to get lots of tweets, to test mixed text and emojis, for example).
 
 
-| **Package** | **Release** | **Release Date** | **Package Evaluator** | **Linux & MacOS** | **Windows** | **Description** |
-|:-------------:|:-------------:|:-------------:|:-------------:|:-----------:|:-----------:|:-------------------|
-| [ModuleInterfaceTools][mit-loc] | [![][mit-rel]][mit-loc] | [![][mit-dat]][mit-loc] | [![][mit-pkg]][pkg-url] | [![][mit-tvs-img]][mit-tvs-url] | [![][mit-app-img]][mit-app-url] | Tools to create a common API for all of these packages
-| [StrAPI][strapi-loc] | [![][strapi-rel]][strapi-loc] | [![][strapi-dat]][strapi-loc] | [![][strapi-pkg]][pkg-url] | [![][strapi-tvs-img]][strapi-tvs-url] | [![][strapi-app-img]][strapi-app-url] | Common API for string/character functionality
-| [CharSetEncodings][cse-loc] | [![][cse-rel]][cse-loc] | [![][cse-dat]][cse-loc] | [![][cse-pkg]][pkg-url] | [![][cse-tvs-img]][cse-tvs-url] | [![][cse-app-img]][cse-app-url] | Basic types/support for Character Sets, Encodings, and Character Set Encodings
-| [ChrBase][chrbase-loc] | [![][chrbase-rel]][chrbase-loc] | [![][chrbase-dat]][chrbase-loc] | [![][chrbase-pkg]][pkg-url] | [![][chrbase-tvs-img]][chrbase-tvs-url] | [![][chrbase-app-img]][chrbase-app-url] | `Chr{CharSet,CodeUnitType}` type and support
-| [MurmurHash3][mh3-loc] | [![][mh3-rel]][mh3-loc] | [![][mh3-dat]][mh3-loc] | [![][mh3-pkg]][pkg-url] | [![][mh3-tvs-img]][mh3-tvs-url] | [![][mh3-app-img]][mh3-app-url] | Pure Julia implementation of MurmurHash3
-| [PCRE2][pcre2-loc] | [![][pcre2-rel]][pcre2-loc] | [![][pcre2-dat]][pcre2-loc] | [![][pcre2-pkg]][pkg-url] | [![][pcre2-tvs-img]][pcre2-tvs-url] | [![][pcre2-app-img]][pcre2-app-url] | `PCRE2` library support
-| [Format][format-loc] | [![][format-rel]][format-loc] | [![][format-dat]][format-loc] | [![][format-pkg]][pkg-url] | [![][format-tvs-img]][format-tvs-url] | [![][format-app-img]][format-app-url] | Python/C style formatting (based on [Formatting](https://github.com/JuliaIO/Formatting.jl))
-| [StrBase][strbase-loc] | [![][strbase-rel]][strbase-loc] | [![][strbase-dat]][strbase-loc] | [![][strbase-pkg]][pkg-url] | [![][strbase-tvs-img]][strbase-tvs-url] | [![][strbase-app-img]][strbase-app-url] | `Str{CSE, Hash, SubSet, Cache}` type
-| [StrRegex][strregex-loc] | [![][strregex-rel]][strregex-loc] | [![][strregex-dat]][strregex-loc] | [![][strregex-pkg]][pkg-url] | [![][strregex-tvs-img]][strregex-tvs-url] | [![][strregex-app-img]][strregex-app-url] | `Regex` support for all string types
-| [StrLiterals][strliterals-loc] | [![][strliterals-rel]][strliterals-loc] | [![][strliterals-dat]][strliterals-loc] | [![][strliterals-pkg]][pkg-url] | [![][strliterals-tvs-img]][strliterals-tvs-url] | [![][strliterals-app-img]][strliterals-app-url] | Extensible string literal support
-| [StrFormat][strformat-loc] | [![][strformat-rel]][strformat-loc] | [![][strformat-dat]][strformat-loc] | [![][strformat-pkg]][pkg-url] | [![][strformat-tvs-img]][strformat-tvs-url] | [![][strformat-app-img]][strformat-app-url] | Formatting extensions for literals
-| [StrTables][strtables-loc] | [![][strtables-rel]][strtables-loc] | [![][strtables-dat]][strtables-loc] | [![][strtables-pkg]][pkg-url] | [![][strtables-tvs-img]][strtables-tvs-url] | [![][strtables-app-img]][strtables-app-url] | Low-level support for entity tables
-| [HTML_Entities][html-loc] | [![][html-rel]][html-loc] | [![][html-dat]][html-loc] | [![][html-pkg]][pkg-url] | [![][html-tvs-img]][html-tvs-url] | [![][html-app-img]][html-app-url] | HTML character sequences
-| [Emoji_Entities][emoji-loc] | [![][emoji-rel]][emoji-loc] | [![][emoji-dat]][emoji-loc] | [![][emoji-pkg]][pkg-url] | [![][emoji-tvs-img]][emoji-tvs-url] | [![][emoji-app-img]][emoji-app-url] | Emoji names (including composite ones)
-| [LaTeX_Entities][latex-loc] | [![][latex-rel]][latex-loc] | [![][latex-dat]][latex-loc] | [![][latex-pkg]][pkg-url] | [![][latex-tvs-img]][latex-tvs-url] | [![][latex-app-img]][latex-app-url] | Julia LaTeX character names
-| [Unicode_Entities][unicode-loc] | [![][unicode-rel]][unicode-loc] | [![][unicode-dat]][unicode-loc] | [![][unicode-pkg]][pkg-url] | [![][unicode-tvs-img]][unicode-tvs-url] | [![][unicode-app-img]][unicode-app-url] | Unicode standard character names
-| [StrEntities][strentities-loc] | [![][strentities-rel]][strentities-loc] | [![][strentities-dat]][strentities-loc] | [![][strentities-pkg]][pkg-url] | [![][strentities-tvs-img]][strentities-tvs-url] | [![][strentities-app-img]][strentities-app-url] | Entity extensions for literals
-| [InternedStrings][int-loc] | [![][int-rel]][int-loc] | [![][int-dat]][int-loc] | [![][int-pkg]][pkg-url] | [![][int-tvs-img]][int-tvs-url] | [![][int-app-img]][int-app-url] | Save space by interning strings (by @oxinabox!)
+| **Package** | **Release** | **Release Date** | **Package Evaluator** | **Unit Tests** | **Description** |
+|:-------------:|:-------------:|:-------------:|:-------------:|:-----------:|:-------------------|
+| [ModuleInterfaceTools][mit-loc] | [![][mit-rel]][mit-loc] | [![][mit-dat]][mit-loc] | [![][mit-pkg]][pkg-url] | [![][mit-tvs-img]][mit-tvs-url] | Tools to create a common API for all of these packages
+| [StrAPI][strapi-loc] | [![][strapi-rel]][strapi-loc] | [![][strapi-dat]][strapi-loc] | [![][strapi-pkg]][pkg-url] | [![][strapi-tvs-img]][strapi-tvs-url] | Common API for string/character functionality
+| [CharSetEncodings][cse-loc] | [![][cse-rel]][cse-loc] | [![][cse-dat]][cse-loc] | [![][cse-pkg]][pkg-url] | [![][cse-tvs-img]][cse-tvs-url] | Basic types/support for Character Sets, Encodings, and Character Set Encodings
+| [ChrBase][chrbase-loc] | [![][chrbase-rel]][chrbase-loc] | [![][chrbase-dat]][chrbase-loc] | [![][chrbase-pkg]][pkg-url] | [![][chrbase-tvs-img]][chrbase-tvs-url] | `Chr{CharSet,CodeUnitType}` type and support
+| [MurmurHash3][mh3-loc] | [![][mh3-rel]][mh3-loc] | [![][mh3-dat]][mh3-loc] | [![][mh3-pkg]][pkg-url] | [![][mh3-tvs-img]][mh3-tvs-url] | Pure Julia implementation of MurmurHash3
+| [PCRE2][pcre2-loc] | [![][pcre2-rel]][pcre2-loc] | [![][pcre2-dat]][pcre2-loc] | [![][pcre2-pkg]][pkg-url] | [![][pcre2-tvs-img]][pcre2-tvs-url] | `PCRE2` library support
+| [Format][format-loc] | [![][format-rel]][format-loc] | [![][format-dat]][format-loc] | [![][format-pkg]][pkg-url] | [![][format-tvs-img]][format-tvs-url] | Python/C style formatting (based on [Formatting](https://github.com/JuliaIO/Formatting.jl))
+| [StrBase][strbase-loc] | [![][strbase-rel]][strbase-loc] | [![][strbase-dat]][strbase-loc] | [![][strbase-pkg]][pkg-url] | [![][strbase-tvs-img]][strbase-tvs-url] | `Str{CSE, Hash, SubSet, Cache}` type
+| [StrRegex][strregex-loc] | [![][strregex-rel]][strregex-loc] | [![][strregex-dat]][strregex-loc] | [![][strregex-pkg]][pkg-url] | [![][strregex-tvs-img]][strregex-tvs-url] | `Regex` support for all string types
+| [StrLiterals][strliterals-loc] | [![][strliterals-rel]][strliterals-loc] | [![][strliterals-dat]][strliterals-loc] | [![][strliterals-pkg]][pkg-url] | [![][strliterals-tvs-img]][strliterals-tvs-url] | Extensible string literal support
+| [StrFormat][strformat-loc] | [![][strformat-rel]][strformat-loc] | [![][strformat-dat]][strformat-loc] | [![][strformat-pkg]][pkg-url] | [![][strformat-tvs-img]][strformat-tvs-url] | Formatting extensions for literals
+| [StrTables][strtables-loc] | [![][strtables-rel]][strtables-loc] | [![][strtables-dat]][strtables-loc] | [![][strtables-pkg]][pkg-url] | [![][strtables-tvs-img]][strtables-tvs-url] | Low-level support for entity tables
+| [HTML_Entities][html-loc] | [![][html-rel]][html-loc] | [![][html-dat]][html-loc] | [![][html-pkg]][pkg-url] | [![][html-tvs-img]][html-tvs-url] | HTML character sequences
+| [Emoji_Entities][emoji-loc] | [![][emoji-rel]][emoji-loc] | [![][emoji-dat]][emoji-loc] | [![][emoji-pkg]][pkg-url] | [![][emoji-tvs-img]][emoji-tvs-url] | Emoji names (including composite ones)
+| [LaTeX_Entities][latex-loc] | [![][latex-rel]][latex-loc] | [![][latex-dat]][latex-loc] | [![][latex-pkg]][pkg-url] | [![][latex-tvs-img]][latex-tvs-url] | Julia LaTeX character names
+| [Unicode_Entities][unicode-loc] | [![][unicode-rel]][unicode-loc] | [![][unicode-dat]][unicode-loc] | [![][unicode-pkg]][pkg-url] | [![][unicode-tvs-img]][unicode-tvs-url] | Unicode standard character names
+| [StrEntities][strentities-loc] | [![][strentities-rel]][strentities-loc] | [![][strentities-dat]][strentities-loc] | [![][strentities-pkg]][pkg-url] | [![][strentities-tvs-img]][strentities-tvs-url] | Entity extensions for literals
+| [InternedStrings][int-loc] | [![][int-rel]][int-loc] | [![][int-dat]][int-loc] | [![][int-pkg]][pkg-url] | [![][int-tvs-img]][int-tvs-url] | Save space by interning strings (by @oxinabox!)
 
 
 [mit-loc]:     https://github.com/JuliaString/ModuleInterfaceTools.jl
 [mit-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/M/ModuleInterfaceTools.svg
 [mit-tvs-img]: https://travis-ci.org/JuliaString/ModuleInterfaceTools.jl.svg?branch=master
 [mit-tvs-url]: https://travis-ci.org/JuliaString/ModuleInterfaceTools.jl
-[mit-app-img]: https://ci.appveyor.com/api/projects/status/x13gh7y6id3fbmke/branch/master?svg=true
-[mit-app-url]: https://ci.appveyor.com/project/ScottPJones/moduleinterfacetools-jl/branch/master
 [mit-rel]:     https://img.shields.io/github/release/JuliaString/ModuleInterfaceTools.jl.svg?label="."
 [mit-dat]:     https://img.shields.io/github/release-date/JuliaString/ModuleInterfaceTools.jl.svg?label="."
 
@@ -136,8 +128,6 @@ or pointers to such (such as a way to get lots of tweets, to test mixed text and
 [mh3-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/M/MurmurHash3.svg
 [mh3-tvs-img]: https://travis-ci.org/JuliaString/MurmurHash3.jl.svg?branch=master
 [mh3-tvs-url]: https://travis-ci.org/JuliaString/MurmurHash3.jl
-[mh3-app-img]: https://ci.appveyor.com/api/projects/status/q55ln7mp20ph5cko/branch/master?svg=true
-[mh3-app-url]: https://ci.appveyor.com/project/ScottPJones/MurmurHash3-jl/branch/master
 [mh3-rel]:     https://img.shields.io/github/release/JuliaString/MurmurHash3.jl.svg?label="."
 [mh3-dat]:     https://img.shields.io/github/release-date/JuliaString/MurmurHash3.jl.svg?label="."
 
@@ -145,8 +135,6 @@ or pointers to such (such as a way to get lots of tweets, to test mixed text and
 [pcre2-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/P/PCRE2.svg
 [pcre2-tvs-img]: https://travis-ci.org/JuliaString/PCRE2.jl.svg?branch=master
 [pcre2-tvs-url]: https://travis-ci.org/JuliaString/PCRE2.jl
-[pcre2-app-img]: https://ci.appveyor.com/api/projects/status/d62uhoik906m7n8r/branch/master?svg=true
-[pcre2-app-url]: https://ci.appveyor.com/project/ScottPJones/pcre2-jl/branch/master
 [pcre2-rel]:     https://img.shields.io/github/release/JuliaString/PCRE2.jl.svg?label="."
 [pcre2-dat]:     https://img.shields.io/github/release-date/JuliaString/PCRE2.jl.svg?label="."
 
@@ -154,8 +142,6 @@ or pointers to such (such as a way to get lots of tweets, to test mixed text and
 [format-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/F/Format.svg
 [format-tvs-img]: https://travis-ci.org/JuliaString/Format.jl.svg?branch=master
 [format-tvs-url]: https://travis-ci.org/JuliaString/Format.jl
-[format-app-img]: https://ci.appveyor.com/api/projects/status/9wb580eyjv4k3iej/branch/master?svg=true
-[format-app-url]: https://ci.appveyor.com/project/ScottPJones/format-jl/branch/master
 [format-rel]:     https://img.shields.io/github/release/JuliaString/Format.jl.svg?label="."
 [format-dat]:     https://img.shields.io/github/release-date/JuliaString/Format.jl.svg?label="."
 
@@ -163,8 +149,6 @@ or pointers to such (such as a way to get lots of tweets, to test mixed text and
 [strapi-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/S/StrAPI.svg
 [strapi-tvs-img]: https://travis-ci.org/JuliaString/StrAPI.jl.svg?branch=master
 [strapi-tvs-url]: https://travis-ci.org/JuliaString/StrAPI.jl
-[strapi-app-img]: https://ci.appveyor.com/api/projects/status/pyw9o1y3wywo95tt/branch/master?svg=true
-[strapi-app-url]: https://ci.appveyor.com/project/ScottPJones/strapi-jl/branch/master
 [strapi-rel]:     https://img.shields.io/github/release/JuliaString/StrAPI.jl.svg?label="."
 [strapi-dat]:     https://img.shields.io/github/release-date/JuliaString/StrAPI.jl.svg?label="."
 
@@ -172,8 +156,6 @@ or pointers to such (such as a way to get lots of tweets, to test mixed text and
 [cse-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/C/CharSetEncodings.svg
 [cse-tvs-img]: https://travis-ci.org/JuliaString/CharSetEncodings.jl.svg?branch=master
 [cse-tvs-url]: https://travis-ci.org/JuliaString/CharSetEncodings.jl
-[cse-app-img]: https://ci.appveyor.com/api/projects/status/08ylxl46exltiemd/branch/master?svg=true
-[cse-app-url]: https://ci.appveyor.com/project/ScottPJones/charsetencodings-jl/branch/master
 [cse-rel]:     https://img.shields.io/github/release/JuliaString/CharSetEncodings.jl.svg?label="."
 [cse-dat]:     https://img.shields.io/github/release-date/JuliaString/CharSetEncodings.jl.svg?label="."
 
@@ -181,8 +163,6 @@ or pointers to such (such as a way to get lots of tweets, to test mixed text and
 [chrbase-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/C/ChrBase.svg
 [chrbase-tvs-img]: https://travis-ci.org/JuliaString/ChrBase.jl.svg?branch=master
 [chrbase-tvs-url]: https://travis-ci.org/JuliaString/ChrBase.jl
-[chrbase-app-img]: https://ci.appveyor.com/api/projects/status/lrdfni7si4o797fr/branch/master?svg=true
-[chrbase-app-url]: https://ci.appveyor.com/project/ScottPJones/chrbase-jl/branch/master
 [chrbase-rel]:     https://img.shields.io/github/release/JuliaString/ChrBase.jl.svg?label="."
 [chrbase-dat]:     https://img.shields.io/github/release-date/JuliaString/ChrBase.jl.svg?label="."
 
@@ -190,8 +170,6 @@ or pointers to such (such as a way to get lots of tweets, to test mixed text and
 [strbase-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/S/StrBase.svg
 [strbase-tvs-img]: https://travis-ci.org/JuliaString/StrBase.jl.svg?branch=master
 [strbase-tvs-url]: https://travis-ci.org/JuliaString/StrBase.jl
-[strbase-app-img]: https://ci.appveyor.com/api/projects/status/2v12uwlr0ueale6n/branch/master?svg=true
-[strbase-app-url]: https://ci.appveyor.com/project/ScottPJones/strbase-jl/branch/master
 [strbase-rel]:     https://img.shields.io/github/release/JuliaString/StrBase.jl.svg?label="."
 [strbase-dat]:     https://img.shields.io/github/release-date/JuliaString/StrBase.jl.svg?label="."
 
@@ -199,8 +177,6 @@ or pointers to such (such as a way to get lots of tweets, to test mixed text and
 [strregex-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/S/StrRegex.svg
 [strregex-tvs-img]: https://travis-ci.org/JuliaString/StrRegex.jl.svg?branch=master
 [strregex-tvs-url]: https://travis-ci.org/JuliaString/StrRegex.jl
-[strregex-app-img]: https://ci.appveyor.com/api/projects/status/iyhlb4unq5ml4g0w/branch/master?svg=true
-[strregex-app-url]: https://ci.appveyor.com/project/ScottPJones/strregex-jl/branch/master
 [strregex-rel]:     https://img.shields.io/github/release/JuliaString/StrRegex.jl.svg?label="."
 [strregex-dat]:     https://img.shields.io/github/release-date/JuliaString/StrRegex.jl.svg?label="."
 
@@ -208,8 +184,6 @@ or pointers to such (such as a way to get lots of tweets, to test mixed text and
 [strliterals-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/S/StrLiterals.svg
 [strliterals-tvs-img]: https://travis-ci.org/JuliaString/StrLiterals.jl.svg?branch=master
 [strliterals-tvs-url]: https://travis-ci.org/JuliaString/StrLiterals.jl
-[strliterals-app-img]: https://ci.appveyor.com/api/projects/status/8462oq09ek07knos/branch/master?svg=true
-[strliterals-app-url]: https://ci.appveyor.com/project/ScottPJones/strliterals-jl/branch/master
 [strliterals-rel]:     https://img.shields.io/github/release/JuliaString/StrLiterals.jl.svg?label="."
 [strliterals-dat]:     https://img.shields.io/github/release-date/JuliaString/StrLiterals.jl.svg?label="."
 
@@ -217,8 +191,6 @@ or pointers to such (such as a way to get lots of tweets, to test mixed text and
 [strformat-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/S/StrFormat.svg
 [strformat-tvs-img]: https://travis-ci.org/JuliaString/StrFormat.jl.svg?branch=master
 [strformat-tvs-url]: https://travis-ci.org/JuliaString/StrFormat.jl
-[strformat-app-img]: https://ci.appveyor.com/api/projects/status/r3c2alh3jfcmu2gc/branch/master?svg=true
-[strformat-app-url]: https://ci.appveyor.com/project/ScottPJones/strformat-jl/branch/master
 [strformat-rel]:     https://img.shields.io/github/release/JuliaString/StrFormat.jl.svg?label="."
 [strformat-dat]:     https://img.shields.io/github/release-date/JuliaString/StrFormat.jl.svg?label="."
 
@@ -226,8 +198,6 @@ or pointers to such (such as a way to get lots of tweets, to test mixed text and
 [strtables-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/S/StrTables.svg
 [strtables-tvs-img]: https://travis-ci.org/JuliaString/StrTables.jl.svg?branch=master
 [strtables-tvs-url]: https://travis-ci.org/JuliaString/StrTables.jl
-[strtables-app-img]: https://ci.appveyor.com/api/projects/status/ekt5t6nt8g0cqhjb/branch/master?svg=true
-[strtables-app-url]: https://ci.appveyor.com/project/ScottPJones/strtables-jl/branch/master
 [strtables-rel]:     https://img.shields.io/github/release/JuliaString/StrTables.jl.svg?label="."
 [strtables-dat]:     https://img.shields.io/github/release-date/JuliaString/StrTables.jl.svg?label="."
 
@@ -235,8 +205,6 @@ or pointers to such (such as a way to get lots of tweets, to test mixed text and
 [html-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/H/HTML_Entities.svg
 [html-tvs-img]: https://travis-ci.org/JuliaString/HTML_Entities.jl.svg?branch=master
 [html-tvs-url]: https://travis-ci.org/JuliaString/HTML_Entities.jl
-[html-app-img]: https://ci.appveyor.com/api/projects/status/xp05kd5mamt92yhj/branch/master?svg=true
-[html-app-url]: https://ci.appveyor.com/project/ScottPJones/html-entities-jl/branch/master
 [html-rel]:     https://img.shields.io/github/release/JuliaString/HTML_Entities.jl.svg?label="."
 [html-dat]:     https://img.shields.io/github/release-date/JuliaString/HTML_Entities.jl.svg?label="."
 
@@ -244,8 +212,6 @@ or pointers to such (such as a way to get lots of tweets, to test mixed text and
 [emoji-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/E/Emoji_Entities.svg
 [emoji-tvs-img]: https://travis-ci.org/JuliaString/Emoji_Entities.jl.svg?branch=master
 [emoji-tvs-url]: https://travis-ci.org/JuliaString/Emoji_Entities.jl
-[emoji-app-img]: https://ci.appveyor.com/api/projects/status/4p6o3reehca95put/branch/master?svg=true
-[emoji-app-url]: https://ci.appveyor.com/project/ScottPJones/emoji-entities-jl/branch/master
 [emoji-rel]:     https://img.shields.io/github/release/JuliaString/Emoji_Entities.jl.svg?label="."
 [emoji-dat]:     https://img.shields.io/github/release-date/JuliaString/Emoji_Entities.jl.svg?label="."
 
@@ -253,8 +219,6 @@ or pointers to such (such as a way to get lots of tweets, to test mixed text and
 [latex-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/L/LaTeX_Entities.svg
 [latex-tvs-img]: https://travis-ci.org/JuliaString/LaTeX_Entities.jl.svg?branch=master
 [latex-tvs-url]: https://travis-ci.org/JuliaString/LaTeX_Entities.jl
-[latex-app-img]: https://ci.appveyor.com/api/projects/status/ok2sdq4u5xwlc6b0/branch/master?svg=true
-[latex-app-url]: https://ci.appveyor.com/project/ScottPJones/latex-entities-jl/branch/master
 [latex-rel]:     https://img.shields.io/github/release/JuliaString/LaTeX_Entities.jl.svg?label="."
 [latex-dat]:     https://img.shields.io/github/release-date/JuliaString/LaTeX_Entities.jl.svg?label="."
 
@@ -262,8 +226,6 @@ or pointers to such (such as a way to get lots of tweets, to test mixed text and
 [unicode-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/U/Unicode_Entitites.svg
 [unicode-tvs-img]: https://travis-ci.org/JuliaString/Unicode_Entities.jl.svg?branch=master
 [unicode-tvs-url]: https://travis-ci.org/JuliaString/Unicode_Entities.jl
-[unicode-app-img]: https://ci.appveyor.com/api/projects/status/c1luci97ry8fxdt7/branch/master?svg=true
-[unicode-app-url]: https://ci.appveyor.com/project/ScottPJones/unicode-entities-jl/branch/master
 [unicode-rel]:     https://img.shields.io/github/release/JuliaString/Unicode_Entities.jl.svg?label="."
 [unicode-dat]:     https://img.shields.io/github/release-date/JuliaString/Unicode_Entities.jl.svg?label="."
 
@@ -271,8 +233,6 @@ or pointers to such (such as a way to get lots of tweets, to test mixed text and
 [strentities-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/S/StrEntities.svg
 [strentities-tvs-img]: https://travis-ci.org/JuliaString/StrEntities.jl.svg?branch=master
 [strentities-tvs-url]: https://travis-ci.org/JuliaString/StrEntities.jl
-[strentities-app-img]: https://ci.appveyor.com/api/projects/status/5pj0ubfrai4dsp0r/branch/master?svg=true
-[strentities-app-url]: https://ci.appveyor.com/project/ScottPJones/strentities-jl/branch/master
 [strentities-rel]:     https://img.shields.io/github/release/JuliaString/StrEntities.jl.svg?label="."
 [strentities-dat]:     https://img.shields.io/github/release-date/JuliaString/StrEntities.jl.svg?label="."
 
@@ -280,8 +240,6 @@ or pointers to such (such as a way to get lots of tweets, to test mixed text and
 [int-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/I/InternedStrings.svg
 [int-tvs-img]: https://travis-ci.org/JuliaString/InternedStrings.jl.svg?branch=master
 [int-tvs-url]: https://travis-ci.org/JuliaString/InternedStrings.jl
-[int-app-img]: https://ci.appveyor.com/api/projects/status/8dlhr5sprhokwyqb/branch/master?svg=true
-[int-app-url]: https://ci.appveyor.com/project/ScottPJones/internedstrings-jl/branch/master
 [int-rel]:     https://img.shields.io/github/release/JuliaString/InternedStrings.jl.svg?label="."
 [int-dat]:     https://img.shields.io/github/release-date/JuliaString/InternedStrings.jl.svg?label="."
 

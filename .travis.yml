@@ -3,9 +3,10 @@ language: julia
 os:
   - linux
   - osx
+  - windows
 julia:
   - 1.0
-  - 1.3
+  - 1
   - nightly
 notifications:
   email: false
@@ -30,5 +31,5 @@ matrix:
 #script:
 
 after_success:
-  # push coverage results to Coveralls & Codecov
-  - julia -e 'using Pkg; cd(Pkg.dir("Strs")); Pkg.add("Coverage"); using Coverage; Coveralls.submit(Coveralls.process_folder()); Codecov.submit(Codecov.process_folder())'
+  # push coverage results to Codecov
+  - julia -e 'using Pkg; cd(Pkg.dir("Strs")); Pkg.add("Coverage"); using Coverage; Codecov.submit(Codecov.process_folder())'
