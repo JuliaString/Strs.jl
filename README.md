@@ -46,7 +46,7 @@ It has two main goals:
 
 It brings together the following:
 
-1) A better type of string literal, using [StrLiterals](https://github.com/JuliaString/StrLiterals.jls), [StrFormat](https://github.com/JuliaString/StrFormat.jl), and [StrEntities](https:://github.com/JUliaString/StrEntities.jl)
+1) A better type of string literal, using [StrLiterals](https://github.com/JuliaString/StrLiterals.jl), [StrFormat](https://github.com/JuliaString/StrFormat.jl), and [StrEntities](https:://github.com/JUliaString/StrEntities.jl)
 
    This is of the form `f"..."` or `F"..."`.
 
