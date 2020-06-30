@@ -1,42 +1,19 @@
-# Strs
-
 [pkg-url]:  https://juliaci.github.io/NanosoldierReports/pkgeval_badges/report.html
 [strs-pkg]: https://juliaci.github.io/NanosoldierReports/pkgeval_badges/S/Strs.svg
-
-[![][gitter-img]][gitter-url]
-[![contributions welcome][contrib]](https://github.com/JuliaString/Strs.jl/issues)
-[![][strs-pkg]][pkg-url]
-[![][release]][strs-url]
-[![][release-date]][strs-url]
-[![][license-img]][license-url]
-[![Logo](Logo.gif)](https://github.com/cormullion)
-
 [contrib]:    https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat
-
-| **Julia Version** | **Unit Tests** | **Coverage** |
-|:------------------:|:------------------:|:------------------:|
-| [![][julia-release]][julia-url] | [![][travis-s-img]][travis-url] | [![][codecov-img]][codecov-url]
-| [Latest][julia-url] | [![][travis-m-img]][travis-url] | [![][codecov-img]][codecov-url]
-
-[license-img]:  http://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat
-[license-url]:  LICENSE.md
-
-[gitter-img]:   https://badges.gitter.im/Join%20Chat.svg
-[gitter-url]:   https://gitter.im/JuliaString/Lobby?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge
-
-[strs-url]:     https://github.com/JuliaString/Strs.jl
-[release]:      https://img.shields.io/github/release/JuliaString/Strs.jl.svg
-[release-date]: https://img.shields.io/github/release-date/JuliaString/Strs.jl.svg
-
-[julia-url]:          https://github.com/JuliaLang/julia
-[julia-release]:      https://img.shields.io/github/release/JuliaLang/julia.svg
-
 [travis-url]:   https://travis-ci.org/JuliaString/Strs.jl
-[travis-s-img]: https://travis-ci.org/JuliaString/Strs.jl.svg
-[travis-m-img]: https://travis-ci.org/JuliaString/Strs.jl.svg?branch=master
-
+[travis-img]: https://travis-ci.org/JuliaString/Strs.jl.svg
 [codecov-url]:  https://codecov.io/gh/JuliaString/Strs.jl
 [codecov-img]:  https://codecov.io/gh/JuliaString/Strs.jl/branch/master/graph/badge.svg
+
+[![Logo](Logo.gif)](https://github.com/cormullion)
+
+# Strs
+
+[![contributions welcome][contrib]](https://github.com/JuliaString/Strs.jl/issues)
+[![][strs-pkg]][pkg-url]
+[![][travis-img]][travis-url]
+[![][codecov-img]][codecov-url]
 
 Strs.jl is a container for a number of different packages from [JuliaString.org](https://juliastring.org)
 It has two main goals:
