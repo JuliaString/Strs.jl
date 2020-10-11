@@ -15,7 +15,7 @@
 [![][travis-img]][travis-url]
 [![][codecov-img]][codecov-url]
 
-Strs.jl is a container for a number of different packages from [JuliaString.org](https://juliastring.org)
+Strs.jl is a container for a number of different packages from [JuliaString](https://github.com/JuliaString)
 It has two main goals:
 1) To be a drop-in replacement for the built-in `String` and `Char` types, adding types that are both faster and easier to use,
    that are also using for interfacing with other languages, and are safer to use.
