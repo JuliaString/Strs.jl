@@ -194,7 +194,7 @@ function display_results(io, xres)
     # pwc(:yellow, io, f"\%10.3f(rn[3]/numchars)")
 end
 
-function dispres(io, xres)
+function dispres(io, xres, skip_unistr=true)
     # (fname, stats, sizes, res)
     (fname, stats, sizes, selstat, selsiz, res) = xres
     show(io, (fname, stats))
@@ -230,7 +230,7 @@ function dispres(io, xres)
     end
     for i = 2:length(res)
         rn = res[i]
-        #rn[1] == "UniStr" && continue
+        skip_unistr && rn[1] == "UniStr" && continue
         pr"\(io)\n\%-12.12s(rn[1])\%6.3f(sizes[i]/stats.len)"
         tn = rn[3]
         minres = min(length(t1), length(tn))
@@ -246,14 +246,14 @@ end
 
 const divline = string(repeat('#', 100),'\n','\f')
 
-function dispbench(io, totres)
+function dispbench(io, totres; kwargs...)
     for res in totres[1]
         dispres(io, res)
         print(io, divline)
     end
 end
 
-dispbench(totres) = dispbench(_stdout(), totres)
+dispbench(totres; kwargs...) = dispbench(_stdout(), totres; kwargs...)
 
 function display_benchmark(io, totres)
     for res in totres[1]
