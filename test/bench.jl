@@ -1,7 +1,7 @@
 #=
 Benchmarking routines for characters and strings
 
-Copyright 2017-2018 Gandalf Software, Inc., Scott P. Jones
+Copyright 2017-2021 Gandalf Software, Inc., Scott P. Jones
 Licensed under MIT License, see LICENSE.md
 
 THIS IS STILL VERY WIP AND HARDCODED!
@@ -23,123 +23,10 @@ dispbench(res)            # Displays the results in a pretty format
 
 isdefined(Main, :STRS_SETUP) || include("setup.jl")
 
-@static V6_COMPAT || (using Serialization)
-@static V6_COMPAT || (Base.iterate(it::Union{CodePoints,CodeUnits}) = iterate(it, 1))
+using Serialization
+Base.iterate(it::Union{CodePoints,CodeUnits}) = iterate(it, 1)
 
-
-const inppath = "textsamples"
-const gutpath = "gutenberg"
-const smppath = "samples"
-
-const gutenbergbooks =
-    (("files/2600/2600-0",        "English"), # War & Peace, some other languages in quotes
-     ("files/1400/1400-0",        "English"), # Great Expectations, uses Unicode quotes
-     ("files/42286/42286-0",      "Hungarian"),
-     #("files/8119/8119-0",        "Polish"), # couldn't get this to load correctly
-     ("files/31536/31536-0",      "Polish"),
-     ("files/32941/32941-0",      "Japanese"),
-     ("files/24264/24264-0",      "Chinese"),
-     ("files/40687/40687-0",      "Telugu"), # Third most spoken in India, official
-     ("files/50513/50513-0",      "French"),
-#     ("files/43007/43007-0",      "Arabic"),
-     ("cache/epub/38496/pg38496", "Portuguese"),
-     ("cache/epub/2000/pg2000",   "Spanish"), # Don Quijote
-     ("cache/epub/48750/pg48750", "Swedish"),
-     ("cache/epub/48322/pg48322", "German"),
-     )
-
-const downloadedbooks = (
-#                         ("LYSAIa GORA DIeVICh'Ia - SIeRGIeI GOLOVAChIoV.txt", "Russian"),
-                         )
-
-getdefdir(dir)::String = dir === nothing ? homedir() : dir
-
-function filter_lines(lines)
-    out = Vector{String}()
-    sizehint!(out, length(lines))
-    # Eliminate initial lines, empty lines, trailing lines
-    checkbeg = true
-    for l in lines
-        if sizeof(l) > 41 && starts_with(l, "***") && ends_with(l, "***") &&
-            occurs_in(" PROJECT GUTENBERG EBOOK", l) &&
-            occurs_in(checkbeg ? "START OF TH" : "END OF TH", l)
-            checkbeg || break # Found "end of"
-            checkbeg = false
-        else
-            push!(out, l)
-        end
-    end
-    out
-end
-
-"""
-Load books from Project Gutenberg site, removing lines added at beginning and end that
-are not part of the book, as much as possible
-"""
-function load_gutenberg!(books, list, dict, gutenbergdir)
-    mkpath(gutenbergdir)
-    for (nam, lang) in list
-        cnt = get(dict, lang, 0)
-        dict[lang] = cnt + 1
-        outnam = cnt == 0 ? "$lang.txt" : "$lang-$cnt.txt"
-        lname = joinpath(gutenbergdir, outnam)
-        download(joinpath("http://www.gutenberg.org/", nam * ".txt"), lname)
-        println("Saved to: ", lname)
-        push!(books, (outnam, filter_lines(readlines(lname))))
-    end
-    books
-end
-
-function remove_empty(lines)
-    # Eliminate empty lines
-    len = length(lines)
-    out = Vector{String}()
-    sizehint!(out, len)
-    for l in lines
-        is_empty(l) || push!(out, l)
-    end
-    out
-end
-
-"""
-load_books(; dir=nothing)
-
-Loads a set of books from a local directory, and downloads a set of books from Project Gutenberg
-Returns them as a dictionary with names -> vectors of strings
-"""
-function load_books(; dir::Any=nothing)
-    defdir = getdefdir(dir)
-    inputdir = joinpath(defdir, inppath)
-    dict = Dict{String,Int}()
-    books = Vector{Tuple{String, Vector{String}}}()
-    for (nam, lang) in downloadedbooks
-        cnt = get(dict, lang, 0)
-        dict[lang] = cnt + 1
-        outnam = cnt == 0 ? "$lang.txt" : "$lang-$cnt.txt"
-        push!(books, (outnam, readlines(joinpath(inputdir, nam))))
-    end
-    load_gutenberg!(books, gutenbergbooks, dict, joinpath(defdir, gutpath))
-end
-
-"""
-save_books(books; dir=nothing)
-
-Saves the collection of downloaded books into the given directory, in a "samples" subdirectory.
-If the directory is not set, it will default to the user's home directory
-"""
-function save_books(books; dir::Any=nothing)
-    sampledir = joinpath(getdefdir(dir), smppath)
-    mkpath(sampledir)
-    for (nam, book) in books
-        outnam = joinpath(sampledir, nam)
-        open(outnam, "w") do io
-            for lin in book
-                println(io, lin)
-            end
-            println("Saved $nam")
-        end
-    end
-end
+include("books.jl")
 
 Base.show(io::IO, cnt::LineCounts) =
     pr"\(io)\%10d(cnt.bytes)\%12.3f(cnt.bytes/cnt.chars)"
@@ -194,7 +81,7 @@ function display_results(io, xres)
     # pwc(:yellow, io, f"\%10.3f(rn[3]/numchars)")
 end
 
-function dispres(io, xres)
+function dispres(io, xres, skip_unistr=true)
     # (fname, stats, sizes, res)
     (fname, stats, sizes, selstat, selsiz, res) = xres
     show(io, (fname, stats))
@@ -230,7 +117,7 @@ function dispres(io, xres)
     end
     for i = 2:length(res)
         rn = res[i]
-        #rn[1] == "UniStr" && continue
+        skip_unistr && rn[1] == "UniStr" && continue
         pr"\(io)\n\%-12.12s(rn[1])\%6.3f(sizes[i]/stats.len)"
         tn = rn[3]
         minres = min(length(t1), length(tn))
@@ -246,14 +133,14 @@ end
 
 const divline = string(repeat('#', 100),'\n','\f')
 
-function dispbench(io, totres)
+function dispbench(io, totres; kwargs...)
     for res in totres[1]
         dispres(io, res)
         print(io, divline)
     end
 end
 
-dispbench(totres) = dispbench(_stdout(), totres)
+dispbench(totres; kwargs...) = dispbench(_stdout(), totres; kwargs...)
 
 function display_benchmark(io, totres)
     for res in totres[1]
@@ -1009,10 +896,16 @@ function checktests(io = _stdout(); dir::Any=nothing, test::Bool=false)
     sampledir = joinpath(getdefdir(dir), smppath)
     for fname in readdir(sampledir)
         lines = readlines(joinpath(sampledir, fname))
-        stats = calcstats(lines)
         list = [String, UTF8Str, UTF16Str, UTF32Str, UniStr]
-        MT = enctyp(stats.maxtyp)
-        MT != UTF32Str && push!(list, MT)
+        try
+            stats = calcstats(lines)
+            MT = enctyp(stats.maxtyp)
+            MT != UTF32Str && push!(list, MT)
+        catch ex
+            typeof(ex) == InterruptException ||
+                pr"calcstats failed on \(fname): \(sprint(showerror, ex, catch_backtrace()))"
+            rethrow()
+        end
         isdefined(Main, :UTF8String) && push!(list, UTF8String, UTF16String, UTF32String)
         enc = encode_lines(list, lines)
         res = (runcheckline(Integer, lines, testlist[1][1]),
@@ -1123,4 +1016,3 @@ function load_results(fname)
         deserialize(io)
     end
 end
-
