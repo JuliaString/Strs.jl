@@ -1,8 +1,6 @@
 [pkg-url]:  https://juliaci.github.io/NanosoldierReports/pkgeval_badges/report.html
 [strs-pkg]: https://juliaci.github.io/NanosoldierReports/pkgeval_badges/S/Strs.svg
 [contrib]:    https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat
-[travis-url]:   https://travis-ci.org/JuliaString/Strs.jl
-[travis-img]: https://travis-ci.org/JuliaString/Strs.jl.svg
 [codecov-url]:  https://codecov.io/gh/JuliaString/Strs.jl
 [codecov-img]:  https://codecov.io/gh/JuliaString/Strs.jl/branch/master/graph/badge.svg
 
@@ -12,7 +10,6 @@
 
 [![contributions welcome][contrib]](https://github.com/JuliaString/Strs.jl/issues)
 [![][strs-pkg]][pkg-url]
-[![][travis-img]][travis-url]
 [![][codecov-img]][codecov-url]
 
 Strs.jl is a container for a number of different packages from [JuliaString.org](https://juliastring.org)
@@ -96,132 +93,96 @@ or pointers to such (such as a way to get lots of tweets, to test mixed text and
 
 [mit-loc]:     https://github.com/JuliaString/ModuleInterfaceTools.jl
 [mit-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/M/ModuleInterfaceTools.svg
-[mit-tvs-img]: https://travis-ci.org/JuliaString/ModuleInterfaceTools.jl.svg?branch=master
-[mit-tvs-url]: https://travis-ci.org/JuliaString/ModuleInterfaceTools.jl
 [mit-rel]:     https://img.shields.io/github/release/JuliaString/ModuleInterfaceTools.jl.svg?label="."
 [mit-dat]:     https://img.shields.io/github/release-date/JuliaString/ModuleInterfaceTools.jl.svg?label="."
 
 [mh3-loc]:     https://github.com/JuliaString/MurmurHash3.jl
 [mh3-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/M/MurmurHash3.svg
-[mh3-tvs-img]: https://travis-ci.org/JuliaString/MurmurHash3.jl.svg?branch=master
-[mh3-tvs-url]: https://travis-ci.org/JuliaString/MurmurHash3.jl
 [mh3-rel]:     https://img.shields.io/github/release/JuliaString/MurmurHash3.jl.svg?label="."
 [mh3-dat]:     https://img.shields.io/github/release-date/JuliaString/MurmurHash3.jl.svg?label="."
 
 [pcre2-loc]:     https://github.com/JuliaString/PCRE2.jl
 [pcre2-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/P/PCRE2.svg
-[pcre2-tvs-img]: https://travis-ci.org/JuliaString/PCRE2.jl.svg?branch=master
-[pcre2-tvs-url]: https://travis-ci.org/JuliaString/PCRE2.jl
 [pcre2-rel]:     https://img.shields.io/github/release/JuliaString/PCRE2.jl.svg?label="."
 [pcre2-dat]:     https://img.shields.io/github/release-date/JuliaString/PCRE2.jl.svg?label="."
 
 [format-loc]:     https://github.com/JuliaString/Format.jl
 [format-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/F/Format.svg
-[format-tvs-img]: https://travis-ci.org/JuliaString/Format.jl.svg?branch=master
-[format-tvs-url]: https://travis-ci.org/JuliaString/Format.jl
 [format-rel]:     https://img.shields.io/github/release/JuliaString/Format.jl.svg?label="."
 [format-dat]:     https://img.shields.io/github/release-date/JuliaString/Format.jl.svg?label="."
 
 [strapi-loc]:     https://github.com/JuliaString/StrAPI.jl
 [strapi-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/S/StrAPI.svg
-[strapi-tvs-img]: https://travis-ci.org/JuliaString/StrAPI.jl.svg?branch=master
-[strapi-tvs-url]: https://travis-ci.org/JuliaString/StrAPI.jl
 [strapi-rel]:     https://img.shields.io/github/release/JuliaString/StrAPI.jl.svg?label="."
 [strapi-dat]:     https://img.shields.io/github/release-date/JuliaString/StrAPI.jl.svg?label="."
 
 [cse-loc]:     https://github.com/JuliaString/CharSetEncodings.jl
 [cse-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/C/CharSetEncodings.svg
-[cse-tvs-img]: https://travis-ci.org/JuliaString/CharSetEncodings.jl.svg?branch=master
-[cse-tvs-url]: https://travis-ci.org/JuliaString/CharSetEncodings.jl
 [cse-rel]:     https://img.shields.io/github/release/JuliaString/CharSetEncodings.jl.svg?label="."
 [cse-dat]:     https://img.shields.io/github/release-date/JuliaString/CharSetEncodings.jl.svg?label="."
 
 [chrbase-loc]:     https://github.com/JuliaString/ChrBase.jl
 [chrbase-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/C/ChrBase.svg
-[chrbase-tvs-img]: https://travis-ci.org/JuliaString/ChrBase.jl.svg?branch=master
-[chrbase-tvs-url]: https://travis-ci.org/JuliaString/ChrBase.jl
 [chrbase-rel]:     https://img.shields.io/github/release/JuliaString/ChrBase.jl.svg?label="."
 [chrbase-dat]:     https://img.shields.io/github/release-date/JuliaString/ChrBase.jl.svg?label="."
 
 [strbase-loc]:     https://github.com/JuliaString/StrBase.jl
 [strbase-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/S/StrBase.svg
-[strbase-tvs-img]: https://travis-ci.org/JuliaString/StrBase.jl.svg?branch=master
-[strbase-tvs-url]: https://travis-ci.org/JuliaString/StrBase.jl
 [strbase-rel]:     https://img.shields.io/github/release/JuliaString/StrBase.jl.svg?label="."
 [strbase-dat]:     https://img.shields.io/github/release-date/JuliaString/StrBase.jl.svg?label="."
 
 [strregex-loc]:     https://github.com/JuliaString/StrRegex.jl
 [strregex-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/S/StrRegex.svg
-[strregex-tvs-img]: https://travis-ci.org/JuliaString/StrRegex.jl.svg?branch=master
-[strregex-tvs-url]: https://travis-ci.org/JuliaString/StrRegex.jl
 [strregex-rel]:     https://img.shields.io/github/release/JuliaString/StrRegex.jl.svg?label="."
 [strregex-dat]:     https://img.shields.io/github/release-date/JuliaString/StrRegex.jl.svg?label="."
 
 [strliterals-loc]:     https://github.com/JuliaString/StrLiterals.jl
 [strliterals-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/S/StrLiterals.svg
-[strliterals-tvs-img]: https://travis-ci.org/JuliaString/StrLiterals.jl.svg?branch=master
-[strliterals-tvs-url]: https://travis-ci.org/JuliaString/StrLiterals.jl
 [strliterals-rel]:     https://img.shields.io/github/release/JuliaString/StrLiterals.jl.svg?label="."
 [strliterals-dat]:     https://img.shields.io/github/release-date/JuliaString/StrLiterals.jl.svg?label="."
 
 [strformat-loc]:     https://github.com/JuliaString/StrFormat.jl
 [strformat-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/S/StrFormat.svg
-[strformat-tvs-img]: https://travis-ci.org/JuliaString/StrFormat.jl.svg?branch=master
-[strformat-tvs-url]: https://travis-ci.org/JuliaString/StrFormat.jl
 [strformat-rel]:     https://img.shields.io/github/release/JuliaString/StrFormat.jl.svg?label="."
 [strformat-dat]:     https://img.shields.io/github/release-date/JuliaString/StrFormat.jl.svg?label="."
 
 [strtables-loc]:     https://github.com/JuliaString/StrTables.jl
 [strtables-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/S/StrTables.svg
-[strtables-tvs-img]: https://travis-ci.org/JuliaString/StrTables.jl.svg?branch=master
-[strtables-tvs-url]: https://travis-ci.org/JuliaString/StrTables.jl
 [strtables-rel]:     https://img.shields.io/github/release/JuliaString/StrTables.jl.svg?label="."
 [strtables-dat]:     https://img.shields.io/github/release-date/JuliaString/StrTables.jl.svg?label="."
 
 [html-loc]:     https://github.com/JuliaString/HTML_Entities.jl
 [html-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/H/HTML_Entities.svg
-[html-tvs-img]: https://travis-ci.org/JuliaString/HTML_Entities.jl.svg?branch=master
-[html-tvs-url]: https://travis-ci.org/JuliaString/HTML_Entities.jl
 [html-rel]:     https://img.shields.io/github/release/JuliaString/HTML_Entities.jl.svg?label="."
 [html-dat]:     https://img.shields.io/github/release-date/JuliaString/HTML_Entities.jl.svg?label="."
 
 [emoji-loc]:     https://github.com/JuliaString/Emoji_Entities.jl
 [emoji-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/E/Emoji_Entities.svg
-[emoji-tvs-img]: https://travis-ci.org/JuliaString/Emoji_Entities.jl.svg?branch=master
-[emoji-tvs-url]: https://travis-ci.org/JuliaString/Emoji_Entities.jl
 [emoji-rel]:     https://img.shields.io/github/release/JuliaString/Emoji_Entities.jl.svg?label="."
 [emoji-dat]:     https://img.shields.io/github/release-date/JuliaString/Emoji_Entities.jl.svg?label="."
 
 [latex-loc]:     https://github.com/JuliaString/LaTeX_Entities.jl
 [latex-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/L/LaTeX_Entities.svg
-[latex-tvs-img]: https://travis-ci.org/JuliaString/LaTeX_Entities.jl.svg?branch=master
-[latex-tvs-url]: https://travis-ci.org/JuliaString/LaTeX_Entities.jl
 [latex-rel]:     https://img.shields.io/github/release/JuliaString/LaTeX_Entities.jl.svg?label="."
 [latex-dat]:     https://img.shields.io/github/release-date/JuliaString/LaTeX_Entities.jl.svg?label="."
 
 [unicode-loc]:     https://github.com/JuliaString/Unicode_Entities.jl
 [unicode-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/U/Unicode_Entitites.svg
-[unicode-tvs-img]: https://travis-ci.org/JuliaString/Unicode_Entities.jl.svg?branch=master
-[unicode-tvs-url]: https://travis-ci.org/JuliaString/Unicode_Entities.jl
 [unicode-rel]:     https://img.shields.io/github/release/JuliaString/Unicode_Entities.jl.svg?label="."
 [unicode-dat]:     https://img.shields.io/github/release-date/JuliaString/Unicode_Entities.jl.svg?label="."
 
 [strentities-loc]:     https://github.com/JuliaString/StrEntities.jl
 [strentities-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/S/StrEntities.svg
-[strentities-tvs-img]: https://travis-ci.org/JuliaString/StrEntities.jl.svg?branch=master
-[strentities-tvs-url]: https://travis-ci.org/JuliaString/StrEntities.jl
 [strentities-rel]:     https://img.shields.io/github/release/JuliaString/StrEntities.jl.svg?label="."
 [strentities-dat]:     https://img.shields.io/github/release-date/JuliaString/StrEntities.jl.svg?label="."
 
 [int-loc]:     https://github.com/JuliaString/InternedStrings.jl
 [int-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/I/InternedStrings.svg
-[int-tvs-img]: https://travis-ci.org/JuliaString/InternedStrings.jl.svg?branch=master
-[int-tvs-url]: https://travis-ci.org/JuliaString/InternedStrings.jl
 [int-rel]:     https://img.shields.io/github/release/JuliaString/InternedStrings.jl.svg?label="."
 [int-dat]:     https://img.shields.io/github/release-date/JuliaString/InternedStrings.jl.svg?label="."
 
 
-The new package [ModuleInterfaceTools](https://github.com/JuliaString/ModuleInterfaceTools.jl) is used to set up a consistent and easy to use API for most of the cooperating packages, without having to worry too much about imports, exports, using, and what functions are part of a public API, and which ones are part of the internal development API for other packages to extend.
+The package [ModuleInterfaceTools](https://github.com/JuliaString/ModuleInterfaceTools.jl) is used to set up a consistent and easy to use API for most of the cooperating packages, without having to worry too much about imports, exports, using, and what functions are part of a public API, and which ones are part of the internal development API for other packages to extend.
 
 ## Architecture and Operations
 
