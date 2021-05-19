@@ -71,115 +71,133 @@ or pointers to such (such as a way to get lots of tweets, to test mixed text and
 
 | **Package** | **Release** | **Release Date** | **Package Evaluator** | **Unit Tests** | **Description** |
 |:-------------:|:-------------:|:-------------:|:-------------:|:-----------:|:-------------------|
-| [ModuleInterfaceTools][mit-loc] | [![][mit-rel]][mit-loc] | [![][mit-dat]][mit-loc] | [![][mit-pkg]][pkg-url] | [![][mit-tvs-img]][mit-tvs-url] | Tools to create a common API for all of these packages
-| [StrAPI][strapi-loc] | [![][strapi-rel]][strapi-loc] | [![][strapi-dat]][strapi-loc] | [![][strapi-pkg]][pkg-url] | [![][strapi-tvs-img]][strapi-tvs-url] | Common API for string/character functionality
-| [CharSetEncodings][cse-loc] | [![][cse-rel]][cse-loc] | [![][cse-dat]][cse-loc] | [![][cse-pkg]][pkg-url] | [![][cse-tvs-img]][cse-tvs-url] | Basic types/support for Character Sets, Encodings, and Character Set Encodings
-| [ChrBase][chrbase-loc] | [![][chrbase-rel]][chrbase-loc] | [![][chrbase-dat]][chrbase-loc] | [![][chrbase-pkg]][pkg-url] | [![][chrbase-tvs-img]][chrbase-tvs-url] | `Chr{CharSet,CodeUnitType}` type and support
-| [MurmurHash3][mh3-loc] | [![][mh3-rel]][mh3-loc] | [![][mh3-dat]][mh3-loc] | [![][mh3-pkg]][pkg-url] | [![][mh3-tvs-img]][mh3-tvs-url] | Pure Julia implementation of MurmurHash3
-| [PCRE2][pcre2-loc] | [![][pcre2-rel]][pcre2-loc] | [![][pcre2-dat]][pcre2-loc] | [![][pcre2-pkg]][pkg-url] | [![][pcre2-tvs-img]][pcre2-tvs-url] | `PCRE2` library support
-| [Format][format-loc] | [![][format-rel]][format-loc] | [![][format-dat]][format-loc] | [![][format-pkg]][pkg-url] | [![][format-tvs-img]][format-tvs-url] | Python/C style formatting (based on [Formatting](https://github.com/JuliaIO/Formatting.jl))
-| [StrBase][strbase-loc] | [![][strbase-rel]][strbase-loc] | [![][strbase-dat]][strbase-loc] | [![][strbase-pkg]][pkg-url] | [![][strbase-tvs-img]][strbase-tvs-url] | `Str{CSE, Hash, SubSet, Cache}` type
-| [StrRegex][strregex-loc] | [![][strregex-rel]][strregex-loc] | [![][strregex-dat]][strregex-loc] | [![][strregex-pkg]][pkg-url] | [![][strregex-tvs-img]][strregex-tvs-url] | `Regex` support for all string types
-| [StrLiterals][strliterals-loc] | [![][strliterals-rel]][strliterals-loc] | [![][strliterals-dat]][strliterals-loc] | [![][strliterals-pkg]][pkg-url] | [![][strliterals-tvs-img]][strliterals-tvs-url] | Extensible string literal support
-| [StrFormat][strformat-loc] | [![][strformat-rel]][strformat-loc] | [![][strformat-dat]][strformat-loc] | [![][strformat-pkg]][pkg-url] | [![][strformat-tvs-img]][strformat-tvs-url] | Formatting extensions for literals
-| [StrTables][strtables-loc] | [![][strtables-rel]][strtables-loc] | [![][strtables-dat]][strtables-loc] | [![][strtables-pkg]][pkg-url] | [![][strtables-tvs-img]][strtables-tvs-url] | Low-level support for entity tables
-| [HTML_Entities][html-loc] | [![][html-rel]][html-loc] | [![][html-dat]][html-loc] | [![][html-pkg]][pkg-url] | [![][html-tvs-img]][html-tvs-url] | HTML character sequences
-| [Emoji_Entities][emoji-loc] | [![][emoji-rel]][emoji-loc] | [![][emoji-dat]][emoji-loc] | [![][emoji-pkg]][pkg-url] | [![][emoji-tvs-img]][emoji-tvs-url] | Emoji names (including composite ones)
-| [LaTeX_Entities][latex-loc] | [![][latex-rel]][latex-loc] | [![][latex-dat]][latex-loc] | [![][latex-pkg]][pkg-url] | [![][latex-tvs-img]][latex-tvs-url] | Julia LaTeX character names
-| [Unicode_Entities][unicode-loc] | [![][unicode-rel]][unicode-loc] | [![][unicode-dat]][unicode-loc] | [![][unicode-pkg]][pkg-url] | [![][unicode-tvs-img]][unicode-tvs-url] | Unicode standard character names
-| [StrEntities][strentities-loc] | [![][strentities-rel]][strentities-loc] | [![][strentities-dat]][strentities-loc] | [![][strentities-pkg]][pkg-url] | [![][strentities-tvs-img]][strentities-tvs-url] | Entity extensions for literals
-| [InternedStrings][int-loc] | [![][int-rel]][int-loc] | [![][int-dat]][int-loc] | [![][int-pkg]][pkg-url] | [![][int-tvs-img]][int-tvs-url] | Save space by interning strings (by @oxinabox!)
+| [ModuleInterfaceTools][mit-loc] | [![][mit-rel]][mit-loc] | [![][mit-dat]][mit-loc] | [![][mit-pkg]][pkg-url] | [![][mit-chk]][mit-loc] | Tools to create a common API for all of these packages
+| [StrAPI][strapi-loc] | [![][strapi-rel]][strapi-loc] | [![][strapi-dat]][strapi-loc] | [![][strapi-pkg]][pkg-url] | [![][strapi-chk]][strapi-loc] | Common API for string/character functionality
+| [CharSetEncodings][cse-loc] | [![][cse-rel]][cse-loc] | [![][cse-dat]][cse-loc] | [![][cse-pkg]][pkg-url] | [![][cse-chk]][cse-loc] | Basic types/support for Character Sets, Encodings, and Character Set Encodings
+| [ChrBase][chrbase-loc] | [![][chrbase-rel]][chrbase-loc] | [![][chrbase-dat]][chrbase-loc] | [![][chrbase-pkg]][pkg-url] | [![][chrbase-chk]][chrbase-loc] | `Chr{CharSet,CodeUnitType}` type and support
+| [MurmurHash3][mh3-loc] | [![][mh3-rel]][mh3-loc] | [![][mh3-dat]][mh3-loc] | [![][mh3-pkg]][pkg-url] | [![][mh3-chk]][mh3-loc] | Pure Julia implementation of MurmurHash3
+| [PCRE2][pcre2-loc] | [![][pcre2-rel]][pcre2-loc] | [![][pcre2-dat]][pcre2-loc] | [![][pcre2-pkg]][pkg-url] | [![][pcre2-chk]][pcre2-loc] | `PCRE2` library support
+| [Format][format-loc] | [![][format-rel]][format-loc] | [![][format-dat]][format-loc] | [![][format-pkg]][pkg-url] | [![][format-chk]][format-loc] | Python/C style formatting (based on [Formatting](https://github.com/JuliaIO/Formatting.jl))
+| [StrBase][strbase-loc] | [![][strbase-rel]][strbase-loc] | [![][strbase-dat]][strbase-loc] | [![][strbase-pkg]][pkg-url] | [![][strbase-chk]][strbase-loc] | `Str{CSE, Hash, SubSet, Cache}` type
+| [StrRegex][strregex-loc] | [![][strregex-rel]][strregex-loc] | [![][strregex-dat]][strregex-loc] | [![][strregex-pkg]][pkg-url] | [![][strregex-chk]][strregex-loc] | `Regex` support for all string types
+| [StrLiterals][strliterals-loc] | [![][strliterals-rel]][strliterals-loc] | [![][strliterals-dat]][strliterals-loc] | [![][strliterals-pkg]][pkg-url] | [![][strliterals-chk]][strliterals-loc] | Extensible string literal support
+| [StrFormat][strformat-loc] | [![][strformat-rel]][strformat-loc] | [![][strformat-dat]][strformat-loc] | [![][strformat-pkg]][pkg-url] | [![][strformat-chk]][strformat-loc] | Formatting extensions for literals
+| [StrTables][strtables-loc] | [![][strtables-rel]][strtables-loc] | [![][strtables-dat]][strtables-loc] | [![][strtables-pkg]][pkg-url] | [![][strtables-chk]][strtables-loc] | Low-level support for entity tables
+| [HTML_Entities][html-loc] | [![][html-rel]][html-loc] | [![][html-dat]][html-loc] | [![][html-pkg]][pkg-url] | [![][html-chk]][html-loc] | HTML character sequences
+| [Emoji_Entities][emoji-loc] | [![][emoji-rel]][emoji-loc] | [![][emoji-dat]][emoji-loc] | [![][emoji-pkg]][pkg-url] | [![][emoji-chk]][emoji-loc] | Emoji names (including composite ones)
+| [LaTeX_Entities][latex-loc] | [![][latex-rel]][latex-loc] | [![][latex-dat]][latex-loc] | [![][latex-pkg]][pkg-url] | [![][latex-chk]][latex-loc] | Julia LaTeX character names
+| [Unicode_Entities][unicode-loc] | [![][unicode-rel]][unicode-loc] | [![][unicode-dat]][unicode-loc] | [![][unicode-pkg]][pkg-url] | [![][unicode-chk]][unicode-loc] | Unicode standard character names
+| [StrEntities][strentities-loc] | [![][strentities-rel]][strentities-loc] | [![][strentities-dat]][strentities-loc] | [![][strentities-pkg]][pkg-url] | [![][strentities-chk]][strentities-loc] | Entity extensions for literals
+| [InternedStrings][int-loc] | [![][int-rel]][int-loc] | [![][int-dat]][int-loc] | [![][int-pkg]][pkg-url] | [![][int-chk]][int-loc] | Save space by interning strings (by @oxinabox!)
 
 
-[mit-loc]:     https://github.com/JuliaString/ModuleInterfaceTools.jl
-[mit-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/M/ModuleInterfaceTools.svg
-[mit-rel]:     https://img.shields.io/github/release/JuliaString/ModuleInterfaceTools.jl.svg?label="."
-[mit-dat]:     https://img.shields.io/github/release-date/JuliaString/ModuleInterfaceTools.jl.svg?label="."
+[mit-loc]: https://github.com/JuliaString/ModuleInterfaceTools.jl
+[mit-pkg]: https://juliaci.github.io/NanosoldierReports/pkgeval_badges/M/ModuleInterfaceTools.svg
+[mit-rel]: https://img.shields.io/github/release/JuliaString/ModuleInterfaceTools.jl.svg?label="."
+[mit-dat]: https://img.shields.io/github/release-date/JuliaString/ModuleInterfaceTools.jl.svg?label="."
+[mit-chk]: https://img.shields.io/github/checks-status/JuliaString/ModuleInterfaceTools.jl/master
 
 [mh3-loc]:     https://github.com/JuliaString/MurmurHash3.jl
 [mh3-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/M/MurmurHash3.svg
 [mh3-rel]:     https://img.shields.io/github/release/JuliaString/MurmurHash3.jl.svg?label="."
 [mh3-dat]:     https://img.shields.io/github/release-date/JuliaString/MurmurHash3.jl.svg?label="."
+[mh3-chk]:     https://img.shields.io/github/checks-status/JuliaString/MurmurHash3.jl/master
 
 [pcre2-loc]:     https://github.com/JuliaString/PCRE2.jl
 [pcre2-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/P/PCRE2.svg
 [pcre2-rel]:     https://img.shields.io/github/release/JuliaString/PCRE2.jl.svg?label="."
 [pcre2-dat]:     https://img.shields.io/github/release-date/JuliaString/PCRE2.jl.svg?label="."
+[pcre2-chk]:     https://img.shields.io/github/checks-status/JuliaString/PCRE2.jl/master
 
 [format-loc]:     https://github.com/JuliaString/Format.jl
 [format-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/F/Format.svg
 [format-rel]:     https://img.shields.io/github/release/JuliaString/Format.jl.svg?label="."
 [format-dat]:     https://img.shields.io/github/release-date/JuliaString/Format.jl.svg?label="."
+[format-chk]:     https://img.shields.io/github/checks-status/JuliaString/Format.jl/master
 
 [strapi-loc]:     https://github.com/JuliaString/StrAPI.jl
 [strapi-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/S/StrAPI.svg
 [strapi-rel]:     https://img.shields.io/github/release/JuliaString/StrAPI.jl.svg?label="."
 [strapi-dat]:     https://img.shields.io/github/release-date/JuliaString/StrAPI.jl.svg?label="."
+[strapi-chk]:     https://img.shields.io/github/checks-status/JuliaString/StrAPI.jl/master
 
 [cse-loc]:     https://github.com/JuliaString/CharSetEncodings.jl
 [cse-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/C/CharSetEncodings.svg
 [cse-rel]:     https://img.shields.io/github/release/JuliaString/CharSetEncodings.jl.svg?label="."
 [cse-dat]:     https://img.shields.io/github/release-date/JuliaString/CharSetEncodings.jl.svg?label="."
+[cse-chk]:     https://img.shields.io/github/checks-status/JuliaString/CharSetEncodings.jl/master
 
 [chrbase-loc]:     https://github.com/JuliaString/ChrBase.jl
 [chrbase-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/C/ChrBase.svg
 [chrbase-rel]:     https://img.shields.io/github/release/JuliaString/ChrBase.jl.svg?label="."
 [chrbase-dat]:     https://img.shields.io/github/release-date/JuliaString/ChrBase.jl.svg?label="."
+[chrbase-chk]:     https://img.shields.io/github/checks-status/JuliaString/ChrBase.jl/master
 
 [strbase-loc]:     https://github.com/JuliaString/StrBase.jl
 [strbase-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/S/StrBase.svg
 [strbase-rel]:     https://img.shields.io/github/release/JuliaString/StrBase.jl.svg?label="."
 [strbase-dat]:     https://img.shields.io/github/release-date/JuliaString/StrBase.jl.svg?label="."
+[strbase-chk]:     https://img.shields.io/github/checks-status/JuliaString/StrBase.jl/master
 
 [strregex-loc]:     https://github.com/JuliaString/StrRegex.jl
 [strregex-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/S/StrRegex.svg
 [strregex-rel]:     https://img.shields.io/github/release/JuliaString/StrRegex.jl.svg?label="."
 [strregex-dat]:     https://img.shields.io/github/release-date/JuliaString/StrRegex.jl.svg?label="."
+[strregex-chk]:     https://img.shields.io/github/checks-status/JuliaString/StrRegex.jl/master
 
 [strliterals-loc]:     https://github.com/JuliaString/StrLiterals.jl
 [strliterals-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/S/StrLiterals.svg
 [strliterals-rel]:     https://img.shields.io/github/release/JuliaString/StrLiterals.jl.svg?label="."
 [strliterals-dat]:     https://img.shields.io/github/release-date/JuliaString/StrLiterals.jl.svg?label="."
+[strliterals-chk]:     https://img.shields.io/github/checks-status/JuliaString/StrLiterals.jl/master
 
 [strformat-loc]:     https://github.com/JuliaString/StrFormat.jl
 [strformat-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/S/StrFormat.svg
 [strformat-rel]:     https://img.shields.io/github/release/JuliaString/StrFormat.jl.svg?label="."
 [strformat-dat]:     https://img.shields.io/github/release-date/JuliaString/StrFormat.jl.svg?label="."
+[strformat-chk]:     https://img.shields.io/github/checks-status/JuliaString/StrFormat.jl/master
 
 [strtables-loc]:     https://github.com/JuliaString/StrTables.jl
 [strtables-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/S/StrTables.svg
 [strtables-rel]:     https://img.shields.io/github/release/JuliaString/StrTables.jl.svg?label="."
 [strtables-dat]:     https://img.shields.io/github/release-date/JuliaString/StrTables.jl.svg?label="."
+[strtables-chk]:     https://img.shields.io/github/checks-status/JuliaString/StrTables.jl/master
 
 [html-loc]:     https://github.com/JuliaString/HTML_Entities.jl
 [html-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/H/HTML_Entities.svg
 [html-rel]:     https://img.shields.io/github/release/JuliaString/HTML_Entities.jl.svg?label="."
 [html-dat]:     https://img.shields.io/github/release-date/JuliaString/HTML_Entities.jl.svg?label="."
+[html-chk]:     https://img.shields.io/github/checks-status/JuliaString/HTML_Entities.jl/master
 
 [emoji-loc]:     https://github.com/JuliaString/Emoji_Entities.jl
 [emoji-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/E/Emoji_Entities.svg
 [emoji-rel]:     https://img.shields.io/github/release/JuliaString/Emoji_Entities.jl.svg?label="."
 [emoji-dat]:     https://img.shields.io/github/release-date/JuliaString/Emoji_Entities.jl.svg?label="."
+[emoji-chk]:     https://img.shields.io/github/checks-status/JuliaString/Emoji_Entities.jl/master
 
 [latex-loc]:     https://github.com/JuliaString/LaTeX_Entities.jl
 [latex-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/L/LaTeX_Entities.svg
 [latex-rel]:     https://img.shields.io/github/release/JuliaString/LaTeX_Entities.jl.svg?label="."
 [latex-dat]:     https://img.shields.io/github/release-date/JuliaString/LaTeX_Entities.jl.svg?label="."
+[latex-chk]:     https://img.shields.io/github/checks-status/JuliaString/LaTeX_Entities.jl/master
 
 [unicode-loc]:     https://github.com/JuliaString/Unicode_Entities.jl
 [unicode-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/U/Unicode_Entitites.svg
 [unicode-rel]:     https://img.shields.io/github/release/JuliaString/Unicode_Entities.jl.svg?label="."
 [unicode-dat]:     https://img.shields.io/github/release-date/JuliaString/Unicode_Entities.jl.svg?label="."
+[unicode-chk]:     https://img.shields.io/github/checks-status/JuliaString/Unicode_Entities.jl/master
 
 [strentities-loc]:     https://github.com/JuliaString/StrEntities.jl
 [strentities-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/S/StrEntities.svg
 [strentities-rel]:     https://img.shields.io/github/release/JuliaString/StrEntities.jl.svg?label="."
 [strentities-dat]:     https://img.shields.io/github/release-date/JuliaString/StrEntities.jl.svg?label="."
+[strentities-chk]:     https://img.shields.io/github/checks-status/JuliaString/StrEntities.jl/master
 
 [int-loc]:     https://github.com/JuliaString/InternedStrings.jl
 [int-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/I/InternedStrings.svg
 [int-rel]:     https://img.shields.io/github/release/JuliaString/InternedStrings.jl.svg?label="."
 [int-dat]:     https://img.shields.io/github/release-date/JuliaString/InternedStrings.jl.svg?label="."
+[int-chk]:     https://img.shields.io/github/checks-status/JuliaString/InternedStrings.jl/master
 
 
 The package [ModuleInterfaceTools](https://github.com/JuliaString/ModuleInterfaceTools.jl) is used to set up a consistent and easy to use API for most of the cooperating packages, without having to worry too much about imports, exports, using, and what functions are part of a public API, and which ones are part of the internal development API for other packages to extend.
