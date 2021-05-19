@@ -3,9 +3,9 @@ const test_legacy = false
 using BenchmarkTools
 
 using Strs
-using Strs:V6_COMPAT
 
 using REPL
+using Downloads: download
 
 @api test StrAPI, StrBase, StrRegex
 

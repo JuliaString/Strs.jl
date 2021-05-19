@@ -82,6 +82,17 @@ function find_end(lines, beg)
     last
 end
 
+# Try 5 times (because of frequent timeout failures)
+function try_download(url, nam)
+    for i = 1:5
+        try
+            download(url, lname)
+            break
+        catch ex
+        end
+    end
+end
+
 """
 Load books from Project Gutenberg site, removing lines added at beginning and end that
 are not part of the book, as much as possible
@@ -93,7 +104,8 @@ function load_gutenberg!(books, list, dict, gutenbergdir)
         dict[lang] = cnt + 1
         outnam = cnt == 0 ? "$lang.txt" : "$lang-$cnt.txt"
         lname = joinpath(gutenbergdir, outnam)
-        download(string("http://www.gutenberg.org/files/", nam, ".txt"), lname)
+        url = string("http://www.gutenberg.org/files/", nam, ".txt")
+        try_download(url, lname)
         println("Saved to: ", lname)
         lines = readlines(lname)
         (beg, cse) = find_beg(lines)
