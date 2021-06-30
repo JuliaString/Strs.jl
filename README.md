@@ -207,7 +207,7 @@ The package [ModuleInterfaceTools](https://github.com/JuliaString/ModuleInterfac
 The general philosophy of the architecture is as follows: have a single easy to use type that can replace `String` that conforms to the recommendations of the Unicode Organization (which internally uses 4 types and is implemented currently as a Julia Union, and has O(1) indexing to characters, not just code units), as well as types to represent binary strings, raw unvalidated strings (made up of 1, 2, or 4 byte codepoints), as well as types for validated ASCII, Latin1, UCS2 (16-bit, BMP [Basic Multilingual Plane]), UTF-8, UTF-16, and UTF-32 encoded strings.
 
 Optimizations for multi code unit encodings such as UTF-8 & UTF-16 will be moved to `StrUTF8` and `StrUTF16` packages (before splitting them out, I'll make sure that the functionality still works, only with slower generic methods, so that you only take up the extra space if you need the faster speed).
-Extensions such as converting to and from non-Unicode encodings, such as Windows CP-1252 or China's official character set, GB18030,  will be done in another package, `StrEncodings`.
+Extensions such as converting to and from non-Unicode encodings, such as Windows CP-1252 or China's official character set, GB18030, will be done in another package, `StrEncodings`.
 
 Subtypes that directly support things like substrings, caching hash values, and caching one or more versions of the string (such as the originally unmodified byte, 16-bit or 32-bit word stream, in the case where the input was not valid, or a valid UTF-8 (similar to the way Python can cache a UTF-8 version of a string) and/or UTF-16 encoded version, for better performance when interoperating with other languages such as JavaScript, Swift, Java, or OS APIs like Windows that expect UTF-16).
 
@@ -228,7 +228,7 @@ Currently, there are the following types:
 * `BinaryStr` for storing non-textual data as a sequence of bytes.
 
 * `ASCIIStr`   an ASCII string, composed of `ASCIIChr` 1-byte codepoints
-* `LatinStr`   a string using the Latin1 subset of Unicode, composed of `LatinChr` 1-byte codepoints.
+* `LatinStr`   a string using the Latin1 subset of Unicode, composed of `LatinChr` 1-byte codepoints
 * `UCS2Str`    a string composed of characters (`UCS2Chr`s) only in the Unicode BMP, stored as 2 byte code units (that each store a single codepoint)
 * `UTF32Str`   a string with only valid Unicode characters, 0-0xd7ff, 0xe000-0x10ffff, stored as 4 byte code units.
 
@@ -294,7 +294,7 @@ Nobody is an island, and to achieve great things, one must stand on the shoulder
 
 I would like to thank some of those giants in particular:
 
-* The four co-creators of Julia: [Jeff Bezanson](https://github.com/JeffBezanson),[Viral B. Shah](https://github.com/ViralBShah), [Alan Edelman](https://github.com/alanedelman), and [Stefan Karpinski](https://github.com/StefanKarpinski), without their uncompromising greediness, none of this would be possible.
+* The four co-creators of Julia: [Jeff Bezanson](https://github.com/JeffBezanson), [Viral B. Shah](https://github.com/ViralBShah), [Alan Edelman](https://github.com/alanedelman), and [Stefan Karpinski](https://github.com/StefanKarpinski), without their uncompromising greediness, none of this would be possible.
 
 * [Tom Breloff](https://github.com/tbreloff), for showing how an ecosystem could be created in Julia, i.e. "Build it, and they will come", for providing some nice code in this [PR](https://github.com/JuliaIO/Formatting.jl/pull/10) (which I shamelessly pirated in order to create [Format](https://github.com/JuliaString/Format.jl), and for good advice at JuliaCon.
 * [Ismael Venegas Castelló](https://twitter.com/SalchiPapa1337) for encouraging me to [tweet](https://twitter.com/GandalfSoftware) about Julia starting at the 2015 JuliaCon, for good advice, and being a great guy in general.
@@ -302,7 +302,7 @@ I would like to thank some of those giants in particular:
 * [Jacob Quinn](https://github.com/quinnj), for collaborating & discussions early on in [Strings](https://github.com/quinnj/Strings.jl) on ideas for better string support in Julia, as well as a lot of hard work on things dear to me, such as databases and importing/exporting data [SQLite](https://github.com/JuliaDatabases/SQLite.jl), [ODBC](https://github.com/JuliaDatabases/ODBC.jl), [CSV](https://github.com/JuliaData/CSV.jl), [WeakRefStrings](https://github.com/JuliaData/WeakRefStrings.jl), [DataStreams](https://github.com/JuliaData/DataStreams.jl), [Feather](https://github.com/JuliaData/Feather.jl), [JSON2](https://github.com/quinnj/JSON2.jl)
 * [Milan Bouchet-Valat](https://github.com/nalimilan), for discussions on string handling and encoding in [StringEncodings](https://github.com/nalimilan/StringEncodings.jl)
 * [Tim Holy](https://github.com/timholy) for the famous "Holy" Trait Trick, which I use extensively in the Str* packages, for the work along with [Matt Bauman](https://github.com/mbauman) on making Julia arrays general, extensible while still performing well, and hence very useful in my work.
-* [Steven G. Johnson]() for illuminating me on how one could create a whole package in very few lines of code when I first started learning Julia, see [DecFP](https://github.com/stevengj/DecFP.jl)
+* [Steven G. Johnson]() for illuminating me on how one could create a whole package in very few lines of code when I first started learning Julia, see [DecFP](https://github.com/stevengj/DecFP.jl).
 * [Tony Kelman](https://github.com/tkelman), for very thorough reviews of my PRs, I learned a great deal from his (and other Julians') comments), including that I didn't have to code in C anymore to get the performance I desired.
 
 * [Lyndon White](https://github.com/oxinabox), I've already "appropriated" :grinning: his very nice [InternedStrings](https://github.com/JuliaString/InternedStrings.jl) into this package, I'm really lucky to have gotten him to join the organization!
