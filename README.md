@@ -1,6 +1,6 @@
 [pkg-url]:  https://juliaci.github.io/NanosoldierReports/pkgeval_badges/report.html
 [strs-pkg]: https://juliaci.github.io/NanosoldierReports/pkgeval_badges/S/Strs.svg
-[contrib]:    https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat
+[contrib]:  https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat
 [codecov-url]:  https://codecov.io/gh/JuliaString/Strs.jl
 [codecov-img]:  https://codecov.io/gh/JuliaString/Strs.jl/branch/master/graph/badge.svg
 
@@ -52,15 +52,15 @@ It brings together the following:
 3) Faster and VALIDATED `UTF8Str` type.
    Julia's built-in `String` type allows storing invalid sequences.
    (Strs provides a `Text1Str` type for holding strings that might be invalid UTF-8, or might be
-   some other encoding, such as Microsoft's CP1252)
+   some other encoding, such as Microsoft's CP1252).
    This is especially a problem because the built-in Regex support in Julia incorrectly passes a flag saying that the argument has already been checked and is a valid UTF-8 sequence.  Skipping that check in PCRE2 does make regex matching much faster, however it leaves you open to attacks if your are using regex on unchecked string input.
 
-4) Types for Binary strings, as well as strings that are known to be text strings, but whose encoding is not known (might be UTF-8 with certain commonly accepted but invalid sequence, such as representing characters > uFFFF in 6 bytes, as two 16 bit surrogate characters, or encoding a null byte as `\0xc0\0x80` instead of `\0`, or S-JIS, CP1252, etc.)
+4) Types for Binary strings, as well as strings that are known to be text strings, but whose encoding is not known (might be UTF-8 with certain commonly accepted but invalid sequence, such as representing characters > uFFFF in 6 bytes, as two 16-bit surrogate characters, or encoding a null byte as `\0xc0\0x80` instead of `\0`, or S-JIS, CP1252, etc.)
 
-5) Highly optimized string functions, operating on 2, 4, or 8 characters at a time
+5) Highly-optimized string functions, operating on 2, 4, or 8 characters at a time
    (I do intend to optimize these further, by using vector instructions on Intel, ARM, and POWER architectures, to process up to 64 characters at a time).
 
-6) Thread-safe Regex support (it was not thread-safe in the LTS (long term support) version of Julia, currently v1.05, but that has been fixed as of the v1.3 release)
+6) Thread-safe Regex support (it was not thread-safe in the LTS (long-term support) version of Julia, currently v1.05, but that has been fixed as of the v1.3 release)
 
 7) Regex support that doesn't assume that `String` values are valid UTF-8, so that it can't be used as a way of attacking programs written in Julia by passing certain unvalidated strings to the PCRE2 library. For speed, one can use the `UTF8Str` type instead of `String` using `R"..."` instead of the `r"..."`.
 
