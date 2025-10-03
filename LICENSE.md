@@ -42,8 +42,6 @@ This also incorporates a large amount of code from various PRs I made, which wer
 | [#12898](https://github.com/JuliaLang/julia/pull/12898) | Add coverage tests for strings/basic.jl |
 | [#12905](https://github.com/JuliaLang/julia/pull/12905) | Deprecate getindex/checkbounds methods for non Integer Real indices for Chars and Strings |
 
-The Julia implementation of MurmurHash3 was based on [MurmurHash3](https://github.com/JuliaLang/julia/blob/master/src/support/MurmurHash3.c) by Autin Appleby, which was placed in the public domain.
-
 Some of the ideas for the design and how to implement came from collaborating on the [StringEncodings](https://github.com/nalimilan/StringEncodings.jl) package, by [Milan Bouchet-Valat](https://github.com/nalimilan) and the [Strings](https://github.com/quinnj/Strings.jl) package, by [Jacob Quinn](https://github.com/quinnj)
 
 The [JuliaString logo(s)](Logo.gif) are copyright (c) 2018 [@cormullion](https://github.com/cormullion) (Julia artist extraordinaire: math + code + Julia -> visual poetry)
