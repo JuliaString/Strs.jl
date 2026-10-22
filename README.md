@@ -75,7 +75,6 @@ or pointers to such (such as a way to get lots of tweets, to test mixed text and
 | [StrAPI][strapi-loc] | [![][strapi-rel]][strapi-loc] | [![][strapi-dat]][strapi-loc] | [![][strapi-pkg]][pkg-url] | [![][strapi-chk]][strapi-loc] | Common API for string/character functionality
 | [CharSetEncodings][cse-loc] | [![][cse-rel]][cse-loc] | [![][cse-dat]][cse-loc] | [![][cse-pkg]][pkg-url] | [![][cse-chk]][cse-loc] | Basic types/support for Character Sets, Encodings, and Character Set Encodings
 | [ChrBase][chrbase-loc] | [![][chrbase-rel]][chrbase-loc] | [![][chrbase-dat]][chrbase-loc] | [![][chrbase-pkg]][pkg-url] | [![][chrbase-chk]][chrbase-loc] | `Chr{CharSet,CodeUnitType}` type and support
-| [MurmurHash3][mh3-loc] | [![][mh3-rel]][mh3-loc] | [![][mh3-dat]][mh3-loc] | [![][mh3-pkg]][pkg-url] | [![][mh3-chk]][mh3-loc] | Pure Julia implementation of MurmurHash3
 | [PCRE2][pcre2-loc] | [![][pcre2-rel]][pcre2-loc] | [![][pcre2-dat]][pcre2-loc] | [![][pcre2-pkg]][pkg-url] | [![][pcre2-chk]][pcre2-loc] | `PCRE2` library support
 | [Format][format-loc] | [![][format-rel]][format-loc] | [![][format-dat]][format-loc] | [![][format-pkg]][pkg-url] | [![][format-chk]][format-loc] | Python/C style formatting (based on [Formatting](https://github.com/JuliaIO/Formatting.jl))
 | [StrBase][strbase-loc] | [![][strbase-rel]][strbase-loc] | [![][strbase-dat]][strbase-loc] | [![][strbase-pkg]][pkg-url] | [![][strbase-chk]][strbase-loc] | `Str{CSE, Hash, SubSet, Cache}` type
@@ -96,12 +95,6 @@ or pointers to such (such as a way to get lots of tweets, to test mixed text and
 [mit-rel]: https://img.shields.io/github/release/JuliaString/ModuleInterfaceTools.jl.svg?label="."
 [mit-dat]: https://img.shields.io/github/release-date/JuliaString/ModuleInterfaceTools.jl.svg?label="."
 [mit-chk]: https://img.shields.io/github/checks-status/JuliaString/ModuleInterfaceTools.jl/master
-
-[mh3-loc]:     https://github.com/JuliaString/MurmurHash3.jl
-[mh3-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/M/MurmurHash3.svg
-[mh3-rel]:     https://img.shields.io/github/release/JuliaString/MurmurHash3.jl.svg?label="."
-[mh3-dat]:     https://img.shields.io/github/release-date/JuliaString/MurmurHash3.jl.svg?label="."
-[mh3-chk]:     https://img.shields.io/github/checks-status/JuliaString/MurmurHash3.jl/master
 
 [pcre2-loc]:     https://github.com/JuliaString/PCRE2.jl
 [pcre2-pkg]:     https://juliaci.github.io/NanosoldierReports/pkgeval_badges/P/PCRE2.svg

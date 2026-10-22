@@ -22,8 +22,6 @@ StrEntities = "42b7a45b-8021-5b99-aff5-7432580bee1c"
 Format      = "1fa38f19-a742-5d3f-a2b9-30dd87b9d5f8" # 9wb580eyjv4k3iej
 StrFormat   = "b5087856-efa9-5a6d-8e6f-97303a7af894"
 
-MurmurHash3 = "b10b62ed-fbae-5ea5-b934-abaf0477b71d"
-
 StrAPI      = "69e7dfc3-c4d0-5e14-8d95-d6042a05b383"
 ChrBase     = "c13fa7b1-fb91-5a40-8b3c-3aad7fd30002"
 StrBase     = "e79e7a6a-7bb1-5a4d-9d64-da657b06f53a"
@@ -54,7 +52,6 @@ StrFormat = "^1.0.1"
 StrRegex = "^1.1.1"
 StrLiterals = "^1.1"
 ChrBase = "^1.0.3"
-MurmurHash3 = "^1.2"
 Emoji_Entities = "^1.0.3"
 HTML_Entities = "^1.0.1"
 LaTeX_Entities = "^1.0.2"
